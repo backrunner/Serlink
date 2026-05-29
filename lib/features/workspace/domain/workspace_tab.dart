@@ -4,7 +4,7 @@ import '../../../core/failure/app_failure.dart';
 import '../../../core/ids/entity_id.dart';
 import '../../terminal/application/terminal_display_settings.dart';
 
-enum WorkspaceArea { hosts, sessions, files, transfers, snippets, settings }
+enum WorkspaceArea { hosts, sessions, transfers, snippets, settings }
 
 enum WorkspaceTabKind { terminal, sftp, localTerminal }
 

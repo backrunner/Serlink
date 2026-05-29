@@ -10,18 +10,23 @@ class EncryptedTransferTaskRepository implements TransferTaskRepository {
   EncryptedTransferTaskRepository({
     required VaultService vault,
     required VaultRecordRepository records,
+  }) : this.lazy(vault: () => vault, records: records);
+
+  EncryptedTransferTaskRepository.lazy({
+    required VaultService Function() vault,
+    required VaultRecordRepository records,
   }) : this._(vault, records);
 
   EncryptedTransferTaskRepository._(this._vault, this._records);
 
   static const recordType = 'transfer_task';
 
-  final VaultService _vault;
+  final VaultService Function() _vault;
   final VaultRecordRepository _records;
 
   @override
   Future<void> save(TransferTask task) async {
-    final envelope = await _vault.encryptRecord(
+    final envelope = await _vault().encryptRecord(
       id: _recordId(task.id),
       type: recordType,
       plaintext: utf8.encode(jsonEncode(task.toJson())),
@@ -34,7 +39,7 @@ class EncryptedTransferTaskRepository implements TransferTaskRepository {
     final envelopes = await _records.list(type: recordType);
     final tasks = <TransferTask>[];
     for (final envelope in envelopes) {
-      final plaintext = await _vault.decryptRecord(envelope);
+      final plaintext = await _vault().decryptRecord(envelope);
       tasks.add(
         TransferTask.fromJson(
           jsonDecode(utf8.decode(plaintext)) as Map<String, Object?>,

@@ -2,6 +2,7 @@
 
 #include <dwmapi.h>
 #include <flutter_windows.h>
+#include <windowsx.h>
 
 #include "resource.h"
 
@@ -16,7 +17,10 @@ namespace {
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
+constexpr DWORD kDwmWindowCornerPreference = 33;
+constexpr int kDwmWindowCornerPreferenceRound = 2;
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
+constexpr int kWindowCornerRadius = 12;
 
 /// Registry key for app theme preference.
 ///
@@ -35,6 +39,104 @@ using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 // scale factor
 int Scale(int source, double scale_factor) {
   return static_cast<int>(source * scale_factor);
+}
+
+double GetWindowScaleFactor(HWND hwnd) {
+  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+  UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+  return dpi / 96.0;
+}
+
+void UpdateWindowShape(HWND hwnd) {
+  if (IsZoomed(hwnd)) {
+    SetWindowRgn(hwnd, nullptr, TRUE);
+    return;
+  }
+
+  RECT window_rect;
+  if (!GetWindowRect(hwnd, &window_rect)) {
+    return;
+  }
+
+  const int width = window_rect.right - window_rect.left;
+  const int height = window_rect.bottom - window_rect.top;
+  const int radius = Scale(kWindowCornerRadius, GetWindowScaleFactor(hwnd));
+  HRGN rounded_region =
+      CreateRoundRectRgn(0, 0, width + 1, height + 1, radius, radius);
+  if (rounded_region != nullptr &&
+      SetWindowRgn(hwnd, rounded_region, TRUE) == 0) {
+    DeleteObject(rounded_region);
+  }
+}
+
+LRESULT HitTestResizeBorder(HWND hwnd, LPARAM lparam) {
+  if (IsZoomed(hwnd)) {
+    return HTCLIENT;
+  }
+
+  RECT window_rect;
+  if (!GetWindowRect(hwnd, &window_rect)) {
+    return HTCLIENT;
+  }
+
+  const POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+  const int border_width =
+      GetSystemMetrics(SM_CXFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
+  const int border_height =
+      GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
+
+  const bool left = point.x >= window_rect.left &&
+                    point.x < window_rect.left + border_width;
+  const bool right = point.x < window_rect.right &&
+                     point.x >= window_rect.right - border_width;
+  const bool top = point.y >= window_rect.top &&
+                   point.y < window_rect.top + border_height;
+  const bool bottom = point.y < window_rect.bottom &&
+                      point.y >= window_rect.bottom - border_height;
+
+  if (top && left) {
+    return HTTOPLEFT;
+  }
+  if (top && right) {
+    return HTTOPRIGHT;
+  }
+  if (bottom && left) {
+    return HTBOTTOMLEFT;
+  }
+  if (bottom && right) {
+    return HTBOTTOMRIGHT;
+  }
+  if (left) {
+    return HTLEFT;
+  }
+  if (right) {
+    return HTRIGHT;
+  }
+  if (top) {
+    return HTTOP;
+  }
+  if (bottom) {
+    return HTBOTTOM;
+  }
+  return HTCLIENT;
+}
+
+void ApplyMaximizedBounds(HWND hwnd, LPARAM lparam) {
+  auto* min_max_info = reinterpret_cast<MINMAXINFO*>(lparam);
+  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+
+  MONITORINFO monitor_info;
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (!GetMonitorInfo(monitor, &monitor_info)) {
+    return;
+  }
+
+  const RECT work_area = monitor_info.rcWork;
+  const RECT monitor_area = monitor_info.rcMonitor;
+  min_max_info->ptMaxPosition.x = work_area.left - monitor_area.left;
+  min_max_info->ptMaxPosition.y = work_area.top - monitor_area.top;
+  min_max_info->ptMaxSize.x = work_area.right - work_area.left;
+  min_max_info->ptMaxSize.y = work_area.bottom - work_area.top;
 }
 
 // Dynamically loads the |EnableNonClientDpiScaling| from the User32 module.
@@ -134,8 +236,10 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
+  const DWORD window_style =
+      (WS_OVERLAPPEDWINDOW & ~WS_CAPTION) | WS_CLIPCHILDREN;
   HWND window = CreateWindow(
-      window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
+      window_class, title.c_str(), window_style,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
@@ -145,6 +249,7 @@ bool Win32Window::Create(const std::wstring& title,
   }
 
   UpdateTheme(window);
+  UpdateWindowShape(window);
 
   return OnCreate();
 }
@@ -179,6 +284,16 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_NCCALCSIZE:
+      return 0;
+
+    case WM_NCHITTEST:
+      return HitTestResizeBorder(hwnd, lparam);
+
+    case WM_GETMINMAXINFO:
+      ApplyMaximizedBounds(hwnd, lparam);
+      return 0;
+
     case WM_DESTROY:
       window_handle_ = nullptr;
       Destroy();
@@ -194,6 +309,7 @@ Win32Window::MessageHandler(HWND hwnd,
 
       SetWindowPos(hwnd, nullptr, newRectSize->left, newRectSize->top, newWidth,
                    newHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+      UpdateWindowShape(hwnd);
 
       return 0;
     }
@@ -204,8 +320,13 @@ Win32Window::MessageHandler(HWND hwnd,
         MoveWindow(child_content_, rect.left, rect.top, rect.right - rect.left,
                    rect.bottom - rect.top, TRUE);
       }
+      UpdateWindowShape(hwnd);
       return 0;
     }
+
+    case WM_EXITSIZEMOVE:
+      UpdateWindowShape(hwnd);
+      return 0;
 
     case WM_ACTIVATE:
       if (child_content_ != nullptr) {
@@ -285,4 +406,8 @@ void Win32Window::UpdateTheme(HWND const window) {
     DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE,
                           &enable_dark_mode, sizeof(enable_dark_mode));
   }
+
+  const int corner_preference = kDwmWindowCornerPreferenceRound;
+  DwmSetWindowAttribute(window, kDwmWindowCornerPreference, &corner_preference,
+                        sizeof(corner_preference));
 }

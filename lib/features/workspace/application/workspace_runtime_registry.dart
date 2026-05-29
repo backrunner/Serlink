@@ -19,11 +19,13 @@ class WorkspaceRuntimeRegistry {
   Terminal createTerminal({
     required SessionId sessionId,
     required String title,
+    String preparingMessage = 'Connection runtime is preparing this tab.',
     bool echoInput = false,
+    int maxLines = 10000,
   }) {
-    final terminal = Terminal(maxLines: 10000);
+    final terminal = Terminal(maxLines: maxLines);
     terminal.write('Serlink $title\r\n');
-    terminal.write('Connection runtime is preparing this tab.\r\n\r\n');
+    terminal.write('$preparingMessage\r\n\r\n');
     if (echoInput) {
       terminal.write(r'$ ');
       terminal.onOutput = (data) {

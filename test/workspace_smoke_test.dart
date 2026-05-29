@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/app/app_dependencies.dart';
@@ -23,8 +24,25 @@ void main() {
     final sshService = _FakeSshSessionService();
     final transferQueue = TransferQueueController();
     final secretStore = InMemorySecretStore();
+    String? copiedRecoveryKey;
     addTearDown(database.close);
     addTearDown(transferQueue.dispose);
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          final arguments = call.arguments as Map<Object?, Object?>;
+          copiedRecoveryKey = arguments['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
 
     await tester.pumpWidget(
       ProviderScope(
@@ -54,7 +72,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Recovery Key'), findsOneWidget);
+    expect(find.byKey(const ValueKey('recovery-key-warning')), findsOneWidget);
+    expect(find.textContaining('shown only once'), findsOneWidget);
+    expect(find.textContaining('cannot retrieve it'), findsOneWidget);
+    expect(find.text('Copy Recovery Key'), findsOneWidget);
     expect(find.text('I have saved it'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('recovery-key-copy-button')));
+    await tester.pumpAndSettle();
+    expect(copiedRecoveryKey, startsWith('SRLK-RK1-'));
+    expect(find.text('Copied'), findsOneWidget);
 
     await tester.tap(find.text('I have saved it'));
     await tester.pumpAndSettle();
@@ -64,9 +91,15 @@ void main() {
       find.text('Import SSH config or add hosts to start a session.'),
       findsOneWidget,
     );
+    expect(find.text('Files'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('workspace-search-field')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('workspace-search-field')), findsNothing);
     await tester.drag(find.byType(ListView), const Offset(0, -260));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.widgetWithText(TextButton, 'Configure'));
@@ -92,6 +125,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Edit'), findsOneWidget);
     expect(find.textContaining('dav.local/serlink'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-data-exchange-button')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Import / Export'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('settings-data-exchange-button')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Export OpenSSH config'), findsOneWidget);
+    expect(find.text('Export identity metadata'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('data-exchange-close-button')));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Hosts'));
     await tester.pumpAndSettle();
@@ -202,6 +248,15 @@ void main() {
     await tester.tap(find.byTooltip('Open SFTP tab'));
     await tester.pumpAndSettle();
     expect(find.text('app.env'), findsOneWidget);
+    expect(find.text('.hidden.env'), findsNothing);
+    expect(find.textContaining('deploy:ops'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('sftp-hidden-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('.hidden.env'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('sftp-hidden-toggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('.hidden.env'), findsNothing);
 
     await tester.tap(find.text('app.env'));
     await tester.pumpAndSettle();
@@ -410,12 +465,26 @@ class _FakeShellSession implements SshShellSession {
 
 class _MutableFakeSftpConnection implements SftpConnection {
   final Map<String, SftpEntry> _entries = {
-    '/app.env': const SftpEntry(
+    '/app.env': SftpEntry(
       name: 'app.env',
       path: '/app.env',
       type: SftpEntryType.file,
       size: 2400,
-      permissions: SftpPermissions('0640'),
+      modifiedAt: DateTime.utc(2026, 1, 2, 3, 4),
+      permissions: const SftpPermissions('0640'),
+      owner: 'deploy',
+      group: 'ops',
+    ),
+    '/.hidden.env': SftpEntry(
+      name: '.hidden.env',
+      path: '/.hidden.env',
+      type: SftpEntryType.file,
+      size: 128,
+      modifiedAt: DateTime.utc(2026, 1, 2, 3, 5),
+      permissions: const SftpPermissions('0600'),
+      owner: 'deploy',
+      group: 'ops',
+      isHidden: true,
     ),
   };
   final Map<String, String> _fileContents = {'/app.env': 'PORT=8080\n'};

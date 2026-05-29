@@ -23,9 +23,26 @@ void main() {
       expect(profile.environment.containsKey('SERLINK_SECRET'), isFalse);
     });
 
-    test('falls back to bash on Unix when SHELL is missing', () {
+    test('uses login zsh on macOS even when SHELL points elsewhere', () {
       final profile = defaultLocalShellProfile(
         operatingSystem: 'macos',
+        environment: const {
+          'SHELL': '/usr/local/bin/fish',
+          'HOME': '/Users/ops',
+        },
+        fileExists: (path) =>
+            path == '/bin/zsh' || path == '/usr/local/bin/fish',
+      );
+
+      expect(profile.executable, '/bin/zsh');
+      expect(profile.arguments, const ['-l', '-i']);
+      expect(profile.workingDirectory, '/Users/ops');
+      expect(profile.environment['SHELL'], '/bin/zsh');
+    });
+
+    test('falls back to bash on Unix when SHELL is missing', () {
+      final profile = defaultLocalShellProfile(
+        operatingSystem: 'linux',
         environment: const {'HOME': '/Users/ops'},
         fileExists: (path) => path == '/bin/bash',
       );

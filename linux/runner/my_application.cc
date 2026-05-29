@@ -19,39 +19,96 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
 
+static gboolean is_window_maximized(GtkWindow* window) {
+  GdkWindow* gdk_window = gtk_widget_get_window(GTK_WIDGET(window));
+  if (gdk_window == nullptr) {
+    return FALSE;
+  }
+  return (gdk_window_get_state(gdk_window) & GDK_WINDOW_STATE_MAXIMIZED) != 0;
+}
+
+static FlMethodResponse* success_response(FlValue* value = nullptr) {
+  return FL_METHOD_RESPONSE(fl_method_success_response_new(value));
+}
+
+static void window_method_call_cb(FlMethodChannel* channel,
+                                  FlMethodCall* method_call,
+                                  gpointer user_data) {
+  (void)channel;
+  GtkWindow* window = GTK_WINDOW(user_data);
+  const gchar* method = fl_method_call_get_name(method_call);
+  g_autoptr(FlMethodResponse) response = nullptr;
+
+  if (g_strcmp0(method, "minimize") == 0) {
+    gtk_window_iconify(window);
+    response = success_response();
+  } else if (g_strcmp0(method, "toggleMaximize") == 0) {
+    if (is_window_maximized(window)) {
+      gtk_window_unmaximize(window);
+    } else {
+      gtk_window_maximize(window);
+    }
+    g_autoptr(FlValue) maximized =
+        fl_value_new_bool(is_window_maximized(window));
+    response = success_response(maximized);
+  } else if (g_strcmp0(method, "isMaximized") == 0) {
+    g_autoptr(FlValue) maximized =
+        fl_value_new_bool(is_window_maximized(window));
+    response = success_response(maximized);
+  } else if (g_strcmp0(method, "close") == 0) {
+    gtk_window_close(window);
+    response = success_response();
+  } else if (g_strcmp0(method, "startDrag") == 0) {
+    GdkDisplay* display = gtk_widget_get_display(GTK_WIDGET(window));
+    GdkSeat* seat = gdk_display_get_default_seat(display);
+    GdkDevice* pointer = seat == nullptr ? nullptr : gdk_seat_get_pointer(seat);
+    gint x_root = 0;
+    gint y_root = 0;
+    if (pointer != nullptr) {
+      gdk_device_get_position(pointer, nullptr, &x_root, &y_root);
+    }
+    gtk_window_begin_move_drag(window, 1, x_root, y_root,
+                               gtk_get_current_event_time());
+    response = success_response();
+  } else {
+    response =
+        FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
+  }
+
+  fl_method_call_respond(method_call, response, nullptr);
+}
+
+static void register_window_channel(GtkWindow* window, FlView* view) {
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  FlMethodChannel* channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+      "serlink/window", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(channel, window_method_call_cb,
+                                            window, nullptr);
+  g_object_set_data_full(G_OBJECT(window), "serlink-window-channel", channel,
+                         g_object_unref);
+}
+
+static void configure_window_chrome(GtkWindow* window) {
+  gtk_window_set_decorated(window, FALSE);
+  gtk_window_set_resizable(window, TRUE);
+
+  GdkScreen* screen = gtk_window_get_screen(window);
+  GdkVisual* visual = gdk_screen_get_rgba_visual(screen);
+  if (visual != nullptr) {
+    gtk_widget_set_visual(GTK_WIDGET(window), visual);
+    gtk_widget_set_app_paintable(GTK_WIDGET(window), TRUE);
+  }
+}
+
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
-  // Use a header bar when running in GNOME as this is the common style used
-  // by applications and is the setup most users will be using (e.g. Ubuntu
-  // desktop).
-  // If running on X and not using GNOME then just use a traditional title bar
-  // in case the window manager does more exotic layout, e.g. tiling.
-  // If running on Wayland assume the header bar will work (may need changing
-  // if future cases occur).
-  gboolean use_header_bar = TRUE;
-#ifdef GDK_WINDOWING_X11
-  GdkScreen* screen = gtk_window_get_screen(window);
-  if (GDK_IS_X11_SCREEN(screen)) {
-    const gchar* wm_name = gdk_x11_screen_get_window_manager_name(screen);
-    if (g_strcmp0(wm_name, "GNOME Shell") != 0) {
-      use_header_bar = FALSE;
-    }
-  }
-#endif
-  if (use_header_bar) {
-    GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
-    gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "serlink");
-    gtk_header_bar_set_show_close_button(header_bar, TRUE);
-    gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
-  } else {
-    gtk_window_set_title(window, "serlink");
-  }
-
+  configure_window_chrome(window);
+  gtk_window_set_title(window, "serlink");
   gtk_window_set_default_size(window, 1280, 720);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
@@ -62,10 +119,11 @@ static void my_application_activate(GApplication* application) {
   GdkRGBA background_color;
   // Background defaults to black, override it here if necessary, e.g. #00000000
   // for transparent.
-  gdk_rgba_parse(&background_color, "#000000");
+  gdk_rgba_parse(&background_color, "#00000000");
   fl_view_set_background_color(view, &background_color);
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
+  register_window_channel(window, view);
 
   // Show the window when Flutter renders.
   // Requires the view to be realized so we can start rendering.

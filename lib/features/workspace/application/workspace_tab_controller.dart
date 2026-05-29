@@ -88,11 +88,18 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     state = state.copyWith(area: area);
   }
 
-  void openTerminal(HostSummary host) {
+  Future<void> openTerminal(HostSummary host) async {
+    final hostSettings = await _readTerminalDisplaySettingsForHost(host.id);
+    final effectiveSettings =
+        hostSettings ?? await _readGlobalTerminalDisplaySettings();
     final sessionId = _newSessionId();
     ref
         .read(workspaceRuntimeRegistryProvider)
-        .createTerminal(sessionId: sessionId, title: host.displayName);
+        .createTerminal(
+          sessionId: sessionId,
+          title: host.displayName,
+          maxLines: effectiveSettings.scrollbackLines,
+        );
     final tab = _open(
       hostId: host.id,
       title: host.displayName,
@@ -102,17 +109,17 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
             sessionId: sessionId,
             title: host.displayName,
             lifecycle: SessionLifecycleState.resolvingProfile,
+            displaySettings: hostSettings,
           ),
         ],
       ),
       lifecycle: SessionLifecycleState.resolvingProfile,
       switchArea: WorkspaceArea.sessions,
     );
-    unawaited(_loadTerminalDisplaySettings(tab.id, host.id));
     unawaited(_connect(tab, _nextConnectionToken(tab.id)));
   }
 
-  void openTerminalFromTab(WorkspaceTabId tabId) {
+  Future<void> openTerminalFromTab(WorkspaceTabId tabId) async {
     final source = state.tabs
         .where((candidate) => candidate.id == tabId)
         .firstOrNull;
@@ -121,10 +128,17 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       return;
     }
     final title = _baseTabTitle(source.title);
+    final hostSettings = await _readTerminalDisplaySettingsForHost(hostId);
+    final effectiveSettings =
+        hostSettings ?? await _readGlobalTerminalDisplaySettings();
     final sessionId = _newSessionId();
     ref
         .read(workspaceRuntimeRegistryProvider)
-        .createTerminal(sessionId: sessionId, title: title);
+        .createTerminal(
+          sessionId: sessionId,
+          title: title,
+          maxLines: effectiveSettings.scrollbackLines,
+        );
     final tab = _open(
       hostId: hostId,
       title: title,
@@ -134,13 +148,13 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
             sessionId: sessionId,
             title: title,
             lifecycle: SessionLifecycleState.resolvingProfile,
+            displaySettings: hostSettings,
           ),
         ],
       ),
       lifecycle: SessionLifecycleState.resolvingProfile,
       switchArea: WorkspaceArea.sessions,
     );
-    unawaited(_loadTerminalDisplaySettings(tab.id, hostId));
     unawaited(_connect(tab, _nextConnectionToken(tab.id)));
   }
 
@@ -151,7 +165,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       title: '${host.displayName} /',
       content: SftpTabContent(sessionId: sessionId, currentPath: '/'),
       lifecycle: SessionLifecycleState.resolvingProfile,
-      switchArea: WorkspaceArea.files,
+      switchArea: WorkspaceArea.sessions,
     );
     unawaited(_connect(tab, _nextConnectionToken(tab.id)));
   }
@@ -170,21 +184,27 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       title: '${_baseTabTitle(source.title)} /',
       content: SftpTabContent(sessionId: sessionId, currentPath: '/'),
       lifecycle: SessionLifecycleState.resolvingProfile,
-      switchArea: WorkspaceArea.files,
+      switchArea: WorkspaceArea.sessions,
     );
     unawaited(_connect(tab, _nextConnectionToken(tab.id)));
   }
 
-  void openTerminalAndSftp(HostSummary host) {
-    openTerminal(host);
+  Future<void> openTerminalAndSftp(HostSummary host) async {
+    await openTerminal(host);
     openSftp(host);
   }
 
-  void openLocalTerminal() {
+  Future<void> openLocalTerminal() async {
+    final settings = await _readGlobalTerminalDisplaySettings();
     final sessionId = _newSessionId();
     ref
         .read(workspaceRuntimeRegistryProvider)
-        .createTerminal(sessionId: sessionId, title: 'Local Shell');
+        .createTerminal(
+          sessionId: sessionId,
+          title: 'Local Shell',
+          preparingMessage: 'Local shell is starting.',
+          maxLines: settings.scrollbackLines,
+        );
     final tab = _open(
       hostId: null,
       title: 'Local Shell',
@@ -343,9 +363,16 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     }
     final paneTitle = tab.title;
     final sessionId = _newSessionId();
+    final effectiveSettings =
+        content.activePaneState?.displaySettings ??
+        _globalTerminalDisplaySettingsSnapshot();
     ref
         .read(workspaceRuntimeRegistryProvider)
-        .createTerminal(sessionId: sessionId, title: paneTitle);
+        .createTerminal(
+          sessionId: sessionId,
+          title: paneTitle,
+          maxLines: effectiveSettings.scrollbackLines,
+        );
     final next = (tab.content as TerminalTabContent).copyWith(
       panes: [
         ...content.panes,
@@ -515,21 +542,30 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     });
   }
 
-  Future<void> _loadTerminalDisplaySettings(
-    WorkspaceTabId tabId,
+  Future<TerminalDisplaySettings?> _readTerminalDisplaySettingsForHost(
     HostId hostId,
   ) async {
     try {
-      final settings = await ref
+      return await ref
           .read(terminalHostDisplaySettingsRepositoryProvider)
           .readForHost(hostId);
-      if (settings == null) {
-        return;
-      }
-      _replaceTerminalDisplaySettings(tabId, settings);
     } on Object {
       // Host-specific display settings are best effort. A locked vault or
       // malformed profile must never interrupt the connection attempt.
+      return null;
+    }
+  }
+
+  TerminalDisplaySettings _globalTerminalDisplaySettingsSnapshot() {
+    return ref.read(terminalDisplaySettingsProvider).value ??
+        const TerminalDisplaySettings();
+  }
+
+  Future<TerminalDisplaySettings> _readGlobalTerminalDisplaySettings() async {
+    try {
+      return await ref.read(terminalDisplaySettingsProvider.future);
+    } on Object {
+      return const TerminalDisplaySettings();
     }
   }
 
@@ -846,12 +882,12 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         shell.done
             .then((_) {
               if (_isCurrent(tab.id, token)) {
-                markDisconnected(tab.id);
+                _markLocalTerminalExited(tab.id);
               }
             })
             .catchError((Object error) {
               if (_isCurrent(tab.id, token)) {
-                _markFailed(tab.id, error);
+                _markLocalTerminalFailed(tab.id, error);
               }
             }),
       );
@@ -861,9 +897,9 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       if (_isCurrent(tab.id, token)) {
         runtime.writeTerminal(
           sessionId,
-          'Local terminal failed: ${_failureFrom(error).message}\r\n',
+          'Local terminal failed: ${_localTerminalFailureFrom(error).message}\r\n',
         );
-        _markFailed(tab.id, error);
+        _markLocalTerminalFailed(tab.id, error);
       }
     }
   }
@@ -904,7 +940,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
             })
             .catchError((Object error) {
               if (_isCurrent(tab.id, token)) {
-                _markTerminalPaneFailed(tab.id, paneIndex, error);
+                _markLocalTerminalPaneFailed(tab.id, paneIndex, error);
               }
             }),
       );
@@ -914,9 +950,9 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       if (_isCurrent(tab.id, token)) {
         runtime.writeTerminal(
           pane.sessionId,
-          'Local terminal failed: ${_failureFrom(error).message}\r\n',
+          'Local terminal failed: ${_localTerminalFailureFrom(error).message}\r\n',
         );
-        _markTerminalPaneFailed(tab.id, paneIndex, error);
+        _markLocalTerminalPaneFailed(tab.id, paneIndex, error);
       }
     }
   }
@@ -965,6 +1001,47 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     );
   }
 
+  void _markLocalTerminalExited(WorkspaceTabId tabId) {
+    if (!ref.mounted) {
+      return;
+    }
+    final tab = state.tabs
+        .where((candidate) => candidate.id == tabId)
+        .firstOrNull;
+    if (tab == null) {
+      return;
+    }
+    _replaceTab(
+      tab.copyWith(
+        lifecycle: SessionLifecycleState.disconnected,
+        failure: const AppFailure(
+          code: 'local_terminal.exited',
+          message: 'Local shell exited. Restart opens a new shell.',
+        ),
+        lastActivityAt: DateTime.now(),
+      ),
+    );
+  }
+
+  void _markLocalTerminalFailed(WorkspaceTabId tabId, Object error) {
+    if (!ref.mounted) {
+      return;
+    }
+    final tab = state.tabs
+        .where((candidate) => candidate.id == tabId)
+        .firstOrNull;
+    if (tab == null) {
+      return;
+    }
+    _replaceTab(
+      tab.copyWith(
+        lifecycle: SessionLifecycleState.failed,
+        failure: _localTerminalFailureFrom(error),
+        lastActivityAt: DateTime.now(),
+      ),
+    );
+  }
+
   void _markTerminalPaneDisconnected(WorkspaceTabId tabId, int paneIndex) {
     _setTerminalPaneLifecycle(
       tabId,
@@ -987,6 +1064,19 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       paneIndex,
       SessionLifecycleState.failed,
       failure: _failureFrom(error),
+    );
+  }
+
+  void _markLocalTerminalPaneFailed(
+    WorkspaceTabId tabId,
+    int paneIndex,
+    Object error,
+  ) {
+    _setTerminalPaneLifecycle(
+      tabId,
+      paneIndex,
+      SessionLifecycleState.failed,
+      failure: _localTerminalFailureFrom(error),
     );
   }
 
@@ -1103,6 +1193,20 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       _ => AppFailure(
         code: 'connection.failed',
         message: 'Connection failed.',
+        diagnostic: error.toString(),
+      ),
+    };
+  }
+
+  AppFailure _localTerminalFailureFrom(Object error) {
+    return switch (error) {
+      LocalTerminalException(:final code, :final message) => AppFailure(
+        code: code,
+        message: message,
+      ),
+      _ => AppFailure(
+        code: 'local_terminal.failed',
+        message: 'Local terminal failed.',
         diagnostic: error.toString(),
       ),
     };

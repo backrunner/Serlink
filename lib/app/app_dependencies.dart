@@ -3,9 +3,14 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/serlink_database.dart';
+import '../core/logging/redactor.dart';
+import '../core/runtime/app_profile_lock.dart';
 import '../features/diagnostics/application/diagnostic_bundle_service.dart';
 import '../features/hosts/application/host_repository.dart';
 import '../features/identities/application/identity_repository.dart';
+import '../features/import_export/application/identity_metadata_export_service.dart';
+import '../features/import_export/application/host_metadata_export_service.dart';
+import '../features/import_export/application/open_ssh_config_export_service.dart';
 import '../features/import_export/application/known_hosts_import_service.dart';
 import '../features/import_export/application/open_ssh_certificate_import_service.dart';
 import '../features/import_export/application/open_ssh_config_import_service.dart';
@@ -28,6 +33,7 @@ import '../features/ssh/application/encrypted_connection_profile_resolver.dart';
 import '../features/ssh/application/host_key_verification_service.dart';
 import '../features/ssh/application/known_host_repository.dart';
 import '../features/terminal/application/terminal_display_settings.dart';
+import '../features/terminal/application/terminal_font_discovery.dart';
 import '../features/transfers/application/transfer_queue_controller.dart';
 import '../features/vault/application/in_memory_vault_service.dart';
 import '../features/vault/application/vault_record_repository.dart';
@@ -102,6 +108,25 @@ final vaultBackupServiceProvider = Provider<VaultBackupService>((ref) {
     records: ref.watch(vaultRecordRepositoryProvider),
   );
 });
+
+final hostMetadataExportServiceProvider = Provider<HostMetadataExportService>((
+  ref,
+) {
+  return HostMetadataExportService(hosts: ref.watch(hostRepositoryProvider));
+});
+
+final openSshConfigExportServiceProvider = Provider<OpenSshConfigExportService>(
+  (ref) {
+    return OpenSshConfigExportService(hosts: ref.watch(hostRepositoryProvider));
+  },
+);
+
+final identityMetadataExportServiceProvider =
+    Provider<IdentityMetadataExportService>((ref) {
+      return IdentityMetadataExportService(
+        identities: ref.watch(identityRepositoryProvider),
+      );
+    });
 
 final knownHostsImportServiceProvider = Provider<KnownHostsImportService>((
   ref,
@@ -433,6 +458,14 @@ final terminalHostDisplaySettingsRepositoryProvider =
       return ref.watch(encryptedTerminalDisplaySettingsRepositoryProvider);
     });
 
+final terminalFontDiscoveryProvider = Provider<TerminalFontDiscovery>((ref) {
+  return const TerminalFontDiscovery();
+});
+
+final terminalFontCatalogProvider = FutureProvider<TerminalFontCatalog>((ref) {
+  return ref.watch(terminalFontDiscoveryProvider).discover();
+});
+
 final terminalDisplaySettingsProvider =
     AsyncNotifierProvider<
       TerminalDisplaySettingsController,
@@ -444,10 +477,19 @@ class TerminalDisplaySettingsController
   @override
   Future<TerminalDisplaySettings> build() async {
     try {
-      return await ref
-              .watch(terminalDisplaySettingsRepositoryProvider)
-              .read() ??
-          const TerminalDisplaySettings();
+      final saved = await ref
+          .watch(terminalDisplaySettingsRepositoryProvider)
+          .read();
+      if (saved != null) {
+        return saved;
+      }
+    } on Object {
+      // A locked or unavailable vault should not block terminal startup.
+    }
+
+    try {
+      final catalog = await ref.watch(terminalFontCatalogProvider.future);
+      return TerminalDisplaySettings(fontFamily: catalog.preferredFontFamily);
     } on Object {
       return const TerminalDisplaySettings();
     }
@@ -464,6 +506,20 @@ class TerminalDisplaySettingsController
   void setLineHeight(double lineHeight) {
     _update(
       _current.copyWith(lineHeight: lineHeight.clamp(1.0, 1.5).toDouble()),
+    );
+  }
+
+  void setFontFamily(String fontFamily) {
+    final normalized = fontFamily.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+    _update(_current.copyWith(fontFamily: normalized));
+  }
+
+  void setScrollbackLines(int scrollbackLines) {
+    _update(
+      _current.copyWith(scrollbackLines: scrollbackLines.clamp(1000, 100000)),
     );
   }
 
@@ -721,7 +777,10 @@ String _vaultFailureMessage(Object error) {
   if (error is VaultException) {
     return error.message;
   }
-  return 'Vault operation failed.';
+  if (error is AppProfileLockException) {
+    return 'This Serlink profile is already open in another window.';
+  }
+  return 'Vault operation failed: ${Redactor.redact(error.toString())}';
 }
 
 final encryptedConnectionProfileResolverProvider =

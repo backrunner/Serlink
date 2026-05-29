@@ -246,6 +246,10 @@ void main() {
     state = container.read(workspaceTabControllerProvider);
     expect(state.activeTab!.id, tab.id);
     expect(state.activeTab!.lifecycle, SessionLifecycleState.disconnected);
+    expect(
+      state.activeTab!.failure?.message,
+      'Local shell exited. Restart opens a new shell.',
+    );
 
     controller.reconnect(tab.id);
     await _drainMicrotasks();
@@ -254,6 +258,33 @@ void main() {
     expect(state.activeTab!.id, tab.id);
     expect(state.activeTab!.lifecycle, SessionLifecycleState.connected);
     expect(localTerminal.openShellCount, 2);
+  });
+
+  test('local terminal failures use local shell wording', () async {
+    final container = _container(
+      service: _FakeSshSessionService(),
+      localTerminal: _FailingLocalTerminalService(StateError('pty missing')),
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    controller.openLocalTerminal();
+    await _drainMicrotasks();
+
+    final state = container.read(workspaceTabControllerProvider);
+    final tab = state.activeTab!;
+    final content = tab.content as LocalTerminalTabContent;
+    expect(tab.lifecycle, SessionLifecycleState.failed);
+    expect(tab.failure?.code, 'local_terminal.failed');
+    expect(tab.failure?.message, 'Local terminal failed.');
+    expect(
+      container
+          .read(workspaceRuntimeRegistryProvider)
+          .terminalFor(content.sessionId)!
+          .buffer
+          .getText(),
+      contains('Local terminal failed: Local terminal failed.'),
+    );
   });
 
   test('closing terminal tabs closes split pane sessions', () async {
@@ -405,6 +436,9 @@ void main() {
           terminalHostDisplaySettingsRepositoryProvider.overrideWithValue(
             _FakeTerminalHostDisplaySettingsRepository(),
           ),
+          terminalDisplaySettingsRepositoryProvider.overrideWithValue(
+            _FakeTerminalDisplaySettingsRepository(),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -434,6 +468,7 @@ void main() {
       themeId: SerlinkTerminalThemeId.highContrast,
       fontSize: 16,
       lineHeight: 1.3,
+      scrollbackLines: 60000,
     );
     final profileRepository = _FakeTerminalHostDisplaySettingsRepository({
       _host.id: profile,
@@ -451,6 +486,13 @@ void main() {
     final tab = container.read(workspaceTabControllerProvider).activeTab!;
     final content = tab.content as TerminalTabContent;
     expect(content.primaryPane.displaySettings, profile);
+    expect(
+      container
+          .read(workspaceRuntimeRegistryProvider)
+          .terminalFor(content.primaryPane.sessionId)!
+          .maxLines,
+      60000,
+    );
     expect(profileRepository.readCount, 1);
   });
 
@@ -472,6 +514,7 @@ void main() {
       themeId: SerlinkTerminalThemeId.serlinkLight,
       fontSize: 18,
       lineHeight: 1.25,
+      scrollbackLines: 25000,
     );
 
     controller.saveTerminalDisplaySettingsForHost(tab.id, profile);
@@ -532,6 +575,9 @@ ProviderContainer _container({
       terminalHostDisplaySettingsRepositoryProvider.overrideWithValue(
         terminalProfiles ?? _FakeTerminalHostDisplaySettingsRepository(),
       ),
+      terminalDisplaySettingsRepositoryProvider.overrideWithValue(
+        _FakeTerminalDisplaySettingsRepository(),
+      ),
     ],
   );
 }
@@ -546,6 +592,17 @@ class _FakeLocalTerminalService implements LocalTerminalService {
     final shell = _FakeShellSession();
     shells.add(shell);
     return shell;
+  }
+}
+
+class _FailingLocalTerminalService implements LocalTerminalService {
+  const _FailingLocalTerminalService(this.error);
+
+  final Object error;
+
+  @override
+  Future<SshShellSession> openShell({int columns = 80, int rows = 24}) async {
+    throw error;
   }
 }
 
@@ -747,5 +804,25 @@ class _FakeTerminalHostDisplaySettingsRepository
     TerminalDisplaySettings settings,
   ) async {
     profiles[hostId] = settings;
+  }
+}
+
+class _FakeTerminalDisplaySettingsRepository
+    implements TerminalDisplaySettingsRepository {
+  TerminalDisplaySettings? settings;
+
+  @override
+  Future<void> delete() async {
+    settings = null;
+  }
+
+  @override
+  Future<TerminalDisplaySettings?> read() async {
+    return settings;
+  }
+
+  @override
+  Future<void> save(TerminalDisplaySettings settings) async {
+    this.settings = settings;
   }
 }

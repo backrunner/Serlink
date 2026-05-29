@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_pty/flutter_pty.dart';
@@ -67,8 +68,25 @@ class FlutterPtyShellSession implements SshShellSession {
       return;
     }
     _closed = true;
-    _pty.kill();
-    await done.timeout(const Duration(milliseconds: 750), onTimeout: () {});
+    _pty.kill(ProcessSignal.sighup);
+    if (await _waitForExit(const Duration(milliseconds: 250))) {
+      return;
+    }
+    _pty.kill(ProcessSignal.sigterm);
+    if (await _waitForExit(const Duration(milliseconds: 250))) {
+      return;
+    }
+    _pty.kill(ProcessSignal.sigkill);
+    await _waitForExit(const Duration(milliseconds: 750));
+  }
+
+  Future<bool> _waitForExit(Duration timeout) async {
+    try {
+      await done.timeout(timeout);
+      return true;
+    } on TimeoutException {
+      return false;
+    }
   }
 
   @override

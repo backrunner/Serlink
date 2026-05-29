@@ -11,6 +11,7 @@ import 'package:xterm/xterm.dart';
 import '../../../app/app_dependencies.dart';
 import '../../../core/ids/entity_id.dart';
 import '../../../core/security/local_file_security.dart';
+import '../../../platform/app_window.dart';
 import '../../hosts/application/host_store.dart';
 import '../../hosts/application/host_write_service.dart';
 import '../../hosts/domain/host.dart';
@@ -36,6 +37,7 @@ import '../../sync/domain/webdav_tls_certificate_details.dart';
 import '../../ssh/application/known_host_repository.dart';
 import '../../terminal/application/terminal_buffer_search_controller.dart';
 import '../../terminal/application/terminal_display_settings.dart';
+import '../../terminal/application/terminal_font_discovery.dart';
 import '../../terminal/application/terminal_shortcut_policy.dart';
 import '../../transfers/application/transfer_queue_controller.dart';
 import '../../transfers/domain/transfer_conflict.dart';
@@ -44,6 +46,25 @@ import '../../vault/application/vault_service.dart';
 import '../application/workspace_tab_controller.dart';
 import '../application/workspace_runtime_registry.dart';
 import '../domain/workspace_tab.dart';
+import 'workspace_search.dart';
+
+final _workspaceSearchQueryProvider =
+    NotifierProvider<_WorkspaceSearchQueryController, String>(
+      _WorkspaceSearchQueryController.new,
+    );
+
+class _WorkspaceSearchQueryController extends Notifier<String> {
+  @override
+  String build() => '';
+
+  void setQuery(String query) {
+    state = query;
+  }
+
+  void clear() {
+    state = '';
+  }
+}
 
 class WorkspaceScreen extends ConsumerWidget {
   const WorkspaceScreen({super.key});
@@ -52,6 +73,10 @@ class WorkspaceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(workspaceTabControllerProvider);
     final controller = ref.read(workspaceTabControllerProvider.notifier);
+    final showSearch = _showsWorkspaceSearch(state.area);
+    final showLocalTerminal = _showsLocalTerminalAction(state.area);
+    final showTopBar =
+        showSearch || showLocalTerminal || AppWindow.usesTrailingWindowControls;
 
     return Scaffold(
       body: Row(
@@ -61,8 +86,15 @@ class WorkspaceScreen extends ConsumerWidget {
           Expanded(
             child: Column(
               children: [
-                _TopBar(onOpenLocalTerminal: controller.openLocalTerminal),
-                const Divider(height: 1),
+                if (showTopBar) ...[
+                  _TopBar(
+                    showSearch: showSearch,
+                    searchPlaceholder: _workspaceSearchPlaceholder(state.area),
+                    showLocalTerminal: showLocalTerminal,
+                    onOpenLocalTerminal: controller.openLocalTerminal,
+                  ),
+                  const Divider(height: 1),
+                ],
                 Expanded(child: _MainSurface(state: state)),
               ],
             ),
@@ -71,6 +103,34 @@ class WorkspaceScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+bool _showsWorkspaceSearch(WorkspaceArea area) {
+  return switch (area) {
+    WorkspaceArea.hosts || WorkspaceArea.snippets => true,
+    WorkspaceArea.sessions ||
+    WorkspaceArea.transfers ||
+    WorkspaceArea.settings => false,
+  };
+}
+
+bool _showsLocalTerminalAction(WorkspaceArea area) {
+  return switch (area) {
+    WorkspaceArea.hosts ||
+    WorkspaceArea.sessions ||
+    WorkspaceArea.snippets => true,
+    WorkspaceArea.transfers || WorkspaceArea.settings => false,
+  };
+}
+
+String _workspaceSearchPlaceholder(WorkspaceArea area) {
+  return switch (area) {
+    WorkspaceArea.hosts => 'Search hosts by name, host, user, tag',
+    WorkspaceArea.snippets => 'Search snippets by name, command, tag',
+    WorkspaceArea.sessions => 'Search sessions',
+    WorkspaceArea.transfers => 'Search transfers',
+    WorkspaceArea.settings => 'Search settings',
+  };
 }
 
 class _Sidebar extends StatelessWidget {
@@ -100,12 +160,6 @@ class _Sidebar extends StatelessWidget {
             onTap: () => onSelected(WorkspaceArea.sessions),
           ),
           _NavItem(
-            icon: Icons.folder_outlined,
-            label: 'Files',
-            selected: selected == WorkspaceArea.files,
-            onTap: () => onSelected(WorkspaceArea.files),
-          ),
-          _NavItem(
             icon: Icons.sync_alt_outlined,
             label: 'Transfers',
             selected: selected == WorkspaceArea.transfers,
@@ -124,7 +178,11 @@ class _Sidebar extends StatelessWidget {
             selected: selected == WorkspaceArea.settings,
             onTap: () => onSelected(WorkspaceArea.settings),
           ),
-          const SizedBox(height: 8),
+          if (AppWindow.usesMacStyleChrome) ...[
+            const SizedBox(height: 6),
+            const _SidebarBrandFooter(),
+          ],
+          const SizedBox(height: 10),
         ],
       ),
     );
@@ -136,33 +194,86 @@ class _BrandHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final content = AppWindow.usesMacStyleChrome
+        ? SizedBox(
+            height: 48,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  const _MacWindowControls(),
+                  const SizedBox(width: 12),
+                  const Expanded(child: _WindowDragRegion()),
+                ],
+              ),
+            ),
+          )
+        : Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: const _BrandMark(),
+          );
+
+    if (!AppWindow.usesCustomChrome) {
+      return content;
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanStart: (_) => unawaited(AppWindow.startDrag()),
+      onDoubleTap: () => unawaited(AppWindow.toggleMaximize()),
+      child: content,
+    );
+  }
+}
+
+class _SidebarBrandFooter extends StatelessWidget {
+  const _SidebarBrandFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(18, 5, 18, 2),
+      child: _BrandMark(compact: true),
+    );
+  }
+}
+
+class _BrandMark extends StatelessWidget {
+  const _BrandMark({this.compact = false});
+
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: scheme.primaryContainer,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(
-              Icons.hub_outlined,
-              size: 18,
-              color: scheme.onPrimaryContainer,
-            ),
+    final iconSize = compact ? 24.0 : 28.0;
+    return Row(
+      children: [
+        Container(
+          width: iconSize,
+          height: iconSize,
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer,
+            borderRadius: BorderRadius.circular(compact ? 7 : 8),
           ),
-          const SizedBox(width: 10),
-          Text(
+          child: Icon(
+            Icons.hub_outlined,
+            size: compact ? 15 : 18,
+            color: scheme.onPrimaryContainer,
+          ),
+        ),
+        SizedBox(width: compact ? 9 : 10),
+        Flexible(
+          child: Text(
             'Serlink',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            overflow: TextOverflow.ellipsis,
+            style:
+                (compact
+                        ? Theme.of(context).textTheme.titleSmall
+                        : Theme.of(context).textTheme.titleMedium)
+                    ?.copyWith(fontWeight: FontWeight.w700),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -219,41 +330,362 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.onOpenLocalTerminal});
+class _TopBar extends ConsumerStatefulWidget {
+  const _TopBar({
+    required this.showSearch,
+    required this.searchPlaceholder,
+    required this.showLocalTerminal,
+    required this.onOpenLocalTerminal,
+  });
 
+  final bool showSearch;
+  final String searchPlaceholder;
+  final bool showLocalTerminal;
   final VoidCallback onOpenLocalTerminal;
 
   @override
+  ConsumerState<_TopBar> createState() => _TopBarState();
+}
+
+class _TopBarState extends ConsumerState<_TopBar> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final query = ref.watch(_workspaceSearchQueryProvider);
+    if (_searchController.text != query) {
+      _searchController.value = TextEditingValue(
+        text: query,
+        selection: TextSelection.collapsed(offset: query.length),
+      );
+    }
     return SizedBox(
       height: 48,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
-            SizedBox(
-              width: 280,
-              child: TextField(
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: 'Search hosts, sessions, snippets',
-                  prefixIcon: const Icon(Icons.search, size: 18),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
+            if (widget.showSearch) ...[
+              SizedBox(
+                width: 312,
+                child: TextField(
+                  key: const ValueKey('workspace-search-field'),
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: true,
+                    fillColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.48),
+                    hintText: widget.searchPlaceholder,
+                    prefixIcon: const Icon(Icons.search, size: 18),
+                    suffixIcon: query.trim().isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              _searchController.clear();
+                              ref
+                                  .read(_workspaceSearchQueryProvider.notifier)
+                                  .clear();
+                            },
+                            icon: const Icon(Icons.close, size: 16),
+                          ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 11,
+                    ),
+                    border: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(999)),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(999)),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(999),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  onChanged: (value) {
+                    ref
+                        .read(_workspaceSearchQueryProvider.notifier)
+                        .setQuery(value);
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            const Expanded(child: _WindowDragRegion()),
+            if (widget.showLocalTerminal)
+              Tooltip(
+                message: 'Open local terminal tab',
+                child: IconButton(
+                  onPressed: widget.onOpenLocalTerminal,
+                  icon: const Icon(Icons.terminal_outlined),
+                ),
+              ),
+            if (AppWindow.usesTrailingWindowControls) ...[
+              const SizedBox(width: 6),
+              const _WindowControls(),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MacWindowControls extends StatefulWidget {
+  const _MacWindowControls();
+
+  @override
+  State<_MacWindowControls> createState() => _MacWindowControlsState();
+}
+
+class _MacWindowControlsState extends State<_MacWindowControls> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() {
+        _hovered = true;
+      }),
+      onExit: (_) => setState(() {
+        _hovered = false;
+      }),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MacWindowControlButton(
+            label: 'Close window',
+            color: const Color(0xFFFF5F57),
+            borderColor: const Color(0xFFE0443E),
+            icon: Icons.close_rounded,
+            showIcon: _hovered,
+            onPressed: () => unawaited(AppWindow.close()),
+          ),
+          const SizedBox(width: 8),
+          _MacWindowControlButton(
+            label: 'Minimize window',
+            color: const Color(0xFFFFBD2E),
+            borderColor: const Color(0xFFDEA123),
+            icon: Icons.remove_rounded,
+            showIcon: _hovered,
+            onPressed: () => unawaited(AppWindow.minimize()),
+          ),
+          const SizedBox(width: 8),
+          _MacWindowControlButton(
+            label: 'Zoom window',
+            color: const Color(0xFF28C840),
+            borderColor: const Color(0xFF1DAC2B),
+            icon: Icons.add_rounded,
+            showIcon: _hovered,
+            onPressed: () => unawaited(AppWindow.toggleMaximize()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MacWindowControlButton extends StatelessWidget {
+  const _MacWindowControlButton({
+    required this.label,
+    required this.color,
+    required this.borderColor,
+    required this.icon,
+    required this.showIcon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final Color color;
+  final Color borderColor;
+  final IconData icon;
+  final bool showIcon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onPressed,
+        child: SizedBox.square(
+          dimension: 14,
+          child: Center(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(color: borderColor, width: 0.7),
+              ),
+              child: SizedBox.square(
+                dimension: 12,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 90),
+                  opacity: showIcon ? 1 : 0,
+                  child: Icon(
+                    icon,
+                    size: 8.5,
+                    color: const Color(0xFF4E1111).withValues(alpha: 0.82),
                   ),
                 ),
               ),
             ),
-            const Spacer(),
-            Tooltip(
-              message: 'Open local terminal tab',
-              child: IconButton(
-                onPressed: onOpenLocalTerminal,
-                icon: const Icon(Icons.terminal_outlined),
-              ),
-            ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WindowDragRegion extends StatelessWidget {
+  const _WindowDragRegion();
+
+  @override
+  Widget build(BuildContext context) {
+    if (!AppWindow.usesCustomChrome) {
+      return const SizedBox.shrink();
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanStart: (_) => unawaited(AppWindow.startDrag()),
+      onDoubleTap: () => unawaited(AppWindow.toggleMaximize()),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _WindowControls extends StatefulWidget {
+  const _WindowControls();
+
+  @override
+  State<_WindowControls> createState() => _WindowControlsState();
+}
+
+class _WindowControlsState extends State<_WindowControls> {
+  bool _isMaximized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refreshMaximized());
+  }
+
+  Future<void> _refreshMaximized() async {
+    final maximized = await AppWindow.isMaximized();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isMaximized = maximized;
+    });
+  }
+
+  Future<void> _toggleMaximize() async {
+    final maximized = await AppWindow.toggleMaximize();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isMaximized = maximized;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _WindowControlButton(
+          icon: Icons.remove_rounded,
+          onPressed: () => unawaited(AppWindow.minimize()),
+        ),
+        _WindowControlButton(
+          icon: _isMaximized
+              ? Icons.filter_none_rounded
+              : Icons.crop_square_rounded,
+          onPressed: () => unawaited(_toggleMaximize()),
+        ),
+        _WindowControlButton(
+          icon: Icons.close_rounded,
+          isClose: true,
+          onPressed: () => unawaited(AppWindow.close()),
+        ),
+      ],
+    );
+  }
+}
+
+class _WindowControlButton extends StatefulWidget {
+  const _WindowControlButton({
+    required this.icon,
+    required this.onPressed,
+    this.isClose = false,
+  });
+
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool isClose;
+
+  @override
+  State<_WindowControlButton> createState() => _WindowControlButtonState();
+}
+
+class _WindowControlButtonState extends State<_WindowControlButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final background = _hovered
+        ? widget.isClose
+              ? const Color(0xFFE81123)
+              : scheme.onSurface.withValues(alpha: 0.08)
+        : Colors.transparent;
+    final foreground = _hovered && widget.isClose
+        ? Colors.white
+        : scheme.onSurfaceVariant;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() {
+        _hovered = true;
+      }),
+      onExit: (_) => setState(() {
+        _hovered = false;
+      }),
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: widget.onPressed,
+          child: SizedBox.square(
+            dimension: 34,
+            child: Icon(widget.icon, size: 16, color: foreground),
+          ),
         ),
       ),
     );
@@ -269,8 +701,7 @@ class _MainSurface extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return switch (state.area) {
       WorkspaceArea.hosts => const _HostsSurface(),
-      WorkspaceArea.sessions ||
-      WorkspaceArea.files => _WorkspaceTabs(state: state),
+      WorkspaceArea.sessions => _WorkspaceTabs(state: state),
       WorkspaceArea.transfers => const _TransfersSurface(),
       WorkspaceArea.snippets => const _SnippetsSurface(),
       WorkspaceArea.settings => const _SettingsSurface(),
@@ -285,6 +716,7 @@ class _HostsSurface extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final vaultSession = ref.watch(vaultSessionControllerProvider);
     final controller = ref.read(workspaceTabControllerProvider.notifier);
+    final searchQuery = ref.watch(_workspaceSearchQueryProvider);
 
     return vaultSession.when(
       loading: () => const _PlaceholderSurface(
@@ -305,6 +737,7 @@ class _HostsSurface extends ConsumerWidget {
           error: (error, stackTrace) =>
               _PlaceholderSurface(title: 'Hosts', body: error.toString()),
           data: (hosts) {
+            final filteredHosts = filterHostSummaries(hosts, searchQuery);
             if (hosts.isEmpty) {
               return _HostsEmptyState(
                 onAddHost: () => _showAddHostDialog(context),
@@ -317,30 +750,38 @@ class _HostsSurface extends ConsumerWidget {
                   child: Column(
                     children: [
                       _HostsHeader(
-                        count: hosts.length,
+                        count: filteredHosts.length,
                         onAddHost: () => _showAddHostDialog(context),
                       ),
                       const Divider(height: 1),
                       Expanded(
-                        child: ListView.separated(
-                          padding: const EdgeInsets.all(12),
-                          itemCount: hosts.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(height: 8),
-                          itemBuilder: (context, index) {
-                            final host = hosts[index];
-                            return _HostRow(
-                              host: host,
-                              onTerminal: () => controller.openTerminal(host),
-                              onSftp: () => controller.openSftp(host),
-                              onBoth: () =>
-                                  controller.openTerminalAndSftp(host),
-                              onEdit: () => _showEditHostDialog(context, host),
-                              onDelete: () =>
-                                  _confirmDeleteHost(context, ref, host),
-                            );
-                          },
-                        ),
+                        child: filteredHosts.isEmpty
+                            ? const _PlaceholderSurface(
+                                title: 'No Matches',
+                                body:
+                                    'No hosts match the current workspace search.',
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.all(12),
+                                itemCount: filteredHosts.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final host = filteredHosts[index];
+                                  return _HostRow(
+                                    host: host,
+                                    onTerminal: () =>
+                                        controller.openTerminal(host),
+                                    onSftp: () => controller.openSftp(host),
+                                    onBoth: () =>
+                                        controller.openTerminalAndSftp(host),
+                                    onEdit: () =>
+                                        _showEditHostDialog(context, host),
+                                    onDelete: () =>
+                                        _confirmDeleteHost(context, ref, host),
+                                  );
+                                },
+                              ),
                       ),
                     ],
                   ),
@@ -1279,26 +1720,143 @@ class _RecoveryKeyDialogGateState
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Recovery Key'),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: SelectableText(recoveryKey),
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('I have saved it'),
-            ),
-          ],
-        );
-      },
+      builder: (context) => _RecoveryKeyDialog(recoveryKey: recoveryKey),
     );
     if (!mounted) {
       return;
     }
     ref.read(vaultSessionControllerProvider.notifier).dismissRecoveryKey();
+  }
+}
+
+class _RecoveryKeyDialog extends StatefulWidget {
+  const _RecoveryKeyDialog({required this.recoveryKey});
+
+  final String recoveryKey;
+
+  @override
+  State<_RecoveryKeyDialog> createState() => _RecoveryKeyDialogState();
+}
+
+class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
+  bool _copied = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
+      contentPadding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
+      title: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.key_outlined,
+              size: 20,
+              color: scheme.onPrimaryContainer,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(child: Text('Recovery Key')),
+        ],
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Save this key before continuing.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 14),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.errorContainer.withValues(alpha: 0.44),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: scheme.error.withValues(alpha: 0.22)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: scheme.error,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'This key is shown only once. If it is lost, Serlink cannot retrieve it for you.',
+                        key: const ValueKey('recovery-key-warning'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onErrorContainer,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest.withValues(alpha: 0.64),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: scheme.outlineVariant),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: SelectableText(
+                  widget.recoveryKey,
+                  key: const ValueKey('recovery-key-value'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'monospace',
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        OutlinedButton.icon(
+          key: const ValueKey('recovery-key-copy-button'),
+          onPressed: _copyRecoveryKey,
+          icon: Icon(_copied ? Icons.check_rounded : Icons.copy_rounded),
+          label: Text(_copied ? 'Copied' : 'Copy Recovery Key'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('I have saved it'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _copyRecoveryKey() async {
+    await Clipboard.setData(ClipboardData(text: widget.recoveryKey));
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _copied = true;
+    });
   }
 }
 
@@ -1315,6 +1873,7 @@ class _VaultAccessSurface extends ConsumerStatefulWidget {
 
 class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface> {
   final TextEditingController _passphraseController = TextEditingController();
+  String? _localErrorMessage;
 
   @override
   void dispose() {
@@ -1329,6 +1888,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface> {
     final isInitializing = session?.vaultState == VaultState.uninitialized;
     final recoveryKey = session?.recoveryKey;
     final errorMessage =
+        _localErrorMessage ??
         session?.failureMessage ??
         (asyncState.hasError ? asyncState.error.toString() : null) ??
         widget.error?.toString();
@@ -1404,6 +1964,15 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface> {
 
   void _submit(bool isInitializing) {
     final passphrase = _passphraseController.text;
+    if (passphrase.isEmpty) {
+      setState(() {
+        _localErrorMessage = 'Enter a vault passphrase to continue.';
+      });
+      return;
+    }
+    setState(() {
+      _localErrorMessage = null;
+    });
     if (isInitializing) {
       ref
           .read(vaultSessionControllerProvider.notifier)
@@ -1566,6 +2135,7 @@ class _SnippetsSurface extends ConsumerWidget {
     }
 
     final snippets = ref.watch(snippetsProvider);
+    final searchQuery = ref.watch(_workspaceSearchQueryProvider);
     return snippets.when(
       loading: () => const _PlaceholderSurface(
         title: 'Snippets',
@@ -1573,42 +2143,56 @@ class _SnippetsSurface extends ConsumerWidget {
       ),
       error: (error, stackTrace) =>
           _PlaceholderSurface(title: 'Snippets', body: error.toString()),
-      data: (items) => Column(
-        children: [
-          _SnippetsHeader(
-            count: items.length,
-            onAdd: () => _showSnippetDialog(context),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: items.isEmpty
-                ? _SnippetsEmptyState(onAdd: () => _showSnippetDialog(context))
-                : ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: items.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final snippet = items[index];
-                      return _SnippetRow(
-                        snippet: snippet,
-                        onInsert: () => _insertSnippet(
-                          context,
-                          ref,
-                          snippet,
-                          submit: false,
-                        ),
-                        onRun: () =>
-                            _insertSnippet(context, ref, snippet, submit: true),
-                        onEdit: () =>
-                            _showSnippetDialog(context, snippet: snippet),
-                        onDelete: () => _deleteSnippet(context, ref, snippet),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
+      data: (items) {
+        final filteredItems = filterCommandSnippets(items, searchQuery);
+        return Column(
+          children: [
+            _SnippetsHeader(
+              count: filteredItems.length,
+              onAdd: () => _showSnippetDialog(context),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: items.isEmpty
+                  ? _SnippetsEmptyState(
+                      onAdd: () => _showSnippetDialog(context),
+                    )
+                  : filteredItems.isEmpty
+                  ? const _PlaceholderSurface(
+                      title: 'No Matches',
+                      body: 'No snippets match the current workspace search.',
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: filteredItems.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final snippet = filteredItems[index];
+                        return _SnippetRow(
+                          snippet: snippet,
+                          onInsert: () => _insertSnippet(
+                            context,
+                            ref,
+                            snippet,
+                            submit: false,
+                          ),
+                          onRun: () => _insertSnippet(
+                            context,
+                            ref,
+                            snippet,
+                            submit: true,
+                          ),
+                          onEdit: () =>
+                              _showSnippetDialog(context, snippet: snippet),
+                          onDelete: () => _deleteSnippet(context, ref, snippet),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1993,12 +2577,22 @@ class _WorkspaceTabs extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(workspaceTabControllerProvider.notifier);
-    final active = state.activeTab;
+    final active = state.activeTab ?? state.tabs.firstOrNull;
+
+    void openNewConnection() {
+      ref.read(_workspaceSearchQueryProvider.notifier).clear();
+      controller.selectArea(WorkspaceArea.hosts);
+    }
 
     if (state.tabs.isEmpty || active == null) {
-      return const _PlaceholderSurface(
+      return _PlaceholderSurface(
         title: 'No active tabs',
         body: 'Open a host from Hosts to create a terminal or SFTP tab.',
+        action: IconButton.filledTonal(
+          tooltip: 'New connection',
+          onPressed: openNewConnection,
+          icon: const Icon(Icons.add),
+        ),
       );
     }
 
@@ -2010,16 +2604,25 @@ class _WorkspaceTabs extends ConsumerWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             itemBuilder: (context, index) {
+              if (index == state.tabs.length) {
+                return _NewTabButton(onPressed: openNewConnection);
+              }
               final tab = state.tabs[index];
-              return _TabPill(
-                tab: tab,
-                selected: tab.id == active.id,
-                onTap: () => controller.setActiveTab(tab.id),
-                onClose: () => controller.closeTab(tab.id),
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _TabPill(
+                    tab: tab,
+                    selected: tab.id == active.id,
+                    onTap: () => controller.setActiveTab(tab.id),
+                    onClose: () => controller.closeTab(tab.id),
+                  ),
+                  const SizedBox(width: 6),
+                ],
               );
             },
-            separatorBuilder: (context, index) => const SizedBox(width: 6),
-            itemCount: state.tabs.length,
+            separatorBuilder: (context, index) => const SizedBox.shrink(),
+            itemCount: state.tabs.length + 1,
           ),
         ),
         const Divider(height: 1),
@@ -2097,6 +2700,32 @@ class _TabPill extends StatelessWidget {
   }
 }
 
+class _NewTabButton extends StatelessWidget {
+  const _NewTabButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: 'New connection',
+      child: Material(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: onPressed,
+          child: SizedBox.square(
+            dimension: 30,
+            child: Icon(Icons.add, size: 17, color: scheme.onSurfaceVariant),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ActiveTabView extends ConsumerWidget {
   const _ActiveTabView({required this.tab});
 
@@ -2105,12 +2734,18 @@ class _ActiveTabView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(workspaceTabControllerProvider.notifier);
+    final isLocalTerminal = tab.content is LocalTerminalTabContent;
     final showBanner =
         tab.lifecycle == SessionLifecycleState.disconnected ||
         tab.lifecycle == SessionLifecycleState.failed;
     final banner = showBanner
         ? _RecoverableFailureBanner(
-            message: tab.failure?.message ?? 'Connection is not active.',
+            message:
+                tab.failure?.message ??
+                (isLocalTerminal
+                    ? 'Local shell is not running.'
+                    : 'Connection is not active.'),
+            actionLabel: isLocalTerminal ? 'Restart' : 'Reconnect',
             onReconnect: () => controller.reconnect(tab.id),
             onClose: () => controller.closeTab(tab.id),
           )
@@ -2138,6 +2773,7 @@ class _ActiveTabView extends ConsumerWidget {
                 showSplit: showSplit,
                 splitAxis: splitAxis,
                 activePane: activePane,
+                local: false,
                 onOpenSftp: tab.hostId == null
                     ? null
                     : () => controller.openSftpFromTab(tab.id),
@@ -2157,6 +2793,7 @@ class _ActiveTabView extends ConsumerWidget {
               showSplit: false,
               splitAxis: Axis.horizontal,
               activePane: 0,
+              local: true,
               onOpenSftp: null,
             ),
             SftpTabContent(:final sessionId, :final currentPath) => _SftpPane(
@@ -2179,11 +2816,13 @@ class _ActiveTabView extends ConsumerWidget {
 class _RecoverableFailureBanner extends StatelessWidget {
   const _RecoverableFailureBanner({
     required this.message,
+    required this.actionLabel,
     required this.onReconnect,
     required this.onClose,
   });
 
   final String message;
+  final String actionLabel;
   final VoidCallback onReconnect;
   final VoidCallback onClose;
 
@@ -2196,7 +2835,7 @@ class _RecoverableFailureBanner extends StatelessWidget {
         child: Row(
           children: [
             Expanded(child: Text(message)),
-            TextButton(onPressed: onReconnect, child: const Text('Reconnect')),
+            TextButton(onPressed: onReconnect, child: Text(actionLabel)),
             TextButton(onPressed: onClose, child: const Text('Close')),
           ],
         ),
@@ -2215,6 +2854,7 @@ class _TerminalPane extends ConsumerStatefulWidget {
     required this.showSplit,
     required this.splitAxis,
     required this.activePane,
+    required this.local,
     required this.onOpenSftp,
   });
 
@@ -2225,6 +2865,7 @@ class _TerminalPane extends ConsumerStatefulWidget {
   final bool showSplit;
   final Axis splitAxis;
   final int activePane;
+  final bool local;
   final VoidCallback? onOpenSftp;
 
   @override
@@ -2339,6 +2980,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
                   globalSettings: globalSettings,
                   axis: widget.splitAxis,
                   activePane: widget.activePane,
+                  local: widget.local,
                   onActivatePane: _setActivePane,
                   onKeyEvent: _terminalViewKeyHandler,
                 )
@@ -2868,6 +3510,7 @@ class _SplitTerminalViewport extends StatelessWidget {
     required this.globalSettings,
     required this.axis,
     required this.activePane,
+    required this.local,
     required this.onActivatePane,
     this.onKeyEvent,
   });
@@ -2878,6 +3521,7 @@ class _SplitTerminalViewport extends StatelessWidget {
   final TerminalDisplaySettings globalSettings;
   final Axis axis;
   final int activePane;
+  final bool local;
   final ValueChanged<int> onActivatePane;
   final FocusOnKeyEventCallback? onKeyEvent;
 
@@ -2898,6 +3542,7 @@ class _SplitTerminalViewport extends StatelessWidget {
             active: activePane == index,
             label: pane.title,
             lifecycle: pane.lifecycle,
+            local: local,
             onKeyEvent: onKeyEvent,
             onTap: () => onActivatePane(index),
           ),
@@ -2924,6 +3569,7 @@ class _TerminalViewportPane extends StatelessWidget {
     required this.active,
     required this.label,
     required this.lifecycle,
+    required this.local,
     this.onKeyEvent,
     required this.onTap,
   });
@@ -2934,6 +3580,7 @@ class _TerminalViewportPane extends StatelessWidget {
   final bool active;
   final String label;
   final SessionLifecycleState lifecycle;
+  final bool local;
   final FocusOnKeyEventCallback? onKeyEvent;
   final VoidCallback onTap;
 
@@ -2959,7 +3606,7 @@ class _TerminalViewportPane extends StatelessWidget {
                   ? scheme.primary.withValues(alpha: 0.10)
                   : scheme.surfaceContainerHighest,
               child: Text(
-                '$label · ${_terminalPaneLifecycleLabel(lifecycle)}',
+                '$label · ${_terminalPaneLifecycleLabel(lifecycle, local: local)}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall,
@@ -2983,7 +3630,24 @@ class _TerminalViewportPane extends StatelessWidget {
   }
 }
 
-String _terminalPaneLifecycleLabel(SessionLifecycleState lifecycle) {
+String _terminalPaneLifecycleLabel(
+  SessionLifecycleState lifecycle, {
+  required bool local,
+}) {
+  if (local) {
+    return switch (lifecycle) {
+      SessionLifecycleState.connected => 'Running',
+      SessionLifecycleState.connecting ||
+      SessionLifecycleState.reconnecting ||
+      SessionLifecycleState.resolvingProfile => 'Starting',
+      SessionLifecycleState.disconnected => 'Exited',
+      SessionLifecycleState.failed => 'Failed',
+      SessionLifecycleState.disconnecting => 'Stopping',
+      SessionLifecycleState.verifyingHostKey ||
+      SessionLifecycleState.authenticating ||
+      SessionLifecycleState.idle => 'Starting',
+    };
+  }
   return switch (lifecycle) {
     SessionLifecycleState.connected => 'Connected',
     SessionLifecycleState.connecting => 'Connecting',
@@ -3656,6 +4320,9 @@ class _TerminalSettingsDialog extends ConsumerWidget {
         ref.watch(terminalDisplaySettingsProvider).value ??
         const TerminalDisplaySettings();
     final settings = hostSettings ?? globalSettings;
+    final fontCatalogAsync = ref.watch(terminalFontCatalogProvider);
+    final fontCatalog =
+        fontCatalogAsync.value ?? TerminalFontCatalog.fallback();
     final editingHostProfile = hostId != null && hostSettings != null;
     final globalController = ref.read(terminalDisplaySettingsProvider.notifier);
     final workspaceController = ref.read(
@@ -3673,50 +4340,102 @@ class _TerminalSettingsDialog extends ConsumerWidget {
     return AlertDialog(
       title: const Text('Terminal Settings'),
       content: SizedBox(
-        width: 520,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DropdownMenu<SerlinkTerminalThemeId>(
-              key: ValueKey(
-                'terminal-theme-${settings.themeId.name}-$editingHostProfile',
-              ),
-              initialSelection: settings.themeId,
-              label: const Text('Theme'),
-              dropdownMenuEntries: [
-                for (final themeId in SerlinkTerminalThemeId.values)
-                  DropdownMenuEntry(value: themeId, label: themeId.label),
+        width: 560,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TerminalSettingsGroup(
+                  title: 'Appearance',
+                  children: [
+                    DropdownMenu<SerlinkTerminalThemeId>(
+                      key: ValueKey(
+                        'terminal-theme-${settings.themeId.name}-$editingHostProfile',
+                      ),
+                      initialSelection: settings.themeId,
+                      label: const Text('Theme'),
+                      expandedInsets: EdgeInsets.zero,
+                      inputDecorationTheme: const InputDecorationThemeData(
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      dropdownMenuEntries: [
+                        for (final themeId in SerlinkTerminalThemeId.values)
+                          DropdownMenuEntry(
+                            value: themeId,
+                            label: themeId.label,
+                          ),
+                      ],
+                      onSelected: (themeId) {
+                        if (themeId != null) {
+                          updateSettings(settings.copyWith(themeId: themeId));
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    _TerminalFontPicker(
+                      settings: settings,
+                      catalog: fontCatalog,
+                      catalogLoading: fontCatalogAsync.isLoading,
+                      editingHostProfile: editingHostProfile,
+                      onFontFamilyChanged: (fontFamily) {
+                        updateSettings(
+                          settings.copyWith(fontFamily: fontFamily),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                _TerminalSettingsGroup(
+                  title: 'Layout',
+                  children: [
+                    _SettingsSlider(
+                      label: 'Font size',
+                      value: settings.fontSize,
+                      min: 10,
+                      max: 24,
+                      divisions: 14,
+                      displayValue:
+                          '${settings.fontSize.toStringAsFixed(0)} px',
+                      onChanged: (value) =>
+                          updateSettings(settings.copyWith(fontSize: value)),
+                    ),
+                    const SizedBox(height: 10),
+                    _SettingsSlider(
+                      label: 'Line height',
+                      value: settings.lineHeight,
+                      min: 1,
+                      max: 1.5,
+                      divisions: 10,
+                      displayValue: settings.lineHeight.toStringAsFixed(2),
+                      onChanged: (value) =>
+                          updateSettings(settings.copyWith(lineHeight: value)),
+                    ),
+                    const SizedBox(height: 10),
+                    _SettingsSlider(
+                      label: 'Scrollback',
+                      value: settings.scrollbackLines.toDouble(),
+                      min: 1000,
+                      max: 100000,
+                      divisions: 99,
+                      displayValue: _formatScrollbackLines(
+                        settings.scrollbackLines,
+                      ),
+                      onChanged: (value) => updateSettings(
+                        settings.copyWith(scrollbackLines: value.round()),
+                      ),
+                    ),
+                  ],
+                ),
               ],
-              onSelected: (themeId) {
-                if (themeId != null) {
-                  updateSettings(settings.copyWith(themeId: themeId));
-                }
-              },
             ),
-            const SizedBox(height: 18),
-            _SettingsSlider(
-              label: 'Font size',
-              value: settings.fontSize,
-              min: 10,
-              max: 24,
-              divisions: 14,
-              displayValue: settings.fontSize.toStringAsFixed(0),
-              onChanged: (value) =>
-                  updateSettings(settings.copyWith(fontSize: value)),
-            ),
-            const SizedBox(height: 8),
-            _SettingsSlider(
-              label: 'Line height',
-              value: settings.lineHeight,
-              min: 1,
-              max: 1.5,
-              divisions: 10,
-              displayValue: settings.lineHeight.toStringAsFixed(2),
-              onChanged: (value) =>
-                  updateSettings(settings.copyWith(lineHeight: value)),
-            ),
-          ],
+          ),
         ),
       ),
       actions: [
@@ -3737,6 +4456,242 @@ class _TerminalSettingsDialog extends ConsumerWidget {
           child: const Text('Done'),
         ),
       ],
+    );
+  }
+}
+
+class _TerminalSettingsGroup extends StatelessWidget {
+  const _TerminalSettingsGroup({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(title, style: textTheme.titleSmall),
+        const SizedBox(height: 10),
+        ...children,
+      ],
+    );
+  }
+}
+
+class _TerminalFontPicker extends StatefulWidget {
+  const _TerminalFontPicker({
+    required this.settings,
+    required this.catalog,
+    required this.catalogLoading,
+    required this.editingHostProfile,
+    required this.onFontFamilyChanged,
+  });
+
+  final TerminalDisplaySettings settings;
+  final TerminalFontCatalog catalog;
+  final bool catalogLoading;
+  final bool editingHostProfile;
+  final ValueChanged<String> onFontFamilyChanged;
+
+  @override
+  State<_TerminalFontPicker> createState() => _TerminalFontPickerState();
+}
+
+class _TerminalFontPickerState extends State<_TerminalFontPicker> {
+  late final TextEditingController _customFontController;
+
+  @override
+  void initState() {
+    super.initState();
+    _customFontController = TextEditingController(
+      text: widget.settings.fontFamily,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _TerminalFontPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.settings.fontFamily != oldWidget.settings.fontFamily &&
+        _customFontController.text != widget.settings.fontFamily) {
+      _customFontController.text = widget.settings.fontFamily;
+    }
+  }
+
+  @override
+  void dispose() {
+    _customFontController.dispose();
+    super.dispose();
+  }
+
+  void _applyCustomFont() {
+    final fontFamily = _customFontController.text.trim();
+    if (fontFamily.isNotEmpty) {
+      widget.onFontFamilyChanged(fontFamily);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fonts = widget.catalog.withCurrentFamily(widget.settings.fontFamily);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownMenu<String>(
+          key: ValueKey(
+            'terminal-font-family-${widget.settings.fontFamily}-${widget.editingHostProfile}',
+          ),
+          initialSelection: widget.settings.fontFamily,
+          label: const Text('Font'),
+          enableFilter: true,
+          requestFocusOnTap: true,
+          expandedInsets: EdgeInsets.zero,
+          menuHeight: 280,
+          inputDecorationTheme: const InputDecorationThemeData(
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          dropdownMenuEntries: [
+            for (final font in fonts)
+              DropdownMenuEntry(
+                value: font.family,
+                label: font.label,
+                leadingIcon: Icon(_terminalFontIcon(font), size: 16),
+                labelWidget: Text(
+                  font.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onSelected: (fontFamily) {
+            if (fontFamily == null) {
+              return;
+            }
+            _customFontController.text = fontFamily;
+            widget.onFontFamilyChanged(fontFamily);
+          },
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          controller: _customFontController,
+          decoration: InputDecoration(
+            labelText: 'Custom family',
+            border: const OutlineInputBorder(),
+            isDense: true,
+            prefixIcon: const Icon(Icons.edit_outlined, size: 18),
+            suffixIcon: IconButton(
+              tooltip: 'Apply custom font',
+              onPressed: _applyCustomFont,
+              icon: const Icon(Icons.check_outlined, size: 18),
+            ),
+          ),
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) => _applyCustomFont(),
+        ),
+        const SizedBox(height: 10),
+        _TerminalFontStatus(
+          catalog: widget.catalog,
+          loading: widget.catalogLoading,
+        ),
+        const SizedBox(height: 10),
+        _TerminalFontPreview(settings: widget.settings),
+      ],
+    );
+  }
+}
+
+IconData _terminalFontIcon(TerminalFontCandidate font) {
+  if (font.hasEnhancedGlyphs) {
+    return Icons.auto_awesome_outlined;
+  }
+  if (font.isBuiltIn) {
+    return Icons.computer_outlined;
+  }
+  return Icons.font_download_outlined;
+}
+
+class _TerminalFontStatus extends StatelessWidget {
+  const _TerminalFontStatus({required this.catalog, required this.loading});
+
+  final TerminalFontCatalog catalog;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final hasNerdFont = catalog.hasNerdFont;
+    final color = hasNerdFont ? scheme.primary : scheme.onSurfaceVariant;
+    final text = loading
+        ? 'Scanning installed fonts'
+        : hasNerdFont
+        ? 'Nerd Font detected'
+        : 'Nerd Font not found';
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.20)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                hasNerdFont ? Icons.check_circle_outline : Icons.info_outline,
+                size: 15,
+                color: color,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                text,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(color: color),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TerminalFontPreview extends StatelessWidget {
+  const _TerminalFontPreview({required this.settings});
+
+  static const _sample = 'serlink    ~/vault    main  ❯  echo ready';
+
+  final TerminalDisplaySettings settings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = settings.terminalTheme;
+    final scheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.background,
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Text(
+              _sample,
+              maxLines: 1,
+              style: settings.textStyle.toTextStyle(color: theme.foreground),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -3776,23 +4731,49 @@ class _SettingsSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(width: 96, child: Text(label)),
-        Expanded(
-          child: Slider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: divisions,
-            label: displayValue,
-            onChanged: onChanged,
-          ),
+        Row(
+          children: [
+            Expanded(child: Text(label)),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                child: Text(
+                  displayValue,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+            ),
+          ],
         ),
-        SizedBox(width: 48, child: Text(displayValue)),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          divisions: divisions,
+          label: displayValue,
+          onChanged: onChanged,
+        ),
       ],
     );
   }
+}
+
+String _formatScrollbackLines(int lines) {
+  if (lines >= 1000) {
+    return '${(lines / 1000).toStringAsFixed(0)}k lines';
+  }
+  return '$lines lines';
 }
 
 enum _SftpUploadKind { file, directory }
@@ -3821,6 +4802,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   final TextEditingController _filterController = TextEditingController();
   Future<List<SftpEntry>>? _entriesFuture;
   String _filterText = '';
+  bool _showHidden = false;
 
   @override
   void initState() {
@@ -3879,6 +4861,28 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
                 ),
               ),
               const SizedBox(width: 8),
+              Tooltip(
+                message: _showHidden
+                    ? 'Hide hidden files'
+                    : 'Show hidden files',
+                child: IconButton(
+                  key: const ValueKey('sftp-hidden-toggle'),
+                  onPressed: canList
+                      ? () {
+                          setState(() {
+                            _showHidden = !_showHidden;
+                          });
+                        }
+                      : null,
+                  icon: Icon(
+                    _showHidden
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    size: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
               Tooltip(
                 message: 'Open terminal tab',
                 child: IconButton(
@@ -3961,13 +4965,22 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
           );
         }
         final allEntries = _sortedEntries(snapshot.data ?? const []);
-        final entries = _filterEntries(allEntries, _filterText);
+        final visibleEntries = _showHidden
+            ? allEntries
+            : [
+                for (final entry in allEntries)
+                  if (!entry.isHidden) entry,
+              ];
+        final entries = _filterEntries(visibleEntries, _filterText);
         if (entries.isEmpty) {
           return _PlaceholderSurface(
             title: _filterText.trim().isEmpty ? 'Empty Folder' : 'No Matches',
-            body: _filterText.trim().isEmpty
-                ? 'This remote directory has no visible entries.'
-                : 'No entries match the current filter.',
+            body: _sftpEmptyBody(
+              allEntries: allEntries,
+              visibleEntries: visibleEntries,
+              filterText: _filterText,
+              showHidden: _showHidden,
+            ),
           );
         }
         return ListView.separated(
@@ -3981,6 +4994,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
                 icon: Icons.drive_folder_upload_outlined,
                 sizeLabel: '',
                 permissionsLabel: '',
+                metadataLabel: '',
                 onTap: () => _openDirectory(_parentPath(widget.path)),
                 onRename: null,
                 onMove: null,
@@ -3999,6 +5013,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
                   : Icons.description_outlined,
               sizeLabel: isDirectory ? '' : _formatBytes(entry.size),
               permissionsLabel: entry.permissions?.octal ?? '',
+              metadataLabel: _sftpEntryMetadataLabel(entry),
               onTap: isDirectory
                   ? () => _openDirectory(entry.path)
                   : () => _previewFile(entry),
@@ -4475,6 +5490,7 @@ class _SftpEntryRow extends StatelessWidget {
     required this.icon,
     required this.sizeLabel,
     required this.permissionsLabel,
+    required this.metadataLabel,
     required this.onTap,
     required this.onRename,
     required this.onMove,
@@ -4488,6 +5504,7 @@ class _SftpEntryRow extends StatelessWidget {
   final IconData icon;
   final String sizeLabel;
   final String permissionsLabel;
+  final String metadataLabel;
   final VoidCallback? onTap;
   final VoidCallback? onRename;
   final VoidCallback? onMove;
@@ -4501,7 +5518,10 @@ class _SftpEntryRow extends StatelessWidget {
       dense: true,
       leading: Icon(icon),
       title: Text(name, overflow: TextOverflow.ellipsis),
-      subtitle: Text(typeLabel),
+      subtitle: Text(
+        metadataLabel.isEmpty ? typeLabel : '$typeLabel · $metadataLabel',
+        overflow: TextOverflow.ellipsis,
+      ),
       trailing: SizedBox(
         width: 360,
         child: Row(
@@ -4714,9 +5734,47 @@ List<SftpEntry> _filterEntries(List<SftpEntry> entries, String filter) {
   return [
     for (final entry in entries)
       if (entry.name.toLowerCase().contains(query) ||
-          entry.path.toLowerCase().contains(query))
+          entry.path.toLowerCase().contains(query) ||
+          (entry.owner?.toLowerCase().contains(query) ?? false) ||
+          (entry.group?.toLowerCase().contains(query) ?? false) ||
+          (entry.permissions?.octal.contains(query) ?? false))
         entry,
   ];
+}
+
+String _sftpEmptyBody({
+  required List<SftpEntry> allEntries,
+  required List<SftpEntry> visibleEntries,
+  required String filterText,
+  required bool showHidden,
+}) {
+  if (filterText.trim().isNotEmpty) {
+    return 'No entries match the current filter.';
+  }
+  if (!showHidden && allEntries.isNotEmpty && visibleEntries.isEmpty) {
+    return 'This remote directory only contains hidden entries.';
+  }
+  return 'This remote directory has no visible entries.';
+}
+
+String _sftpEntryMetadataLabel(SftpEntry entry) {
+  final ownerGroup = _ownerGroupLabel(entry);
+  final parts = [
+    if (entry.modifiedAt case final modifiedAt?)
+      _shortLocalDateTime(modifiedAt),
+    ?ownerGroup,
+  ];
+  return parts.join(' · ');
+}
+
+String? _ownerGroupLabel(SftpEntry entry) {
+  final owner = entry.owner?.trim();
+  final group = entry.group?.trim();
+  if ((owner == null || owner.isEmpty) && (group == null || group.isEmpty)) {
+    return null;
+  }
+  return '${owner?.isEmpty ?? true ? '-' : owner}:'
+      '${group?.isEmpty ?? true ? '-' : group}';
 }
 
 int _entryRank(SftpEntryType type) {
@@ -4939,165 +5997,489 @@ class _SettingsSurface extends ConsumerWidget {
     final vaultState = vault?.vaultState;
     final canImportHostData = vaultState == VaultState.unlocked;
 
+    final scheme = Theme.of(context).colorScheme;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 36),
       children: [
-        _SettingsSection(
-          title: 'Security',
-          children: [
-            _SettingsActionRow(
-              icon: Icons.lock_outline,
-              title: 'Vault',
-              subtitle: _vaultStateLabel(vaultState),
-              action: vaultState == VaultState.unlocked
-                  ? TextButton(
-                      onPressed: () => ref
-                          .read(vaultSessionControllerProvider.notifier)
-                          .lock(),
-                      child: const Text('Lock'),
-                    )
-                  : null,
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 980),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Settings',
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Security, sync, import/export, and runtime controls.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _SettingsStatusPill(
+                      label: _vaultStatusPillLabel(vaultState),
+                      color: vaultState == VaultState.unlocked
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                _SettingsSection(
+                  title: 'Security',
+                  children: [
+                    _SettingsActionRow(
+                      icon: Icons.lock_outline,
+                      title: 'Vault',
+                      subtitle: _vaultStateLabel(vaultState),
+                      action: vaultState == VaultState.unlocked
+                          ? TextButton(
+                              onPressed: () => ref
+                                  .read(vaultSessionControllerProvider.notifier)
+                                  .lock(),
+                              child: const Text('Lock'),
+                            )
+                          : null,
+                    ),
+                    _SettingsActionRow(
+                      icon: Icons.key_outlined,
+                      title: 'Local unlock',
+                      subtitle: _localUnlockLabel(vault),
+                      action: vaultState == VaultState.unlocked
+                          ? Switch(
+                              value: vault?.localUnlockAvailable ?? false,
+                              onChanged: (value) =>
+                                  _setLocalVaultUnlock(context, ref, value),
+                            )
+                          : vault?.localUnlockAvailable == true
+                          ? TextButton(
+                              onPressed: () => ref
+                                  .read(vaultSessionControllerProvider.notifier)
+                                  .unlockWithLocalKey(),
+                              child: const Text('Unlock'),
+                            )
+                          : null,
+                    ),
+                    const _SettingsInfoRow(
+                      icon: Icons.verified_user_outlined,
+                      title: 'Host key confirmation',
+                      subtitle:
+                          'Unknown or changed fingerprints require modal review.',
+                    ),
+                    _SettingsActionRow(
+                      icon: Icons.badge_outlined,
+                      title: 'Credentials',
+                      subtitle: canImportHostData
+                          ? 'Review imported passwords, keys, and certificates.'
+                          : 'Unlock the vault to review encrypted credentials.',
+                      action: TextButton(
+                        onPressed: canImportHostData
+                            ? () => _showIdentityManagerDialog(context, ref)
+                            : null,
+                        child: const Text('Manage'),
+                      ),
+                    ),
+                    _SettingsActionRow(
+                      icon: Icons.verified_outlined,
+                      title: 'Known hosts',
+                      subtitle: canImportHostData
+                          ? 'Review trusted host fingerprints stored in the vault.'
+                          : 'Unlock the vault to review trusted host fingerprints.',
+                      action: TextButton(
+                        onPressed: canImportHostData
+                            ? () => _showKnownHostsDialog(context, ref)
+                            : null,
+                        child: const Text('Manage'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 26),
+                _SyncSettingsSection(vaultState: vaultState),
+                const SizedBox(height: 26),
+                _SettingsSection(
+                  title: 'Data',
+                  children: [
+                    _SettingsActionRow(
+                      icon: Icons.import_export_outlined,
+                      title: 'Import / Export',
+                      subtitle:
+                          'Backups, OpenSSH files, certificates, known_hosts, and metadata.',
+                      action: TextButton(
+                        key: const ValueKey('settings-data-exchange-button'),
+                        onPressed: () => _showDataExchangeDialog(
+                          context,
+                          ref,
+                          canImportHostData: canImportHostData,
+                        ),
+                        child: const Text('Open'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 26),
+                _SettingsSection(
+                  title: 'Runtime',
+                  children: [
+                    const _SettingsInfoRow(
+                      icon: Icons.bug_report_outlined,
+                      title: 'Debug logging',
+                      subtitle: 'Debug builds keep redacted local logs only.',
+                    ),
+                    const _SettingsInfoRow(
+                      icon: Icons.health_and_safety_outlined,
+                      title: 'Crash reporting',
+                      subtitle:
+                          'Release Sentry events are redacted before upload.',
+                    ),
+                    _SettingsActionRow(
+                      icon: Icons.support_agent_outlined,
+                      title: 'Diagnostic bundle',
+                      subtitle:
+                          'Build info, redacted runtime metadata, and log tail.',
+                      action: TextButton(
+                        onPressed: () => _exportDiagnosticBundle(context, ref),
+                        child: Text('Export'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            _SettingsActionRow(
-              icon: Icons.key_outlined,
-              title: 'Local unlock',
-              subtitle: _localUnlockLabel(vault),
-              action: vaultState == VaultState.unlocked
-                  ? Switch(
-                      value: vault?.localUnlockAvailable ?? false,
-                      onChanged: (value) =>
-                          _setLocalVaultUnlock(context, ref, value),
-                    )
-                  : vault?.localUnlockAvailable == true
-                  ? TextButton(
-                      onPressed: () => ref
-                          .read(vaultSessionControllerProvider.notifier)
-                          .unlockWithLocalKey(),
-                      child: const Text('Unlock'),
-                    )
-                  : null,
-            ),
-            const _SettingsInfoRow(
-              icon: Icons.verified_user_outlined,
-              title: 'Host key confirmation',
-              subtitle: 'Unknown or changed fingerprints require modal review.',
-            ),
-            _SettingsActionRow(
-              icon: Icons.badge_outlined,
-              title: 'Credentials',
-              subtitle: canImportHostData
-                  ? 'Review imported passwords, keys, and certificates.'
-                  : 'Unlock the vault to review encrypted credentials.',
-              action: TextButton(
-                onPressed: canImportHostData
-                    ? () => _showIdentityManagerDialog(context, ref)
-                    : null,
-                child: const Text('Manage'),
-              ),
-            ),
-            _SettingsActionRow(
-              icon: Icons.verified_outlined,
-              title: 'Known hosts',
-              subtitle: canImportHostData
-                  ? 'Review trusted host fingerprints stored in the vault.'
-                  : 'Unlock the vault to review trusted host fingerprints.',
-              action: TextButton(
-                onPressed: canImportHostData
-                    ? () => _showKnownHostsDialog(context, ref)
-                    : null,
-                child: const Text('Manage'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _SyncSettingsSection(vaultState: vaultState),
-        const SizedBox(height: 12),
-        _SettingsSection(
-          title: 'Data',
-          children: [
-            _SettingsActionRow(
-              icon: Icons.file_upload_outlined,
-              title: 'Export encrypted backup',
-              subtitle: 'Writes vault header and encrypted records.',
-              action: TextButton(
-                onPressed: () => _exportVaultBackup(context, ref),
-                child: const Text('Export'),
-              ),
-            ),
-            _SettingsActionRow(
-              icon: Icons.support_agent_outlined,
-              title: 'Export diagnostic bundle',
-              subtitle:
-                  'Writes app build info, redacted runtime metadata, and log tail.',
-              action: TextButton(
-                onPressed: () => _exportDiagnosticBundle(context, ref),
-                child: const Text('Export'),
-              ),
-            ),
-            _SettingsActionRow(
-              icon: Icons.file_download_outlined,
-              title: 'Import encrypted backup',
-              subtitle: 'Imports a Serlink vault backup after confirmation.',
-              action: TextButton(
-                onPressed: () => _importVaultBackup(context, ref),
-                child: const Text('Import'),
-              ),
-            ),
-            _SettingsActionRow(
-              icon: Icons.dns_outlined,
-              title: 'Import OpenSSH config',
-              subtitle:
-                  'Previews host metadata before importing encrypted records.',
-              action: TextButton(
-                onPressed: canImportHostData
-                    ? () => _importOpenSshConfig(context, ref)
-                    : null,
-                child: const Text('Import'),
-              ),
-            ),
-            _SettingsActionRow(
-              icon: Icons.verified_outlined,
-              title: 'Import known_hosts',
-              subtitle: 'Imports matching host fingerprints into the vault.',
-              action: TextButton(
-                onPressed: canImportHostData
-                    ? () => _importKnownHosts(context, ref)
-                    : null,
-                child: const Text('Import'),
-              ),
-            ),
-            _SettingsActionRow(
-              icon: Icons.badge_outlined,
-              title: 'Import OpenSSH certificate',
-              subtitle:
-                  'Stores certificate, private key, and passphrase as encrypted identity material.',
-              action: TextButton(
-                onPressed: canImportHostData
-                    ? () => _importOpenSshCertificate(context, ref)
-                    : null,
-                child: const Text('Import'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        const _SettingsSection(
-          title: 'Runtime',
-          children: [
-            _SettingsInfoRow(
-              icon: Icons.bug_report_outlined,
-              title: 'Debug logging',
-              subtitle: 'Debug builds keep redacted local logs only.',
-            ),
-            _SettingsInfoRow(
-              icon: Icons.health_and_safety_outlined,
-              title: 'Crash reporting',
-              subtitle: 'Release Sentry events are redacted before upload.',
-            ),
-          ],
+          ),
         ),
       ],
+    );
+  }
+}
+
+Future<void> _showDataExchangeDialog(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool canImportHostData,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      Future<void> runAction(_DataExchangeAction action) async {
+        Navigator.of(dialogContext).pop();
+        await Future<void>.delayed(Duration.zero);
+        if (!context.mounted) {
+          return;
+        }
+        switch (action) {
+          case _DataExchangeAction.exportVaultBackup:
+            await _exportVaultBackup(context, ref);
+          case _DataExchangeAction.exportHostMetadata:
+            await _exportHostMetadata(context, ref);
+          case _DataExchangeAction.exportOpenSshConfig:
+            await _exportOpenSshConfig(context, ref);
+          case _DataExchangeAction.exportIdentityMetadata:
+            await _exportIdentityMetadata(context, ref);
+          case _DataExchangeAction.importVaultBackup:
+            await _importVaultBackup(context, ref);
+          case _DataExchangeAction.importOpenSshConfig:
+            await _importOpenSshConfig(context, ref);
+          case _DataExchangeAction.importKnownHosts:
+            await _importKnownHosts(context, ref);
+          case _DataExchangeAction.importOpenSshCertificate:
+            await _importOpenSshCertificate(context, ref);
+        }
+      }
+
+      return _DataExchangeDialog(
+        canImportHostData: canImportHostData,
+        onActionSelected: (action) => unawaited(runAction(action)),
+      );
+    },
+  );
+}
+
+enum _DataExchangeAction {
+  exportVaultBackup,
+  exportHostMetadata,
+  exportOpenSshConfig,
+  exportIdentityMetadata,
+  importVaultBackup,
+  importOpenSshConfig,
+  importKnownHosts,
+  importOpenSshCertificate,
+}
+
+class _DataExchangeDialog extends StatelessWidget {
+  const _DataExchangeDialog({
+    required this.canImportHostData,
+    required this.onActionSelected,
+  });
+
+  final bool canImportHostData;
+  final ValueChanged<_DataExchangeAction> onActionSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final lockedSubtitle = 'Unlock the vault to use this action.';
+
+    return Dialog(
+      clipBehavior: Clip.antiAlias,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 660, maxHeight: 720),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Import / Export',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('data-exchange-close-button'),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Backups stay available anytime. Host, identity, and SSH data require an unlocked vault.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _DataExchangeSection(
+                  title: 'Export',
+                  children: [
+                    _DataExchangeActionTile(
+                      icon: Icons.lock_outline,
+                      title: 'Export encrypted backup',
+                      subtitle: 'Encrypted vault records and header.',
+                      onPressed: () => onActionSelected(
+                        _DataExchangeAction.exportVaultBackup,
+                      ),
+                    ),
+                    _DataExchangeActionTile(
+                      icon: Icons.dns_outlined,
+                      title: 'Export host metadata',
+                      subtitle: 'Host names, addresses, tags, and options.',
+                      enabled: canImportHostData,
+                      disabledSubtitle: lockedSubtitle,
+                      onPressed: () => onActionSelected(
+                        _DataExchangeAction.exportHostMetadata,
+                      ),
+                    ),
+                    _DataExchangeActionTile(
+                      icon: Icons.terminal_outlined,
+                      title: 'Export OpenSSH config',
+                      subtitle: 'Selected hosts as an OpenSSH config.',
+                      enabled: canImportHostData,
+                      disabledSubtitle: lockedSubtitle,
+                      onPressed: () => onActionSelected(
+                        _DataExchangeAction.exportOpenSshConfig,
+                      ),
+                    ),
+                    _DataExchangeActionTile(
+                      icon: Icons.badge_outlined,
+                      title: 'Export identity metadata',
+                      subtitle:
+                          'Display names, hints, and public fingerprints.',
+                      enabled: canImportHostData,
+                      disabledSubtitle: lockedSubtitle,
+                      onPressed: () => onActionSelected(
+                        _DataExchangeAction.exportIdentityMetadata,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _DataExchangeSection(
+                  title: 'Import',
+                  children: [
+                    _DataExchangeActionTile(
+                      icon: Icons.restore_outlined,
+                      title: 'Import encrypted backup',
+                      subtitle: 'Merge records from a Serlink backup.',
+                      onPressed: () => onActionSelected(
+                        _DataExchangeAction.importVaultBackup,
+                      ),
+                    ),
+                    _DataExchangeActionTile(
+                      icon: Icons.terminal_outlined,
+                      title: 'Import OpenSSH config',
+                      subtitle: 'Create hosts from an ssh config file.',
+                      enabled: canImportHostData,
+                      disabledSubtitle: lockedSubtitle,
+                      onPressed: () => onActionSelected(
+                        _DataExchangeAction.importOpenSshConfig,
+                      ),
+                    ),
+                    _DataExchangeActionTile(
+                      icon: Icons.verified_outlined,
+                      title: 'Import known_hosts',
+                      subtitle: 'Add fingerprints for existing hosts.',
+                      enabled: canImportHostData,
+                      disabledSubtitle: lockedSubtitle,
+                      onPressed: () => onActionSelected(
+                        _DataExchangeAction.importKnownHosts,
+                      ),
+                    ),
+                    _DataExchangeActionTile(
+                      icon: Icons.key_outlined,
+                      title: 'Import OpenSSH certificate',
+                      subtitle: 'Create an identity from key and certificate.',
+                      enabled: canImportHostData,
+                      disabledSubtitle: lockedSubtitle,
+                      onPressed: () => onActionSelected(
+                        _DataExchangeAction.importOpenSshCertificate,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DataExchangeSection extends StatelessWidget {
+  const _DataExchangeSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.symmetric(
+              horizontal: BorderSide(color: scheme.outlineVariant),
+            ),
+          ),
+          child: Column(
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                if (index > 0)
+                  Divider(
+                    height: 1,
+                    indent: 52,
+                    color: scheme.outlineVariant.withValues(alpha: 0.7),
+                  ),
+                children[index],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DataExchangeActionTile extends StatelessWidget {
+  const _DataExchangeActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onPressed,
+    this.enabled = true,
+    this.disabledSubtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onPressed;
+  final bool enabled;
+  final String? disabledSubtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final effectiveSubtitle = enabled ? subtitle : disabledSubtitle ?? subtitle;
+
+    return InkWell(
+      onTap: enabled ? onPressed : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+        child: Opacity(
+          opacity: enabled ? 1 : 0.48,
+          child: Row(
+            children: [
+              SizedBox.square(
+                dimension: 40,
+                child: Center(
+                  child: Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      effectiveSubtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: scheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -6153,18 +7535,65 @@ class _SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-              child: Text(title, style: Theme.of(context).textTheme.titleSmall),
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.symmetric(
+              horizontal: BorderSide(color: scheme.outlineVariant),
             ),
-            for (final child in children) child,
-          ],
+          ),
+          child: Column(
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                if (index > 0)
+                  Divider(
+                    height: 1,
+                    indent: 48,
+                    color: scheme.outlineVariant.withValues(alpha: 0.72),
+                  ),
+                children[index],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsStatusPill extends StatelessWidget {
+  const _SettingsStatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -6208,13 +7637,46 @@ class _SettingsActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, size: 20),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing: action,
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: ListTile(
+        minLeadingWidth: 28,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        leading: SizedBox.square(
+          dimension: 32,
+          child: Icon(icon, size: 19, color: scheme.onSurfaceVariant),
+        ),
+        title: Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 3),
+          child: Text(
+            subtitle,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ),
+        trailing: action == null
+            ? null
+            : Padding(padding: const EdgeInsets.only(left: 16), child: action),
+      ),
     );
   }
+}
+
+String _vaultStatusPillLabel(VaultState? state) {
+  return switch (state) {
+    VaultState.uninitialized => 'Vault not created',
+    VaultState.locked => 'Vault locked',
+    VaultState.unlocked => 'Vault unlocked',
+    null => 'Vault loading',
+  };
 }
 
 String _vaultStateLabel(VaultState? state) {
@@ -6561,6 +8023,275 @@ Future<void> _exportVaultBackup(BuildContext context, WidgetRef ref) async {
       _showSnackBar(context, _backupErrorMessage(error));
     }
   }
+}
+
+Future<void> _exportHostMetadata(BuildContext context, WidgetRef ref) async {
+  try {
+    final hosts = await ref.read(hostRepositoryProvider).list();
+    hosts.sort(
+      (left, right) => left.displayName.toLowerCase().compareTo(
+        right.displayName.toLowerCase(),
+      ),
+    );
+    if (!context.mounted) {
+      return;
+    }
+    if (hosts.isEmpty) {
+      _showSnackBar(context, 'No hosts are available to export.');
+      return;
+    }
+    final selectedHostIds = await _showHostSelectionDialog(
+      context,
+      hosts,
+      title: 'Export host metadata?',
+      description:
+          'Exports host names, addresses, usernames, tags, jump host links, and connection options. Credentials and private key material are excluded.',
+    );
+    if (selectedHostIds == null ||
+        selectedHostIds.isEmpty ||
+        !context.mounted) {
+      return;
+    }
+    final bundle = await ref
+        .read(hostMetadataExportServiceProvider)
+        .export(selectedHostIds: selectedHostIds);
+    if (!context.mounted) {
+      return;
+    }
+    final location = await getSaveLocation(
+      suggestedName: 'serlink-host-metadata.json',
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'Serlink Host Metadata', extensions: ['json']),
+      ],
+    );
+    if (location == null) {
+      return;
+    }
+    final file = File(location.path);
+    await file.writeAsBytes(bundle.toBytes(), flush: true);
+    await LocalFileSecurity.restrictExistingFile(file);
+    if (context.mounted) {
+      _showSnackBar(context, 'Host metadata exported.');
+    }
+  } on Object {
+    if (context.mounted) {
+      _showSnackBar(context, 'Host metadata could not be exported.');
+    }
+  }
+}
+
+Future<void> _exportOpenSshConfig(BuildContext context, WidgetRef ref) async {
+  try {
+    final hosts = await ref.read(hostRepositoryProvider).list();
+    hosts.sort(
+      (left, right) => left.displayName.toLowerCase().compareTo(
+        right.displayName.toLowerCase(),
+      ),
+    );
+    if (!context.mounted) {
+      return;
+    }
+    if (hosts.isEmpty) {
+      _showSnackBar(context, 'No hosts are available to export.');
+      return;
+    }
+    final selectedHostIds = await _showHostSelectionDialog(
+      context,
+      hosts,
+      title: 'Export OpenSSH config?',
+      description:
+          'Exports selected hosts and any required jump hosts as an OpenSSH config. Credentials and private key material are excluded.',
+    );
+    if (selectedHostIds == null ||
+        selectedHostIds.isEmpty ||
+        !context.mounted) {
+      return;
+    }
+    final decision = await ref
+        .read(securityModalServiceProvider)
+        .confirmExport(
+          const ExportPreview(
+            title: 'Export OpenSSH config?',
+            encrypted: false,
+            sensitiveFields: [
+              'hostnames',
+              'usernames',
+              'ports',
+              'jump host aliases',
+              'connection settings',
+            ],
+          ),
+        );
+    if (decision != ExportDecision.confirm || !context.mounted) {
+      return;
+    }
+    final bundle = await ref
+        .read(openSshConfigExportServiceProvider)
+        .export(selectedHostIds: selectedHostIds);
+    final location = await getSaveLocation(
+      suggestedName: 'serlink-openssh-config.sshconfig',
+      acceptedTypeGroups: const [
+        XTypeGroup(
+          label: 'OpenSSH Config',
+          extensions: ['sshconfig', 'config', 'txt'],
+        ),
+      ],
+    );
+    if (location == null) {
+      return;
+    }
+    final file = File(location.path);
+    await file.writeAsString(bundle.contents, flush: true);
+    await LocalFileSecurity.restrictExistingFile(file);
+    if (context.mounted) {
+      _showSnackBar(context, 'OpenSSH config exported.');
+    }
+  } on Object catch (error) {
+    if (context.mounted) {
+      _showSnackBar(context, _openSshConfigExportErrorMessage(error));
+    }
+  }
+}
+
+Future<void> _exportIdentityMetadata(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final confirmed = await ref
+      .read(securityModalServiceProvider)
+      .confirmExport(
+        const ExportPreview(
+          title: 'Export identity metadata?',
+          encrypted: false,
+          sensitiveFields: [
+            'display names',
+            'username hints',
+            'public key fingerprints',
+            'certificate principals',
+          ],
+        ),
+      );
+  if (confirmed != ExportDecision.confirm || !context.mounted) {
+    return;
+  }
+
+  try {
+    final bundle = await ref
+        .read(identityMetadataExportServiceProvider)
+        .export();
+    final location = await getSaveLocation(
+      suggestedName: 'serlink-identity-metadata.json',
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'Serlink Identity Metadata', extensions: ['json']),
+      ],
+    );
+    if (location == null) {
+      return;
+    }
+    final file = File(location.path);
+    await file.writeAsBytes(bundle.toBytes(), flush: true);
+    await LocalFileSecurity.restrictExistingFile(file);
+    if (context.mounted) {
+      _showSnackBar(context, 'Identity metadata exported.');
+    }
+  } on Object catch (error) {
+    if (context.mounted) {
+      _showSnackBar(context, _identityMetadataExportErrorMessage(error));
+    }
+  }
+}
+
+Future<List<HostId>?> _showHostSelectionDialog(
+  BuildContext context,
+  List<HostConfig> hosts, {
+  required String title,
+  required String description,
+}) {
+  final selected = {for (final host in hosts) host.id};
+  return showDialog<List<HostId>>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: Text(title),
+            content: SizedBox(
+              width: 560,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 320),
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final host in hosts)
+                          CheckboxListTile(
+                            dense: true,
+                            value: selected.contains(host.id),
+                            title: Text(host.displayName),
+                            subtitle: Text(
+                              '${host.username}@${host.hostname}:${host.port}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                if (value ?? false) {
+                                  selected.add(host.id);
+                                } else {
+                                  selected.remove(host.id);
+                                }
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    if (selected.length == hosts.length) {
+                      selected.clear();
+                    } else {
+                      selected
+                        ..clear()
+                        ..addAll(hosts.map((host) => host.id));
+                    }
+                  });
+                },
+                child: Text(
+                  selected.length == hosts.length ? 'Clear all' : 'Select all',
+                ),
+              ),
+              FilledButton(
+                onPressed: selected.isEmpty
+                    ? null
+                    : () => Navigator.of(
+                        context,
+                      ).pop(selected.toList(growable: false)),
+                child: const Text('Export'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
 }
 
 Future<void> _exportDiagnosticBundle(
@@ -7082,6 +8813,14 @@ String _diagnosticErrorMessage(Object error) {
   return 'Diagnostic bundle could not be exported.';
 }
 
+String _openSshConfigExportErrorMessage(Object error) {
+  return 'OpenSSH config could not be exported.';
+}
+
+String _identityMetadataExportErrorMessage(Object error) {
+  return 'Identity metadata could not be exported.';
+}
+
 String _importErrorMessage(Object error) {
   if (error is OpenSshConfigImportException) {
     return error.message;
@@ -7115,10 +8854,15 @@ void _showSnackBar(BuildContext context, String message) {
 }
 
 class _PlaceholderSurface extends StatelessWidget {
-  const _PlaceholderSurface({required this.title, required this.body});
+  const _PlaceholderSurface({
+    required this.title,
+    required this.body,
+    this.action,
+  });
 
   final String title;
   final String body;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -7135,6 +8879,7 @@ class _PlaceholderSurface extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+            if (action != null) ...[const SizedBox(height: 16), action!],
           ],
         ),
       ),

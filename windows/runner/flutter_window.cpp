@@ -1,5 +1,6 @@
 #include "flutter_window.h"
 
+#include <flutter/standard_method_codec.h>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -25,6 +26,7 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  RegisterWindowChannel();
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -40,6 +42,8 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  window_channel_ = nullptr;
+
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -68,4 +72,51 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+}
+
+void FlutterWindow::RegisterWindowChannel() {
+  window_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "serlink/window",
+          &flutter::StandardMethodCodec::GetInstance());
+
+  window_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        HWND hwnd = GetHandle();
+        if (hwnd == nullptr) {
+          result->Error("window_unavailable", "The app window is unavailable.");
+          return;
+        }
+
+        const std::string& method = call.method_name();
+        if (method == "minimize") {
+          ShowWindow(hwnd, SW_MINIMIZE);
+          result->Success();
+          return;
+        }
+        if (method == "toggleMaximize") {
+          ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+          result->Success(flutter::EncodableValue(IsZoomed(hwnd) != 0));
+          return;
+        }
+        if (method == "isMaximized") {
+          result->Success(flutter::EncodableValue(IsZoomed(hwnd) != 0));
+          return;
+        }
+        if (method == "close") {
+          PostMessage(hwnd, WM_CLOSE, 0, 0);
+          result->Success();
+          return;
+        }
+        if (method == "startDrag") {
+          ReleaseCapture();
+          SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+          result->Success();
+          return;
+        }
+
+        result->NotImplemented();
+      });
 }

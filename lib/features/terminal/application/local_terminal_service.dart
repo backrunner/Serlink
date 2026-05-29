@@ -44,8 +44,33 @@ LocalShellProfile defaultLocalShellProfile({
   final exists = fileExists ?? ((path) => File(path).existsSync());
   return switch (os) {
     'windows' => _defaultWindowsShellProfile(env),
+    'macos' => _defaultMacOsShellProfile(env, exists),
     _ => _defaultUnixShellProfile(env, exists),
   };
+}
+
+LocalShellProfile _defaultMacOsShellProfile(
+  Map<String, String> environment,
+  FileExists fileExists,
+) {
+  final executable = _firstExisting([
+    '/bin/zsh',
+    environment['SHELL'],
+    '/bin/bash',
+    '/bin/sh',
+  ], fileExists);
+  if (executable == null) {
+    throw const LocalTerminalException(
+      'local_terminal.shell_missing',
+      'No local shell executable was found.',
+    );
+  }
+  return LocalShellProfile(
+    executable: executable,
+    arguments: executable == '/bin/zsh' ? const ['-l', '-i'] : const [],
+    workingDirectory: _nonEmpty(environment['HOME']),
+    environment: _shellEnvironment(environment, executable),
+  );
 }
 
 LocalShellProfile _defaultUnixShellProfile(
@@ -67,7 +92,7 @@ LocalShellProfile _defaultUnixShellProfile(
   return LocalShellProfile(
     executable: executable,
     workingDirectory: _nonEmpty(environment['HOME']),
-    environment: _filteredShellEnvironment(environment),
+    environment: _shellEnvironment(environment, executable),
   );
 }
 
@@ -121,4 +146,11 @@ Map<String, String> _filteredShellEnvironment(Map<String, String> environment) {
     ])
       if (_nonEmpty(environment[key]) != null) key: environment[key]!,
   };
+}
+
+Map<String, String> _shellEnvironment(
+  Map<String, String> environment,
+  String executable,
+) {
+  return {..._filteredShellEnvironment(environment), 'SHELL': executable};
 }

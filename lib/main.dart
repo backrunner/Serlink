@@ -43,8 +43,11 @@ Future<void> main() async {
   final app = ProviderScope(
     overrides: [
       transferTaskRepositoryProvider.overrideWith((ref) {
-        return EncryptedTransferTaskRepository(
-          vault: ref.watch(vaultServiceProvider),
+        return EncryptedTransferTaskRepository.lazy(
+          // Avoid building a vault dependency while vault initialization is
+          // restoring transfer history.
+          vault: () =>
+              ref.read(vaultSessionControllerProvider.notifier).service,
           records: ref.watch(vaultRecordRepositoryProvider),
         );
       }),

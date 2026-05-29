@@ -6,21 +6,24 @@ import 'package:xterm/xterm.dart';
 import '../../../core/ids/entity_id.dart';
 import '../../vault/application/vault_record_repository.dart';
 import '../../vault/application/vault_service.dart';
+import 'terminal_font_discovery.dart';
 
 enum SerlinkTerminalThemeId { serlinkDark, serlinkLight, highContrast }
 
 class TerminalDisplaySettings {
   const TerminalDisplaySettings({
     this.themeId = SerlinkTerminalThemeId.serlinkDark,
-    this.fontFamily = 'monospace',
+    this.fontFamily = defaultTerminalFontFamily,
     this.fontSize = 13,
     this.lineHeight = 1.2,
+    this.scrollbackLines = 10000,
   });
 
   final SerlinkTerminalThemeId themeId;
   final String fontFamily;
   final double fontSize;
   final double lineHeight;
+  final int scrollbackLines;
 
   Map<String, Object?> toJson() {
     return {
@@ -28,15 +31,20 @@ class TerminalDisplaySettings {
       'fontFamily': fontFamily,
       'fontSize': fontSize,
       'lineHeight': lineHeight,
+      'scrollbackLines': scrollbackLines,
     };
   }
 
   factory TerminalDisplaySettings.fromJson(Map<String, Object?> json) {
     return TerminalDisplaySettings(
-      themeId: SerlinkTerminalThemeId.values.byName(json['themeId'] as String),
-      fontFamily: json['fontFamily'] as String,
-      fontSize: (json['fontSize'] as num).toDouble(),
-      lineHeight: (json['lineHeight'] as num).toDouble(),
+      themeId: _themeIdFromJson(json['themeId']),
+      fontFamily: switch (json['fontFamily']) {
+        final String value when value.trim().isNotEmpty => value,
+        _ => defaultTerminalFontFamily,
+      },
+      fontSize: _doubleFromJson(json['fontSize'], fallback: 13),
+      lineHeight: _doubleFromJson(json['lineHeight'], fallback: 1.2),
+      scrollbackLines: _intFromJson(json['scrollbackLines'], fallback: 10000),
     );
   }
 
@@ -45,12 +53,14 @@ class TerminalDisplaySettings {
     String? fontFamily,
     double? fontSize,
     double? lineHeight,
+    int? scrollbackLines,
   }) {
     return TerminalDisplaySettings(
       themeId: themeId ?? this.themeId,
       fontFamily: fontFamily ?? this.fontFamily,
       fontSize: fontSize ?? this.fontSize,
       lineHeight: lineHeight ?? this.lineHeight,
+      scrollbackLines: scrollbackLines ?? this.scrollbackLines,
     );
   }
 
@@ -60,15 +70,18 @@ class TerminalDisplaySettings {
         other.themeId == themeId &&
         other.fontFamily == fontFamily &&
         other.fontSize == fontSize &&
-        other.lineHeight == lineHeight;
+        other.lineHeight == lineHeight &&
+        other.scrollbackLines == scrollbackLines;
   }
 
   @override
-  int get hashCode => Object.hash(themeId, fontFamily, fontSize, lineHeight);
+  int get hashCode =>
+      Object.hash(themeId, fontFamily, fontSize, lineHeight, scrollbackLines);
 
   TerminalStyle get textStyle {
     return TerminalStyle(
       fontFamily: fontFamily,
+      fontFamilyFallback: terminalFontFallbackFamilies(fontFamily),
       fontSize: fontSize,
       height: lineHeight,
     );
@@ -81,6 +94,35 @@ class TerminalDisplaySettings {
       SerlinkTerminalThemeId.highContrast => _highContrastTheme,
     };
   }
+}
+
+SerlinkTerminalThemeId _themeIdFromJson(Object? value) {
+  if (value is! String) {
+    return SerlinkTerminalThemeId.serlinkDark;
+  }
+  for (final themeId in SerlinkTerminalThemeId.values) {
+    if (themeId.name == value) {
+      return themeId;
+    }
+  }
+  return SerlinkTerminalThemeId.serlinkDark;
+}
+
+double _doubleFromJson(Object? value, {required double fallback}) {
+  return switch (value) {
+    final num v => v.toDouble(),
+    final String v => double.tryParse(v) ?? fallback,
+    _ => fallback,
+  };
+}
+
+int _intFromJson(Object? value, {required int fallback}) {
+  return switch (value) {
+    final int v => v,
+    final num v => v.toInt(),
+    final String v => int.tryParse(v) ?? fallback,
+    _ => fallback,
+  };
 }
 
 abstract interface class TerminalDisplaySettingsRepository {

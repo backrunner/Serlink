@@ -28,21 +28,17 @@ class Redactor {
   }
 
   static SentryEvent redactSentryEvent(SentryEvent event) {
-    return event.copyWith(
-      message: event.message == null
+    event.message = event.message == null
+        ? null
+        : SentryMessage(Redactor.redact(event.message!.formatted));
+    event.request = null;
+    event.breadcrumbs = event.breadcrumbs?.map((breadcrumb) {
+      breadcrumb.message = breadcrumb.message == null
           ? null
-          : SentryMessage(Redactor.redact(event.message!.formatted)),
-      request: null,
-      breadcrumbs: event.breadcrumbs
-          ?.map(
-            (breadcrumb) => breadcrumb.copyWith(
-              message: breadcrumb.message == null
-                  ? null
-                  : Redactor.redact(breadcrumb.message!),
-              data: const <String, dynamic>{'redacted': true},
-            ),
-          )
-          .toList(),
-    );
+          : Redactor.redact(breadcrumb.message!);
+      breadcrumb.data = const <String, dynamic>{'redacted': true};
+      return breadcrumb;
+    }).toList();
+    return event;
   }
 }

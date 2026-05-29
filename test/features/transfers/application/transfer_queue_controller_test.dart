@@ -57,7 +57,34 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(queue.state.byId(taskId)!.state, TransferState.completed);
+    expect(connection.cancelCount, 0);
   });
+
+  test(
+    'propagates pause, resume, and cancel to active transfer stream',
+    () async {
+      final taskId = queue.enqueueUpload(
+        connection: connection,
+        localPath: '/local/large.iso',
+        remotePath: '/remote/large.iso',
+      );
+
+      await queue.pause(taskId);
+
+      expect(queue.state.byId(taskId)!.state, TransferState.paused);
+      expect(connection.pauseCount, 1);
+
+      await queue.resume(taskId);
+
+      expect(queue.state.byId(taskId)!.state, TransferState.running);
+      expect(connection.resumeCount, 1);
+
+      await queue.cancel(taskId);
+
+      expect(queue.state.byId(taskId)!.state, TransferState.canceled);
+      expect(connection.cancelCount, 1);
+    },
+  );
 
   test(
     'enforces max concurrent transfers and starts next after completion',
@@ -257,6 +284,9 @@ class _FakeSftpConnection implements SftpConnection {
   final Completer<void> _done = Completer<void>();
   TransferItemKind? lastUploadKind;
   TransferItemKind? lastDownloadKind;
+  int pauseCount = 0;
+  int resumeCount = 0;
+  int cancelCount = 0;
 
   void emit(TransferProgress progress) {
     _controller!.add(progress);
@@ -281,7 +311,7 @@ class _FakeSftpConnection implements SftpConnection {
     required String remotePath,
   }) {
     lastUploadKind = itemKind;
-    _controller = StreamController<TransferProgress>();
+    _controller = _createController();
     return _controller!.stream;
   }
 
@@ -293,8 +323,22 @@ class _FakeSftpConnection implements SftpConnection {
     required String localPath,
   }) {
     lastDownloadKind = itemKind;
-    _controller = StreamController<TransferProgress>();
+    _controller = _createController();
     return _controller!.stream;
+  }
+
+  StreamController<TransferProgress> _createController() {
+    return StreamController<TransferProgress>(
+      onPause: () {
+        pauseCount += 1;
+      },
+      onResume: () {
+        resumeCount += 1;
+      },
+      onCancel: () {
+        cancelCount += 1;
+      },
+    );
   }
 
   @override

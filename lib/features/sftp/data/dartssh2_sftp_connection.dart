@@ -137,13 +137,19 @@ class DartSsh2SftpConnection implements SftpConnection {
     required String localPath,
     required String remotePath,
   }) {
-    final controller = StreamController<TransferProgress>();
+    final transfer = _SftpTransferControl();
+    final controller = StreamController<TransferProgress>(
+      onPause: transfer.pause,
+      onResume: transfer.resume,
+      onCancel: transfer.cancel,
+    );
     unawaited(
       _upload(
         taskId: taskId,
         itemKind: itemKind,
         localPath: localPath,
         remotePath: remotePath,
+        transfer: transfer,
         controller: controller,
       ),
     );
@@ -157,13 +163,19 @@ class DartSsh2SftpConnection implements SftpConnection {
     required String remotePath,
     required String localPath,
   }) {
-    final controller = StreamController<TransferProgress>();
+    final transfer = _SftpTransferControl();
+    final controller = StreamController<TransferProgress>(
+      onPause: transfer.pause,
+      onResume: transfer.resume,
+      onCancel: transfer.cancel,
+    );
     unawaited(
       _download(
         taskId: taskId,
         itemKind: itemKind,
         remotePath: remotePath,
         localPath: localPath,
+        transfer: transfer,
         controller: controller,
       ),
     );
@@ -182,6 +194,7 @@ class DartSsh2SftpConnection implements SftpConnection {
     required TransferItemKind itemKind,
     required String localPath,
     required String remotePath,
+    required _SftpTransferControl transfer,
     required StreamController<TransferProgress> controller,
   }) async {
     try {
@@ -191,6 +204,7 @@ class DartSsh2SftpConnection implements SftpConnection {
             taskId: taskId,
             localPath: localPath,
             remotePath: remotePath,
+            transfer: transfer,
             controller: controller,
           );
         case TransferItemKind.directory:
@@ -198,16 +212,23 @@ class DartSsh2SftpConnection implements SftpConnection {
             taskId: taskId,
             localPath: localPath,
             remotePath: remotePath,
+            transfer: transfer,
             controller: controller,
           );
       }
+    } on _SftpTransferCanceled {
+      // Queue cancellation owns the visible task state.
     } on Object catch (error, stackTrace) {
-      controller.addError(
-        SftpFailureException(mapExternalSftpError(error)),
-        stackTrace,
-      );
+      if (!transfer.isCanceled && !controller.isClosed) {
+        controller.addError(
+          SftpFailureException(mapExternalSftpError(error)),
+          stackTrace,
+        );
+      }
     } finally {
-      await controller.close();
+      if (!controller.isClosed) {
+        await controller.close();
+      }
     }
   }
 
@@ -216,6 +237,7 @@ class DartSsh2SftpConnection implements SftpConnection {
     required TransferItemKind itemKind,
     required String remotePath,
     required String localPath,
+    required _SftpTransferControl transfer,
     required StreamController<TransferProgress> controller,
   }) async {
     try {
@@ -225,6 +247,7 @@ class DartSsh2SftpConnection implements SftpConnection {
             taskId: taskId,
             remotePath: remotePath,
             localPath: localPath,
+            transfer: transfer,
             controller: controller,
           );
         case TransferItemKind.directory:
@@ -232,16 +255,23 @@ class DartSsh2SftpConnection implements SftpConnection {
             taskId: taskId,
             remotePath: remotePath,
             localPath: localPath,
+            transfer: transfer,
             controller: controller,
           );
       }
+    } on _SftpTransferCanceled {
+      // Queue cancellation owns the visible task state.
     } on Object catch (error, stackTrace) {
-      controller.addError(
-        SftpFailureException(mapExternalSftpError(error)),
-        stackTrace,
-      );
+      if (!transfer.isCanceled && !controller.isClosed) {
+        controller.addError(
+          SftpFailureException(mapExternalSftpError(error)),
+          stackTrace,
+        );
+      }
     } finally {
-      await controller.close();
+      if (!controller.isClosed) {
+        await controller.close();
+      }
     }
   }
 
@@ -249,10 +279,14 @@ class DartSsh2SftpConnection implements SftpConnection {
     required TransferTaskId taskId,
     required String localPath,
     required String remotePath,
+    required _SftpTransferControl transfer,
     required StreamController<TransferProgress> controller,
   }) async {
+    await transfer.waitIfPaused();
     final totalBytes = await File(localPath).length();
-    controller.add(
+    _emitTransferProgress(
+      controller,
+      transfer,
       TransferProgress(
         taskId: taskId,
         state: TransferState.running,
@@ -266,9 +300,13 @@ class DartSsh2SftpConnection implements SftpConnection {
       remotePath: remotePath,
       baseTransferredBytes: 0,
       totalBytes: totalBytes,
+      transfer: transfer,
       controller: controller,
     );
-    controller.add(
+    transfer.markCompleted();
+    _emitTransferProgress(
+      controller,
+      transfer,
       TransferProgress(
         taskId: taskId,
         state: TransferState.completed,
@@ -282,13 +320,16 @@ class DartSsh2SftpConnection implements SftpConnection {
     required TransferTaskId taskId,
     required String localPath,
     required String remotePath,
+    required _SftpTransferControl transfer,
     required StreamController<TransferProgress> controller,
   }) async {
+    await transfer.waitIfPaused();
     final root = Directory(localPath);
     final files = <File>[];
     final directories = <Directory>[root];
     var totalBytes = 0;
     await for (final entity in root.list(recursive: true, followLinks: false)) {
+      await transfer.waitIfPaused();
       if (entity is Directory) {
         directories.add(entity);
       } else if (entity is File) {
@@ -296,7 +337,9 @@ class DartSsh2SftpConnection implements SftpConnection {
         totalBytes += await entity.length();
       }
     }
-    controller.add(
+    _emitTransferProgress(
+      controller,
+      transfer,
       TransferProgress(
         taskId: taskId,
         state: TransferState.running,
@@ -309,10 +352,12 @@ class DartSsh2SftpConnection implements SftpConnection {
       final remoteDirectory = relativePath == '.'
           ? remotePath
           : p.posix.join(remotePath, p.split(relativePath).join('/'));
+      await transfer.waitIfPaused();
       await _ensureRemoteDirectory(remoteDirectory);
     }
     var transferredBytes = 0;
     for (final file in files) {
+      await transfer.waitIfPaused();
       final relativePath = p.relative(file.path, from: root.path);
       final remoteFilePath = p.posix.join(
         remotePath,
@@ -324,11 +369,15 @@ class DartSsh2SftpConnection implements SftpConnection {
         remotePath: remoteFilePath,
         baseTransferredBytes: transferredBytes,
         totalBytes: totalBytes,
+        transfer: transfer,
         controller: controller,
       );
       transferredBytes += await file.length();
     }
-    controller.add(
+    transfer.markCompleted();
+    _emitTransferProgress(
+      controller,
+      transfer,
       TransferProgress(
         taskId: taskId,
         state: TransferState.completed,
@@ -344,10 +393,12 @@ class DartSsh2SftpConnection implements SftpConnection {
     required String remotePath,
     required int baseTransferredBytes,
     required int totalBytes,
+    required _SftpTransferControl transfer,
     required StreamController<TransferProgress> controller,
   }) async {
     ssh.SftpFile? remoteFile;
     try {
+      await transfer.waitIfPaused();
       final localFile = File(localPath);
       remoteFile = await _sftp.open(
         remotePath,
@@ -359,7 +410,9 @@ class DartSsh2SftpConnection implements SftpConnection {
       final writer = remoteFile.write(
         localFile.openRead().map(Uint8List.fromList),
         onProgress: (transferred) {
-          controller.add(
+          _emitTransferProgress(
+            controller,
+            transfer,
             TransferProgress(
               taskId: taskId,
               state: TransferState.running,
@@ -369,7 +422,9 @@ class DartSsh2SftpConnection implements SftpConnection {
           );
         },
       );
+      transfer.bindWriter(writer);
       await writer.done;
+      transfer.throwIfCanceled();
     } finally {
       await remoteFile?.close();
     }
@@ -379,11 +434,15 @@ class DartSsh2SftpConnection implements SftpConnection {
     required TransferTaskId taskId,
     required String remotePath,
     required String localPath,
+    required _SftpTransferControl transfer,
     required StreamController<TransferProgress> controller,
   }) async {
+    await transfer.waitIfPaused();
     final stat = await _sftp.stat(remotePath);
     final totalBytes = stat.size;
-    controller.add(
+    _emitTransferProgress(
+      controller,
+      transfer,
       TransferProgress(
         taskId: taskId,
         state: TransferState.running,
@@ -398,9 +457,13 @@ class DartSsh2SftpConnection implements SftpConnection {
       baseTransferredBytes: 0,
       fileBytes: totalBytes,
       aggregateTotalBytes: totalBytes,
+      transfer: transfer,
       controller: controller,
     );
-    controller.add(
+    transfer.markCompleted();
+    _emitTransferProgress(
+      controller,
+      transfer,
       TransferProgress(
         taskId: taskId,
         state: TransferState.completed,
@@ -414,12 +477,15 @@ class DartSsh2SftpConnection implements SftpConnection {
     required TransferTaskId taskId,
     required String remotePath,
     required String localPath,
+    required _SftpTransferControl transfer,
     required StreamController<TransferProgress> controller,
   }) async {
+    await transfer.waitIfPaused();
     final tree = await _collectRemoteTree(remotePath);
     var totalBytes = 0;
     var hasUnknownSize = false;
     for (final file in tree.files) {
+      await transfer.waitIfPaused();
       final size = file.size;
       if (size == null) {
         hasUnknownSize = true;
@@ -428,7 +494,9 @@ class DartSsh2SftpConnection implements SftpConnection {
       }
     }
     final aggregateTotalBytes = hasUnknownSize ? null : totalBytes;
-    controller.add(
+    _emitTransferProgress(
+      controller,
+      transfer,
       TransferProgress(
         taskId: taskId,
         state: TransferState.running,
@@ -438,6 +506,7 @@ class DartSsh2SftpConnection implements SftpConnection {
     );
     await Directory(localPath).create(recursive: true);
     for (final directory in tree.directories) {
+      await transfer.waitIfPaused();
       final relativePath = p.posix.relative(directory.path, from: remotePath);
       if (relativePath == '.') {
         continue;
@@ -448,6 +517,7 @@ class DartSsh2SftpConnection implements SftpConnection {
     }
     var transferredBytes = 0;
     for (final file in tree.files) {
+      await transfer.waitIfPaused();
       final relativePath = p.posix.relative(file.path, from: remotePath);
       final localFilePath = p.joinAll([
         localPath,
@@ -460,11 +530,15 @@ class DartSsh2SftpConnection implements SftpConnection {
         baseTransferredBytes: transferredBytes,
         fileBytes: file.size,
         aggregateTotalBytes: aggregateTotalBytes,
+        transfer: transfer,
         controller: controller,
       );
       transferredBytes += file.size ?? await File(localFilePath).length();
     }
-    controller.add(
+    transfer.markCompleted();
+    _emitTransferProgress(
+      controller,
+      transfer,
       TransferProgress(
         taskId: taskId,
         state: TransferState.completed,
@@ -481,27 +555,86 @@ class DartSsh2SftpConnection implements SftpConnection {
     required int baseTransferredBytes,
     required int? fileBytes,
     required int? aggregateTotalBytes,
+    required _SftpTransferControl transfer,
     required StreamController<TransferProgress> controller,
   }) async {
+    await transfer.waitIfPaused();
     final localFile = File(localPath);
     await localFile.parent.create(recursive: true);
-    final sink = localFile.openWrite();
-    await _sftp.download(
-      remotePath,
-      sink,
-      length: fileBytes == 0 ? null : fileBytes,
-      closeDestination: true,
-      onProgress: (transferred) {
-        controller.add(
-          TransferProgress(
-            taskId: taskId,
-            state: TransferState.running,
-            transferredBytes: baseTransferredBytes + transferred,
-            totalBytes: aggregateTotalBytes,
-          ),
-        );
-      },
-    );
+    ssh.SftpFile? remoteFile;
+    IOSink? sink;
+    StreamSubscription<Uint8List>? subscription;
+    final done = Completer<void>();
+    var transferredBytes = 0;
+
+    Future<void> fail(Object error, StackTrace stackTrace) async {
+      if (!done.isCompleted) {
+        done.completeError(error, stackTrace);
+      }
+      await subscription?.cancel();
+    }
+
+    try {
+      remoteFile = await _sftp.open(
+        remotePath,
+        mode: ssh.SftpFileOpenMode.read,
+      );
+      sink = localFile.openWrite();
+      subscription = remoteFile
+          .read(length: fileBytes == 0 ? null : fileBytes)
+          .listen(
+            null,
+            onError: (Object error, StackTrace stackTrace) {
+              if (!done.isCompleted) {
+                done.completeError(error, stackTrace);
+              }
+            },
+            onDone: () {
+              if (!done.isCompleted) {
+                done.complete();
+              }
+            },
+            cancelOnError: true,
+          );
+      subscription.onData((chunk) {
+        Future<void> writeChunk() async {
+          try {
+            await transfer.waitIfPaused();
+            sink!.add(chunk);
+            await sink.flush();
+            transferredBytes += chunk.length;
+            _emitTransferProgress(
+              controller,
+              transfer,
+              TransferProgress(
+                taskId: taskId,
+                state: TransferState.running,
+                transferredBytes: baseTransferredBytes + transferredBytes,
+                totalBytes: aggregateTotalBytes,
+              ),
+            );
+          } on Object catch (error, stackTrace) {
+            await fail(error, stackTrace);
+          }
+        }
+
+        subscription!.pause(writeChunk());
+      });
+      transfer.bindSubscription(
+        subscription,
+        onCanceled: () {
+          if (!done.isCompleted) {
+            done.completeError(const _SftpTransferCanceled());
+          }
+        },
+      );
+      await done.future;
+      transfer.throwIfCanceled();
+    } finally {
+      await subscription?.cancel();
+      await sink?.close();
+      await remoteFile?.close();
+    }
   }
 
   Future<_RemoteTree> _collectRemoteTree(String rootPath) async {
@@ -582,6 +715,151 @@ class _RemoteTree {
 
   final List<SftpEntry> directories;
   final List<SftpEntry> files;
+}
+
+class _SftpTransferCanceled implements Exception {
+  const _SftpTransferCanceled();
+}
+
+class _SftpTransferControl {
+  final List<void Function()> _pauseCallbacks = [];
+  final List<void Function()> _resumeCallbacks = [];
+  final List<FutureOr<void> Function()> _cancelCallbacks = [];
+
+  bool _paused = false;
+  bool _canceled = false;
+  bool _completed = false;
+  Completer<void>? _resumeCompleter;
+  Future<void>? _cancelFuture;
+
+  bool get isCanceled => _canceled;
+
+  void markCompleted() {
+    _completed = true;
+  }
+
+  void pause() {
+    if (_canceled || _completed || _paused) {
+      return;
+    }
+    _paused = true;
+    _resumeCompleter ??= Completer<void>();
+    for (final callback in _pauseCallbacks) {
+      callback();
+    }
+  }
+
+  void resume() {
+    if (!_paused) {
+      return;
+    }
+    _paused = false;
+    final completer = _resumeCompleter;
+    _resumeCompleter = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+    for (final callback in _resumeCallbacks) {
+      callback();
+    }
+  }
+
+  Future<void> cancel() {
+    if (_completed) {
+      return Future.value();
+    }
+    final existing = _cancelFuture;
+    if (existing != null) {
+      return existing;
+    }
+    _canceled = true;
+    resume();
+    final callbacks = List<FutureOr<void> Function()>.of(_cancelCallbacks);
+    _cancelCallbacks.clear();
+    _cancelFuture = Future.wait([
+      for (final callback in callbacks) _ignoreCancelError(callback),
+    ]).then((_) {});
+    return _cancelFuture!;
+  }
+
+  Future<void> waitIfPaused() async {
+    while (_paused && !_canceled) {
+      await _resumeCompleter!.future;
+    }
+    throwIfCanceled();
+  }
+
+  void throwIfCanceled() {
+    if (_canceled) {
+      throw const _SftpTransferCanceled();
+    }
+  }
+
+  void bindWriter(ssh.SftpFileWriter writer) {
+    _pauseCallbacks.add(writer.pause);
+    _resumeCallbacks.add(writer.resume);
+    _cancelCallbacks.add(() => _abortWriter(writer));
+    if (_paused) {
+      writer.pause();
+    }
+    if (_canceled) {
+      unawaited(_abortWriter(writer));
+    }
+  }
+
+  void bindSubscription<T>(
+    StreamSubscription<T> subscription, {
+    void Function()? onCanceled,
+  }) {
+    _pauseCallbacks.add(subscription.pause);
+    _resumeCallbacks.add(subscription.resume);
+    _cancelCallbacks.add(() async {
+      await subscription.cancel();
+      onCanceled?.call();
+    });
+    if (_paused) {
+      subscription.pause();
+    }
+    if (_canceled) {
+      unawaited(_ignoreFuture(subscription.cancel()));
+      onCanceled?.call();
+    }
+  }
+}
+
+Future<void> _ignoreCancelError(FutureOr<void> Function() callback) async {
+  try {
+    await callback();
+  } on Object {
+    // Transfer cancellation is best-effort; the queue state is already owned
+    // by the caller and must not get stuck because a transport refused abort.
+  }
+}
+
+Future<void> _abortWriter(ssh.SftpFileWriter writer) async {
+  try {
+    await writer.abort();
+  } on StateError {
+    // The writer may have completed between the cancel request and abort.
+  }
+}
+
+Future<void> _ignoreFuture(Future<void> future) async {
+  try {
+    await future;
+  } on Object {
+    // Best-effort cleanup.
+  }
+}
+
+void _emitTransferProgress(
+  StreamController<TransferProgress> controller,
+  _SftpTransferControl transfer,
+  TransferProgress progress,
+) {
+  if (!transfer.isCanceled && !controller.isClosed) {
+    controller.add(progress);
+  }
 }
 
 Future<T> _withMappedSftpErrors<T>(Future<T> Function() operation) async {

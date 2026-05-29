@@ -310,7 +310,10 @@ class TransferQueueController {
     );
     _replaceTask(updated);
     if (_isTerminal(progress.state)) {
-      _subscriptions.remove(taskId)?.cancel();
+      // Terminal progress means the transfer completed on its own. Let the
+      // source stream close normally so SFTP implementations do not interpret
+      // this as a user-requested cancellation.
+      _subscriptions.remove(taskId);
       _pump();
     }
   }

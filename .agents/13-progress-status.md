@@ -1,0 +1,114 @@
+# Implementation Progress Status
+
+Last updated: 2026-05-29.
+
+This file tracks the current codebase against the desktop complete-product plan. It is intentionally stricter than a public MVP checklist: items marked partial are not release-complete.
+
+## Current Verification
+
+- `flutter analyze`: passing before the latest documentation/support-package收口; rerun required after the current edits.
+- `flutter test`: passing before the latest documentation/support-package收口; rerun required after the current edits.
+- Current verified scope is unit/widget-level plus smoke tests. Full desktop build and integration tests are still required.
+- `flutter_pty` currently emits a macOS Swift Package Manager support warning during Flutter commands. It is non-blocking today, but must be tracked before release because future Flutter versions may make it an error.
+- Scope note: see [14-release-scope-decisions.md](14-release-scope-decisions.md) for capabilities intentionally moved out of the first desktop release.
+
+## Phase Status
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| Phase 0: Project Foundation | Mostly complete | Flutter desktop project, module layout, Riverpod, Drift, xterm, dartssh2, Sentry redaction hooks, app shell, tests, strict analyzer, profile database lock, and best-effort local file permission tightening are in place. CI/package automation is still not complete. |
+| Phase 1: Vault, Host Inventory, Credentials | Partial, strong core | Vault create/unlock/lock, recovery key modal, encrypted records, host CRUD, password/private-key identities, private-key file import, encrypted backup import/export, local OS secure-storage unlock protector, OpenSSH config preview/import UI with resolvable ProxyJump linking and IdentityFile private-key import/linking, OpenSSH known_hosts import UI/service, OpenSSH certificate import UI/service, Settings credential manager, Settings known-host manager, host connection settings with persisted keepalive/timeout/reconnect policy, and locked UI exist. PPK import is out of first-release scope. |
+| Phase 2: SSH Terminal | Partial | dartssh2 shell service, password/private-key auth, xterm adapter, real local terminal tabs backed by desktop PTY, batched terminal output writes, workspace tabs, reconnect-in-place semantics, automatic reconnect policy, split-tab session cleanup, known-host encrypted storage, fingerprint modal, multiline paste confirmation, buffer search, encrypted global terminal font/theme settings, encrypted per-host terminal profiles, terminal split panes with independent pane sessions, a basic terminal shortcut pass-through policy, and automated CJK/emoji/combining-character input compatibility coverage exist. Cross-platform shortcut audit and real OS IME interaction verification are still pending. |
+| Phase 3: SFTP MVP | Partial | SFTP service and list/table runtime view exist. Directory navigation, filtering, mkdir, rename, move, delete, chmod, permission display, text preview/remote edit for bounded-size files, file/folder upload and download queueing, Transfers queue UI, overwrite/merge/skip/rename confirmation, speed, ETA, typed SFTP failures, concise failure UI, and encrypted transfer history persistence exist. Integration fixtures still need work. Explorer-style mode is out of first-release scope. |
+| Phase 4: WebDAV Encrypted Sync | Partial, strong core | Sync provider interfaces, local test provider, WebDAV security guard, Settings setup UI, encrypted WebDAV configuration, SecretStore-backed WebDAV password storage, automatic WebDAV sync scheduling, pull/import of missing remote records, same-record conflict detection, host/snippet/sync-settings field-level conflict merge, encrypted tombstone delete propagation, stale remote record cleanup, automatic retry/backoff after failures, blocking Settings conflict resolver, encrypted sync device metadata, Settings device cleanup, remote wrong-vault/corrupt-manifest detection, blocking repair actions, delete tombstones for device revocation, local-device revoked write blocking, WebDAV parent-directory creation, stable WebDAV provider error classification, and TLS certificate diagnostic/pinning handling exist. Identity/credential conflicts remain whole-record only by design. |
+| Phase 5: Desktop UX Completion | Partial | Professional compact shell exists with Hosts/Sessions/Files/Transfers/Snippets/Settings. Settings is structured. Encrypted command snippets now support CRUD, tags, confirm-before-run, sync-safe delete tombstones, and insert/run into the active connected terminal tab. Command palette, shortcut map, accessibility pass, and final UI polish remain. |
+| Phase 6: Advanced SSH | Partial | Keyboard-interactive auth material exists. Local, remote, and SOCKS dynamic forwarding have service support, Terminal toolbar modal UI, stop control, and session cleanup. ProxyJump host links are resolved into ordered jump snapshots and dartssh2 connects through bastions with nested `forwardLocal` channels. OpenSSH certificate auth material is bound to private-key signing for dartssh2 public-key auth. Host startup commands resolve into connection profiles and execute after terminal attach. Bastion/certificate/forwarding integration fixtures are not complete. SSH Agent, FIDO2, and zmodem are out of first-release scope. |
+| Phase 7: iCloud Sync | Out of first-release scope | CloudKit and iCloud Drive providers are intentionally deferred. WebDAV remains the first-release encrypted sync provider. |
+| Phase 8: Beta Hardening | Early partial | Sentry redaction, runtime mode basics, and redacted diagnostic bundle export with build metadata exist. Packaging, signing/notarization, installers, dependency audit, SBOM, notices, and integration test servers are missing. |
+
+## Completed Or Implemented In Code
+
+- Encrypted vault envelope with AAD validation and tamper tests.
+- Drift persistence for vault header and encrypted records.
+- Vault creation/unlock/lock and recovery key handling.
+- Device-local vault unlock uses OS secure storage for a random device key, never stores the vault passphrase, and can be enabled/disabled from Settings.
+- Host repository and host UI create/edit/delete.
+- Password identity and private-key identity creation through host flow.
+- Encrypted identity secret records.
+- Encrypted known-host records and fingerprint verification flow.
+- Blocking fingerprint modal for unknown/changed host keys.
+- Settings > Data exposes OpenSSH config, `known_hosts`, and OpenSSH certificate import actions while the vault is unlocked.
+- OpenSSH config import previews common `Host`, `HostName`, `User`, `Port`, `IdentityFile`, `CertificateFile`, and `ProxyJump` directives, links resolvable ProxyJump aliases to imported or existing host IDs, imports readable local `IdentityFile` private keys as encrypted identities when the config source path is available, warns for unsupported directives/patterns/unresolved jumps/missing keys, and imports host metadata as encrypted records after confirmation.
+- Connection profiles now expand host `jumpHostIds` into ordered ProxyJump chains, reject cyclic chains, and keep each jump host's own encrypted auth material isolated in memory for connection time only.
+- OpenSSH `known_hosts` import maps hostname/port entries to existing Serlink hosts and stores imported fingerprints as encrypted known-host records after confirmation.
+- OpenSSH certificate import UI/service validates certificate public-key lines, stores certificate/private-key/passphrase material as encrypted identity secrets, and creates `openSshCertificate` identity records after a blocking preview modal.
+- Settings includes compact credential and known-host managers with blocking delete confirmation and encrypted tombstone generation for deleted credential/known-host records.
+- OpenSSH certificate identities now resolve into connection auth material and dartssh2 sends the certificate public-key blob while signing with the paired private key.
+- Host connection settings now persist connect timeout, keepalive interval, reconnect attempts, and reconnect backoff, and those values flow into SSH connection profiles.
+- Encrypted vault backup import/export service and Settings entry points.
+- Terminal/SFTP/local terminal mixed workspace tab container, including opening same-host SFTP from a terminal tab and same-host terminal from an SFTP tab.
+- Local terminal tabs now start the desktop user's default shell through `flutter_pty`, attach to the same xterm adapter as SSH terminals, disconnect cleanly on process exit, and reconnect in place by starting a new local shell.
+- Closing a workspace tab now cleans up all underlying pane/session connections, including split terminal panes and SFTP sessions.
+- Terminal tabs can manage local, remote, and SOCKS dynamic forwards through one compact blocking modal, and forwards are cleaned up when the SSH/SFTP session closes.
+- SSH and SFTP sessions can connect through configured ProxyJump bastions using dartssh2 `forwardLocal` channels; host-key verification runs for each hop.
+- SSH terminal profiles carry startup commands; terminal tabs execute non-empty commands after the shell is attached.
+- Terminal multiline paste detection and blocking confirmation modal.
+- Terminal adapter batches burst stdout/stderr writes and flushes pending terminal output before session close.
+- Terminal buffer search with highlighted matches and current-match navigation.
+- Terminal display settings for font size, line height, and built-in themes persist as encrypted vault records.
+- Per-host terminal display profiles persist as encrypted vault records and are attached to terminal tabs as in-memory snapshots so existing terminals keep their styling after vault lock.
+- Reconnect in the current tab as a new connection.
+- Vault lock blocks new credential resolution but does not explicitly tear down existing runtimes.
+- SFTP runtime list view using the active SFTP connection.
+- SFTP list filtering and file operations for mkdir, rename, move, delete, and chmod through the active runtime connection.
+- SFTP file rows open a compact text preview/edit modal; previews are capped at 64 KiB and truncated previews are read-only to avoid overwriting large files with partial content.
+- SFTP file and folder upload/download queueing through `TransferQueueController`.
+- Transfers page with queue state, progress, speed, ETA, pause/resume/cancel/retry actions.
+- Overwrite/merge/skip/rename confirmation for remote upload targets and local download targets.
+- Recursive folder upload/download support in the dartssh2 SFTP adapter.
+- Transfer queue domain/controller with unit and smoke coverage.
+- Typed SFTP failure mapping for dartssh2 and local file-system errors.
+- SFTP list/operation/transfer failures now surface concise user-facing messages instead of raw exception strings.
+- Transfer task metadata/history persists as encrypted vault records.
+- App restart does not restore transfer sessions; previously active transfer history is marked `transfer.interrupted`.
+- Transfer persistence is best-effort so vault lock does not interrupt already-established SFTP connections.
+- Settings > Sync supports WebDAV account configuration.
+- WebDAV endpoint, username, base path, enabled state, and insecure-HTTP opt-in are stored as encrypted vault settings.
+- WebDAV password material is stored through `SecretStore` instead of vault records or SQLite plaintext.
+- HTTP WebDAV requires a blocking modal confirmation in the setup flow.
+- WebDAV sync is automatic: the app starts an auto-sync controller after launch, schedules sync when the vault is unlocked and WebDAV is enabled, syncs after syncable encrypted record changes, and periodically refreshes in the background.
+- Automatic WebDAV sync pulls missing remote encrypted records, detects same-record revision conflicts, then pushes the merged encrypted vault header, encrypted records, and encrypted manifest.
+- Automatic WebDAV sync propagates encrypted delete tombstones, prevents locally deleted records from being restored by stale remote objects, removes stale remote record objects during push, and retries failed syncs with bounded backoff.
+- Settings > Sync surfaces detected encrypted record conflicts and resolves them through blocking keep-local or use-remote actions.
+- Settings > Sync supports field-level conflict review and merge for host, snippet, and sync settings records; identity/credential conflicts intentionally stay whole-record resolution.
+- Sync rejects remote manifests from another vault, treats corrupted or mismatched remote manifests as repairable failures, and Settings > Sync can rebuild the remote encrypted sync set after blocking confirmation.
+- Sync registers a device-local sync device ID through `SecretStore`, stores device metadata as encrypted vault records, writes encrypted writer-device metadata into the sync manifest, exposes a Settings modal for removing non-local device records, supports resetting the current local sync device registration with an encrypted tombstone for the old identity, propagates encrypted device tombstones, and prevents a locally revoked device from silently re-registering during automatic sync.
+- WebDAV sync creates remote parent directories before encrypted object writes and maps provider failures into stable redacted errors for authentication, permission, missing/incomplete remote paths, provider locks, quota, TLS certificate failures, timeouts, network failures, and server errors. Certificate diagnostics now carry fingerprint/validity data into the repair flow and certificate trust is persisted as an endpoint pin.
+- The real desktop database path is protected by a profile lock and best-effort `0700` directory / `0600` database-file permissions on non-Windows platforms.
+- Diagnostic bundle export writes app build metadata, redacted runtime metadata, and redacted log tail only, explicitly excluding terminal output, commands, hostnames, usernames, paths, credentials, and private keys.
+- Diagnostic bundle export also includes the recent Sentry event id when one exists, but still excludes all sensitive session content.
+- Snippets are stored as encrypted vault records, support CRUD in the Snippets surface, and can be inserted into or executed in the active connected terminal tab with modal confirmation when required.
+- Terminal tabs now support split-pane presentation with horizontal/vertical layout switching, active-pane selection, and independent pane-level terminal sessions and lifecycle inside one tab container.
+- Terminal views now keep a narrow local shortcut allowlist for copy/paste/select-all/search while leaving other key combinations to the terminal input path by default.
+- Terminal widget tests now cover CJK text, emoji, and combining-character input through `TerminalView`, guarding the desktop input path on top of xterm's built-in wide-character and composing support.
+- Redaction utility and Sentry `beforeSend` sanitization.
+
+## Highest Priority Missing Work
+
+1. SFTP transfer hardening that can be unit-tested without real servers: queue edge cases, interruption semantics, and local path conflict handling.
+2. Sync productization that can be completed in code: provider-specific quota/partial-upload guidance, migration policy, and WebDAV compatibility error mapping.
+3. Terminal maturity that can be covered without real devices: shortcut policy coverage and buffer/search behavior. Real OS IME interaction verification is lower priority until release QA.
+4. Advanced SSH integration fixtures for ProxyJump, OpenSSH certificates, startup commands, and forwarding.
+5. Import pipeline hardening for `CertificateFile`, `Include`, `Match`, inheritance, and other OpenSSH edge cases.
+6. Release engineering: packaging, signing, notarization, dependency audit, SBOM, license notices, integration servers.
+7. Platform security hardening: platform-specific temp-file cleanup review and OS-specific permission verification.
+8. Explicitly deferred: iCloud providers, SSH Agent, FIDO2/hardware keys, zmodem/rz/sz, PuTTY PPK import, and Explorer-style SFTP mode.
+
+## Current Implementation Focus
+
+The next implementation slices should close remaining desktop product gaps in this order:
+
+1. Close remaining pure-code sync and transfer gaps before spending time on real-device validation.
+2. Expand terminal shortcut policy tests and other deterministic terminal behavior coverage.
+3. Add integration fixtures for OpenSSH/SFTP/WebDAV once UI flows are stable.
+4. Add release engineering automation for packaging, signing inputs, dependency inventory, license notices, and SBOM.

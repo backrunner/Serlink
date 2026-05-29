@@ -1,0 +1,111 @@
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*.pyc
+*.class
+.atom/
+.history
+.svn/
+migrate_working_dir/
+
+# Editor and IDE files
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter, Dart, and Pub
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+/coverage/
+**/Flutter/ephemeral/
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# Symbolication and obfuscation output
+app.*.symbols
+app.*.map.json
+
+# Android build artifacts
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Apple and Swift build artifacts
+.build/
+.buildlog/
+.swiftpm/
+DerivedData/
+**/Pods/
+**/dgph
+**/xcuserdata/
+
+# Windows and CMake build artifacts
+.vs/
+cmake-build-*/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+x64/
+x86/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.[Cc]ache
+!*.[Cc]ache/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Credentials, signing material, and local SSH keys
+*.jks
+*.keystore
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.pfx
+*.p8
+*.pem
+*.der
+*.cer
+*.crt
+*.csr
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.ppk
+
+# Release archives and installers
+*.app.zip
+*.dmg
+*.pkg
+*.msix
+*.msi
+*.exe
+*.AppImage
+*.deb
+*.rpm

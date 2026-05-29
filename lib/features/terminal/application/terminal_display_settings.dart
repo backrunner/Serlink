@@ -1,0 +1,268 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:xterm/xterm.dart';
+
+import '../../../core/ids/entity_id.dart';
+import '../../vault/application/vault_record_repository.dart';
+import '../../vault/application/vault_service.dart';
+
+enum SerlinkTerminalThemeId { serlinkDark, serlinkLight, highContrast }
+
+class TerminalDisplaySettings {
+  const TerminalDisplaySettings({
+    this.themeId = SerlinkTerminalThemeId.serlinkDark,
+    this.fontFamily = 'monospace',
+    this.fontSize = 13,
+    this.lineHeight = 1.2,
+  });
+
+  final SerlinkTerminalThemeId themeId;
+  final String fontFamily;
+  final double fontSize;
+  final double lineHeight;
+
+  Map<String, Object?> toJson() {
+    return {
+      'themeId': themeId.name,
+      'fontFamily': fontFamily,
+      'fontSize': fontSize,
+      'lineHeight': lineHeight,
+    };
+  }
+
+  factory TerminalDisplaySettings.fromJson(Map<String, Object?> json) {
+    return TerminalDisplaySettings(
+      themeId: SerlinkTerminalThemeId.values.byName(json['themeId'] as String),
+      fontFamily: json['fontFamily'] as String,
+      fontSize: (json['fontSize'] as num).toDouble(),
+      lineHeight: (json['lineHeight'] as num).toDouble(),
+    );
+  }
+
+  TerminalDisplaySettings copyWith({
+    SerlinkTerminalThemeId? themeId,
+    String? fontFamily,
+    double? fontSize,
+    double? lineHeight,
+  }) {
+    return TerminalDisplaySettings(
+      themeId: themeId ?? this.themeId,
+      fontFamily: fontFamily ?? this.fontFamily,
+      fontSize: fontSize ?? this.fontSize,
+      lineHeight: lineHeight ?? this.lineHeight,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is TerminalDisplaySettings &&
+        other.themeId == themeId &&
+        other.fontFamily == fontFamily &&
+        other.fontSize == fontSize &&
+        other.lineHeight == lineHeight;
+  }
+
+  @override
+  int get hashCode => Object.hash(themeId, fontFamily, fontSize, lineHeight);
+
+  TerminalStyle get textStyle {
+    return TerminalStyle(
+      fontFamily: fontFamily,
+      fontSize: fontSize,
+      height: lineHeight,
+    );
+  }
+
+  TerminalTheme get terminalTheme {
+    return switch (themeId) {
+      SerlinkTerminalThemeId.serlinkDark => _serlinkDarkTheme,
+      SerlinkTerminalThemeId.serlinkLight => _serlinkLightTheme,
+      SerlinkTerminalThemeId.highContrast => _highContrastTheme,
+    };
+  }
+}
+
+abstract interface class TerminalDisplaySettingsRepository {
+  Future<TerminalDisplaySettings?> read();
+  Future<void> save(TerminalDisplaySettings settings);
+  Future<void> delete();
+}
+
+abstract interface class TerminalHostDisplaySettingsRepository {
+  Future<TerminalDisplaySettings?> readForHost(HostId hostId);
+  Future<void> saveForHost(HostId hostId, TerminalDisplaySettings settings);
+  Future<void> deleteForHost(HostId hostId);
+}
+
+class EncryptedTerminalDisplaySettingsRepository
+    implements
+        TerminalDisplaySettingsRepository,
+        TerminalHostDisplaySettingsRepository {
+  EncryptedTerminalDisplaySettingsRepository({
+    required VaultService vault,
+    required VaultRecordRepository records,
+  }) : this._(vault, records);
+
+  EncryptedTerminalDisplaySettingsRepository._(this._vault, this._records);
+
+  static const recordType = 'terminal_settings';
+  static const hostProfileRecordType = 'terminal_profile';
+
+  final VaultService _vault;
+  final VaultRecordRepository _records;
+
+  @override
+  Future<TerminalDisplaySettings?> read() async {
+    final envelope = await _records.read(_terminalDisplaySettingsRecordId);
+    if (envelope == null) {
+      return null;
+    }
+    return _decode(envelope);
+  }
+
+  @override
+  Future<void> save(TerminalDisplaySettings settings) async {
+    final envelope = await _vault.encryptRecord(
+      id: _terminalDisplaySettingsRecordId,
+      type: recordType,
+      plaintext: utf8.encode(jsonEncode(settings.toJson())),
+    );
+    await _records.upsert(envelope);
+  }
+
+  @override
+  Future<void> delete() async {
+    await _records.delete(_terminalDisplaySettingsRecordId);
+  }
+
+  @override
+  Future<TerminalDisplaySettings?> readForHost(HostId hostId) async {
+    final envelope = await _records.read(_terminalHostProfileRecordId(hostId));
+    if (envelope == null) {
+      return null;
+    }
+    return _decode(envelope);
+  }
+
+  @override
+  Future<void> saveForHost(
+    HostId hostId,
+    TerminalDisplaySettings settings,
+  ) async {
+    final envelope = await _vault.encryptRecord(
+      id: _terminalHostProfileRecordId(hostId),
+      type: hostProfileRecordType,
+      plaintext: utf8.encode(jsonEncode(settings.toJson())),
+    );
+    await _records.upsert(envelope);
+  }
+
+  @override
+  Future<void> deleteForHost(HostId hostId) async {
+    await _records.delete(_terminalHostProfileRecordId(hostId));
+  }
+
+  Future<TerminalDisplaySettings> _decode(VaultRecordEnvelope envelope) async {
+    final plaintext = await _vault.decryptRecord(envelope);
+    return TerminalDisplaySettings.fromJson(
+      jsonDecode(utf8.decode(plaintext)) as Map<String, Object?>,
+    );
+  }
+}
+
+final _terminalDisplaySettingsRecordId = VaultRecordId(
+  'terminal:display_settings',
+);
+
+VaultRecordId _terminalHostProfileRecordId(HostId hostId) {
+  return VaultRecordId('terminal:profile:${hostId.value}');
+}
+
+extension SerlinkTerminalThemeLabel on SerlinkTerminalThemeId {
+  String get label {
+    return switch (this) {
+      SerlinkTerminalThemeId.serlinkDark => 'Serlink Dark',
+      SerlinkTerminalThemeId.serlinkLight => 'Serlink Light',
+      SerlinkTerminalThemeId.highContrast => 'High Contrast',
+    };
+  }
+}
+
+const _serlinkDarkTheme = TerminalTheme(
+  cursor: Color(0xFF58A6FF),
+  selection: Color(0x6658A6FF),
+  foreground: Color(0xFFE6EDF3),
+  background: Color(0xFF0D1117),
+  black: Color(0xFF0D1117),
+  red: Color(0xFFFF7B72),
+  green: Color(0xFF7EE787),
+  yellow: Color(0xFFFFD33D),
+  blue: Color(0xFF58A6FF),
+  magenta: Color(0xFFD2A8FF),
+  cyan: Color(0xFF76E3EA),
+  white: Color(0xFFE6EDF3),
+  brightBlack: Color(0xFF6E7681),
+  brightRed: Color(0xFFFFA198),
+  brightGreen: Color(0xFF56D364),
+  brightYellow: Color(0xFFE3B341),
+  brightBlue: Color(0xFF79C0FF),
+  brightMagenta: Color(0xFFBC8CFF),
+  brightCyan: Color(0xFF39C5CF),
+  brightWhite: Color(0xFFFFFFFF),
+  searchHitBackground: Color(0x99FFD33D),
+  searchHitBackgroundCurrent: Color(0xFF58A6FF),
+  searchHitForeground: Color(0xFF0D1117),
+);
+
+const _serlinkLightTheme = TerminalTheme(
+  cursor: Color(0xFF0969DA),
+  selection: Color(0x663A7BD5),
+  foreground: Color(0xFF24292F),
+  background: Color(0xFFFFFFFF),
+  black: Color(0xFF24292F),
+  red: Color(0xFFCF222E),
+  green: Color(0xFF1A7F37),
+  yellow: Color(0xFF9A6700),
+  blue: Color(0xFF0969DA),
+  magenta: Color(0xFF8250DF),
+  cyan: Color(0xFF1B7C83),
+  white: Color(0xFFFFFFFF),
+  brightBlack: Color(0xFF57606A),
+  brightRed: Color(0xFFA40E26),
+  brightGreen: Color(0xFF116329),
+  brightYellow: Color(0xFF7D4E00),
+  brightBlue: Color(0xFF0550AE),
+  brightMagenta: Color(0xFF6639BA),
+  brightCyan: Color(0xFF3192AA),
+  brightWhite: Color(0xFFF6F8FA),
+  searchHitBackground: Color(0x99FFE17D),
+  searchHitBackgroundCurrent: Color(0xFF0969DA),
+  searchHitForeground: Color(0xFFFFFFFF),
+);
+
+const _highContrastTheme = TerminalTheme(
+  cursor: Color(0xFFFFFFFF),
+  selection: Color(0x88FFFFFF),
+  foreground: Color(0xFFFFFFFF),
+  background: Color(0xFF000000),
+  black: Color(0xFF000000),
+  red: Color(0xFFFF5F5F),
+  green: Color(0xFF5FFF87),
+  yellow: Color(0xFFFFFF5F),
+  blue: Color(0xFF5FAFFF),
+  magenta: Color(0xFFFF87FF),
+  cyan: Color(0xFF5FFFFF),
+  white: Color(0xFFFFFFFF),
+  brightBlack: Color(0xFF808080),
+  brightRed: Color(0xFFFF8787),
+  brightGreen: Color(0xFF87FFAF),
+  brightYellow: Color(0xFFFFFF87),
+  brightBlue: Color(0xFF87C8FF),
+  brightMagenta: Color(0xFFFFAFFF),
+  brightCyan: Color(0xFF87FFFF),
+  brightWhite: Color(0xFFFFFFFF),
+  searchHitBackground: Color(0xFFFFFF00),
+  searchHitBackgroundCurrent: Color(0xFFFF5F5F),
+  searchHitForeground: Color(0xFF000000),
+);

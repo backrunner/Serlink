@@ -1,0 +1,66 @@
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:serlink/core/ids/entity_id.dart';
+import 'package:serlink/features/sync/application/auto_sync_controller.dart';
+import 'package:serlink/features/sync/application/sync_device_service.dart';
+import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
+import 'package:serlink/features/vault/application/vault_record_repository.dart';
+import 'package:serlink/features/vault/application/vault_service.dart';
+
+void main() {
+  late InMemoryVaultService vault;
+  late InMemoryVaultRecordRepository inner;
+  late VaultRecordChangeBus changes;
+  late NotifyingVaultRecordRepository repository;
+  late List<VaultRecordChange> emitted;
+
+  setUp(() async {
+    vault = InMemoryVaultService(config: const VaultCryptoConfig.testing());
+    await vault.initialize(passphrase: 'passphrase');
+    inner = InMemoryVaultRecordRepository();
+    changes = VaultRecordChangeBus();
+    emitted = [];
+    changes.stream.listen(emitted.add);
+    repository = NotifyingVaultRecordRepository(inner: inner, changes: changes);
+  });
+
+  tearDown(() async {
+    await changes.close();
+  });
+
+  test('emits change events for syncable encrypted record writes', () async {
+    final envelope = await vault.encryptRecord(
+      id: VaultRecordId('host:prod'),
+      type: 'host',
+      plaintext: utf8.encode('encrypted host payload'),
+    );
+
+    await repository.upsert(envelope);
+
+    expect(emitted, hasLength(1));
+    expect(emitted.single.kind, VaultRecordChangeKind.upsert);
+    expect(emitted.single.id, envelope.id);
+    expect(emitted.single.type, 'host');
+  });
+
+  test('does not emit change events for sync device touches', () async {
+    final envelope = await vault.encryptRecord(
+      id: VaultRecordId('sync:device:local'),
+      type: EncryptedSyncDeviceRepository.recordType,
+      plaintext: utf8.encode('device metadata'),
+    );
+
+    await repository.upsert(envelope);
+
+    expect(emitted, isEmpty);
+  });
+
+  test('emits change events for record deletes', () async {
+    await repository.delete(VaultRecordId('host:prod'));
+
+    expect(emitted, hasLength(1));
+    expect(emitted.single.kind, VaultRecordChangeKind.delete);
+    expect(emitted.single.id, VaultRecordId('host:prod'));
+  });
+}

@@ -1,6 +1,6 @@
 # Release Scope Decisions
 
-Last updated: 2026-05-28.
+Last updated: 2026-05-29.
 
 This file records capabilities intentionally moved out of the first desktop release. These are not permanent product rejections; they are excluded from the current release target because implementation cost, platform variance, or upstream limitations would reduce release quality.
 
@@ -98,11 +98,9 @@ Follow-up condition:
 
 ## Still Required For First Desktop Release
 
-- Terminal split panes or an explicit decision to defer them if multi-tab remains the preferred v1 workflow.
 - Shortcut pass-through and CJK/IME verification.
-- Field-level conflict merge or a documented whole-record conflict policy beyond the current keep-local/use-remote encrypted-record resolver.
 - Provider-specific sync quota guidance and partial-upload repair guidance.
 - OS-specific validation for secure storage capability/fallback UX.
-- `CertificateFile` pairing and deeper OpenSSH config edge cases such as `Include`, `Match`, and inheritance.
+- Remaining OpenSSH import hardening is now focused on validation against real `ssh -G`, richer `ProxyCommand` manual-conversion guidance, and future product semantics for host CAs/revoked keys. `Include`, `Host *` inheritance, `Match` isolation, paired `CertificateFile` import, and known-host security marker warnings have code coverage.
 - Integration fixtures for SSH, SFTP, WebDAV, ProxyJump, OpenSSH certificates, startup commands, and port forwarding.
 - Release packaging, signing/notarization, installers, SBOM, license notices, dependency audit, app-version/package metadata in support bundles, and cross-platform CI.

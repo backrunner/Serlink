@@ -6,6 +6,13 @@ This review captures important items not yet covered deeply enough in the Serlin
 
 Serlink has solid coverage for the main first-release product surface: host management, encrypted vault, SSH terminal, SFTP list/table UI, workspace tabs, WebDAV encrypted sync, security modals, and crash resilience. iCloud providers are post-v1 scope.
 
+Current code verification on 2026-05-29:
+
+- `flutter analyze` passes.
+- `flutter test` passes with 182 tests.
+- No skipped tests were found in `test/`.
+- The remaining first-release gaps are primarily release engineering, integration fixtures, platform QA, OpenSSH import verification against real OpenSSH behavior, and user-facing documentation.
+
 The remaining gaps are mostly in four categories:
 
 - Platform integration details.
@@ -77,6 +84,16 @@ Need to handle or explicitly warn about:
 - `@revoked`
 - multiple hostnames per known-host entry
 
+Current implementation note:
+
+- OpenSSH config import now expands readable `Include` files with cycle and depth protection.
+- `Host *` and other wildcard pattern blocks are used for inheritance when they match concrete aliases, but wildcard/negated patterns are not imported as concrete hosts.
+- Unsupported `Match` blocks are isolated so their directives do not mutate surrounding host imports.
+- Paired `IdentityFile` and `CertificateFile` entries can import encrypted OpenSSH certificate identities.
+- `ProxyCommand`, `IdentityAgent`, `UserKnownHostsFile`, and `GlobalKnownHostsFile` now produce explicit warnings instead of falling through as generic unsupported directives.
+- `known_hosts` import supports comma-separated multi-target lines and produces explicit warnings for hashed host targets, wildcard patterns, `@cert-authority`, and `@revoked`.
+- Remaining importer gaps are full OpenSSH precedence validation against `ssh -G`, richer manual-conversion guidance for `ProxyCommand`, and future product semantics for host CAs/revoked keys rather than warning-only handling.
+
 MVP recommendation:
 
 - Parse common directives and import/link readable local `IdentityFile` private keys when a concrete config file path is available.
@@ -141,6 +158,13 @@ Requirement:
 - Avoid unbounded memory buffering.
 - Pause lower-priority tasks when a connection is unstable.
 - Keep transfer failures isolated to the task.
+
+Current implementation note:
+
+- The transfer queue limits global concurrency and isolates task-level failures.
+- Queue pause/resume/cancel now propagates into dartssh2 upload/download streams instead of only updating UI state.
+- Directory transfers check pause/cancel between files and directories. Active file downloads use a controlled read/write loop to avoid unbounded progress buffering.
+- Per-host concurrency policy and integration tests with unstable real SFTP servers remain release hardening work.
 
 ### 9. WebDAV TLS And Server Compatibility
 
@@ -208,6 +232,7 @@ Current implementation note:
 - Settings > Sync can rebuild the remote encrypted sync set from local encrypted records after blocking confirmation.
 - WebDAV writes create parent directories before encrypted object upload and provider failures are mapped into stable redacted errors for authentication, permission, missing/incomplete paths, locks, quota, TLS certificate failure, timeout, network failure, and server errors.
 - Settings > Sync shows local clock and certificate validity timestamps in a blocking modal for not-yet-valid WebDAV certificates.
+- Local and WebDAV sync providers reject unsafe object refs such as absolute paths, parent traversal, empty segments, and backslash paths before touching storage.
 - Remaining repair gaps are deeper real-provider compatibility validation and provider-specific quota/partial-upload guidance.
 
 ### 13. Data Migration And Downgrade Policy
@@ -269,7 +294,19 @@ Need decisions:
 - Update signing.
 - Migration backup before update.
 
-### 19. Test Matrix
+### 19. User-Facing Documentation
+
+Current gap:
+
+- `README.md` is still the default Flutter starter text.
+- Release builds need clear setup, security model, sync behavior, supported authentication modes, known limitations, and troubleshooting guidance.
+
+Requirement:
+
+- Replace the starter README with Serlink-specific development and product documentation.
+- Add release support metadata once packaging targets are wired.
+
+### 20. Test Matrix
 
 Define explicit supported versions:
 
@@ -279,7 +316,7 @@ Define explicit supported versions:
 - OpenSSH server versions.
 - WebDAV providers.
 
-### 20. Localization Strategy
+### 21. Localization Strategy
 
 Even if first release is Chinese/English only:
 

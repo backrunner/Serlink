@@ -81,25 +81,33 @@ class WebDavSyncProvider implements SyncProvider {
     final files = await _client.readDir(directory);
     return [
       for (final file in files)
-        if (file.isDir != true && file.path != null)
-          RemoteObjectRef(_stripBasePath(file.path!)),
+        if (file.isDir != true && file.path != null) ...[
+          if (_safeRemoteObjectPathOrNull(_stripBasePath(file.path!))
+              case final path?)
+            RemoteObjectRef(path),
+        ],
     ]..sort((a, b) => a.path.compareTo(b.path));
   }
 
   @override
   Future<List<int>> readObject(RemoteObjectRef ref) async {
-    return _client.read(_join(_basePath, ref.path));
+    return _client.read(_objectPath(ref));
   }
 
   @override
   Future<void> writeObject(RemoteObjectRef ref, List<int> bytes) async {
-    await _client.mkdirAll(_parentPath(_join(_basePath, ref.path)));
-    await _client.write(_join(_basePath, ref.path), Uint8List.fromList(bytes));
+    final path = _objectPath(ref);
+    await _client.mkdirAll(_parentPath(path));
+    await _client.write(path, Uint8List.fromList(bytes));
   }
 
   @override
   Future<void> deleteObject(RemoteObjectRef ref) async {
-    await _client.remove(_join(_basePath, ref.path));
+    await _client.remove(_objectPath(ref));
+  }
+
+  String _objectPath(RemoteObjectRef ref) {
+    return _join(_basePath, _safeRemoteObjectPath(ref.path));
   }
 
   String _stripBasePath(String remotePath) {
@@ -526,6 +534,30 @@ String _join(String basePath, String childPath) {
     return basePath;
   }
   return '$basePath/$cleanedChild';
+}
+
+String _safeRemoteObjectPath(String path) {
+  final safePath = _safeRemoteObjectPathOrNull(path);
+  if (safePath == null) {
+    throw const SyncProviderException(
+      'sync.provider.invalid_object_ref',
+      'Sync object path is invalid.',
+    );
+  }
+  return safePath;
+}
+
+String? _safeRemoteObjectPathOrNull(String path) {
+  if (path.isEmpty || path.startsWith('/') || path.contains(r'\')) {
+    return null;
+  }
+  final segments = path.split('/');
+  if (segments.any(
+    (segment) => segment.isEmpty || segment == '.' || segment == '..',
+  )) {
+    return null;
+  }
+  return path;
 }
 
 String _parentPath(String path) {

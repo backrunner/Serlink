@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:serlink/features/sync/data/local_sync_provider.dart';
 import 'package:serlink/features/sync/data/webdav_sync_provider.dart';
 import 'package:serlink/features/sync/domain/sync_provider.dart';
@@ -71,6 +72,26 @@ void main() {
     },
   );
 
+  test('local sync provider rejects unsafe object paths', () async {
+    final provider = LocalDirectorySyncProvider(tempDir);
+
+    await expectLater(
+      provider.writeObject(const RemoteObjectRef('../outside.bin'), [1]),
+      throwsA(
+        isA<SyncProviderException>().having(
+          (error) => error.code,
+          'code',
+          'sync.provider.invalid_object_ref',
+        ),
+      ),
+    );
+
+    expect(
+      await File(p.join(tempDir.parent.path, 'outside.bin')).exists(),
+      isFalse,
+    );
+  });
+
   test('webdav provider rejects insecure HTTP unless explicitly allowed', () {
     expect(
       () => WebDavSyncProvider(
@@ -111,6 +132,30 @@ void main() {
       expect(client.writes, containsPair('/serlink/records/a.bin', [1, 2]));
     },
   );
+
+  test('webdav provider rejects unsafe object paths', () async {
+    final client = _FakeWebDavClient();
+    final provider = WebDavSyncProvider(
+      endpoint: Uri.parse('https://example.test/webdav'),
+      username: 'u',
+      password: 'p',
+      client: client,
+    );
+
+    await expectLater(
+      provider.writeObject(const RemoteObjectRef('/absolute.bin'), [1]),
+      throwsA(
+        isA<SyncProviderException>().having(
+          (error) => error.code,
+          'code',
+          'sync.provider.invalid_object_ref',
+        ),
+      ),
+    );
+
+    expect(client.writes, isEmpty);
+    expect(client.createdDirectories, isEmpty);
+  });
 
   test('webdav provider maps provider errors to stable sync errors', () async {
     final client = _FakeWebDavClient(

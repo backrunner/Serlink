@@ -44,7 +44,9 @@ class LocalDirectorySyncProvider implements SyncProvider {
       if (entity is! File) {
         continue;
       }
-      final relativePath = p.relative(entity.path, from: rootDirectory.path);
+      final relativePath = p
+          .split(p.relative(entity.path, from: rootDirectory.path))
+          .join('/');
       if (relativePath == _manifestFileName) {
         continue;
       }
@@ -59,22 +61,44 @@ class LocalDirectorySyncProvider implements SyncProvider {
 
   @override
   Future<List<int>> readObject(RemoteObjectRef ref) async {
-    return File(p.join(rootDirectory.path, ref.path)).readAsBytes();
+    return File(_objectPath(ref)).readAsBytes();
   }
 
   @override
   Future<void> writeObject(RemoteObjectRef ref, List<int> bytes) async {
     await rootDirectory.create(recursive: true);
-    final file = File(p.join(rootDirectory.path, ref.path));
+    final file = File(_objectPath(ref));
     await file.parent.create(recursive: true);
     await file.writeAsBytes(bytes, flush: true);
   }
 
   @override
   Future<void> deleteObject(RemoteObjectRef ref) async {
-    final file = File(p.join(rootDirectory.path, ref.path));
+    final file = File(_objectPath(ref));
     if (await file.exists()) {
       await file.delete();
     }
   }
+
+  String _objectPath(RemoteObjectRef ref) {
+    final relativePath = _safeRemoteObjectPath(ref.path);
+    return p.joinAll([rootDirectory.path, ...relativePath.split('/')]);
+  }
+}
+
+String _safeRemoteObjectPath(String path) {
+  if (path.isEmpty ||
+      path.startsWith('/') ||
+      path.contains(r'\') ||
+      path
+          .split('/')
+          .any(
+            (segment) => segment.isEmpty || segment == '.' || segment == '..',
+          )) {
+    throw const SyncProviderException(
+      'sync.provider.invalid_object_ref',
+      'Sync object path is invalid.',
+    );
+  }
+  return path;
 }

@@ -56,8 +56,8 @@ class KnownHostsImportService {
 
     for (final entry in knownHosts.entries) {
       final matches = _matchingHosts(entry.targets, hostConfigs);
+      unmatchedHosts += _unmatchedTargetCount(entry.targets, hostConfigs);
       if (matches.isEmpty) {
-        unmatchedHosts += entry.targets.length;
         continue;
       }
       for (final host in matches) {
@@ -119,14 +119,7 @@ _KnownHostsParseResult _parseKnownHosts(String contents) {
 
     if (hasMarker) {
       skippedLines += 1;
-      warnings.add(
-        KnownHostsImportWarning(
-          lineNumber: lineNumber,
-          code: 'known_hosts.marker_unsupported',
-          message:
-              'Line $lineNumber uses ${fields.first}, which is not imported yet.',
-        ),
-      );
+      warnings.add(_markerWarning(fields.first, lineNumber));
       continue;
     }
 
@@ -156,6 +149,28 @@ _KnownHostsParseResult _parseKnownHosts(String contents) {
     skippedLines: skippedLines,
     warnings: warnings,
   );
+}
+
+KnownHostsImportWarning _markerWarning(String marker, int lineNumber) {
+  return switch (marker.toLowerCase()) {
+    '@cert-authority' => KnownHostsImportWarning(
+      lineNumber: lineNumber,
+      code: 'known_hosts.cert_authority_unsupported',
+      message:
+          'Line $lineNumber defines a host certificate authority. Serlink does not import CA trust from known_hosts yet.',
+    ),
+    '@revoked' => KnownHostsImportWarning(
+      lineNumber: lineNumber,
+      code: 'known_hosts.revoked_key_unsupported',
+      message:
+          'Line $lineNumber marks a host key as revoked. Serlink does not import revoked keys; review matching hosts manually.',
+    ),
+    _ => KnownHostsImportWarning(
+      lineNumber: lineNumber,
+      code: 'known_hosts.marker_unsupported',
+      message: 'Line $lineNumber uses $marker, which is not imported yet.',
+    ),
+  };
 }
 
 List<_KnownHostsTarget> _parseTargets(
@@ -248,6 +263,24 @@ List<HostConfig> _matchingHosts(
     }
   }
   return matches;
+}
+
+int _unmatchedTargetCount(
+  List<_KnownHostsTarget> targets,
+  List<HostConfig> hosts,
+) {
+  var unmatched = 0;
+  for (final target in targets) {
+    final hasMatch = hosts.any(
+      (host) =>
+          host.hostname.toLowerCase() == target.hostname &&
+          host.port == target.port,
+    );
+    if (!hasMatch) {
+      unmatched += 1;
+    }
+  }
+  return unmatched;
 }
 
 String _formatMd5Fingerprint(Uint8List keyBlob) {

@@ -6649,7 +6649,10 @@ Future<void> _importOpenSshConfig(BuildContext context, WidgetRef ref) async {
 
   try {
     final service = ref.read(openSshConfigImportServiceProvider);
-    final preview = service.preview(await file.readAsString());
+    final preview = service.preview(
+      await file.readAsString(),
+      configSourcePath: file.path,
+    );
     if (!context.mounted) {
       return;
     }

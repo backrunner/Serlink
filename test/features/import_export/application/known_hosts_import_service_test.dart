@@ -52,7 +52,13 @@ unmatched.example.test ssh-ed25519 aGVsbG8=
       expect(result.recordsImported, 2);
       expect(result.unmatchedHosts, 1);
       expect(result.skippedLines, 2);
-      expect(result.warnings, hasLength(2));
+      expect(
+        result.warnings.map((warning) => warning.code),
+        containsAll([
+          'known_hosts.cert_authority_unsupported',
+          'known_hosts.hashed_host_unsupported',
+        ]),
+      );
 
       final bastion = await knownHosts.read(HostId('host-1'));
       expect(bastion!.algorithm, 'ssh-ed25519');
@@ -75,6 +81,94 @@ unmatched.example.test ssh-ed25519 aGVsbG8=
       expect(serialized, isNot(contains('db.internal')));
     },
   );
+
+  test('imports comma-separated targets from one known_hosts line', () async {
+    await hosts.save(
+      _host(id: HostId('host-1'), hostname: 'bastion.internal', port: 22),
+    );
+    await hosts.save(
+      _host(id: HostId('host-2'), hostname: 'alias.internal', port: 22),
+    );
+    await hosts.save(
+      _host(id: HostId('host-3'), hostname: 'db.internal', port: 2222),
+    );
+
+    final result = await service.importText(
+      'bastion.internal,alias.internal,[db.internal]:2222 ssh-ed25519 aGVsbG8=',
+    );
+
+    expect(result.entriesParsed, 1);
+    expect(result.recordsImported, 3);
+    expect(result.unmatchedHosts, 0);
+    expect(result.skippedLines, 0);
+    expect(result.warnings, isEmpty);
+    expect(await knownHosts.read(HostId('host-1')), isNotNull);
+    expect(await knownHosts.read(HostId('host-2')), isNotNull);
+    expect(await knownHosts.read(HostId('host-3')), isNotNull);
+  });
+
+  test(
+    'counts unmatched targets on partially matched known_hosts lines',
+    () async {
+      await hosts.save(
+        _host(id: HostId('host-1'), hostname: 'bastion.internal', port: 22),
+      );
+
+      final result = await service.importText(
+        'bastion.internal,missing.internal,[other.internal]:2200 ssh-ed25519 aGVsbG8=',
+      );
+
+      expect(result.entriesParsed, 1);
+      expect(result.recordsImported, 1);
+      expect(result.unmatchedHosts, 2);
+      expect(await knownHosts.read(HostId('host-1')), isNotNull);
+    },
+  );
+
+  test('keeps valid targets but warns for hashed or pattern targets', () async {
+    await hosts.save(
+      _host(id: HostId('host-1'), hostname: 'bastion.internal', port: 22),
+    );
+
+    final result = await service.importText(
+      'bastion.internal,|1|salt|hash,*.example.test ssh-ed25519 aGVsbG8=',
+    );
+
+    expect(result.entriesParsed, 1);
+    expect(result.recordsImported, 1);
+    expect(result.skippedLines, 0);
+    expect(
+      result.warnings.map((warning) => warning.code),
+      containsAll([
+        'known_hosts.hashed_host_unsupported',
+        'known_hosts.pattern_unsupported',
+      ]),
+    );
+    expect(await knownHosts.read(HostId('host-1')), isNotNull);
+  });
+
+  test('warns specifically for cert-authority and revoked markers', () async {
+    await hosts.save(
+      _host(id: HostId('host-1'), hostname: 'bastion.internal', port: 22),
+    );
+
+    final result = await service.importText('''
+@revoked bastion.internal ssh-ed25519 aGVsbG8=
+@cert-authority *.example.test ssh-ed25519 aGVsbG8=
+''');
+
+    expect(result.entriesParsed, 0);
+    expect(result.recordsImported, 0);
+    expect(result.skippedLines, 2);
+    expect(
+      result.warnings.map((warning) => warning.code),
+      containsAll([
+        'known_hosts.cert_authority_unsupported',
+        'known_hosts.revoked_key_unsupported',
+      ]),
+    );
+    expect(await knownHosts.read(HostId('host-1')), isNull);
+  });
 
   test(
     'preserves known host creation time when replacing fingerprint',

@@ -6,6 +6,7 @@ import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/hosts/application/host_repository.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/identities/application/identity_repository.dart';
+import 'package:serlink/features/identities/domain/identity.dart';
 import 'package:serlink/features/import_export/application/open_ssh_config_import_service.dart';
 import 'package:serlink/features/ssh/application/encrypted_connection_profile_resolver.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
@@ -31,13 +32,14 @@ Host *
 ''');
 
     expect(result.entries, hasLength(2));
-    expect(result.skippedHosts, 1);
+    expect(result.skippedHosts, 0);
     expect(
       result.warnings.map((warning) => warning.code),
-      containsAll([
-        'ssh_config.directive_unsupported',
-        'ssh_config.host_pattern_unsupported',
-      ]),
+      contains('ssh_config.directive_unsupported'),
+    );
+    expect(
+      result.warnings.map((warning) => warning.code),
+      isNot(contains('ssh_config.host_pattern_unsupported')),
     );
 
     final prod = result.entries.first;
@@ -51,6 +53,151 @@ Host *
     final bastion = result.entries.last;
     expect(bastion.alias, 'bastion');
     expect(bastion.hostname, 'prod.example.test');
+  });
+
+  test('expands Include files and applies Host star inheritance', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'serlink-ssh-config-include-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final defaults = File('${tempDir.path}/defaults.conf');
+    await defaults.writeAsString('''
+Host *
+  User ops
+  Port 2200
+  IdentityFile shared_key
+''');
+    final configFile = File('${tempDir.path}/config');
+    await configFile.writeAsString('''
+Include defaults.conf
+
+Host prod
+  HostName prod.example.test
+''');
+    final service = OpenSshConfigImportService();
+
+    final result = service.preview(
+      await configFile.readAsString(),
+      configSourcePath: configFile.path,
+    );
+
+    expect(result.entries, hasLength(1));
+    expect(result.warnings, isEmpty);
+    expect(result.skippedHosts, 0);
+    expect(result.entries.single.alias, 'prod');
+    expect(result.entries.single.hostname, 'prod.example.test');
+    expect(result.entries.single.username, 'ops');
+    expect(result.entries.single.port, 2200);
+    expect(result.entries.single.identityFiles, ['shared_key']);
+  });
+
+  test('Include glob does not match nested child directories', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'serlink-ssh-config-include-glob-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final configDir = Directory('${tempDir.path}/conf.d');
+    final nestedDir = Directory('${configDir.path}/nested');
+    await nestedDir.create(recursive: true);
+    await File('${configDir.path}/top.conf').writeAsString('''
+Host top
+  HostName top.example.test
+  User ops
+''');
+    await File('${nestedDir.path}/nested.conf').writeAsString('''
+Host nested
+  HostName nested.example.test
+  User ops
+''');
+    final configFile = File('${tempDir.path}/config');
+    await configFile.writeAsString('Include conf.d/*.conf');
+    final service = OpenSshConfigImportService();
+
+    final result = service.preview(
+      await configFile.readAsString(),
+      configSourcePath: configFile.path,
+    );
+
+    expect(result.entries.map((entry) => entry.alias), ['top']);
+  });
+
+  test('warns on Include cycles and unsafe ProxyCommand', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'serlink-ssh-config-cycle-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final configFile = File('${tempDir.path}/config');
+    await configFile.writeAsString('''
+Include config
+
+Host prod
+  HostName prod.example.test
+  User deploy
+  ProxyCommand ssh bastion nc %h %p
+  IdentityAgent ~/.ssh/agent.sock
+''');
+    final service = OpenSshConfigImportService();
+
+    final result = service.preview(
+      await configFile.readAsString(),
+      configSourcePath: configFile.path,
+    );
+
+    expect(result.entries, hasLength(1));
+    expect(
+      result.warnings.map((warning) => warning.code),
+      containsAll([
+        'ssh_config.include_cycle',
+        'ssh_config.identity_agent_unsupported',
+        'ssh_config.proxy_command_unsupported',
+      ]),
+    );
+  });
+
+  test('does not let Match blocks mutate surrounding Host entries', () {
+    final service = OpenSshConfigImportService();
+
+    final result = service.preview('''
+Host prod
+  HostName prod.example.test
+  User deploy
+
+Match host prod
+  User root
+  IdentityFile root_key
+
+Host db
+  HostName db.example.test
+  User ops
+  UserKnownHostsFile ~/.ssh/custom_known_hosts
+  GlobalKnownHostsFile /etc/ssh/ssh_known_hosts
+''');
+
+    expect(result.entries, hasLength(2));
+    final prod = result.entries.singleWhere((entry) => entry.alias == 'prod');
+    final db = result.entries.singleWhere((entry) => entry.alias == 'db');
+    expect(prod.username, 'deploy');
+    expect(prod.identityFiles, isEmpty);
+    expect(db.username, 'ops');
+    expect(
+      result.warnings.map((warning) => warning.code),
+      containsAll([
+        'ssh_config.known_hosts_file_unsupported',
+        'ssh_config.match_unsupported',
+      ]),
+    );
   });
 
   test(
@@ -212,6 +359,171 @@ Host prod
     expect(serializedRecords, isNot(contains('OPENSSH PRIVATE KEY')));
     expect(serializedRecords, isNot(contains('prod.example.test')));
   });
+
+  test(
+    'imports paired IdentityFile and CertificateFile as certificate auth',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'serlink-ssh-config-cert-import-',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+      final keyFile = File('${tempDir.path}/prod_key');
+      await keyFile.writeAsString(
+        '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----',
+      );
+      final certificateFile = File('${tempDir.path}/prod_key-cert.pub');
+      await certificateFile.writeAsString(
+        'ssh-ed25519-cert-v01@openssh.com YWJj deploy@prod',
+      );
+      final configFile = File('${tempDir.path}/config');
+      await configFile.writeAsString('''
+Host prod
+  HostName prod.example.test
+  User deploy
+  IdentityFile prod_key
+  CertificateFile prod_key-cert.pub
+''');
+
+      final vault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await vault.initialize(passphrase: 'passphrase');
+      final records = InMemoryVaultRecordRepository();
+      final hosts = EncryptedHostRepository(vault: vault, records: records);
+      final identities = EncryptedIdentityRepository(
+        vault: vault,
+        records: records,
+      );
+      final service = OpenSshConfigImportService(
+        hosts: hosts,
+        identities: identities,
+        records: records,
+        vault: vault,
+        now: () => DateTime.utc(2026, 5, 28),
+      );
+
+      final preview = service.preview(
+        await configFile.readAsString(),
+        configSourcePath: configFile.path,
+      );
+      final result = await service.applyPreview(
+        preview,
+        configSourcePath: configFile.path,
+      );
+
+      expect(result.hostsCreated, 1);
+      expect(result.identitiesImported, 1);
+      expect(result.warnings, isEmpty);
+
+      final importedHost = (await hosts.list()).single;
+      expect(importedHost.authKinds, {HostAuthKind.openSshCertificate});
+      expect(importedHost.identityIds, hasLength(1));
+      final identity = await identities.read(importedHost.identityIds.single);
+      expect(identity?.kind, IdentityKind.openSshCertificate);
+
+      final resolver = EncryptedConnectionProfileResolver(
+        hosts: hosts,
+        identities: identities,
+        records: records,
+        vault: vault,
+      );
+      final profile = await resolver.resolve(
+        hostId: importedHost.id,
+        sessionId: SessionId('session-1'),
+      );
+      expect(profile.authMethods.single, isA<SshOpenSshCertificateAuth>());
+
+      final serializedRecords = jsonEncode([
+        for (final record in await records.list()) record.toJson(),
+      ]);
+      expect(serializedRecords, isNot(contains('OPENSSH PRIVATE KEY')));
+      expect(serializedRecords, isNot(contains('ssh-ed25519-cert')));
+    },
+  );
+
+  test(
+    'reuses private-key identity when paired certificate is missing',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'serlink-ssh-config-missing-cert-',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+      final keyFile = File('${tempDir.path}/shared_key');
+      await keyFile.writeAsString(
+        '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----',
+      );
+      final configFile = File('${tempDir.path}/config');
+      await configFile.writeAsString('''
+Host prod
+  HostName prod.example.test
+  User deploy
+  IdentityFile shared_key
+  CertificateFile missing-cert.pub
+
+Host stage
+  HostName stage.example.test
+  User deploy
+  IdentityFile shared_key
+  CertificateFile missing-cert.pub
+''');
+
+      final vault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await vault.initialize(passphrase: 'passphrase');
+      final records = InMemoryVaultRecordRepository();
+      final hosts = EncryptedHostRepository(vault: vault, records: records);
+      final identities = EncryptedIdentityRepository(
+        vault: vault,
+        records: records,
+      );
+      final service = OpenSshConfigImportService(
+        hosts: hosts,
+        identities: identities,
+        records: records,
+        vault: vault,
+        now: () => DateTime.utc(2026, 5, 28),
+      );
+
+      final preview = service.preview(
+        await configFile.readAsString(),
+        configSourcePath: configFile.path,
+      );
+      final result = await service.applyPreview(
+        preview,
+        configSourcePath: configFile.path,
+      );
+
+      expect(result.hostsCreated, 2);
+      expect(result.identitiesImported, 1);
+      expect(
+        result.warnings.map((warning) => warning.code),
+        contains('ssh_config.certificate_file_missing'),
+      );
+
+      final importedHosts = await hosts.list();
+      for (final host in importedHosts) {
+        expect(host.authKinds, {HostAuthKind.privateKey});
+        expect(host.identityIds, hasLength(1));
+      }
+      expect(
+        importedHosts.map((host) => host.identityIds.single).toSet(),
+        hasLength(1),
+      );
+      final identity = await identities.read(
+        importedHosts.first.identityIds.single,
+      );
+      expect(identity?.kind, IdentityKind.privateKey);
+    },
+  );
 
   test(
     'applies resolvable ProxyJump aliases as encrypted host links',

@@ -104,6 +104,12 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('workspace-search-field')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('settings-vault-recovery-button')),
+      findsNothing,
+    );
+    expect(find.text('Recover / Reset'), findsNothing);
+    expect(find.widgetWithText(TextButton, 'Lock'), findsOneWidget);
     await tester.drag(find.byType(ListView), const Offset(0, -260));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.widgetWithText(TextButton, 'Configure'));

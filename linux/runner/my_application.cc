@@ -14,6 +14,11 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
+static constexpr gint kDefaultWindowWidth = 1280;
+static constexpr gint kDefaultWindowHeight = 720;
+static constexpr gint kMinimumWindowWidth = 960;
+static constexpr gint kMinimumWindowHeight = 600;
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
@@ -92,6 +97,10 @@ static void register_window_channel(GtkWindow* window, FlView* view) {
 static void configure_window_chrome(GtkWindow* window) {
   gtk_window_set_decorated(window, FALSE);
   gtk_window_set_resizable(window, TRUE);
+  GdkGeometry geometry = {};
+  geometry.min_width = kMinimumWindowWidth;
+  geometry.min_height = kMinimumWindowHeight;
+  gtk_window_set_geometry_hints(window, nullptr, &geometry, GDK_HINT_MIN_SIZE);
 
   GdkScreen* screen = gtk_window_get_screen(window);
   GdkVisual* visual = gdk_screen_get_rgba_visual(screen);
@@ -109,7 +118,8 @@ static void my_application_activate(GApplication* application) {
 
   configure_window_chrome(window);
   gtk_window_set_title(window, "serlink");
-  gtk_window_set_default_size(window, 1280, 720);
+  gtk_window_set_default_size(window, kDefaultWindowWidth,
+                              kDefaultWindowHeight);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(

@@ -21,6 +21,8 @@ constexpr DWORD kDwmWindowCornerPreference = 33;
 constexpr int kDwmWindowCornerPreferenceRound = 2;
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 constexpr int kWindowCornerRadius = 12;
+constexpr int kMinimumWindowWidth = 960;
+constexpr int kMinimumWindowHeight = 600;
 
 /// Registry key for app theme preference.
 ///
@@ -121,8 +123,14 @@ LRESULT HitTestResizeBorder(HWND hwnd, LPARAM lparam) {
   return HTCLIENT;
 }
 
-void ApplyMaximizedBounds(HWND hwnd, LPARAM lparam) {
+void ApplyWindowSizeBounds(HWND hwnd, LPARAM lparam) {
   auto* min_max_info = reinterpret_cast<MINMAXINFO*>(lparam);
+  const double scale_factor = GetWindowScaleFactor(hwnd);
+  min_max_info->ptMinTrackSize.x =
+      Scale(kMinimumWindowWidth, scale_factor);
+  min_max_info->ptMinTrackSize.y =
+      Scale(kMinimumWindowHeight, scale_factor);
+
   HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
 
   MONITORINFO monitor_info;
@@ -291,7 +299,7 @@ Win32Window::MessageHandler(HWND hwnd,
       return HitTestResizeBorder(hwnd, lparam);
 
     case WM_GETMINMAXINFO:
-      ApplyMaximizedBounds(hwnd, lparam);
+      ApplyWindowSizeBounds(hwnd, lparam);
       return 0;
 
     case WM_DESTROY:

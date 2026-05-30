@@ -2,6 +2,8 @@ import Cocoa
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
+  private static let minimumWindowSize = NSSize(width: 960, height: 600)
+
   private var windowChannel: FlutterMethodChannel?
 
   override func awakeFromNib() {
@@ -32,6 +34,7 @@ class MainFlutterWindow: NSWindow {
     styleMask.insert(.fullSizeContentView)
     isMovableByWindowBackground = false
     isOpaque = true
+    minSize = Self.minimumWindowSize
     backgroundColor = .windowBackgroundColor
 
     standardWindowButton(.closeButton)?.isHidden = true

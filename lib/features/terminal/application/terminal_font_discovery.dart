@@ -187,8 +187,6 @@ const _knownTerminalFonts = [
 List<String> terminalFontFallbackFamilies(String primaryFamily) {
   final seen = {normalizeTerminalFontFamily(primaryFamily)};
   final candidates = [
-    'Symbols Nerd Font Mono',
-    'Symbols Nerd Font',
     'MesloLGS NF',
     'JetBrainsMono Nerd Font',
     'JetBrainsMono Nerd Font Mono',
@@ -202,6 +200,8 @@ List<String> terminalFontFallbackFamilies(String primaryFamily) {
     'SauceCodePro Nerd Font',
     'Menlo for Powerline',
     'DejaVu Sans Mono for Powerline',
+    'Symbols Nerd Font Mono',
+    'Symbols Nerd Font',
     'Noto Sans Symbols',
     'Noto Sans Symbols 2',
     'Noto Sans Mono CJK SC',
@@ -226,6 +226,13 @@ List<String> terminalFontFallbackFamilies(String primaryFamily) {
 
 String normalizeTerminalFontFamily(String value) {
   return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+}
+
+bool terminalFontFamilyHasEnhancedGlyphs(String family) {
+  final normalized = normalizeTerminalFontFamily(family);
+  return normalized.contains('nerdfont') ||
+      normalized.contains('powerline') ||
+      normalized.startsWith('meslolgsnf');
 }
 
 List<TerminalFontCandidate> _dedupeFonts(List<TerminalFontCandidate> fonts) {

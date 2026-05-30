@@ -123,7 +123,7 @@ void main() {
 
     adapter.attach();
     terminal.resize(120, 32, 1000, 700);
-    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
 
     expect(previousResizeCalled, isTrue);
     expect(session.resizes.single, (120, 32, 1000, 700));
@@ -135,6 +135,36 @@ void main() {
     terminal.resize(100, 30);
     expect(previousResizeCalled, isTrue);
     expect(session.resizes, hasLength(1));
+  });
+
+  test('coalesces resize bursts before forwarding to shell session', () async {
+    final terminal = Terminal();
+    final session = _FakeShellSession();
+    final adapter = TerminalAdapter(terminal: terminal, session: session);
+
+    adapter.attach();
+    terminal.resize(100, 28, 800, 560);
+    terminal.resize(105, 29, 840, 580);
+    terminal.resize(120, 32, 1000, 700);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+
+    expect(session.resizes, [(120, 32, 1000, 700)]);
+
+    await adapter.close();
+  });
+
+  test('syncs terminal size that was measured before attach', () async {
+    final terminal = Terminal();
+    terminal.resize(110, 30, 900, 600);
+    final session = _FakeShellSession();
+    final adapter = TerminalAdapter(terminal: terminal, session: session);
+
+    adapter.attach();
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+
+    expect(session.resizes, [(110, 30, 0, 0)]);
+
+    await adapter.close();
   });
 }
 

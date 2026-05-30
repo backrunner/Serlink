@@ -47,6 +47,30 @@ void main() {
     );
   });
 
+  test('terminal text style reserves Nerd Font glyph overhang', () {
+    const settings = TerminalDisplaySettings(
+      fontFamily: 'MesloLGS NF',
+      fontSize: 14,
+    );
+
+    expect(settings.textStyle.toTextStyle().letterSpacing, greaterThan(0));
+  });
+
+  test('ordinary terminal fonts do not add glyph overhang reserve', () {
+    const settings = TerminalDisplaySettings(fontFamily: 'JetBrains Mono');
+
+    expect(settings.textStyle.toTextStyle().letterSpacing, 0);
+  });
+
+  test('full Nerd Font fallbacks are preferred before symbol-only fonts', () {
+    final fallbacks = terminalFontFallbackFamilies('JetBrains Mono');
+
+    expect(
+      fallbacks.indexOf('JetBrainsMono Nerd Font'),
+      lessThan(fallbacks.indexOf('Symbols Nerd Font Mono')),
+    );
+  });
+
   test('theme ids have human readable labels', () {
     expect(SerlinkTerminalThemeId.serlinkDark.label, 'Serlink Dark');
     expect(SerlinkTerminalThemeId.serlinkLight.label, 'Serlink Light');

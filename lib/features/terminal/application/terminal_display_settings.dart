@@ -79,11 +79,12 @@ class TerminalDisplaySettings {
       Object.hash(themeId, fontFamily, fontSize, lineHeight, scrollbackLines);
 
   TerminalStyle get textStyle {
-    return TerminalStyle(
+    return _SerlinkTerminalStyle(
       fontFamily: fontFamily,
       fontFamilyFallback: terminalFontFallbackFamilies(fontFamily),
       fontSize: fontSize,
       height: lineHeight,
+      glyphOverhangReserve: _glyphOverhangReserveFor(fontFamily, fontSize),
     );
   }
 
@@ -94,6 +95,50 @@ class TerminalDisplaySettings {
       SerlinkTerminalThemeId.highContrast => _highContrastTheme,
     };
   }
+}
+
+class _SerlinkTerminalStyle extends TerminalStyle {
+  const _SerlinkTerminalStyle({
+    required super.fontFamily,
+    required super.fontFamilyFallback,
+    required super.fontSize,
+    required super.height,
+    required this.glyphOverhangReserve,
+  });
+
+  final double glyphOverhangReserve;
+
+  @override
+  TextStyle toTextStyle({
+    Color? color,
+    Color? backgroundColor,
+    bool bold = false,
+    bool italic = false,
+    bool underline = false,
+  }) {
+    return super
+        .toTextStyle(
+          color: color,
+          backgroundColor: backgroundColor,
+          bold: bold,
+          italic: italic,
+          underline: underline,
+        )
+        .copyWith(letterSpacing: glyphOverhangReserve);
+  }
+}
+
+double _glyphOverhangReserveFor(String fontFamily, double fontSize) {
+  final enhancedGlyphFont =
+      terminalFontFamilyHasEnhancedGlyphs(fontFamily) ||
+      normalizeTerminalFontFamily(fontFamily) == defaultTerminalFontFamily;
+  if (!enhancedGlyphFont) {
+    return 0;
+  }
+  // Some Nerd Font and Powerline glyphs paint slightly outside their measured
+  // advance. xterm paints terminal cells independently, so a small reserve
+  // keeps colored prompts and icons from shaving off their right edge.
+  return (fontSize * 0.045).clamp(0.45, 0.75).toDouble();
 }
 
 SerlinkTerminalThemeId _themeIdFromJson(Object? value) {
@@ -232,11 +277,11 @@ extension SerlinkTerminalThemeLabel on SerlinkTerminalThemeId {
 }
 
 const _serlinkDarkTheme = TerminalTheme(
-  cursor: Color(0xFF58A6FF),
-  selection: Color(0x6658A6FF),
+  cursor: Color(0xFF2DD4BF),
+  selection: Color(0x552DD4BF),
   foreground: Color(0xFFE6EDF3),
-  background: Color(0xFF0D1117),
-  black: Color(0xFF0D1117),
+  background: Color(0xFF0E1116),
+  black: Color(0xFF0E1116),
   red: Color(0xFFFF7B72),
   green: Color(0xFF7EE787),
   yellow: Color(0xFFFFD33D),
@@ -253,13 +298,13 @@ const _serlinkDarkTheme = TerminalTheme(
   brightCyan: Color(0xFF39C5CF),
   brightWhite: Color(0xFFFFFFFF),
   searchHitBackground: Color(0x99FFD33D),
-  searchHitBackgroundCurrent: Color(0xFF58A6FF),
-  searchHitForeground: Color(0xFF0D1117),
+  searchHitBackgroundCurrent: Color(0xFF2DD4BF),
+  searchHitForeground: Color(0xFF0E1116),
 );
 
 const _serlinkLightTheme = TerminalTheme(
-  cursor: Color(0xFF0969DA),
-  selection: Color(0x663A7BD5),
+  cursor: Color(0xFF0D9488),
+  selection: Color(0x330D9488),
   foreground: Color(0xFF24292F),
   background: Color(0xFFFFFFFF),
   black: Color(0xFF24292F),

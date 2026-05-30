@@ -1,0 +1,348 @@
+part of '../workspace_screen.dart';
+
+class _MacWindowControls extends StatefulWidget {
+  const _MacWindowControls();
+
+  @override
+  State<_MacWindowControls> createState() => _MacWindowControlsState();
+}
+
+class _MacWindowControlsState extends State<_MacWindowControls> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() {
+        _hovered = true;
+      }),
+      onExit: (_) => setState(() {
+        _hovered = false;
+      }),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MacWindowControlButton(
+            label: 'Close window',
+            color: const Color(0xFFFF5F57),
+            pressedColor: const Color(0xFFBF4943),
+            borderColor: const Color(0xFFE0443E),
+            glyphColor: const Color(0xFF7E0F0A),
+            glyph: _MacWindowControlGlyph.close,
+            showIcon: _hovered,
+            onPressed: () => unawaited(AppWindow.close()),
+          ),
+          _MacWindowControlButton(
+            label: 'Minimize window',
+            color: const Color(0xFFFFBD2E),
+            pressedColor: const Color(0xFFBF9123),
+            borderColor: const Color(0xFFDEA123),
+            glyphColor: const Color(0xFF8A5A00),
+            glyph: _MacWindowControlGlyph.minimize,
+            showIcon: _hovered,
+            onPressed: () => unawaited(AppWindow.minimize()),
+          ),
+          _MacWindowControlButton(
+            label: 'Zoom window',
+            color: const Color(0xFF28C840),
+            pressedColor: const Color(0xFF1F9E32),
+            borderColor: const Color(0xFF1DAC2B),
+            glyphColor: const Color(0xFF006400),
+            glyph: _MacWindowControlGlyph.zoom,
+            showIcon: _hovered,
+            onPressed: () => unawaited(AppWindow.toggleMaximize()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MacWindowControlButton extends StatefulWidget {
+  const _MacWindowControlButton({
+    required this.label,
+    required this.color,
+    required this.pressedColor,
+    required this.borderColor,
+    required this.glyphColor,
+    required this.glyph,
+    required this.showIcon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final Color color;
+  final Color pressedColor;
+  final Color borderColor;
+  final Color glyphColor;
+  final _MacWindowControlGlyph glyph;
+  final bool showIcon;
+  final VoidCallback onPressed;
+
+  static const _hitSize = 20.0;
+  static const _dotSize = 12.0;
+
+  @override
+  State<_MacWindowControlButton> createState() =>
+      _MacWindowControlButtonState();
+}
+
+enum _MacWindowControlGlyph { close, minimize, zoom }
+
+class _MacWindowControlButtonState extends State<_MacWindowControlButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (_pressed == pressed) {
+      return;
+    }
+    setState(() {
+      _pressed = pressed;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: widget.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _setPressed(true),
+        onTapCancel: () => _setPressed(false),
+        onTapUp: (_) => _setPressed(false),
+        onTap: widget.onPressed,
+        child: SizedBox.square(
+          dimension: _MacWindowControlButton._hitSize,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 70),
+              curve: Curves.easeOut,
+              width: _MacWindowControlButton._dotSize,
+              height: _MacWindowControlButton._dotSize,
+              decoration: BoxDecoration(
+                color: _pressed ? widget.pressedColor : widget.color,
+                shape: BoxShape.circle,
+                border: Border.all(color: widget.borderColor, width: 0.5),
+              ),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 80),
+                curve: Curves.easeOut,
+                opacity: widget.showIcon ? 1 : 0,
+                child: CustomPaint(
+                  painter: _MacWindowControlGlyphPainter(
+                    glyph: widget.glyph,
+                    color: widget.glyphColor.withValues(alpha: 0.86),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MacWindowControlGlyphPainter extends CustomPainter {
+  const _MacWindowControlGlyphPainter({
+    required this.glyph,
+    required this.color,
+  });
+
+  final _MacWindowControlGlyph glyph;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    switch (glyph) {
+      case _MacWindowControlGlyph.close:
+        _paintClose(canvas, size);
+      case _MacWindowControlGlyph.minimize:
+        _paintMinimize(canvas, size);
+      case _MacWindowControlGlyph.zoom:
+        _paintZoom(canvas, size);
+    }
+  }
+
+  void _paintClose(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.25
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(size.width * 0.34, size.height * 0.34),
+      Offset(size.width * 0.66, size.height * 0.66),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.66, size.height * 0.34),
+      Offset(size.width * 0.34, size.height * 0.66),
+      paint,
+    );
+  }
+
+  void _paintMinimize(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.35
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(size.width * 0.30, size.height * 0.56),
+      Offset(size.width * 0.70, size.height * 0.56),
+      paint,
+    );
+  }
+
+  void _paintZoom(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final first = Path()
+      ..moveTo(size.width * 0.30, size.height * 0.30)
+      ..lineTo(size.width * 0.66, size.height * 0.30)
+      ..lineTo(size.width * 0.30, size.height * 0.66)
+      ..close();
+    final second = Path()
+      ..moveTo(size.width * 0.70, size.height * 0.70)
+      ..lineTo(size.width * 0.34, size.height * 0.70)
+      ..lineTo(size.width * 0.70, size.height * 0.34)
+      ..close();
+    canvas.drawPath(first, paint);
+    canvas.drawPath(second, paint);
+  }
+
+  @override
+  bool shouldRepaint(_MacWindowControlGlyphPainter oldDelegate) {
+    return oldDelegate.glyph != glyph || oldDelegate.color != color;
+  }
+}
+
+class _WindowDragRegion extends StatelessWidget {
+  const _WindowDragRegion();
+
+  @override
+  Widget build(BuildContext context) {
+    if (!AppWindow.usesCustomChrome) {
+      return const SizedBox.shrink();
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanStart: (_) => unawaited(AppWindow.startDrag()),
+      onDoubleTap: () => unawaited(AppWindow.toggleMaximize()),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _WindowControls extends StatefulWidget {
+  const _WindowControls();
+
+  @override
+  State<_WindowControls> createState() => _WindowControlsState();
+}
+
+class _WindowControlsState extends State<_WindowControls> {
+  bool _isMaximized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refreshMaximized());
+  }
+
+  Future<void> _refreshMaximized() async {
+    final maximized = await AppWindow.isMaximized();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isMaximized = maximized;
+    });
+  }
+
+  Future<void> _toggleMaximize() async {
+    final maximized = await AppWindow.toggleMaximize();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isMaximized = maximized;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _WindowControlButton(
+          icon: Icons.remove_rounded,
+          onPressed: () => unawaited(AppWindow.minimize()),
+        ),
+        _WindowControlButton(
+          icon: _isMaximized
+              ? Icons.filter_none_rounded
+              : Icons.crop_square_rounded,
+          onPressed: () => unawaited(_toggleMaximize()),
+        ),
+        _WindowControlButton(
+          icon: Icons.close_rounded,
+          isClose: true,
+          onPressed: () => unawaited(AppWindow.close()),
+        ),
+      ],
+    );
+  }
+}
+
+class _WindowControlButton extends StatefulWidget {
+  const _WindowControlButton({
+    required this.icon,
+    required this.onPressed,
+    this.isClose = false,
+  });
+
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool isClose;
+
+  @override
+  State<_WindowControlButton> createState() => _WindowControlButtonState();
+}
+
+class _WindowControlButtonState extends State<_WindowControlButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final background = _hovered
+        ? widget.isClose
+              ? const Color(0xFFE81123)
+              : scheme.onSurface.withValues(alpha: 0.08)
+        : Colors.transparent;
+    final foreground = _hovered && widget.isClose
+        ? Colors.white
+        : scheme.onSurfaceVariant;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() {
+        _hovered = true;
+      }),
+      onExit: (_) => setState(() {
+        _hovered = false;
+      }),
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(6),
+          onTap: widget.onPressed,
+          child: SizedBox.square(
+            dimension: 34,
+            child: Icon(widget.icon, size: 16, color: foreground),
+          ),
+        ),
+      ),
+    );
+  }
+}

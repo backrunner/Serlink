@@ -9,7 +9,7 @@ class _SettingsSurface extends ConsumerWidget {
     final vaultState = vault?.vaultState;
     final canImportHostData = vaultState == VaultState.unlocked;
 
-    final scheme = Theme.of(context).colorScheme;
+    final t = context.tokens;
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 22, 24, 36),
       children: [
@@ -28,13 +28,16 @@ class _SettingsSurface extends ConsumerWidget {
                           Text(
                             'Settings',
                             style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.w700),
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: t.textPrimary,
+                                ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             'Security, sync, import/export, and runtime controls.',
                             style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(color: scheme.onSurfaceVariant),
+                                ?.copyWith(color: t.textSecondary),
                           ),
                         ],
                       ),
@@ -42,8 +45,8 @@ class _SettingsSurface extends ConsumerWidget {
                     _SettingsStatusPill(
                       label: _vaultStatusPillLabel(vaultState),
                       color: vaultState == VaultState.unlocked
-                          ? scheme.primary
-                          : scheme.onSurfaceVariant,
+                          ? t.accentPrimary
+                          : t.textMuted,
                     ),
                   ],
                 ),

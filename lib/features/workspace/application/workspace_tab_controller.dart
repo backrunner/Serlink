@@ -208,7 +208,15 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     final tab = _open(
       hostId: null,
       title: 'Local Shell',
-      content: LocalTerminalTabContent(sessionId: sessionId),
+      content: LocalTerminalTabContent(
+        panes: [
+          TerminalPaneState(
+            sessionId: sessionId,
+            title: 'Local Shell',
+            lifecycle: SessionLifecycleState.connecting,
+          ),
+        ],
+      ),
       lifecycle: SessionLifecycleState.connecting,
       switchArea: WorkspaceArea.sessions,
     );
@@ -346,25 +354,21 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .where((candidate) => candidate.id == tabId)
         .firstOrNull;
     final content = tab?.content;
-    if (tab == null || content is! TerminalTabContent) {
+    final panes = content == null ? null : _terminalPanesOf(content);
+    final layout = content == null ? null : _terminalLayoutOf(content);
+    if (tab == null ||
+        content == null ||
+        panes == null ||
+        panes.isEmpty ||
+        layout == null) {
       return;
     }
-    _replaceTab(
-      tab.copyWith(
-        content: content.copyWith(
-          splitAxis: axis,
-          activePane: content.activePane.clamp(0, 1),
-        ),
-        lastActivityAt: DateTime.now(),
-      ),
-    );
-    if (content.panes.length > 1) {
-      return;
-    }
+    final activePane = _activePaneIndexOf(content).clamp(0, panes.length - 1);
     final paneTitle = tab.title;
     final sessionId = _newSessionId();
+    final paneIndex = panes.length;
     final effectiveSettings =
-        content.activePaneState?.displaySettings ??
+        _activePaneStateOf(content)?.displaySettings ??
         _globalTerminalDisplaySettingsSnapshot();
     ref
         .read(workspaceRuntimeRegistryProvider)
@@ -373,20 +377,30 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
           title: paneTitle,
           maxLines: effectiveSettings.scrollbackLines,
         );
-    final next = (tab.content as TerminalTabContent).copyWith(
+    final local = content is LocalTerminalTabContent;
+    final nextLayout = layout.replaceLeaf(
+      activePane,
+      TerminalPaneSplit(
+        axis: axis,
+        first: TerminalPaneLeaf(activePane),
+        second: TerminalPaneLeaf(paneIndex),
+      ),
+    );
+    final next = _copyTerminalPaneContent(
+      content,
       panes: [
-        ...content.panes,
+        ...panes,
         TerminalPaneState(
           sessionId: sessionId,
           title: paneTitle,
-          lifecycle: tab.hostId == null
+          lifecycle: local
               ? SessionLifecycleState.connecting
               : SessionLifecycleState.resolvingProfile,
-          displaySettings: content.primaryPane.displaySettings,
+          displaySettings: panes.first.displaySettings,
         ),
       ],
-      splitAxis: axis,
-      activePane: 1,
+      layout: nextLayout,
+      activePane: paneIndex,
     );
     final updatedTab = tab.copyWith(
       content: next,
@@ -395,10 +409,10 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     );
     _replaceTab(updatedTab);
     final paneToken = _nextConnectionToken(tab.id);
-    if (tab.hostId == null) {
-      unawaited(_connectLocalTerminalPane(updatedTab, 1, paneToken));
+    if (local) {
+      unawaited(_connectLocalTerminalPane(updatedTab, paneIndex, paneToken));
     } else {
-      unawaited(_connectTerminalPane(updatedTab, 1, paneToken));
+      unawaited(_connectTerminalPane(updatedTab, paneIndex, paneToken));
     }
   }
 
@@ -407,11 +421,12 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .where((candidate) => candidate.id == tabId)
         .firstOrNull;
     final content = tab?.content;
-    if (tab == null || content is! TerminalTabContent) {
+    final panes = content == null ? null : _terminalPanesOf(content);
+    if (tab == null || content == null || panes == null || panes.isEmpty) {
       return;
     }
-    if (content.panes.length > 1) {
-      for (final pane in content.panes.skip(1)) {
+    if (panes.length > 1) {
+      for (final pane in panes.skip(1)) {
         unawaited(
           ref
               .read(workspaceRuntimeRegistryProvider)
@@ -421,9 +436,14 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     }
     _replaceTab(
       tab.copyWith(
-        content: content.copyWith(panes: [content.primaryPane], activePane: 0),
-        lifecycle: content.primaryPane.lifecycle,
-        failure: content.primaryPane.failure,
+        content: _copyTerminalPaneContent(
+          content,
+          panes: [panes.first],
+          layout: const TerminalPaneLeaf(0),
+          activePane: 0,
+        ),
+        lifecycle: panes.first.lifecycle,
+        failure: panes.first.failure,
         lastActivityAt: DateTime.now(),
       ),
     );
@@ -434,12 +454,53 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .where((candidate) => candidate.id == tabId)
         .firstOrNull;
     final content = tab?.content;
-    if (tab == null || content is! TerminalTabContent) {
+    if (tab == null || content == null || _terminalPanesOf(content) == null) {
       return;
     }
     _replaceTab(
       tab.copyWith(
-        content: content.copyWith(splitAxis: axis),
+        content: _copyTerminalPaneContent(content, splitAxis: axis),
+        lastActivityAt: DateTime.now(),
+      ),
+    );
+  }
+
+  void closeActiveTerminalPane(WorkspaceTabId tabId) {
+    final tab = state.tabs
+        .where((candidate) => candidate.id == tabId)
+        .firstOrNull;
+    final content = tab?.content;
+    final panes = content == null ? null : _terminalPanesOf(content);
+    final layout = content == null ? null : _terminalLayoutOf(content);
+    if (tab == null ||
+        content == null ||
+        panes == null ||
+        panes.length <= 1 ||
+        layout == null) {
+      return;
+    }
+    final paneIndex = _activePaneIndexOf(content).clamp(0, panes.length - 1);
+    final nextPanes = [...panes]..removeAt(paneIndex);
+    final nextLayout =
+        layout.removeLeaf(paneIndex)?.reindexAfterRemoving(paneIndex) ??
+        const TerminalPaneLeaf(0);
+    final nextActivePane = paneIndex.clamp(0, nextPanes.length - 1);
+    unawaited(
+      ref
+          .read(workspaceRuntimeRegistryProvider)
+          .closeSession(panes[paneIndex].sessionId),
+    );
+    final nextContent = _copyTerminalPaneContent(
+      content,
+      panes: nextPanes,
+      layout: nextLayout,
+      activePane: nextActivePane,
+    );
+    _replaceTab(
+      tab.copyWith(
+        content: nextContent,
+        lifecycle: _aggregateLifecycle(nextContent),
+        failure: _aggregateFailure(nextContent),
         lastActivityAt: DateTime.now(),
       ),
     );
@@ -450,13 +511,14 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .where((candidate) => candidate.id == tabId)
         .firstOrNull;
     final content = tab?.content;
-    if (tab == null || content is! TerminalTabContent) {
+    final panes = content == null ? null : _terminalPanesOf(content);
+    if (tab == null || content == null || panes == null || panes.isEmpty) {
       return;
     }
-    final normalizedIndex = paneIndex.clamp(0, content.panes.length - 1);
+    final normalizedIndex = paneIndex.clamp(0, panes.length - 1);
     _replaceTab(
       tab.copyWith(
-        content: content.copyWith(activePane: normalizedIndex),
+        content: _copyTerminalPaneContent(content, activePane: normalizedIndex),
         lastActivityAt: DateTime.now(),
       ),
     );
@@ -469,7 +531,8 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     }
     final sessionId = switch (tab.content) {
       TerminalTabContent(:final activePaneState) => activePaneState?.sessionId,
-      LocalTerminalTabContent(:final sessionId) => sessionId,
+      LocalTerminalTabContent(:final activePaneState) =>
+        activePaneState?.sessionId,
       SftpTabContent() => null,
     };
     if (sessionId == null) {
@@ -619,6 +682,62 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     _replaceTab(tab.copyWith(content: content.copyWith(panes: panes)));
   }
 
+  List<TerminalPaneState>? _terminalPanesOf(WorkspaceTabContent content) {
+    return switch (content) {
+      TerminalTabContent(:final panes) => panes,
+      LocalTerminalTabContent(:final panes) => panes,
+      SftpTabContent() => null,
+    };
+  }
+
+  TerminalPaneState? _activePaneStateOf(WorkspaceTabContent content) {
+    return switch (content) {
+      TerminalTabContent(:final activePaneState) => activePaneState,
+      LocalTerminalTabContent(:final activePaneState) => activePaneState,
+      SftpTabContent() => null,
+    };
+  }
+
+  int _activePaneIndexOf(WorkspaceTabContent content) {
+    return switch (content) {
+      TerminalTabContent(:final activePane) => activePane,
+      LocalTerminalTabContent(:final activePane) => activePane,
+      SftpTabContent() => 0,
+    };
+  }
+
+  TerminalPaneLayout _terminalLayoutOf(WorkspaceTabContent content) {
+    return switch (content) {
+      TerminalTabContent(:final layout) => layout,
+      LocalTerminalTabContent(:final layout) => layout,
+      SftpTabContent() => const TerminalPaneLeaf(0),
+    };
+  }
+
+  WorkspaceTabContent _copyTerminalPaneContent(
+    WorkspaceTabContent content, {
+    List<TerminalPaneState>? panes,
+    TerminalPaneLayout? layout,
+    Axis? splitAxis,
+    int? activePane,
+  }) {
+    return switch (content) {
+      TerminalTabContent() => content.copyWith(
+        panes: panes,
+        layout: layout,
+        splitAxis: splitAxis,
+        activePane: activePane,
+      ),
+      LocalTerminalTabContent() => content.copyWith(
+        panes: panes,
+        layout: layout,
+        splitAxis: splitAxis,
+        activePane: activePane,
+      ),
+      SftpTabContent() => content,
+    };
+  }
+
   WorkspaceTabState _open({
     required HostId? hostId,
     required String title,
@@ -700,8 +819,11 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
               shell.done
                   .then((_) {
                     if (_isCurrent(tab.id, token)) {
-                      _markTerminalPaneDisconnected(tab.id, paneIndex);
-                      if (panes.length == 1) {
+                      _markTerminalPaneDisconnectedBySession(
+                        tab.id,
+                        pane.sessionId,
+                      );
+                      if (_currentTerminalPaneCount(tab.id) == 1) {
                         _scheduleReconnect(
                           tabId: tab.id,
                           policy: profile.reconnectPolicy,
@@ -711,7 +833,11 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
                   })
                   .catchError((Object error) {
                     if (_isCurrent(tab.id, token)) {
-                      _markTerminalPaneFailed(tab.id, paneIndex, error);
+                      _markTerminalPaneFailedBySession(
+                        tab.id,
+                        pane.sessionId,
+                        error,
+                      );
                     }
                   }),
             );
@@ -823,12 +949,12 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         shell.done
             .then((_) {
               if (_isCurrent(tab.id, token)) {
-                _markTerminalPaneDisconnected(tab.id, paneIndex);
+                _markTerminalPaneDisconnectedBySession(tab.id, pane.sessionId);
               }
             })
             .catchError((Object error) {
               if (_isCurrent(tab.id, token)) {
-                _markTerminalPaneFailed(tab.id, paneIndex, error);
+                _markTerminalPaneFailedBySession(tab.id, pane.sessionId, error);
               }
             }),
       );
@@ -840,7 +966,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
           pane.sessionId,
           'Connection failed: ${_failureFrom(error).message}\r\n',
         );
-        _markTerminalPaneFailed(tab.id, paneIndex, error);
+        _markTerminalPaneFailedBySession(tab.id, pane.sessionId, error);
       }
     }
   }
@@ -850,56 +976,71 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     int token, {
     bool preserveReconnectAttempts = false,
   }) async {
-    if (tab.content is! LocalTerminalTabContent) {
+    final content = tab.content;
+    if (content is! LocalTerminalTabContent) {
       return;
     }
-    final sessionId = _sessionIdOf(tab.content);
     final runtime = ref.read(workspaceRuntimeRegistryProvider);
     try {
-      _replaceTab(
-        tab.copyWith(
-          lifecycle: SessionLifecycleState.connecting,
-          clearFailure: true,
-          lastActivityAt: DateTime.now(),
-        ),
+      final connecting = _copyTerminalTabLifecycle(
+        tab,
+        SessionLifecycleState.connecting,
+        clearFailure: true,
       );
-      final shell = await ref.read(localTerminalServiceProvider).openShell();
-      _ensureCurrent(tab.id, token);
-      runtime.attachTerminal(sessionId: sessionId, session: shell);
-      _replaceTab(
-        _currentTab(tab.id).copyWith(
-          lifecycle: SessionLifecycleState.connected,
+      _replaceTab(connecting.copyWith(lastActivityAt: DateTime.now()));
+      for (
+        var paneIndex = 0;
+        paneIndex < content.panes.length;
+        paneIndex += 1
+      ) {
+        final pane = content.panes[paneIndex];
+        final shell = await ref.read(localTerminalServiceProvider).openShell();
+        _ensureCurrent(tab.id, token);
+        runtime.attachTerminal(sessionId: pane.sessionId, session: shell);
+        _setTerminalPaneLifecycle(
+          tab.id,
+          paneIndex,
+          SessionLifecycleState.connected,
           clearFailure: true,
-          lastActivityAt: DateTime.now(),
-        ),
-      );
-      if (preserveReconnectAttempts) {
-        _clearReconnectTimer(tab.id);
-      } else {
-        _clearReconnectState(tab.id);
+        );
+        if (preserveReconnectAttempts) {
+          _clearReconnectTimer(tab.id);
+        } else {
+          _clearReconnectState(tab.id);
+        }
+        unawaited(
+          shell.done
+              .then((_) {
+                if (_isCurrent(tab.id, token)) {
+                  _markLocalTerminalPaneExitedBySession(tab.id, pane.sessionId);
+                }
+              })
+              .catchError((Object error) {
+                if (_isCurrent(tab.id, token)) {
+                  _markLocalTerminalPaneFailedBySession(
+                    tab.id,
+                    pane.sessionId,
+                    error,
+                  );
+                }
+              }),
+        );
       }
-      unawaited(
-        shell.done
-            .then((_) {
-              if (_isCurrent(tab.id, token)) {
-                _markLocalTerminalExited(tab.id);
-              }
-            })
-            .catchError((Object error) {
-              if (_isCurrent(tab.id, token)) {
-                _markLocalTerminalFailed(tab.id, error);
-              }
-            }),
-      );
     } on _StaleConnectionAttempt {
       return;
     } on Object catch (error) {
       if (_isCurrent(tab.id, token)) {
-        runtime.writeTerminal(
-          sessionId,
-          'Local terminal failed: ${_localTerminalFailureFrom(error).message}\r\n',
-        );
-        _markLocalTerminalFailed(tab.id, error);
+        for (var i = 0; i < content.panes.length; i += 1) {
+          runtime.writeTerminal(
+            content.panes[i].sessionId,
+            'Local terminal failed: ${_localTerminalFailureFrom(error).message}\r\n',
+          );
+          if (content.panes.length == 1) {
+            _markLocalTerminalFailed(tab.id, error);
+          } else {
+            _markLocalTerminalPaneFailed(tab.id, i, error);
+          }
+        }
       }
     }
   }
@@ -910,7 +1051,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     int token,
   ) async {
     final content = tab.content;
-    if (content is! TerminalTabContent) {
+    if (content is! LocalTerminalTabContent) {
       return;
     }
     final pane = content.panes[paneIndex];
@@ -935,12 +1076,16 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         shell.done
             .then((_) {
               if (_isCurrent(tab.id, token)) {
-                _markTerminalPaneDisconnected(tab.id, paneIndex);
+                _markLocalTerminalPaneExitedBySession(tab.id, pane.sessionId);
               }
             })
             .catchError((Object error) {
               if (_isCurrent(tab.id, token)) {
-                _markLocalTerminalPaneFailed(tab.id, paneIndex, error);
+                _markLocalTerminalPaneFailedBySession(
+                  tab.id,
+                  pane.sessionId,
+                  error,
+                );
               }
             }),
       );
@@ -952,7 +1097,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
           pane.sessionId,
           'Local terminal failed: ${_localTerminalFailureFrom(error).message}\r\n',
         );
-        _markLocalTerminalPaneFailed(tab.id, paneIndex, error);
+        _markLocalTerminalPaneFailedBySession(tab.id, pane.sessionId, error);
       }
     }
   }
@@ -1001,28 +1146,6 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     );
   }
 
-  void _markLocalTerminalExited(WorkspaceTabId tabId) {
-    if (!ref.mounted) {
-      return;
-    }
-    final tab = state.tabs
-        .where((candidate) => candidate.id == tabId)
-        .firstOrNull;
-    if (tab == null) {
-      return;
-    }
-    _replaceTab(
-      tab.copyWith(
-        lifecycle: SessionLifecycleState.disconnected,
-        failure: const AppFailure(
-          code: 'local_terminal.exited',
-          message: 'Local shell exited. Restart opens a new shell.',
-        ),
-        lastActivityAt: DateTime.now(),
-      ),
-    );
-  }
-
   void _markLocalTerminalFailed(WorkspaceTabId tabId, Object error) {
     if (!ref.mounted) {
       return;
@@ -1038,6 +1161,64 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         lifecycle: SessionLifecycleState.failed,
         failure: _localTerminalFailureFrom(error),
         lastActivityAt: DateTime.now(),
+      ),
+    );
+  }
+
+  void _markLocalTerminalPaneExitedBySession(
+    WorkspaceTabId tabId,
+    SessionId sessionId,
+  ) {
+    final paneIndex = _paneIndexForSession(tabId, sessionId);
+    if (paneIndex == null) {
+      return;
+    }
+    _markLocalTerminalPaneExited(tabId, paneIndex);
+  }
+
+  void _markTerminalPaneDisconnectedBySession(
+    WorkspaceTabId tabId,
+    SessionId sessionId,
+  ) {
+    final paneIndex = _paneIndexForSession(tabId, sessionId);
+    if (paneIndex == null) {
+      return;
+    }
+    _markTerminalPaneDisconnected(tabId, paneIndex);
+  }
+
+  void _markTerminalPaneFailedBySession(
+    WorkspaceTabId tabId,
+    SessionId sessionId,
+    Object error,
+  ) {
+    final paneIndex = _paneIndexForSession(tabId, sessionId);
+    if (paneIndex == null) {
+      return;
+    }
+    _markTerminalPaneFailed(tabId, paneIndex, error);
+  }
+
+  void _markLocalTerminalPaneFailedBySession(
+    WorkspaceTabId tabId,
+    SessionId sessionId,
+    Object error,
+  ) {
+    final paneIndex = _paneIndexForSession(tabId, sessionId);
+    if (paneIndex == null) {
+      return;
+    }
+    _markLocalTerminalPaneFailed(tabId, paneIndex, error);
+  }
+
+  void _markLocalTerminalPaneExited(WorkspaceTabId tabId, int paneIndex) {
+    _setTerminalPaneLifecycle(
+      tabId,
+      paneIndex,
+      SessionLifecycleState.disconnected,
+      failure: const AppFailure(
+        code: 'local_terminal.exited',
+        message: 'Local shell exited. Restart opens a new shell.',
       ),
     );
   }
@@ -1080,6 +1261,37 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     );
   }
 
+  int? _paneIndexForSession(WorkspaceTabId tabId, SessionId sessionId) {
+    if (!ref.mounted) {
+      return null;
+    }
+    final tab = state.tabs
+        .where((candidate) => candidate.id == tabId)
+        .firstOrNull;
+    final content = tab?.content;
+    final panes = content == null ? null : _terminalPanesOf(content);
+    if (panes == null) {
+      return null;
+    }
+    for (var index = 0; index < panes.length; index += 1) {
+      if (panes[index].sessionId == sessionId) {
+        return index;
+      }
+    }
+    return null;
+  }
+
+  int? _currentTerminalPaneCount(WorkspaceTabId tabId) {
+    if (!ref.mounted) {
+      return null;
+    }
+    final tab = state.tabs
+        .where((candidate) => candidate.id == tabId)
+        .firstOrNull;
+    final content = tab?.content;
+    return content == null ? null : _terminalPanesOf(content)?.length;
+  }
+
   void _setTerminalPaneLifecycle(
     WorkspaceTabId tabId,
     int paneIndex,
@@ -1094,18 +1306,20 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .where((candidate) => candidate.id == tabId)
         .firstOrNull;
     final content = tab?.content;
+    final panes = content == null ? null : _terminalPanesOf(content);
     if (tab == null ||
-        content is! TerminalTabContent ||
-        paneIndex >= content.panes.length) {
+        content == null ||
+        panes == null ||
+        paneIndex >= panes.length) {
       return;
     }
-    final panes = [...content.panes];
-    panes[paneIndex] = panes[paneIndex].copyWith(
+    final nextPanes = [...panes];
+    nextPanes[paneIndex] = nextPanes[paneIndex].copyWith(
       lifecycle: lifecycle,
       failure: failure,
       clearFailure: clearFailure,
     );
-    final nextContent = content.copyWith(panes: panes);
+    final nextContent = _copyTerminalPaneContent(content, panes: nextPanes);
     _replaceTab(
       tab.copyWith(
         content: nextContent,
@@ -1122,14 +1336,15 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     bool clearFailure = false,
   }) {
     final content = tab.content;
-    if (content is! TerminalTabContent) {
+    final panes = _terminalPanesOf(content);
+    if (panes == null) {
       return tab.copyWith(lifecycle: lifecycle, clearFailure: clearFailure);
     }
-    final panes = [
-      for (final pane in content.panes)
+    final nextPanes = [
+      for (final pane in panes)
         pane.copyWith(lifecycle: lifecycle, clearFailure: clearFailure),
     ];
-    final nextContent = content.copyWith(panes: panes);
+    final nextContent = _copyTerminalPaneContent(content, panes: nextPanes);
     return tab.copyWith(
       content: nextContent,
       lifecycle: _aggregateLifecycle(nextContent),
@@ -1138,8 +1353,12 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     );
   }
 
-  SessionLifecycleState _aggregateLifecycle(TerminalTabContent content) {
-    final lifecycles = content.panes.map((pane) => pane.lifecycle).toSet();
+  SessionLifecycleState _aggregateLifecycle(WorkspaceTabContent content) {
+    final panes = _terminalPanesOf(content);
+    if (panes == null || panes.isEmpty) {
+      return SessionLifecycleState.idle;
+    }
+    final lifecycles = panes.map((pane) => pane.lifecycle).toSet();
     if (lifecycles.every((value) => value == SessionLifecycleState.connected)) {
       return SessionLifecycleState.connected;
     }
@@ -1155,12 +1374,16 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     if (lifecycles.contains(SessionLifecycleState.connecting)) {
       return SessionLifecycleState.connecting;
     }
-    return content.primaryPane.lifecycle;
+    return panes.first.lifecycle;
   }
 
-  AppFailure? _aggregateFailure(TerminalTabContent content) {
-    return content.activePaneState?.failure ??
-        content.panes
+  AppFailure? _aggregateFailure(WorkspaceTabContent content) {
+    final panes = _terminalPanesOf(content);
+    if (panes == null) {
+      return null;
+    }
+    return _activePaneStateOf(content)?.failure ??
+        panes
             .map((pane) => pane.failure)
             .firstWhere((failure) => failure != null, orElse: () => null);
   }
@@ -1171,7 +1394,9 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         for (final pane in panes) pane.sessionId,
       ],
       SftpTabContent(:final sessionId) => [sessionId],
-      LocalTerminalTabContent(:final sessionId) => [sessionId],
+      LocalTerminalTabContent(:final panes) => [
+        for (final pane in panes) pane.sessionId,
+      ],
     };
     for (final sessionId in sessionIds) {
       await ref.read(workspaceRuntimeRegistryProvider).closeSession(sessionId);
@@ -1248,14 +1473,6 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
 
 String _ensureTrailingNewline(String text) {
   return text.endsWith('\n') || text.endsWith('\r') ? text : '$text\n';
-}
-
-SessionId _sessionIdOf(WorkspaceTabContent content) {
-  return switch (content) {
-    TerminalTabContent(:final primaryPane) => primaryPane.sessionId,
-    SftpTabContent(:final sessionId) => sessionId,
-    LocalTerminalTabContent(:final sessionId) => sessionId,
-  };
 }
 
 String _sftpTitle(String currentTitle, String path) {

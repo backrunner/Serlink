@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ import 'package:xterm/xterm.dart';
 
 import '../../../app/app_dependencies.dart';
 import '../../../core/ids/entity_id.dart';
+import '../../../design_system/design_system.dart';
 import '../../../core/security/local_file_security.dart';
 import '../../../platform/app_window.dart';
 import '../../hosts/application/host_store.dart';
@@ -50,21 +51,32 @@ import '../domain/workspace_tab.dart';
 import 'workspace_search.dart';
 
 part 'workspace_screen/shell.dart';
+part 'workspace_screen/shell_top_bar.dart';
+part 'workspace_screen/shell_window_controls.dart';
 part 'workspace_screen/hosts_surface.dart';
 part 'workspace_screen/host_form_dialog.dart';
+part 'workspace_screen/host_form_sections.dart';
 part 'workspace_screen/vault_access.dart';
+part 'workspace_screen/vault_recovery_dialogs.dart';
 part 'workspace_screen/host_rows.dart';
 part 'workspace_screen/snippets.dart';
 part 'workspace_screen/sessions_tabs.dart';
 part 'workspace_screen/terminal_pane.dart';
+part 'workspace_screen/terminal_toolbar.dart';
+part 'workspace_screen/terminal_viewports.dart';
 part 'workspace_screen/terminal_forwarding.dart';
 part 'workspace_screen/terminal_settings.dart';
 part 'workspace_screen/sftp_pane.dart';
+part 'workspace_screen/sftp_components.dart';
 part 'workspace_screen/transfers_surface.dart';
 part 'workspace_screen/file_path_helpers.dart';
 part 'workspace_screen/settings_surface.dart';
 part 'workspace_screen/settings_data_exchange.dart';
 part 'workspace_screen/settings_sync.dart';
+part 'workspace_screen/settings_sync_conflicts.dart';
+part 'workspace_screen/settings_sync_devices.dart';
+part 'workspace_screen/settings_sync_webdav.dart';
 part 'workspace_screen/settings_management.dart';
 part 'workspace_screen/settings_import_export.dart';
+part 'workspace_screen/settings_import_export_certificate.dart';
 part 'workspace_screen/dialogs.dart';

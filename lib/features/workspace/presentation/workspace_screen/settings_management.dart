@@ -8,40 +8,7 @@ class _SettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: scheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 10),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.symmetric(
-              horizontal: BorderSide(color: scheme.outlineVariant),
-            ),
-          ),
-          child: Column(
-            children: [
-              for (var index = 0; index < children.length; index++) ...[
-                if (index > 0)
-                  Divider(
-                    height: 1,
-                    indent: 48,
-                    color: scheme.outlineVariant.withValues(alpha: 0.72),
-                  ),
-                children[index],
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
+    return SurfaceSection(title: title, children: children);
   }
 }
 
@@ -53,23 +20,7 @@ class _SettingsStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
+    return StatusPill(label: label, color: color);
   }
 }
 
@@ -110,21 +61,22 @@ class _SettingsActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = context.tokens;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: ListTile(
         minLeadingWidth: 28,
         contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         leading: SizedBox.square(
           dimension: 32,
-          child: Icon(icon, size: 19, color: scheme.onSurfaceVariant),
+          child: Icon(icon, size: 19, color: t.textSecondary),
         ),
         title: Text(
           title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: t.textPrimary,
+          ),
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 3),
@@ -132,7 +84,7 @@ class _SettingsActionRow extends StatelessWidget {
             subtitle,
             style: Theme.of(
               context,
-            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
           ),
         ),
         trailing: action == null

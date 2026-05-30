@@ -8,10 +8,11 @@ class _TerminalPane extends ConsumerStatefulWidget {
     required this.title,
     required this.panes,
     required this.showSplit,
-    required this.splitAxis,
+    required this.layout,
     required this.activePane,
     required this.local,
     required this.onOpenSftp,
+    required this.onToolbarSnapshotChanged,
   });
 
   final WorkspaceTabId tabId;
@@ -19,10 +20,11 @@ class _TerminalPane extends ConsumerStatefulWidget {
   final String title;
   final List<TerminalPaneState> panes;
   final bool showSplit;
-  final Axis splitAxis;
+  final TerminalPaneLayout layout;
   final int activePane;
   final bool local;
   final VoidCallback? onOpenSftp;
+  final ValueChanged<_TerminalToolbarSnapshot> onToolbarSnapshotChanged;
 
   @override
   ConsumerState<_TerminalPane> createState() => _TerminalPaneState();
@@ -94,30 +96,9 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     final activePaneState =
         widget.panes[widget.activePane.clamp(0, widget.panes.length - 1)];
     final settings = activePaneState.displaySettings ?? globalSettings;
+    _scheduleToolbarSnapshot(activePaneState);
     return Column(
       children: [
-        _TerminalToolbar(
-          searchActive: _showSearch,
-          activeLocalForward: _activeLocalForward,
-          activeRemoteForward: _activeRemoteForward,
-          activeDynamicForward: _activeDynamicForward,
-          forwardBusy: _forwardBusy,
-          forwardEnabled:
-              widget.hostId != null &&
-              activePaneState.lifecycle == SessionLifecycleState.connected,
-          onToggleSearch: _toggleSearch,
-          onManageForwarding: _manageForwarding,
-          onOpenSftp: widget.onOpenSftp,
-          showSplit: widget.showSplit,
-          splitAxis: widget.splitAxis,
-          onToggleSplit: _toggleSplit,
-          onSetSplitAxis: _setSplitAxis,
-          onSettings: () => _showTerminalSettingsDialog(
-            context,
-            tabId: widget.tabId,
-            hostId: widget.hostId,
-          ),
-        ),
         if (_showSearch)
           _TerminalSearchBar(
             controller: _searchTextController,
@@ -134,7 +115,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
                   terminals: _terminals(),
                   controllers: _terminalControllers,
                   globalSettings: globalSettings,
-                  axis: widget.splitAxis,
+                  layout: widget.layout,
                   activePane: widget.activePane,
                   local: widget.local,
                   onActivatePane: _setActivePane,
@@ -151,19 +132,57 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     );
   }
 
-  void _toggleSplit() {
-    final controller = ref.read(workspaceTabControllerProvider.notifier);
-    if (widget.showSplit) {
-      controller.disableTerminalSplit(widget.tabId);
-      return;
-    }
-    controller.enableTerminalSplit(widget.tabId);
+  void _scheduleToolbarSnapshot(TerminalPaneState activePaneState) {
+    final snapshot = _TerminalToolbarSnapshot(
+      tabId: widget.tabId,
+      searchActive: _showSearch,
+      activeLocalForward: _activeLocalForward,
+      activeRemoteForward: _activeRemoteForward,
+      activeDynamicForward: _activeDynamicForward,
+      forwardBusy: _forwardBusy,
+      forwardEnabled:
+          !widget.local &&
+          widget.hostId != null &&
+          activePaneState.lifecycle == SessionLifecycleState.connected,
+      showForwarding: !widget.local,
+      showOpenSftp: !widget.local && widget.onOpenSftp != null,
+      onToggleSearch: _toggleSearch,
+      onManageForwarding: _manageForwarding,
+      onOpenSftp: widget.onOpenSftp,
+      showSplit: widget.showSplit,
+      onSplitRight: _splitRight,
+      onSplitDown: _splitDown,
+      onCloseActivePane: _closeActivePane,
+      onSettings: () => _showTerminalSettingsDialog(
+        context,
+        tabId: widget.tabId,
+        hostId: widget.hostId,
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      widget.onToolbarSnapshotChanged(snapshot);
+    });
   }
 
-  void _setSplitAxis(Axis axis) {
+  void _splitRight() {
     ref
         .read(workspaceTabControllerProvider.notifier)
-        .setTerminalSplitAxis(widget.tabId, axis);
+        .enableTerminalSplit(widget.tabId, axis: Axis.horizontal);
+  }
+
+  void _splitDown() {
+    ref
+        .read(workspaceTabControllerProvider.notifier)
+        .enableTerminalSplit(widget.tabId, axis: Axis.vertical);
+  }
+
+  void _closeActivePane() {
+    ref
+        .read(workspaceTabControllerProvider.notifier)
+        .closeActiveTerminalPane(widget.tabId);
   }
 
   void _setActivePane(int index) {
@@ -507,333 +526,4 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     }
     return true;
   }
-}
-
-class _TerminalToolbar extends StatelessWidget {
-  const _TerminalToolbar({
-    required this.searchActive,
-    required this.activeLocalForward,
-    required this.activeRemoteForward,
-    required this.activeDynamicForward,
-    required this.forwardBusy,
-    required this.forwardEnabled,
-    required this.onToggleSearch,
-    required this.onManageForwarding,
-    required this.onOpenSftp,
-    required this.showSplit,
-    required this.splitAxis,
-    required this.onToggleSplit,
-    required this.onSetSplitAxis,
-    required this.onSettings,
-  });
-
-  final bool searchActive;
-  final _LocalForwardDraft? activeLocalForward;
-  final _RemoteForwardDraft? activeRemoteForward;
-  final _DynamicForwardDraft? activeDynamicForward;
-  final bool forwardBusy;
-  final bool forwardEnabled;
-  final VoidCallback onToggleSearch;
-  final VoidCallback onManageForwarding;
-  final VoidCallback? onOpenSftp;
-  final bool showSplit;
-  final Axis splitAxis;
-  final VoidCallback onToggleSplit;
-  final ValueChanged<Axis> onSetSplitAxis;
-  final VoidCallback onSettings;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: Row(
-        children: [
-          const Spacer(),
-          Tooltip(
-            message: 'Search terminal',
-            child: IconButton(
-              isSelected: searchActive,
-              onPressed: onToggleSearch,
-              icon: const Icon(Icons.search, size: 18),
-            ),
-          ),
-          Tooltip(
-            message: _forwardingTooltip(
-              activeLocalForward,
-              activeRemoteForward,
-              activeDynamicForward,
-              busy: forwardBusy,
-            ),
-            child: IconButton(
-              isSelected:
-                  activeLocalForward != null ||
-                  activeRemoteForward != null ||
-                  activeDynamicForward != null,
-              onPressed: forwardEnabled && !forwardBusy
-                  ? onManageForwarding
-                  : null,
-              icon: const Icon(Icons.settings_ethernet_outlined, size: 18),
-            ),
-          ),
-          Tooltip(
-            message: 'Open SFTP tab',
-            child: IconButton(
-              onPressed: onOpenSftp,
-              icon: const Icon(Icons.folder_open_outlined, size: 18),
-            ),
-          ),
-          Tooltip(
-            message: showSplit ? 'Close split' : 'Split terminal',
-            child: IconButton(
-              onPressed: onToggleSplit,
-              icon: Icon(
-                showSplit
-                    ? Icons.close_fullscreen_outlined
-                    : Icons.splitscreen_outlined,
-                size: 18,
-              ),
-            ),
-          ),
-          if (showSplit)
-            SegmentedButton<Axis>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment<Axis>(
-                  value: Axis.horizontal,
-                  icon: Icon(Icons.view_column_outlined, size: 16),
-                  tooltip: 'Vertical split',
-                ),
-                ButtonSegment<Axis>(
-                  value: Axis.vertical,
-                  icon: Icon(Icons.view_agenda_outlined, size: 16),
-                  tooltip: 'Horizontal split',
-                ),
-              ],
-              selected: {splitAxis},
-              onSelectionChanged: (selection) {
-                final axis = selection.firstOrNull;
-                if (axis != null) {
-                  onSetSplitAxis(axis);
-                }
-              },
-            ),
-          Tooltip(
-            message: 'Terminal settings',
-            child: IconButton(
-              onPressed: onSettings,
-              icon: const Icon(Icons.tune_outlined, size: 18),
-            ),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-    );
-  }
-}
-
-class _SingleTerminalViewport extends StatelessWidget {
-  const _SingleTerminalViewport({
-    required this.terminal,
-    required this.controller,
-    required this.settings,
-    this.onKeyEvent,
-  });
-
-  final Terminal terminal;
-  final TerminalController controller;
-  final TerminalDisplaySettings settings;
-  final FocusOnKeyEventCallback? onKeyEvent;
-
-  @override
-  Widget build(BuildContext context) {
-    return TerminalView(
-      terminal,
-      controller: controller,
-      autofocus: true,
-      padding: const EdgeInsets.all(12),
-      theme: settings.terminalTheme,
-      textStyle: settings.textStyle,
-      onKeyEvent: onKeyEvent,
-    );
-  }
-}
-
-class _SplitTerminalViewport extends StatelessWidget {
-  const _SplitTerminalViewport({
-    required this.panes,
-    required this.terminals,
-    required this.controllers,
-    required this.globalSettings,
-    required this.axis,
-    required this.activePane,
-    required this.local,
-    required this.onActivatePane,
-    this.onKeyEvent,
-  });
-
-  final List<TerminalPaneState> panes;
-  final List<Terminal> terminals;
-  final List<TerminalController> controllers;
-  final TerminalDisplaySettings globalSettings;
-  final Axis axis;
-  final int activePane;
-  final bool local;
-  final ValueChanged<int> onActivatePane;
-  final FocusOnKeyEventCallback? onKeyEvent;
-
-  @override
-  Widget build(BuildContext context) {
-    final children = <Widget>[];
-    for (var index = 0; index < panes.length; index += 1) {
-      if (index > 0) {
-        children.add(_splitDivider(axis));
-      }
-      final pane = panes[index];
-      children.add(
-        Expanded(
-          child: _TerminalViewportPane(
-            terminal: terminals[index],
-            controller: controllers[index],
-            settings: pane.displaySettings ?? globalSettings,
-            active: activePane == index,
-            label: pane.title,
-            lifecycle: pane.lifecycle,
-            local: local,
-            onKeyEvent: onKeyEvent,
-            onTap: () => onActivatePane(index),
-          ),
-        ),
-      );
-    }
-    return axis == Axis.horizontal
-        ? Row(children: children)
-        : Column(children: children);
-  }
-
-  Widget _splitDivider(Axis axis) {
-    return axis == Axis.horizontal
-        ? const VerticalDivider(width: 1, thickness: 1)
-        : const Divider(height: 1, thickness: 1);
-  }
-}
-
-class _TerminalViewportPane extends StatelessWidget {
-  const _TerminalViewportPane({
-    required this.terminal,
-    required this.controller,
-    required this.settings,
-    required this.active,
-    required this.label,
-    required this.lifecycle,
-    required this.local,
-    this.onKeyEvent,
-    required this.onTap,
-  });
-
-  final Terminal terminal;
-  final TerminalController controller;
-  final TerminalDisplaySettings settings;
-  final bool active;
-  final String label;
-  final SessionLifecycleState lifecycle;
-  final bool local;
-  final FocusOnKeyEventCallback? onKeyEvent;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: active ? scheme.primary : scheme.outlineVariant,
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          children: [
-            Container(
-              height: 28,
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              alignment: Alignment.centerLeft,
-              color: active
-                  ? scheme.primary.withValues(alpha: 0.10)
-                  : scheme.surfaceContainerHighest,
-              child: Text(
-                '$label · ${_terminalPaneLifecycleLabel(lifecycle, local: local)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-            Expanded(
-              child: TerminalView(
-                terminal,
-                controller: controller,
-                autofocus: active,
-                padding: const EdgeInsets.all(12),
-                theme: settings.terminalTheme,
-                textStyle: settings.textStyle,
-                onKeyEvent: onKeyEvent,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String _terminalPaneLifecycleLabel(
-  SessionLifecycleState lifecycle, {
-  required bool local,
-}) {
-  if (local) {
-    return switch (lifecycle) {
-      SessionLifecycleState.connected => 'Running',
-      SessionLifecycleState.connecting ||
-      SessionLifecycleState.reconnecting ||
-      SessionLifecycleState.resolvingProfile => 'Starting',
-      SessionLifecycleState.disconnected => 'Exited',
-      SessionLifecycleState.failed => 'Failed',
-      SessionLifecycleState.disconnecting => 'Stopping',
-      SessionLifecycleState.verifyingHostKey ||
-      SessionLifecycleState.authenticating ||
-      SessionLifecycleState.idle => 'Starting',
-    };
-  }
-  return switch (lifecycle) {
-    SessionLifecycleState.connected => 'Connected',
-    SessionLifecycleState.connecting => 'Connecting',
-    SessionLifecycleState.reconnecting => 'Reconnecting',
-    SessionLifecycleState.disconnected => 'Disconnected',
-    SessionLifecycleState.failed => 'Failed',
-    SessionLifecycleState.resolvingProfile => 'Preparing',
-    SessionLifecycleState.verifyingHostKey => 'Verifying',
-    SessionLifecycleState.authenticating => 'Authenticating',
-    SessionLifecycleState.disconnecting => 'Disconnecting',
-    SessionLifecycleState.idle => 'Idle',
-  };
-}
-
-String _forwardingTooltip(
-  _LocalForwardDraft? activeForward,
-  _RemoteForwardDraft? activeRemoteForward,
-  _DynamicForwardDraft? activeDynamicForward, {
-  required bool busy,
-}) {
-  if (busy) {
-    return 'Updating port forwarding';
-  }
-  final activeCount = [
-    activeForward,
-    activeRemoteForward,
-    activeDynamicForward,
-  ].whereType<Object>().length;
-  if (activeCount == 0) {
-    return 'Manage port forwarding';
-  }
-  return 'Manage port forwarding ($activeCount active)';
 }

@@ -30,7 +30,6 @@ class _SnippetsSurface extends ConsumerWidget {
               count: filteredItems.length,
               onAdd: () => _showSnippetDialog(context),
             ),
-            const Divider(height: 1),
             Expanded(
               child: items.isEmpty
                   ? _SnippetsEmptyState(
@@ -84,28 +83,59 @@ class _SnippetsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
+    final t = context.tokens;
+    return SurfaceToolbar(
+      child: Row(
+        children: [
+          Text(
+            'Snippets',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: t.textPrimary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          _CountBadge(count: count),
+          const Spacer(),
+          Tooltip(
+            message: 'Add snippet',
+            child: IconButton(
+              key: const ValueKey('add-snippet-button'),
+              onPressed: onAdd,
+              icon: const Icon(Icons.add),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small pill that shows a count next to a section title.
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.surfaceSunken,
+        borderRadius: SerlinkRadii.pill,
+        border: Border.all(color: t.borderSubtle),
+      ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            Text('Snippets', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(width: 8),
-            Text(
-              count.toString(),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const Spacer(),
-            Tooltip(
-              message: 'Add snippet',
-              child: IconButton(
-                key: const ValueKey('add-snippet-button'),
-                onPressed: onAdd,
-                icon: const Icon(Icons.add),
-              ),
-            ),
-          ],
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Text(
+          count.toString(),
+          style: TextStyle(
+            color: t.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
         ),
       ),
     );
@@ -147,78 +177,78 @@ class _SnippetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    snippet.name,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+    final t = context.tokens;
+    return ListRow(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  snippet.name,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: t.textPrimary,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _singleLineCommand(snippet.command),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _singleLineCommand(snippet.command),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    color: t.textSecondary,
                   ),
-                  if (snippet.tags.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final tag in snippet.tags) Chip(label: Text(tag)),
-                      ],
-                    ),
-                  ],
+                ),
+                if (snippet.tags.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final tag in snippet.tags) Chip(label: Text(tag)),
+                    ],
+                  ),
                 ],
-              ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Tooltip(
-              message: 'Insert into active terminal',
-              child: IconButton(
-                key: ValueKey('snippet-insert-${snippet.id.value}'),
-                onPressed: onInsert,
-                icon: const Icon(Icons.input_outlined),
-              ),
+          ),
+          const SizedBox(width: 12),
+          Tooltip(
+            message: 'Insert into active terminal',
+            child: IconButton(
+              key: ValueKey('snippet-insert-${snippet.id.value}'),
+              onPressed: onInsert,
+              icon: const Icon(Icons.input_outlined),
             ),
-            Tooltip(
-              message: 'Run in active terminal',
-              child: IconButton(
-                key: ValueKey('snippet-run-${snippet.id.value}'),
-                onPressed: onRun,
-                icon: const Icon(Icons.play_arrow_outlined),
-              ),
+          ),
+          Tooltip(
+            message: 'Run in active terminal',
+            child: IconButton(
+              key: ValueKey('snippet-run-${snippet.id.value}'),
+              onPressed: onRun,
+              icon: const Icon(Icons.play_arrow_outlined),
             ),
-            Tooltip(
-              message: 'Edit snippet',
-              child: IconButton(
-                key: ValueKey('snippet-edit-${snippet.id.value}'),
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
-              ),
+          ),
+          Tooltip(
+            message: 'Edit snippet',
+            child: IconButton(
+              key: ValueKey('snippet-edit-${snippet.id.value}'),
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined),
             ),
-            Tooltip(
-              message: 'Delete snippet',
-              child: IconButton(
-                key: ValueKey('snippet-delete-${snippet.id.value}'),
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline),
-              ),
+          ),
+          Tooltip(
+            message: 'Delete snippet',
+            child: IconButton(
+              key: ValueKey('snippet-delete-${snippet.id.value}'),
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

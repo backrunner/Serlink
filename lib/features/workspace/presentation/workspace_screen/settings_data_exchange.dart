@@ -64,7 +64,7 @@ class _DataExchangeDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = context.tokens;
     final lockedSubtitle = 'Unlock the vault to use this action.';
 
     return Dialog(
@@ -86,6 +86,7 @@ class _DataExchangeDialog extends StatelessWidget {
                         'Import / Export',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
+                          color: t.textPrimary,
                         ),
                       ),
                     ),
@@ -100,13 +101,14 @@ class _DataExchangeDialog extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Backups stay available anytime. Host, identity, and SSH data require an unlocked vault.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
                 ),
                 const SizedBox(height: 20),
-                _DataExchangeSection(
+                SurfaceSection(
                   title: 'Export',
+                  dividerIndent: 52,
                   children: [
                     _DataExchangeActionTile(
                       icon: Icons.lock_outline,
@@ -150,8 +152,9 @@ class _DataExchangeDialog extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 20),
-                _DataExchangeSection(
+                SurfaceSection(
                   title: 'Import',
+                  dividerIndent: 52,
                   children: [
                     _DataExchangeActionTile(
                       icon: Icons.restore_outlined,
@@ -202,52 +205,6 @@ class _DataExchangeDialog extends StatelessWidget {
   }
 }
 
-class _DataExchangeSection extends StatelessWidget {
-  const _DataExchangeSection({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: scheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.symmetric(
-              horizontal: BorderSide(color: scheme.outlineVariant),
-            ),
-          ),
-          child: Column(
-            children: [
-              for (var index = 0; index < children.length; index++) ...[
-                if (index > 0)
-                  Divider(
-                    height: 1,
-                    indent: 52,
-                    color: scheme.outlineVariant.withValues(alpha: 0.7),
-                  ),
-                children[index],
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _DataExchangeActionTile extends StatelessWidget {
   const _DataExchangeActionTile({
     required this.icon,
@@ -267,14 +224,14 @@ class _DataExchangeActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = context.tokens;
     final effectiveSubtitle = enabled ? subtitle : disabledSubtitle ?? subtitle;
 
     return InkWell(
       onTap: enabled ? onPressed : null,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: SerlinkRadii.control,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         child: Opacity(
           opacity: enabled ? 1 : 0.48,
           child: Row(
@@ -282,7 +239,7 @@ class _DataExchangeActionTile extends StatelessWidget {
               SizedBox.square(
                 dimension: 40,
                 child: Center(
-                  child: Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+                  child: Icon(icon, size: 20, color: t.textSecondary),
                 ),
               ),
               const SizedBox(width: 10),
@@ -294,24 +251,21 @@ class _DataExchangeActionTile extends StatelessWidget {
                       title,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
+                        color: t.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       effectiveSubtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              Icon(
-                Icons.chevron_right,
-                size: 20,
-                color: scheme.onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_right, size: 20, color: t.textMuted),
             ],
           ),
         ),

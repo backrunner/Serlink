@@ -111,44 +111,54 @@ String? _defaultImportUsername() {
 }
 
 void _showSnackBar(BuildContext context, String message) {
+  final t = context.tokens;
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
     ..showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(212, 0, 16, 16),
-        content: Text(message),
+        margin: const EdgeInsets.fromLTRB(256, 0, 16, 16),
+        backgroundColor: t.surfaceRaised,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: SerlinkRadii.dialog,
+          side: BorderSide(color: t.borderSubtle),
+        ),
+        content: Text(message, style: TextStyle(color: t.textPrimary)),
       ),
     );
 }
 
 class _PlaceholderSurface extends StatelessWidget {
-  const _PlaceholderSurface({
-    required this.title,
-    required this.body,
-    this.action,
-  });
+  const _PlaceholderSurface({required this.title, required this.body});
 
   final String title;
   final String body;
-  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(title, style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: t.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               body,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: t.textSecondary),
             ),
-            if (action != null) ...[const SizedBox(height: 16), action!],
           ],
         ),
       ),

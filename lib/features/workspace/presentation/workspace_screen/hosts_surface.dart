@@ -37,14 +37,13 @@ class _HostsSurface extends ConsumerWidget {
             return Row(
               children: [
                 SizedBox(
-                  width: 420,
+                  width: 440,
                   child: Column(
                     children: [
                       _HostsHeader(
                         count: filteredHosts.length,
                         onAddHost: () => _showAddHostDialog(context),
                       ),
-                      const Divider(height: 1),
                       Expanded(
                         child: filteredHosts.isEmpty
                             ? const _PlaceholderSurface(
@@ -53,23 +52,29 @@ class _HostsSurface extends ConsumerWidget {
                                     'No hosts match the current workspace search.',
                               )
                             : ListView.separated(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(16),
                                 itemCount: filteredHosts.length,
                                 separatorBuilder: (context, index) =>
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: 12),
                                 itemBuilder: (context, index) {
                                   final host = filteredHosts[index];
-                                  return _HostRow(
-                                    host: host,
-                                    onTerminal: () =>
-                                        controller.openTerminal(host),
-                                    onSftp: () => controller.openSftp(host),
-                                    onBoth: () =>
-                                        controller.openTerminalAndSftp(host),
-                                    onEdit: () =>
-                                        _showEditHostDialog(context, host),
-                                    onDelete: () =>
-                                        _confirmDeleteHost(context, ref, host),
+                                  return EntranceFade(
+                                    key: ValueKey('host-row-${host.id.value}'),
+                                    delay: Duration(
+                                      milliseconds: 40 * (index.clamp(0, 8)),
+                                    ),
+                                    child: _HostRow(
+                                      host: host,
+                                      onTerminal: () =>
+                                          controller.openTerminal(host),
+                                      onSftp: () => controller.openSftp(host),
+                                      onBoth: () =>
+                                          controller.openTerminalAndSftp(host),
+                                      onEdit: () =>
+                                          _showEditHostDialog(context, host),
+                                      onDelete: () =>
+                                          _confirmDeleteHost(context, ref, host),
+                                    ),
                                   );
                                 },
                               ),
@@ -146,29 +151,29 @@ class _HostsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            Text('Hosts', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(width: 8),
-            Text(
-              count.toString(),
-              style: Theme.of(context).textTheme.bodySmall,
+    final t = context.tokens;
+    return SurfaceToolbar(
+      child: Row(
+        children: [
+          Text(
+            'Hosts',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: t.textPrimary,
             ),
-            const Spacer(),
-            Tooltip(
-              message: 'Add host',
-              child: IconButton(
-                key: const ValueKey('add-host-button'),
-                onPressed: onAddHost,
-                icon: const Icon(Icons.add),
-              ),
+          ),
+          const SizedBox(width: 8),
+          _CountBadge(count: count),
+          const Spacer(),
+          Tooltip(
+            message: 'Add host',
+            child: IconButton(
+              key: const ValueKey('add-host-button'),
+              onPressed: onAddHost,
+              icon: const Icon(Icons.add),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -181,18 +186,27 @@ class _HostsEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('No Hosts', style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              'No Hosts',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: t.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               'Import SSH config or add hosts to start a session.',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: t.textSecondary),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(

@@ -19,51 +19,91 @@ class _TerminalSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final countLabel = '${result.displayIndex}/${result.matchCount}';
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: SizedBox(
-        height: 44,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 300,
-                child: TextField(
-                  key: const ValueKey('terminal-search-field'),
-                  controller: controller,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    prefixIcon: Icon(Icons.search, size: 16),
-                    hintText: 'Search terminal',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: onChanged,
-                  onSubmitted: (_) => onNext(),
+    final t = context.tokens;
+    final hasMatches = result.matchCount > 0;
+    final countLabel = hasMatches
+        ? '${result.displayIndex}/${result.matchCount}'
+        : 'No results';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.surfaceRaised,
+        border: Border(bottom: BorderSide(color: t.borderSubtle)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        child: Row(
+          children: [
+            // Unified find-bar pill: borderless field + inline count + nav.
+            Expanded(
+              child: Container(
+                height: 38,
+                padding: const EdgeInsets.only(left: 12, right: 4),
+                decoration: BoxDecoration(
+                  color: t.surfaceSunken,
+                  borderRadius: SerlinkRadii.control,
+                  border: Border.all(color: t.borderSubtle),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.search, size: 16, color: t.textMuted),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        key: const ValueKey('terminal-search-field'),
+                        controller: controller,
+                        autofocus: true,
+                        style: TextStyle(color: t.textPrimary, fontSize: 13.5),
+                        decoration: InputDecoration(
+                          isCollapsed: true,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          filled: false,
+                          hintText: 'Search terminal',
+                          hintStyle: TextStyle(color: t.textMuted),
+                        ),
+                        onChanged: onChanged,
+                        onSubmitted: (_) => onNext(),
+                      ),
+                    ),
+                    Text(
+                      countLabel,
+                      style: TextStyle(
+                        color: hasMatches ? t.textSecondary : t.textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 1,
+                      height: 18,
+                      color: t.borderSubtle,
+                    ),
+                    IconButton(
+                      tooltip: 'Previous match',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: hasMatches ? onPrevious : null,
+                      icon: const Icon(Icons.keyboard_arrow_up, size: 18),
+                    ),
+                    IconButton(
+                      tooltip: 'Next match',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: hasMatches ? onNext : null,
+                      icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 12),
-              SizedBox(width: 48, child: Text(countLabel)),
-              IconButton(
-                tooltip: 'Previous match',
-                onPressed: result.matchCount == 0 ? null : onPrevious,
-                icon: const Icon(Icons.keyboard_arrow_up, size: 18),
-              ),
-              IconButton(
-                tooltip: 'Next match',
-                onPressed: result.matchCount == 0 ? null : onNext,
-                icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-              ),
-              const Spacer(),
-              IconButton(
-                tooltip: 'Close search',
-                onPressed: onClose,
-                icon: const Icon(Icons.close, size: 18),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Close search',
+              onPressed: onClose,
+              icon: const Icon(Icons.close, size: 18),
+            ),
+          ],
         ),
       ),
     );
@@ -128,31 +168,27 @@ class _TerminalSettingsDialog extends ConsumerWidget {
                 _TerminalSettingsGroup(
                   title: 'Appearance',
                   children: [
-                    DropdownMenu<SerlinkTerminalThemeId>(
-                      key: ValueKey(
-                        'terminal-theme-${settings.themeId.name}-$editingHostProfile',
-                      ),
-                      initialSelection: settings.themeId,
-                      label: const Text('Theme'),
-                      expandedInsets: EdgeInsets.zero,
-                      inputDecorationTheme: const InputDecorationThemeData(
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      dropdownMenuEntries: [
-                        for (final themeId in SerlinkTerminalThemeId.values)
-                          DropdownMenuEntry(
-                            value: themeId,
-                            label: themeId.label,
-                          ),
-                      ],
-                      onSelected: (themeId) {
-                        if (themeId != null) {
+                    SerlinkLabeledField(
+                      label: 'Theme',
+                      child: SerlinkSelect<SerlinkTerminalThemeId>(
+                        key: ValueKey(
+                          'terminal-theme-${settings.themeId.name}-$editingHostProfile',
+                        ),
+                        value: settings.themeId,
+                        items: [
+                          for (final themeId in SerlinkTerminalThemeId.values)
+                            SerlinkSelectItem(
+                              value: themeId,
+                              label: themeId.label,
+                              icon: Icons.palette_outlined,
+                            ),
+                        ],
+                        onChanged: (themeId) {
                           updateSettings(settings.copyWith(themeId: themeId));
-                        }
-                      },
+                        },
+                      ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     _TerminalFontPicker(
                       settings: settings,
                       catalog: fontCatalog,
@@ -243,13 +279,29 @@ class _TerminalSettingsGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final t = context.tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(title, style: textTheme.titleSmall),
-        const SizedBox(height: 10),
-        ...children,
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 10),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: t.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ),
+        SurfacePanel(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
+          ),
+        ),
       ],
     );
   }
@@ -313,64 +365,55 @@ class _TerminalFontPickerState extends State<_TerminalFontPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DropdownMenu<String>(
-          key: ValueKey(
-            'terminal-font-family-${widget.settings.fontFamily}-${widget.editingHostProfile}',
+        SerlinkLabeledField(
+          label: 'Font',
+          trailing: _TerminalFontStatus(
+            catalog: widget.catalog,
+            loading: widget.catalogLoading,
           ),
-          initialSelection: widget.settings.fontFamily,
-          label: const Text('Font'),
-          enableFilter: true,
-          requestFocusOnTap: true,
-          expandedInsets: EdgeInsets.zero,
-          menuHeight: 280,
-          inputDecorationTheme: const InputDecorationThemeData(
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-          dropdownMenuEntries: [
-            for (final font in fonts)
-              DropdownMenuEntry(
-                value: font.family,
-                label: font.label,
-                leadingIcon: Icon(_terminalFontIcon(font), size: 16),
-                labelWidget: Text(
-                  font.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-          ],
-          onSelected: (fontFamily) {
-            if (fontFamily == null) {
-              return;
-            }
-            _customFontController.text = fontFamily;
-            widget.onFontFamilyChanged(fontFamily);
-          },
-        ),
-        const SizedBox(height: 10),
-        TextFormField(
-          controller: _customFontController,
-          decoration: InputDecoration(
-            labelText: 'Custom family',
-            border: const OutlineInputBorder(),
-            isDense: true,
-            prefixIcon: const Icon(Icons.edit_outlined, size: 18),
-            suffixIcon: IconButton(
-              tooltip: 'Apply custom font',
-              onPressed: _applyCustomFont,
-              icon: const Icon(Icons.check_outlined, size: 18),
+          child: SerlinkSelect<String>(
+            key: ValueKey(
+              'terminal-font-family-${widget.settings.fontFamily}-${widget.editingHostProfile}',
             ),
+            value: widget.settings.fontFamily,
+            searchable: true,
+            searchHint: 'Search fonts',
+            hintText: 'Select a font',
+            items: [
+              for (final font in fonts)
+                SerlinkSelectItem(
+                  value: font.family,
+                  label: font.label,
+                  icon: _terminalFontIcon(font),
+                ),
+            ],
+            onChanged: (fontFamily) {
+              _customFontController.text = fontFamily;
+              widget.onFontFamilyChanged(fontFamily);
+            },
           ),
-          textInputAction: TextInputAction.done,
-          onFieldSubmitted: (_) => _applyCustomFont(),
         ),
-        const SizedBox(height: 10),
-        _TerminalFontStatus(
-          catalog: widget.catalog,
-          loading: widget.catalogLoading,
+        const SizedBox(height: 16),
+        SerlinkLabeledField(
+          label: 'Custom family',
+          helper: 'Type an installed font family, then apply.',
+          child: TextFormField(
+            controller: _customFontController,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'e.g. JetBrains Mono',
+              prefixIcon: const Icon(Icons.edit_outlined, size: 18),
+              suffixIcon: IconButton(
+                tooltip: 'Apply custom font',
+                onPressed: _applyCustomFont,
+                icon: const Icon(Icons.check_rounded, size: 18),
+              ),
+            ),
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _applyCustomFont(),
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 16),
         _TerminalFontPreview(settings: widget.settings),
       ],
     );
@@ -395,44 +438,33 @@ class _TerminalFontStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = context.tokens;
     final hasNerdFont = catalog.hasNerdFont;
-    final color = hasNerdFont ? scheme.primary : scheme.onSurfaceVariant;
+    final color = hasNerdFont ? t.statusSuccess : t.textMuted;
     final text = loading
-        ? 'Scanning installed fonts'
+        ? 'Scanning fonts'
         : hasNerdFont
-        ? 'Nerd Font detected'
-        : 'Nerd Font not found';
+        ? 'Nerd Font ready'
+        : 'No Nerd Font';
 
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: color.withValues(alpha: 0.20)),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          hasNerdFont ? Icons.check_circle : Icons.circle_outlined,
+          size: 13,
+          color: color,
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                hasNerdFont ? Icons.check_circle_outline : Icons.info_outline,
-                size: 15,
-                color: color,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                text,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelMedium?.copyWith(color: color),
-              ),
-            ],
+        const SizedBox(width: 5),
+        Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -447,13 +479,13 @@ class _TerminalFontPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = settings.terminalTheme;
-    final scheme = Theme.of(context).colorScheme;
+    final t = context.tokens;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: SerlinkRadii.control,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: theme.background,
-          border: Border.all(color: scheme.outlineVariant),
+          border: Border.all(color: t.borderSubtle),
         ),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -506,17 +538,28 @@ class _SettingsSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = context.tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
-            Expanded(child: Text(label)),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: t.textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
             DecoratedBox(
               decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(999),
+                color: t.accentPrimary.withValues(alpha: 0.14),
+                borderRadius: SerlinkRadii.pill,
+                border: Border.all(
+                  color: t.accentPrimary.withValues(alpha: 0.3),
+                ),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -525,7 +568,12 @@ class _SettingsSlider extends StatelessWidget {
                 ),
                 child: Text(
                   displayValue,
-                  style: Theme.of(context).textTheme.labelMedium,
+                  style: TextStyle(
+                    color: t.accentPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
             ),

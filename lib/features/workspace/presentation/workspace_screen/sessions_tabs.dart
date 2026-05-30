@@ -1,14 +1,24 @@
 part of '../workspace_screen.dart';
 
-class _WorkspaceTabs extends ConsumerWidget {
+class _WorkspaceTabs extends ConsumerStatefulWidget {
   const _WorkspaceTabs({required this.state});
 
   final WorkspaceState state;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_WorkspaceTabs> createState() => _WorkspaceTabsState();
+}
+
+class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
+  _TerminalToolbarSnapshot? _terminalToolbar;
+  String? _terminalToolbarSignature;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final active = state.activeTab ?? state.tabs.firstOrNull;
+    final toolbar = _toolbarFor(active);
 
     void openNewConnection() {
       ref.read(_workspaceSearchQueryProvider.notifier).clear();
@@ -16,50 +26,94 @@ class _WorkspaceTabs extends ConsumerWidget {
     }
 
     if (state.tabs.isEmpty || active == null) {
-      return _PlaceholderSurface(
+      return const _PlaceholderSurface(
         title: 'No active tabs',
         body: 'Open a host from Hosts to create a terminal or SFTP tab.',
-        action: IconButton.filledTonal(
-          tooltip: 'New connection',
-          onPressed: openNewConnection,
-          icon: const Icon(Icons.add),
-        ),
       );
     }
 
     return Column(
       children: [
-        SizedBox(
-          height: 42,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            itemBuilder: (context, index) {
-              if (index == state.tabs.length) {
-                return _NewTabButton(onPressed: openNewConnection);
-              }
-              final tab = state.tabs[index];
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _TabPill(
-                    tab: tab,
-                    selected: tab.id == active.id,
-                    onTap: () => controller.setActiveTab(tab.id),
-                    onClose: () => controller.closeTab(tab.id),
+        Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: context.tokens.surfaceBase,
+            border: Border(
+              bottom: BorderSide(color: context.tokens.borderSubtle),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 7,
                   ),
-                  const SizedBox(width: 6),
-                ],
-              );
-            },
-            separatorBuilder: (context, index) => const SizedBox.shrink(),
-            itemCount: state.tabs.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == state.tabs.length) {
+                      return _NewTabButton(onPressed: openNewConnection);
+                    }
+                    final tab = state.tabs[index];
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _TabPill(
+                          tab: tab,
+                          selected: tab.id == active.id,
+                          onTap: () => controller.setActiveTab(tab.id),
+                          onClose: () => controller.closeTab(tab.id),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                    );
+                  },
+                  separatorBuilder: (context, index) => const SizedBox.shrink(),
+                  itemCount: state.tabs.length + 1,
+                ),
+              ),
+              if (toolbar != null) ...[
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: context.tokens.borderSubtle,
+                ),
+                _TerminalToolbar(snapshot: toolbar),
+              ],
+            ],
           ),
         ),
-        const Divider(height: 1),
-        Expanded(child: _ActiveTabView(tab: active)),
+        Expanded(
+          child: _ActiveTabView(
+            tab: active,
+            onTerminalToolbarChanged: _handleTerminalToolbarChanged,
+          ),
+        ),
       ],
     );
+  }
+
+  _TerminalToolbarSnapshot? _toolbarFor(WorkspaceTabState? active) {
+    final toolbar = _terminalToolbar;
+    if (active == null ||
+        toolbar == null ||
+        toolbar.tabId != active.id ||
+        (active.content is! TerminalTabContent &&
+            active.content is! LocalTerminalTabContent)) {
+      return null;
+    }
+    return toolbar;
+  }
+
+  void _handleTerminalToolbarChanged(_TerminalToolbarSnapshot snapshot) {
+    _terminalToolbar = snapshot;
+    if (_terminalToolbarSignature == snapshot.signature || !mounted) {
+      return;
+    }
+    setState(() {
+      _terminalToolbarSignature = snapshot.signature;
+    });
   }
 }
 
@@ -78,7 +132,7 @@ class _TabPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = context.tokens;
     final icon = switch (tab.content.kind) {
       WorkspaceTabKind.terminal => Icons.terminal,
       WorkspaceTabKind.sftp => Icons.folder_open,
@@ -95,35 +149,73 @@ class _TabPill extends StatelessWidget {
       SessionLifecycleState.failed => Icons.error_outline,
       _ => null,
     };
+    final stateColor = switch (tab.lifecycle) {
+      SessionLifecycleState.failed ||
+      SessionLifecycleState.disconnected => t.statusDanger,
+      _ => t.statusWarning,
+    };
 
-    return Material(
-      color: selected ? scheme.primary.withValues(alpha: 0.16) : scheme.surface,
-      borderRadius: BorderRadius.circular(6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(6),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15),
-              const SizedBox(width: 8),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 180),
-                child: Text(tab.title, overflow: TextOverflow.ellipsis),
-              ),
-              if (stateIcon != null) ...[
-                const SizedBox(width: 6),
-                Icon(stateIcon, size: 14, color: scheme.error),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: selected ? t.accentPrimary.withValues(alpha: 0.16) : null,
+        borderRadius: SerlinkRadii.control,
+        border: Border.all(
+          color: selected
+              ? t.accentPrimary.withValues(alpha: 0.5)
+              : t.borderSubtle,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: SerlinkRadii.control,
+        child: InkWell(
+          borderRadius: SerlinkRadii.control,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 10, right: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 15,
+                  color: selected ? t.accentPrimary : t.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Text(
+                    tab.title,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected ? t.textPrimary : t.textSecondary,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (stateIcon != null) ...[
+                  const SizedBox(width: 6),
+                  Icon(stateIcon, size: 14, color: stateColor),
+                ],
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  style: const ButtonStyle(
+                    padding: WidgetStatePropertyAll(EdgeInsets.zero),
+                    minimumSize: WidgetStatePropertyAll(Size.square(24)),
+                    fixedSize: WidgetStatePropertyAll(Size.square(24)),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: WidgetStatePropertyAll(
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(7)),
+                      ),
+                    ),
+                  ),
+                  tooltip: 'Close tab',
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close, size: 15),
+                ),
               ],
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Close tab',
-                onPressed: onClose,
-                icon: const Icon(Icons.close, size: 15),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -138,18 +230,25 @@ class _NewTabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final t = context.tokens;
     return Tooltip(
       message: 'New connection',
-      child: Material(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(6),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(6),
-          onTap: onPressed,
-          child: SizedBox.square(
-            dimension: 30,
-            child: Icon(Icons.add, size: 17, color: scheme.onSurfaceVariant),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: t.surfaceSunken,
+          borderRadius: SerlinkRadii.control,
+          border: Border.all(color: t.borderSubtle),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: SerlinkRadii.control,
+          child: InkWell(
+            borderRadius: SerlinkRadii.control,
+            onTap: onPressed,
+            child: SizedBox.square(
+              dimension: 30,
+              child: Icon(Icons.add, size: 17, color: t.textSecondary),
+            ),
           ),
         ),
       ),
@@ -158,9 +257,13 @@ class _NewTabButton extends StatelessWidget {
 }
 
 class _ActiveTabView extends ConsumerWidget {
-  const _ActiveTabView({required this.tab});
+  const _ActiveTabView({
+    required this.tab,
+    required this.onTerminalToolbarChanged,
+  });
 
   final WorkspaceTabState tab;
+  final ValueChanged<_TerminalToolbarSnapshot> onTerminalToolbarChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -190,7 +293,7 @@ class _ActiveTabView extends ConsumerWidget {
             TerminalTabContent(
               :final panes,
               :final showSplit,
-              :final splitAxis,
+              :final layout,
               :final activePane,
             ) =>
               _TerminalPane(
@@ -202,31 +305,35 @@ class _ActiveTabView extends ConsumerWidget {
                 title: tab.title,
                 panes: panes,
                 showSplit: showSplit,
-                splitAxis: splitAxis,
+                layout: layout,
                 activePane: activePane,
                 local: false,
                 onOpenSftp: tab.hostId == null
                     ? null
                     : () => controller.openSftpFromTab(tab.id),
+                onToolbarSnapshotChanged: onTerminalToolbarChanged,
               ),
-            LocalTerminalTabContent(:final sessionId) => _TerminalPane(
-              key: ValueKey(sessionId.value),
-              tabId: tab.id,
-              hostId: null,
-              title: 'Local Shell',
-              panes: [
-                TerminalPaneState(
-                  sessionId: sessionId,
-                  title: 'Local Shell',
-                  lifecycle: tab.lifecycle,
+            LocalTerminalTabContent(
+              :final panes,
+              :final showSplit,
+              :final layout,
+              :final activePane,
+            ) =>
+              _TerminalPane(
+                key: ValueKey(
+                  panes.map((pane) => pane.sessionId.value).join(':'),
                 ),
-              ],
-              showSplit: false,
-              splitAxis: Axis.horizontal,
-              activePane: 0,
-              local: true,
-              onOpenSftp: null,
-            ),
+                tabId: tab.id,
+                hostId: null,
+                title: 'Local Shell',
+                panes: panes,
+                showSplit: showSplit,
+                layout: layout,
+                activePane: activePane,
+                local: true,
+                onOpenSftp: null,
+                onToolbarSnapshotChanged: onTerminalToolbarChanged,
+              ),
             SftpTabContent(:final sessionId, :final currentPath) => _SftpPane(
               key: ValueKey('${sessionId.value}:$currentPath'),
               tabId: tab.id,
@@ -259,13 +366,21 @@ class _RecoverableFailureBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.errorContainer,
+    final t = context.tokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.statusDanger.withValues(alpha: 0.12),
+        border: Border(bottom: BorderSide(color: t.borderSubtle)),
+      ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            Expanded(child: Text(message)),
+            Icon(Icons.error_outline, size: 17, color: t.statusDanger),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(message, style: TextStyle(color: t.textPrimary)),
+            ),
             TextButton(onPressed: onReconnect, child: Text(actionLabel)),
             TextButton(onPressed: onClose, child: const Text('Close')),
           ],

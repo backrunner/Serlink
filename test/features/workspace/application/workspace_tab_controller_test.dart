@@ -17,6 +17,8 @@ import 'package:serlink/features/terminal/application/terminal_display_settings.
 import 'package:serlink/features/workspace/application/workspace_tab_controller.dart';
 import 'package:serlink/features/workspace/domain/workspace_tab.dart';
 
+part 'workspace_tab_controller_test_fakes.dart';
+
 void main() {
   test(
     'opens terminal, marks disconnect, and reconnects in same tab',
@@ -287,6 +289,102 @@ void main() {
     );
   });
 
+  test(
+    'enables, configures, and disables local terminal split state',
+    () async {
+      final localTerminal = _FakeLocalTerminalService();
+      final container = _container(
+        service: _FakeSshSessionService(),
+        localTerminal: localTerminal,
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openLocalTerminal();
+      await _drainMicrotasks();
+
+      final tabId = container
+          .read(workspaceTabControllerProvider)
+          .activeTab!
+          .id;
+
+      controller.enableTerminalSplit(tabId);
+      await _drainMicrotasks();
+      var content =
+          container.read(workspaceTabControllerProvider).activeTab!.content
+              as LocalTerminalTabContent;
+      expect(content.showSplit, isTrue);
+      expect(content.splitAxis, Axis.horizontal);
+      expect(content.activePane, 1);
+      expect(content.panes, hasLength(2));
+      expect(localTerminal.openShellCount, 2);
+      expect(content.panes[0].sessionId, isNot(content.panes[1].sessionId));
+      final firstSplit = _expectSplit(content.layout, Axis.horizontal);
+      _expectLeaf(firstSplit.first, 0);
+      _expectLeaf(firstSplit.second, 1);
+      expect(
+        container
+            .read(workspaceRuntimeRegistryProvider)
+            .terminalFor(content.panes[1].sessionId),
+        isNotNull,
+      );
+
+      final inserted = controller.insertIntoActiveTerminal('echo split');
+      expect(inserted, isTrue);
+      expect(localTerminal.shells[0].writes, isEmpty);
+      expect(localTerminal.shells[1].writes, ['echo split']);
+
+      controller.enableTerminalSplit(tabId, axis: Axis.vertical);
+      await _drainMicrotasks();
+      content =
+          container.read(workspaceTabControllerProvider).activeTab!.content
+              as LocalTerminalTabContent;
+      expect(content.showSplit, isTrue);
+      expect(content.activePane, 2);
+      expect(content.panes, hasLength(3));
+      expect(localTerminal.openShellCount, 3);
+      final nestedSplit = _expectSplit(content.layout, Axis.horizontal);
+      _expectLeaf(nestedSplit.first, 0);
+      final nestedRight = _expectSplit(nestedSplit.second, Axis.vertical);
+      _expectLeaf(nestedRight.first, 1);
+      _expectLeaf(nestedRight.second, 2);
+
+      controller.setActiveTerminalPane(tabId, 1);
+      controller.closeActiveTerminalPane(tabId);
+      await _drainMicrotasks();
+      content =
+          container.read(workspaceTabControllerProvider).activeTab!.content
+              as LocalTerminalTabContent;
+      expect(content.showSplit, isTrue);
+      expect(content.activePane, 1);
+      expect(content.panes, hasLength(2));
+      final collapsedSplit = _expectSplit(content.layout, Axis.horizontal);
+      _expectLeaf(collapsedSplit.first, 0);
+      _expectLeaf(collapsedSplit.second, 1);
+      expect(localTerminal.shells[1]._done.isCompleted, isTrue);
+      expect(localTerminal.shells[2]._done.isCompleted, isFalse);
+
+      final insertedAfterClose = controller.insertIntoActiveTerminal(
+        'after close',
+      );
+      expect(insertedAfterClose, isTrue);
+      expect(localTerminal.shells[2].writes, ['after close']);
+
+      controller.disableTerminalSplit(tabId);
+      await _drainMicrotasks();
+      content =
+          container.read(workspaceTabControllerProvider).activeTab!.content
+              as LocalTerminalTabContent;
+      expect(content.showSplit, isFalse);
+      expect(content.activePane, 0);
+      expect(content.panes, hasLength(1));
+      expect(localTerminal.shells[0]._done.isCompleted, isFalse);
+      expect(localTerminal.shells[2]._done.isCompleted, isTrue);
+    },
+  );
+
   test('closing terminal tabs closes split pane sessions', () async {
     final service = _FakeSshSessionService();
     final container = _container(service: service);
@@ -367,6 +465,9 @@ void main() {
     expect(content.panes, hasLength(2));
     expect(service.openShellCount, 2);
     expect(content.panes[0].sessionId, isNot(content.panes[1].sessionId));
+    var split = _expectSplit(content.layout, Axis.horizontal);
+    _expectLeaf(split.first, 0);
+    _expectLeaf(split.second, 1);
 
     controller.setActiveTerminalPane(tabId, 1);
     content =
@@ -382,6 +483,21 @@ void main() {
     expect(content.splitAxis, Axis.vertical);
     expect(content.activePane, 1);
 
+    controller.enableTerminalSplit(tabId, axis: Axis.horizontal);
+    await _drainMicrotasks();
+    content =
+        container.read(workspaceTabControllerProvider).activeTab!.content
+            as TerminalTabContent;
+    expect(content.showSplit, isTrue);
+    expect(content.activePane, 2);
+    expect(content.panes, hasLength(3));
+    expect(service.openShellCount, 3);
+    split = _expectSplit(content.layout, Axis.vertical);
+    _expectLeaf(split.first, 0);
+    final lowerSplit = _expectSplit(split.second, Axis.horizontal);
+    _expectLeaf(lowerSplit.first, 1);
+    _expectLeaf(lowerSplit.second, 2);
+
     controller.disableTerminalSplit(tabId);
     await _drainMicrotasks();
     content =
@@ -390,6 +506,8 @@ void main() {
     expect(content.showSplit, isFalse);
     expect(content.activePane, 0);
     expect(content.panes, hasLength(1));
+    expect(service.shells[1]._done.isCompleted, isTrue);
+    expect(service.shells[2]._done.isCompleted, isTrue);
   });
 
   test(
@@ -537,6 +655,17 @@ void main() {
   });
 }
 
+TerminalPaneSplit _expectSplit(TerminalPaneLayout layout, Axis axis) {
+  final split = layout as TerminalPaneSplit;
+  expect(split.axis, axis);
+  return split;
+}
+
+void _expectLeaf(TerminalPaneLayout layout, int paneIndex) {
+  final leaf = layout as TerminalPaneLeaf;
+  expect(leaf.paneIndex, paneIndex);
+}
+
 final _host = HostSummary(
   id: HostId('host-1'),
   displayName: 'Test Host',
@@ -580,249 +709,4 @@ ProviderContainer _container({
       ),
     ],
   );
-}
-
-class _FakeLocalTerminalService implements LocalTerminalService {
-  final List<_FakeShellSession> shells = [];
-  var openShellCount = 0;
-
-  @override
-  Future<SshShellSession> openShell({int columns = 80, int rows = 24}) async {
-    openShellCount += 1;
-    final shell = _FakeShellSession();
-    shells.add(shell);
-    return shell;
-  }
-}
-
-class _FailingLocalTerminalService implements LocalTerminalService {
-  const _FailingLocalTerminalService(this.error);
-
-  final Object error;
-
-  @override
-  Future<SshShellSession> openShell({int columns = 80, int rows = 24}) async {
-    throw error;
-  }
-}
-
-Future<void> _drainMicrotasks() async {
-  for (var i = 0; i < 8; i += 1) {
-    await Future<void>.delayed(Duration.zero);
-  }
-}
-
-class _FakeSshSessionService implements SshSessionService {
-  final List<_FakeShellSession> shells = [];
-  var openShellCount = 0;
-  var openSftpCount = 0;
-
-  @override
-  Future<SshShellSession> openShell(ConnectionProfileSnapshot profile) async {
-    openShellCount += 1;
-    final shell = _FakeShellSession();
-    shells.add(shell);
-    return shell;
-  }
-
-  @override
-  Future<SftpConnection> openSftp(ConnectionProfileSnapshot profile) async {
-    openSftpCount += 1;
-    return _FakeSftpConnection();
-  }
-
-  @override
-  Future<void> startLocalForward({
-    required SessionId sessionId,
-    required int localPort,
-    required String remoteHost,
-    required int remotePort,
-  }) async {}
-
-  @override
-  Future<void> stopLocalForward({required SessionId sessionId}) async {}
-
-  @override
-  Future<RemoteForwardBinding> startRemoteForward({
-    required SessionId sessionId,
-    required String bindHost,
-    required int bindPort,
-    required String localHost,
-    required int localPort,
-  }) async {
-    return RemoteForwardBinding(
-      bindHost: bindHost,
-      bindPort: bindPort,
-      localHost: localHost,
-      localPort: localPort,
-    );
-  }
-
-  @override
-  Future<void> stopRemoteForward({required SessionId sessionId}) async {}
-
-  @override
-  Future<DynamicForwardBinding> startDynamicForward({
-    required SessionId sessionId,
-    required String bindHost,
-    required int bindPort,
-  }) async {
-    return DynamicForwardBinding(bindHost: bindHost, bindPort: bindPort);
-  }
-
-  @override
-  Future<void> stopDynamicForward({required SessionId sessionId}) async {}
-
-  @override
-  Future<void> testConnection(ConnectionProfileSnapshot profile) async {}
-}
-
-class _FakeShellSession implements SshShellSession {
-  final Completer<void> _done = Completer<void>();
-  final List<String> writes = [];
-
-  void completeDone() {
-    if (!_done.isCompleted) {
-      _done.complete();
-    }
-  }
-
-  @override
-  Future<void> get done => _done.future;
-
-  @override
-  Stream<List<int>> get stderr => const Stream<List<int>>.empty();
-
-  @override
-  Stream<List<int>> get stdout => const Stream<List<int>>.empty();
-
-  @override
-  Future<void> close() async {
-    completeDone();
-  }
-
-  @override
-  Future<void> resize({
-    required int columns,
-    required int rows,
-    int? pixelWidth,
-    int? pixelHeight,
-  }) async {}
-
-  @override
-  Future<void> write(List<int> bytes) async {
-    writes.add(String.fromCharCodes(bytes));
-  }
-}
-
-class _FakeSftpConnection implements SftpConnection {
-  final Completer<void> _done = Completer<void>();
-
-  @override
-  Future<void> chmod(String path, SftpPermissions permissions) async {}
-
-  @override
-  Future<void> close() async {
-    if (!_done.isCompleted) {
-      _done.complete();
-    }
-  }
-
-  @override
-  Future<void> get done => _done.future;
-
-  @override
-  Future<void> deleteDirectory(String path, {required bool recursive}) async {}
-
-  @override
-  Future<void> deleteFile(String path) async {}
-
-  @override
-  Stream<TransferProgress> download({
-    required TransferTaskId taskId,
-    required TransferItemKind itemKind,
-    required String remotePath,
-    required String localPath,
-  }) {
-    return const Stream<TransferProgress>.empty();
-  }
-
-  @override
-  Future<List<SftpEntry>> list(String path) async => [];
-
-  @override
-  Future<void> mkdir(String path) async {}
-
-  @override
-  Future<SftpFilePreview> readTextPreview(
-    String path, {
-    int maxBytes = defaultSftpPreviewBytes,
-  }) async {
-    return const SftpFilePreview(text: '', bytesRead: 0, truncated: false);
-  }
-
-  @override
-  Future<void> rename(String oldPath, String newPath) async {}
-
-  @override
-  Future<void> writeTextFile(String path, String contents) async {}
-
-  @override
-  Stream<TransferProgress> upload({
-    required TransferTaskId taskId,
-    required TransferItemKind itemKind,
-    required String localPath,
-    required String remotePath,
-  }) {
-    return const Stream<TransferProgress>.empty();
-  }
-}
-
-class _FakeTerminalHostDisplaySettingsRepository
-    implements TerminalHostDisplaySettingsRepository {
-  _FakeTerminalHostDisplaySettingsRepository([
-    Map<HostId, TerminalDisplaySettings>? profiles,
-  ]) : profiles = {...?profiles};
-
-  final Map<HostId, TerminalDisplaySettings> profiles;
-  var readCount = 0;
-
-  @override
-  Future<void> deleteForHost(HostId hostId) async {
-    profiles.remove(hostId);
-  }
-
-  @override
-  Future<TerminalDisplaySettings?> readForHost(HostId hostId) async {
-    readCount += 1;
-    return profiles[hostId];
-  }
-
-  @override
-  Future<void> saveForHost(
-    HostId hostId,
-    TerminalDisplaySettings settings,
-  ) async {
-    profiles[hostId] = settings;
-  }
-}
-
-class _FakeTerminalDisplaySettingsRepository
-    implements TerminalDisplaySettingsRepository {
-  TerminalDisplaySettings? settings;
-
-  @override
-  Future<void> delete() async {
-    settings = null;
-  }
-
-  @override
-  Future<TerminalDisplaySettings?> read() async {
-    return settings;
-  }
-
-  @override
-  Future<void> save(TerminalDisplaySettings settings) async {
-    this.settings = settings;
-  }
 }

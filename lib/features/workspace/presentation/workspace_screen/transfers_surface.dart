@@ -41,6 +41,7 @@ class _TransferTaskRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.tokens;
     final queue = ref.read(transferQueueControllerProvider);
     final progress = task.totalBytes == null || task.totalBytes == 0
         ? null
@@ -49,103 +50,132 @@ class _TransferTaskRow extends ConsumerWidget {
         task.state == TransferState.running ||
         task.state == TransferState.paused;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  task.itemKind == TransferItemKind.directory
-                      ? Icons.folder_outlined
-                      : task.direction == TransferDirection.upload
-                      ? Icons.upload_outlined
-                      : Icons.download_outlined,
-                  size: 18,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    task.direction == TransferDirection.upload
-                        ? _fileName(task.localPath)
-                        : _fileName(task.remotePath),
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall,
+    return ListRow(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                task.itemKind == TransferItemKind.directory
+                    ? Icons.folder_outlined
+                    : task.direction == TransferDirection.upload
+                    ? Icons.upload_outlined
+                    : Icons.download_outlined,
+                size: 18,
+                color: t.textSecondary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  task.direction == TransferDirection.upload
+                      ? _fileName(task.localPath)
+                      : _fileName(task.remotePath),
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: t.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                Text(_transferStateLabel(task.state)),
-              ],
+              ),
+              StatusPill(
+                label: _transferStateLabel(task.state),
+                color: _transferStateColor(task.state, t),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            task.direction == TransferDirection.upload
+                ? '${task.localPath} -> ${task.remotePath}'
+                : '${task.remotePath} -> ${task.localPath}',
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+          ),
+          if (isActive) ...[
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: SerlinkRadii.pill,
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 5,
+                backgroundColor: t.surfaceSunken,
+                color: t.accentPrimary,
+              ),
             ),
             const SizedBox(height: 6),
             Text(
-              task.direction == TransferDirection.upload
-                  ? '${task.localPath} -> ${task.remotePath}'
-                  : '${task.remotePath} -> ${task.localPath}',
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
+              _transferProgressLabel(task),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
             ),
-            if (isActive) ...[
-              const SizedBox(height: 10),
-              LinearProgressIndicator(value: progress),
-              const SizedBox(height: 6),
+            if (task.bytesPerSecond != null) ...[
+              const SizedBox(height: 2),
               Text(
-                _transferProgressLabel(task),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              if (task.bytesPerSecond != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  '${_formatBytes(task.bytesPerSecond!.round())}/s'
-                  '${task.eta == null ? '' : ' · ${_formatDuration(task.eta!)} left'}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ],
-            if (task.state == TransferState.failed && task.failure != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                task.failure!.message,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                ),
+                '${_formatBytes(task.bytesPerSecond!.round())}/s'
+                '${task.eta == null ? '' : ' · ${_formatDuration(task.eta!)} left'}',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: t.textMuted),
               ),
             ],
+          ],
+          if (task.state == TransferState.failed && task.failure != null) ...[
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (task.state == TransferState.running)
-                  TextButton(
-                    onPressed: () => queue.pause(task.id),
-                    child: const Text('Pause'),
-                  ),
-                if (task.state == TransferState.paused)
-                  TextButton(
-                    onPressed: () => queue.resume(task.id),
-                    child: const Text('Resume'),
-                  ),
-                if (queue.canRetry(task.id))
-                  TextButton(
-                    onPressed: () => queue.retry(task.id),
-                    child: const Text('Retry'),
-                  ),
-                if (task.state == TransferState.running ||
-                    task.state == TransferState.paused ||
-                    task.state == TransferState.queued)
-                  TextButton(
-                    onPressed: () => queue.cancel(task.id),
-                    child: const Text('Cancel'),
-                  ),
-              ],
+            Text(
+              task.failure!.message,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: t.statusDanger),
             ),
           ],
-        ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (task.state == TransferState.running)
+                TextButton(
+                  onPressed: () => queue.pause(task.id),
+                  child: const Text('Pause'),
+                ),
+              if (task.state == TransferState.paused)
+                TextButton(
+                  onPressed: () => queue.resume(task.id),
+                  child: const Text('Resume'),
+                ),
+              if (queue.canRetry(task.id))
+                TextButton(
+                  onPressed: () => queue.retry(task.id),
+                  child: const Text('Retry'),
+                ),
+              if (task.state == TransferState.running ||
+                  task.state == TransferState.paused ||
+                  task.state == TransferState.queued)
+                TextButton(
+                  onPressed: () => queue.cancel(task.id),
+                  child: const Text('Cancel'),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
+}
+
+Color _transferStateColor(TransferState state, SerlinkTokens t) {
+  return switch (state) {
+    TransferState.queued => t.textMuted,
+    TransferState.running => t.statusInfo,
+    TransferState.paused => t.statusWarning,
+    TransferState.completed => t.statusSuccess,
+    TransferState.failed => t.statusDanger,
+    TransferState.canceled => t.textMuted,
+  };
 }
 
 List<SftpEntry> _sortedEntries(List<SftpEntry> entries) {

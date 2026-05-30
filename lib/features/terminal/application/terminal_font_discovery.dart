@@ -17,6 +17,24 @@ class TerminalFontCandidate {
 
   bool get hasEnhancedGlyphs => isNerdFont || isPowerline;
 
+  bool get isSymbolOnly {
+    final normalized = normalizeTerminalFontFamily(family);
+    return normalized == 'symbolsnerdfont' ||
+        normalized == 'symbolsnerdfontmono';
+  }
+
+  bool get isTerminalOptimized {
+    final normalized = normalizeTerminalFontFamily(family);
+    return normalized == defaultTerminalFontFamily ||
+        normalized.contains('mono') ||
+        normalized.contains('code') ||
+        normalized.contains('hack') ||
+        normalized.contains('meslolgs') ||
+        normalized.contains('iosevkaterm') ||
+        normalized.contains('sourcecodepro') ||
+        normalized.contains('saucecodepro');
+  }
+
   String get label {
     if (isNerdFont) {
       return '$family  ·  Nerd Font';
@@ -44,12 +62,22 @@ class TerminalFontCatalog {
 
   TerminalFontCandidate get preferredFont {
     for (final font in fonts) {
-      if (font.isNerdFont) {
+      if (font.isNerdFont && !font.isSymbolOnly && font.isTerminalOptimized) {
         return font;
       }
     }
     for (final font in fonts) {
-      if (font.isPowerline) {
+      if (font.isPowerline && !font.isSymbolOnly && font.isTerminalOptimized) {
+        return font;
+      }
+    }
+    for (final font in fonts) {
+      if (font.isNerdFont && !font.isSymbolOnly) {
+        return font;
+      }
+    }
+    for (final font in fonts) {
+      if (font.isPowerline && !font.isSymbolOnly) {
         return font;
       }
     }

@@ -53,17 +53,40 @@ void main() {
     expect(SerlinkTerminalThemeId.highContrast.label, 'High Contrast');
   });
 
-  test('font catalog prefers Nerd Fonts over ordinary monospace fonts', () {
+  test(
+    'font catalog prefers terminal-ready Nerd Fonts over ordinary fonts',
+    () {
+      const catalog = TerminalFontCatalog(
+        fonts: [
+          TerminalFontCandidate(family: 'Menlo'),
+          TerminalFontCandidate(family: 'Example Nerd Font', isNerdFont: true),
+          TerminalFontCandidate(
+            family: 'Hack Nerd Font Mono',
+            isNerdFont: true,
+          ),
+          TerminalFontCandidate(family: 'monospace', isBuiltIn: true),
+        ],
+      );
+
+      expect(catalog.hasNerdFont, isTrue);
+      expect(catalog.preferredFontFamily, 'Hack Nerd Font Mono');
+    },
+  );
+
+  test('font catalog never uses Symbols Nerd Font as the primary font', () {
     const catalog = TerminalFontCatalog(
       fonts: [
+        TerminalFontCandidate(
+          family: 'Symbols Nerd Font Mono',
+          isNerdFont: true,
+        ),
         TerminalFontCandidate(family: 'Menlo'),
-        TerminalFontCandidate(family: 'Hack Nerd Font', isNerdFont: true),
         TerminalFontCandidate(family: 'monospace', isBuiltIn: true),
       ],
     );
 
     expect(catalog.hasNerdFont, isTrue);
-    expect(catalog.preferredFontFamily, 'Hack Nerd Font');
+    expect(catalog.preferredFontFamily, 'monospace');
   });
 
   test('font discovery detects Nerd Font file names', () async {

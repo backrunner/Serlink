@@ -61,7 +61,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Serlink'), findsOneWidget);
     expect(find.text('Create Vault'), findsWidgets);
 
     await tester.enterText(

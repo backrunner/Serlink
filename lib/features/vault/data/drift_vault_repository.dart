@@ -104,6 +104,11 @@ class DriftVaultRecordRepository implements VaultRecordRepository {
       _database.encryptedRecords,
     )..where((table) => table.id.equals(id.value))).go();
   }
+
+  @override
+  Future<void> clear() async {
+    await _database.delete(_database.encryptedRecords).go();
+  }
 }
 
 VaultRecordEnvelope _toEnvelope(EncryptedRecordRow row) {

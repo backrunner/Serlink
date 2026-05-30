@@ -602,12 +602,14 @@ class VaultSessionState {
     this.localUnlockAvailable = false,
     this.recoveryKey,
     this.failureMessage,
+    this.unlockFailureCount = 0,
   });
 
   final VaultState vaultState;
   final bool localUnlockAvailable;
   final VaultRecoveryKey? recoveryKey;
   final String? failureMessage;
+  final int unlockFailureCount;
 
   VaultSessionState copyWith({
     VaultState? vaultState,
@@ -616,6 +618,8 @@ class VaultSessionState {
     bool clearRecoveryKey = false,
     String? failureMessage,
     bool clearFailure = false,
+    int? unlockFailureCount,
+    bool clearUnlockFailures = false,
   }) {
     return VaultSessionState(
       vaultState: vaultState ?? this.vaultState,
@@ -624,6 +628,9 @@ class VaultSessionState {
       failureMessage: clearFailure
           ? null
           : failureMessage ?? this.failureMessage,
+      unlockFailureCount: clearUnlockFailures
+          ? 0
+          : unlockFailureCount ?? this.unlockFailureCount,
     );
   }
 }
@@ -690,7 +697,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     try {
       await service.unlock(passphrase: passphrase);
       state = AsyncData(
-        previous.copyWith(vaultState: VaultState.unlocked, clearFailure: true),
+        previous.copyWith(
+          vaultState: VaultState.unlocked,
+          clearFailure: true,
+          clearUnlockFailures: true,
+        ),
       );
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
@@ -700,8 +711,35 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         previous.copyWith(
           failureMessage: _vaultFailureMessage(error),
           clearRecoveryKey: true,
+          unlockFailureCount: previous.unlockFailureCount + 1,
         ),
       );
+    }
+  }
+
+  Future<String?> unlockWithRecoveryCode({required String recoveryCode}) async {
+    final previous =
+        state.value ?? const VaultSessionState(vaultState: VaultState.locked);
+    state = const AsyncLoading<VaultSessionState>();
+    try {
+      await service.unlockWithRecoveryKey(VaultRecoveryKey(recoveryCode));
+      state = AsyncData(
+        previous.copyWith(
+          vaultState: VaultState.unlocked,
+          clearFailure: true,
+          clearUnlockFailures: true,
+        ),
+      );
+      unawaited(
+        ref.read(transferQueueControllerProvider).restorePersistedTasks(),
+      );
+      return null;
+    } on Object catch (error) {
+      final message = _vaultFailureMessage(error);
+      state = AsyncData(
+        previous.copyWith(failureMessage: message, clearRecoveryKey: true),
+      );
+      return message;
     }
   }
 
@@ -712,7 +750,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     try {
       await service.unlockWithLocalKey(secrets: ref.read(secretStoreProvider));
       state = AsyncData(
-        previous.copyWith(vaultState: VaultState.unlocked, clearFailure: true),
+        previous.copyWith(
+          vaultState: VaultState.unlocked,
+          clearFailure: true,
+          clearUnlockFailures: true,
+        ),
       );
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
@@ -738,6 +780,29 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         localUnlockAvailable: localUnlockAvailable,
       ),
     );
+  }
+
+  Future<String?> resetVault() async {
+    final previous =
+        state.value ?? const VaultSessionState(vaultState: VaultState.locked);
+    state = const AsyncLoading<VaultSessionState>();
+    try {
+      await _clearLocalUnlockSecrets();
+      await ref.read(vaultRecordRepositoryProvider).clear();
+      await ref.read(vaultHeaderStoreProvider).clear();
+      await service.lock();
+      _service = _createService();
+      state = const AsyncData(
+        VaultSessionState(vaultState: VaultState.uninitialized),
+      );
+      return null;
+    } on Object catch (error) {
+      final message = _vaultFailureMessage(error);
+      state = AsyncData(
+        previous.copyWith(failureMessage: message, clearRecoveryKey: true),
+      );
+      return message;
+    }
   }
 
   Future<void> enableLocalUnlock() async {
@@ -770,6 +835,31 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       return;
     }
     state = AsyncData(current.copyWith(clearRecoveryKey: true));
+  }
+
+  void resetUnlockFailureState() {
+    final current = state.value;
+    if (current == null ||
+        current.vaultState != VaultState.locked ||
+        (current.failureMessage == null && current.unlockFailureCount == 0)) {
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(clearFailure: true, clearUnlockFailures: true),
+    );
+  }
+
+  Future<void> _clearLocalUnlockSecrets() async {
+    final header = service.header;
+    if (header == null || header.localUnlockProtectors.isEmpty) {
+      return;
+    }
+    try {
+      await service.disableLocalUnlock(secrets: ref.read(secretStoreProvider));
+    } on Object {
+      // The persisted header is about to be removed. A stale local unlock
+      // secret cannot unlock anything once its matching header protector is gone.
+    }
   }
 }
 

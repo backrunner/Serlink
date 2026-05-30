@@ -72,6 +72,21 @@ class NotifyingVaultRecordRepository implements VaultRecordRepository {
       VaultRecordChange(kind: VaultRecordChangeKind.delete, id: id),
     );
   }
+
+  @override
+  Future<void> clear() async {
+    final records = await inner.list();
+    await inner.clear();
+    for (final record in records) {
+      changes.notify(
+        VaultRecordChange(
+          kind: VaultRecordChangeKind.delete,
+          id: record.id,
+          type: record.type,
+        ),
+      );
+    }
+  }
 }
 
 enum AutoSyncPhase { disabled, idle, scheduled, syncing, conflicts, failed }

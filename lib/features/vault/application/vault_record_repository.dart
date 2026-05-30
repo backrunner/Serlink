@@ -6,6 +6,7 @@ abstract interface class VaultRecordRepository {
   Future<VaultRecordEnvelope?> read(VaultRecordId id);
   Future<List<VaultRecordEnvelope>> list({String? type});
   Future<void> delete(VaultRecordId id);
+  Future<void> clear();
 }
 
 class InMemoryVaultRecordRepository implements VaultRecordRepository {
@@ -32,5 +33,10 @@ class InMemoryVaultRecordRepository implements VaultRecordRepository {
   @override
   Future<void> delete(VaultRecordId id) async {
     _records.remove(id);
+  }
+
+  @override
+  Future<void> clear() async {
+    _records.clear();
   }
 }

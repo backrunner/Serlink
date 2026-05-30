@@ -449,6 +449,29 @@ void main() {
     expect(await DriftVaultRecordRepository(harness.database).list(), isEmpty);
   });
 
+  testWidgets('settings exposes recovery and reset while vault is locked', (
+    tester,
+  ) async {
+    await _pumpLockedVaultApp(tester);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    final recoveryButton = find.byKey(
+      const ValueKey('settings-vault-recovery-button'),
+    );
+    expect(recoveryButton, findsOneWidget);
+
+    await tester.tap(recoveryButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Recovery Code'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('vault-reset-entry-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Reset Vault'), findsOneWidget);
+    expect(find.text('Reset Vault Permanently'), findsOneWidget);
+  });
+
   testWidgets('vault unlock error resets after switching workspace tabs', (
     tester,
   ) async {

@@ -178,11 +178,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
   }
 
   Future<void> _showRecoveryCodeDialog() {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const _RecoveryCodeDialog(),
-    );
+    return _showVaultRecoveryCodeDialog(context);
   }
 
   void _submit(bool isInitializing) {

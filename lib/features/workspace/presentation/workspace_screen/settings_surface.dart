@@ -58,14 +58,22 @@ class _SettingsSurface extends ConsumerWidget {
                       icon: Icons.lock_outline,
                       title: 'Vault',
                       subtitle: _vaultStateLabel(vaultState),
-                      action: vaultState == VaultState.unlocked
-                          ? TextButton(
-                              onPressed: () => ref
-                                  .read(vaultSessionControllerProvider.notifier)
-                                  .lock(),
-                              child: const Text('Lock'),
-                            )
-                          : null,
+                      action: switch (vaultState) {
+                        VaultState.unlocked => TextButton(
+                          onPressed: () => ref
+                              .read(vaultSessionControllerProvider.notifier)
+                              .lock(),
+                          child: const Text('Lock'),
+                        ),
+                        VaultState.locked => TextButton.icon(
+                          key: const ValueKey('settings-vault-recovery-button'),
+                          onPressed: () =>
+                              _showVaultRecoveryCodeDialog(context),
+                          icon: const Icon(Icons.key_outlined, size: 18),
+                          label: const Text('Recover / Reset'),
+                        ),
+                        VaultState.uninitialized || null => null,
+                      },
                     ),
                     _SettingsActionRow(
                       icon: Icons.key_outlined,

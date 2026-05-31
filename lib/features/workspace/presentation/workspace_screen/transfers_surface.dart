@@ -138,24 +138,24 @@ class _TransferTaskRow extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               if (task.state == TransferState.running)
-                TextButton(
+                SerlinkTextButton(
                   onPressed: () => queue.pause(task.id),
                   child: const Text('Pause'),
                 ),
               if (task.state == TransferState.paused)
-                TextButton(
+                SerlinkTextButton(
                   onPressed: () => queue.resume(task.id),
                   child: const Text('Resume'),
                 ),
               if (queue.canRetry(task.id))
-                TextButton(
+                SerlinkTextButton(
                   onPressed: () => queue.retry(task.id),
                   child: const Text('Retry'),
                 ),
               if (task.state == TransferState.running ||
                   task.state == TransferState.paused ||
                   task.state == TransferState.queued)
-                TextButton(
+                SerlinkTextButton(
                   onPressed: () => queue.cancel(task.id),
                   child: const Text('Cancel'),
                 ),

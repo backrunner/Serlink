@@ -217,10 +217,15 @@ class TerminalTabContent extends WorkspaceTabContent {
 }
 
 class SftpTabContent extends WorkspaceTabContent {
-  const SftpTabContent({required this.sessionId, required this.currentPath});
+  const SftpTabContent({
+    required this.sessionId,
+    required this.currentPath,
+    required this.rootPath,
+  });
 
   final SessionId sessionId;
   final String currentPath;
+  final String rootPath;
 
   @override
   WorkspaceTabKind get kind => WorkspaceTabKind.sftp;
@@ -286,6 +291,7 @@ class WorkspaceTabState {
     required this.lifecycle,
     required this.createdAt,
     required this.lastActivityAt,
+    this.sftpDefaultDirectory = '/',
     this.failure,
     this.hasActiveTransfer = false,
   });
@@ -295,6 +301,7 @@ class WorkspaceTabState {
   final String title;
   final WorkspaceTabContent content;
   final SessionLifecycleState lifecycle;
+  final String sftpDefaultDirectory;
   final AppFailure? failure;
   final bool hasActiveTransfer;
   final DateTime createdAt;
@@ -307,6 +314,7 @@ class WorkspaceTabState {
     AppFailure? failure,
     bool clearFailure = false,
     bool? hasActiveTransfer,
+    String? sftpDefaultDirectory,
     DateTime? lastActivityAt,
   }) {
     return WorkspaceTabState(
@@ -315,6 +323,7 @@ class WorkspaceTabState {
       title: title ?? this.title,
       content: content ?? this.content,
       lifecycle: lifecycle ?? this.lifecycle,
+      sftpDefaultDirectory: sftpDefaultDirectory ?? this.sftpDefaultDirectory,
       failure: clearFailure ? null : failure ?? this.failure,
       hasActiveTransfer: hasActiveTransfer ?? this.hasActiveTransfer,
       createdAt: createdAt,

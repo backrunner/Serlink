@@ -109,6 +109,7 @@ class _FakeShellSession implements SshShellSession {
 }
 
 class _MutableFakeSftpConnection implements SftpConnection {
+  final Set<String> deniedListPaths = {};
   final Map<String, SftpEntry> _entries = {
     '/app.env': SftpEntry(
       name: 'app.env',
@@ -131,8 +132,21 @@ class _MutableFakeSftpConnection implements SftpConnection {
       group: 'ops',
       isHidden: true,
     ),
+    '/home/ops/home.env': SftpEntry(
+      name: 'home.env',
+      path: '/home/ops/home.env',
+      type: SftpEntryType.file,
+      size: 512,
+      modifiedAt: DateTime.utc(2026, 1, 2, 3, 6),
+      permissions: const SftpPermissions('0640'),
+      owner: 'deploy',
+      group: 'ops',
+    ),
   };
-  final Map<String, String> _fileContents = {'/app.env': 'PORT=8080\n'};
+  final Map<String, String> _fileContents = {
+    '/app.env': 'PORT=8080\n',
+    '/home/ops/home.env': 'HOME=true\n',
+  };
   final Completer<void> _done = Completer<void>();
 
   @override
@@ -191,6 +205,14 @@ class _MutableFakeSftpConnection implements SftpConnection {
 
   @override
   Future<List<SftpEntry>> list(String path) async {
+    if (deniedListPaths.contains(path)) {
+      throw const SftpFailureException(
+        SftpFailure(
+          code: SftpFailureCode.permissionDenied,
+          message: 'Permission denied by the remote server.',
+        ),
+      );
+    }
     return [
       for (final entry in _entries.values)
         if (_parentOf(entry.path) == path) entry,

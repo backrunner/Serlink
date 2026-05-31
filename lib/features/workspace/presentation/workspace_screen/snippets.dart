@@ -97,9 +97,9 @@ class _SnippetsHeader extends StatelessWidget {
           const SizedBox(width: 8),
           _CountBadge(count: count),
           const Spacer(),
-          Tooltip(
+          SerlinkTooltip(
             message: 'Add snippet',
-            child: IconButton(
+            child: SerlinkIconButton(
               key: const ValueKey('add-snippet-button'),
               onPressed: onAdd,
               icon: const Icon(Icons.add),
@@ -150,7 +150,7 @@ class _SnippetsEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: FilledButton.icon(
+      child: SerlinkFilledButton.icon(
         key: const ValueKey('empty-add-snippet-button'),
         onPressed: onAdd,
         icon: const Icon(Icons.add, size: 18),
@@ -208,7 +208,7 @@ class _SnippetRow extends StatelessWidget {
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      for (final tag in snippet.tags) Chip(label: Text(tag)),
+                      for (final tag in snippet.tags) SerlinkTag(label: tag),
                     ],
                   ),
                 ],
@@ -216,33 +216,33 @@ class _SnippetRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Tooltip(
+          SerlinkTooltip(
             message: 'Insert into active terminal',
-            child: IconButton(
+            child: SerlinkIconButton(
               key: ValueKey('snippet-insert-${snippet.id.value}'),
               onPressed: onInsert,
               icon: const Icon(Icons.input_outlined),
             ),
           ),
-          Tooltip(
+          SerlinkTooltip(
             message: 'Run in active terminal',
-            child: IconButton(
+            child: SerlinkIconButton(
               key: ValueKey('snippet-run-${snippet.id.value}'),
               onPressed: onRun,
               icon: const Icon(Icons.play_arrow_outlined),
             ),
           ),
-          Tooltip(
+          SerlinkTooltip(
             message: 'Edit snippet',
-            child: IconButton(
+            child: SerlinkIconButton(
               key: ValueKey('snippet-edit-${snippet.id.value}'),
               onPressed: onEdit,
               icon: const Icon(Icons.edit_outlined),
             ),
           ),
-          Tooltip(
+          SerlinkTooltip(
             message: 'Delete snippet',
-            child: IconButton(
+            child: SerlinkIconButton(
               key: ValueKey('snippet-delete-${snippet.id.value}'),
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline),
@@ -258,7 +258,7 @@ Future<void> _showSnippetDialog(
   BuildContext context, {
   CommandSnippet? snippet,
 }) {
-  return showDialog<void>(
+  return showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => _SnippetDialog(snippet: snippet),
@@ -306,21 +306,21 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return SerlinkDialog(
       title: Text(_isEditing ? 'Edit Snippet' : 'Add Snippet'),
       content: SizedBox(
         width: 560,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
+            SerlinkTextField(
               key: const ValueKey('snippet-name-field'),
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Name'),
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 12),
-            TextField(
+            SerlinkTextField(
               key: const ValueKey('snippet-command-field'),
               controller: _commandController,
               minLines: 3,
@@ -328,14 +328,14 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
               decoration: const InputDecoration(labelText: 'Command'),
             ),
             const SizedBox(height: 12),
-            TextField(
+            SerlinkTextField(
               key: const ValueKey('snippet-tags-field'),
               controller: _tagsController,
               decoration: const InputDecoration(labelText: 'Tags'),
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => _save(),
             ),
-            CheckboxListTile(
+            SerlinkCheckboxListTile(
               contentPadding: EdgeInsets.zero,
               value: _confirmBeforeRun,
               title: const Text('Confirm before run'),
@@ -347,23 +347,17 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
             ),
             if (_errorMessage != null) ...[
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
+              SerlinkAlert.danger(message: _errorMessage!, compact: true),
             ],
           ],
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           key: const ValueKey('snippet-save-button'),
           onPressed: _saving ? null : _save,
           child: Text(_saving ? 'Saving' : 'Save'),

@@ -235,7 +235,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         _activePaneState.lifecycle != SessionLifecycleState.connected) {
       return;
     }
-    final action = await showDialog<_ForwardDialogAction>(
+    final action = await showSerlinkDialog<_ForwardDialogAction>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _ForwardingDialog(

@@ -13,6 +13,7 @@ import '../../sftp/application/sftp_connection.dart';
 import '../../sftp/data/dartssh2_sftp_connection.dart';
 import '../application/ssh_session_service.dart';
 import '../domain/connection_profile.dart';
+import 'ssh_agent_client.dart';
 
 typedef SshSocketFactory =
     Future<SSHSocket> Function(String host, int port, {Duration? timeout});
@@ -21,12 +22,18 @@ class DartSsh2SessionService implements SshSessionService {
   DartSsh2SessionService({
     SshSocketFactory socketFactory = SSHSocket.connect,
     Future<HostKeyDecision> Function(HostKeyPrompt prompt)? confirmHostKey,
-  }) : this._(socketFactory, confirmHostKey);
+    SshAgentClient agentClient = const LocalSshAgentClient(),
+  }) : this._(socketFactory, confirmHostKey, agentClient);
 
-  DartSsh2SessionService._(this._socketFactory, this._confirmHostKey);
+  DartSsh2SessionService._(
+    this._socketFactory,
+    this._confirmHostKey,
+    this._agentClient,
+  );
 
   final SshSocketFactory _socketFactory;
   final Future<HostKeyDecision> Function(HostKeyPrompt prompt)? _confirmHostKey;
+  final SshAgentClient _agentClient;
   final Map<SessionId, _SshClientChain> _clientChains = {};
   final Map<SessionId, ServerSocket> _localForwards = {};
   final Map<SessionId, SSHRemoteForward> _remoteForwards = {};
@@ -222,7 +229,10 @@ class DartSsh2SessionService implements SshSessionService {
   }
 
   SSHClient _createClient(SSHSocket socket, _SshEndpoint endpoint) {
-    final material = DartSsh2AuthMaterial.fromAuthMethods(endpoint.authMethods);
+    final material = DartSsh2AuthMaterial.fromAuthMethods(
+      endpoint.authMethods,
+      agentClient: _agentClient,
+    );
     return SSHClient(
       socket,
       username: endpoint.username,
@@ -273,16 +283,24 @@ class DartSsh2AuthMaterial {
   final String? password;
   final List<String> keyboardInteractiveResponses;
 
-  factory DartSsh2AuthMaterial.fromProfile(ConnectionProfileSnapshot profile) {
-    return DartSsh2AuthMaterial.fromAuthMethods(profile.authMethods);
+  factory DartSsh2AuthMaterial.fromProfile(
+    ConnectionProfileSnapshot profile, {
+    SshAgentClient agentClient = const LocalSshAgentClient(),
+  }) {
+    return DartSsh2AuthMaterial.fromAuthMethods(
+      profile.authMethods,
+      agentClient: agentClient,
+    );
   }
 
   factory DartSsh2AuthMaterial.fromAuthMethods(
-    List<SshAuthMethod> authMethods,
-  ) {
+    List<SshAuthMethod> authMethods, {
+    SshAgentClient agentClient = const LocalSshAgentClient(),
+  }) {
     final identities = <SSHKeyPair>[];
     final keyboardResponses = <String>[];
     String? passwordValue;
+    var agentRequested = false;
 
     for (final method in authMethods) {
       switch (method) {
@@ -300,10 +318,26 @@ class DartSsh2AuthMaterial {
             for (final response in responses) utf8.decode(response.copyBytes()),
           ]);
         case SshAgentAuth():
-          throw const UnsupportedSshAuthException(
-            'ssh_auth.agent_unsupported',
-            'Local SSH agent authentication requires an async signer bridge.',
-          );
+          if (agentRequested) {
+            continue;
+          }
+          agentRequested = true;
+          try {
+            identities.addAll([
+              for (final identity in agentClient.listIdentities())
+                SshAgentKeyPair(identity: identity, agent: agentClient),
+            ]);
+          } on SshAgentException catch (error) {
+            throw UnsupportedSshAuthException(
+              'ssh_auth.agent_unavailable',
+              error.message,
+            );
+          } on Object {
+            throw const UnsupportedSshAuthException(
+              'ssh_auth.agent_unavailable',
+              'SSH agent is not available.',
+            );
+          }
         case SshOpenSshCertificateAuth(
           :final privateKeyPem,
           :final certificate,
@@ -334,6 +368,12 @@ class DartSsh2AuthMaterial {
     if (passwordValue == null &&
         identities.isEmpty &&
         keyboardResponses.isEmpty) {
+      if (agentRequested) {
+        throw const UnsupportedSshAuthException(
+          'ssh_auth.agent_empty',
+          'SSH agent has no loaded identities.',
+        );
+      }
       throw const UnsupportedSshAuthException(
         'ssh_auth.empty',
         'Connection profile does not contain a supported authentication method.',

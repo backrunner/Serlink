@@ -27,6 +27,7 @@ import '../features/sync/application/sync_field_merge_service.dart';
 import '../features/sync/application/sync_repair_service.dart';
 import '../features/sync/application/sync_run_service.dart';
 import '../features/sync/application/sync_settings_service.dart';
+import '../features/sync/data/cloudkit_sync_provider.dart';
 import '../features/sync/domain/sync_provider.dart';
 import '../features/ssh/application/connection_profile_resolver.dart';
 import '../features/ssh/application/encrypted_connection_profile_resolver.dart';
@@ -209,6 +210,20 @@ final webDavSyncSettingsProvider = FutureProvider<WebDavSyncSettings?>((ref) {
   return ref.watch(syncSettingsServiceProvider).readWebDav();
 });
 
+final iCloudAvailableProvider = FutureProvider<bool>((ref) {
+  return CloudKitSyncProvider.isAvailable();
+});
+
+final cloudKitSyncSettingsProvider = FutureProvider<CloudKitSyncSettings?>((
+  ref,
+) {
+  final vaultSession = ref.watch(vaultSessionControllerProvider).value;
+  if (vaultSession?.vaultState != VaultState.unlocked) {
+    return null;
+  }
+  return ref.watch(syncSettingsServiceProvider).readCloudKit();
+});
+
 final syncDeviceRepositoryProvider = Provider<SyncDeviceRepository>((ref) {
   return EncryptedSyncDeviceRepository(
     vault: ref.watch(vaultServiceProvider),
@@ -291,6 +306,10 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       webDavSyncSettingsProvider,
       (_, _) => _configure(),
     );
+    ref.listen<AsyncValue<CloudKitSyncSettings?>>(
+      cloudKitSyncSettingsProvider,
+      (_, _) => _configure(),
+    );
     ref.listen<AsyncValue<VaultRecordChange>>(vaultRecordChangesProvider, (
       _,
       change,
@@ -365,7 +384,11 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     try {
       final provider = await ref
           .read(syncSettingsServiceProvider)
-          .buildWebDavProvider();
+          .activeSyncProvider();
+      if (provider == null) {
+        state = const AutoSyncStatus(phase: AutoSyncPhase.idle);
+        return;
+      }
       final result = await ref
           .read(syncRunServiceProvider)
           .syncEncryptedSnapshot(provider);
@@ -408,8 +431,11 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     if (vaultSession?.vaultState != VaultState.unlocked) {
       return false;
     }
-    final settings = ref.read(webDavSyncSettingsProvider).value;
-    return settings?.enabled ?? false;
+    final webDavEnabled =
+        ref.read(webDavSyncSettingsProvider).value?.enabled ?? false;
+    final cloudKitEnabled =
+        ref.read(cloudKitSyncSettingsProvider).value?.enabled ?? false;
+    return webDavEnabled || cloudKitEnabled;
   }
 }
 

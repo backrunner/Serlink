@@ -5,7 +5,7 @@ Future<OpenSshCertificateImportDraft?> _showOpenSshCertificateImportDialog(
   required OpenSshCertificateImportDraft draft,
   required OpenSshCertificateImportPreview preview,
 }) {
-  return showDialog<OpenSshCertificateImportDraft>(
+  return showSerlinkDialog<OpenSshCertificateImportDraft>(
     context: context,
     barrierDismissible: false,
     builder: (context) =>
@@ -56,7 +56,7 @@ class _OpenSshCertificateImportDialogState
   @override
   Widget build(BuildContext context) {
     final warnings = widget.preview.warnings.take(3).toList(growable: false);
-    return AlertDialog(
+    return SerlinkDialog(
       title: const Text('Import OpenSSH certificate?'),
       content: SizedBox(
         width: 560,
@@ -75,17 +75,27 @@ class _OpenSshCertificateImportDialogState
               ),
             if (warnings.isNotEmpty) ...[
               const SizedBox(height: 8),
-              for (final warning in warnings)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    warning.message,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+              SerlinkAlert.warning(
+                title: 'Import warnings',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < warnings.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 4),
+                      Text(
+                        warnings[i].message,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: context.tokens.textSecondary,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+              ),
             ],
             const SizedBox(height: 12),
-            TextField(
+            SerlinkTextField(
               key: const ValueKey('openssh-cert-display-name-field'),
               controller: _displayNameController,
               decoration: const InputDecoration(
@@ -94,7 +104,7 @@ class _OpenSshCertificateImportDialogState
               ),
             ),
             const SizedBox(height: 10),
-            TextField(
+            SerlinkTextField(
               key: const ValueKey('openssh-cert-username-field'),
               controller: _usernameController,
               decoration: const InputDecoration(
@@ -103,7 +113,7 @@ class _OpenSshCertificateImportDialogState
               ),
             ),
             const SizedBox(height: 10),
-            TextField(
+            SerlinkTextField(
               key: const ValueKey('openssh-cert-passphrase-field'),
               controller: _passphraseController,
               obscureText: true,
@@ -114,20 +124,17 @@ class _OpenSshCertificateImportDialogState
             ),
             if (_errorMessage != null) ...[
               const SizedBox(height: 8),
-              Text(
-                _errorMessage!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
+              SerlinkAlert.danger(message: _errorMessage!, compact: true),
             ],
           ],
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(onPressed: _confirm, child: const Text('Import')),
+        SerlinkFilledButton(onPressed: _confirm, child: const Text('Import')),
       ],
     );
   }

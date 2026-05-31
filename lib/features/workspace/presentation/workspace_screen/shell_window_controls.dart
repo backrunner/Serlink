@@ -331,12 +331,18 @@ class _WindowControlButtonState extends State<_WindowControlButton> {
       onExit: (_) => setState(() {
         _hovered = false;
       }),
-      child: Material(
-        color: background,
-        borderRadius: BorderRadius.circular(6),
-        child: InkWell(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: background,
           borderRadius: BorderRadius.circular(6),
+        ),
+        child: SerlinkPressable(
           onTap: widget.onPressed,
+          borderRadius: BorderRadius.circular(6),
+          hoverColor: Colors.transparent,
+          pressedColor: widget.isClose
+              ? Colors.white.withValues(alpha: 0.16)
+              : scheme.onSurface.withValues(alpha: 0.12),
           child: SizedBox.square(
             dimension: 34,
             child: Icon(widget.icon, size: 16, color: foreground),

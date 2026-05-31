@@ -181,6 +181,39 @@ void main() {
   );
 
   test(
+    'opens sftp at host default folder and clamps parent navigation',
+    () async {
+      final service = _FakeSshSessionService();
+      final container = _container(service: service);
+      addTearDown(container.dispose);
+
+      final host = _hostWithSftpDefault('/srv/app');
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openSftp(host);
+      await _drainMicrotasks();
+
+      var state = container.read(workspaceTabControllerProvider);
+      var tab = state.activeTab!;
+      var content = tab.content as SftpTabContent;
+      expect(content.rootPath, '/srv/app');
+      expect(content.currentPath, '/srv/app');
+
+      controller.changeSftpDirectory(tab.id, '/srv/app/releases');
+      state = container.read(workspaceTabControllerProvider);
+      tab = state.activeTab!;
+      content = tab.content as SftpTabContent;
+      expect(content.currentPath, '/srv/app/releases');
+
+      controller.changeSftpDirectory(tab.id, '/srv');
+      state = container.read(workspaceTabControllerProvider);
+      content = state.activeTab!.content as SftpTabContent;
+      expect(content.currentPath, '/srv/app');
+    },
+  );
+
+  test(
     'opens related sftp and terminal tabs from active workspace tabs',
     () async {
       final service = _FakeSshSessionService();
@@ -676,6 +709,20 @@ final _host = HostSummary(
   tags: const {},
   trustState: HostTrustState.trusted,
 );
+
+HostSummary _hostWithSftpDefault(String path) {
+  return HostSummary(
+    id: _host.id,
+    displayName: _host.displayName,
+    hostname: _host.hostname,
+    username: _host.username,
+    port: _host.port,
+    authKinds: _host.authKinds,
+    tags: _host.tags,
+    trustState: _host.trustState,
+    sftpDefaultDirectory: path,
+  );
+}
 
 ProviderContainer _container({
   required _FakeSshSessionService service,

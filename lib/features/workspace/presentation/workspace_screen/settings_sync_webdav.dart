@@ -5,7 +5,7 @@ Future<void> _showWebDavSyncDialog(
   WidgetRef ref,
   WebDavSyncSettings? settings,
 ) {
-  return showDialog<void>(
+  return showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => _WebDavSyncDialog(initialSettings: settings),
@@ -60,14 +60,14 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return SerlinkDialog(
       title: const Text('WebDAV Sync'),
       content: SizedBox(
         width: 560,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
+            SerlinkTextField(
               key: const ValueKey('webdav-endpoint-field'),
               controller: _endpointController,
               decoration: const InputDecoration(
@@ -77,14 +77,14 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 12),
-            TextField(
+            SerlinkTextField(
               key: const ValueKey('webdav-username-field'),
               controller: _usernameController,
               decoration: const InputDecoration(labelText: 'Username'),
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 12),
-            TextField(
+            SerlinkTextField(
               key: const ValueKey('webdav-password-field'),
               controller: _passwordController,
               decoration: InputDecoration(
@@ -96,7 +96,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 12),
-            TextField(
+            SerlinkTextField(
               key: const ValueKey('webdav-base-path-field'),
               controller: _basePathController,
               decoration: const InputDecoration(labelText: 'Base path'),
@@ -104,7 +104,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
               onSubmitted: (_) => _save(),
             ),
             const SizedBox(height: 8),
-            SwitchListTile(
+            SerlinkSwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _enabled,
               title: const Text('Enable WebDAV sync'),
@@ -114,7 +114,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
                 });
               },
             ),
-            CheckboxListTile(
+            SerlinkCheckboxListTile(
               contentPadding: EdgeInsets.zero,
               value: _allowInsecureHttp,
               title: const Text('Allow HTTP endpoint'),
@@ -126,28 +126,22 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
             ),
             if (_errorMessage != null) ...[
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
+              SerlinkAlert.danger(message: _errorMessage!, compact: true),
             ],
           ],
         ),
       ),
       actions: [
         if (_isEditing)
-          TextButton(
+          SerlinkTextButton(
             onPressed: _saving ? null : _delete,
             child: const Text('Remove'),
           ),
-        TextButton(
+        SerlinkTextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           key: const ValueKey('webdav-save-button'),
           onPressed: _saving ? null : _save,
           child: Text(_saving ? 'Saving' : 'Save'),

@@ -14,7 +14,7 @@ class _TerminalToolbar extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _ToolbarIconButton(
+            _ToolbarSerlinkIconButton(
               key: const ValueKey('terminal-search-button'),
               tooltip: 'Search terminal',
               icon: Icons.search,
@@ -22,7 +22,7 @@ class _TerminalToolbar extends StatelessWidget {
               onPressed: snapshot.onToggleSearch,
             ),
             if (snapshot.showForwarding)
-              _ToolbarIconButton(
+              _ToolbarSerlinkIconButton(
                 key: const ValueKey('terminal-forwarding-button'),
                 tooltip: _forwardingTooltip(
                   snapshot.activeLocalForward,
@@ -40,32 +40,32 @@ class _TerminalToolbar extends StatelessWidget {
                     : null,
               ),
             if (snapshot.showOpenSftp)
-              _ToolbarIconButton(
+              _ToolbarSerlinkIconButton(
                 key: const ValueKey('terminal-open-sftp-button'),
                 tooltip: 'Open SFTP tab',
                 icon: Icons.folder_open_outlined,
                 onPressed: snapshot.onOpenSftp,
               ),
-            _ToolbarIconButton(
+            _ToolbarSerlinkIconButton(
               key: const ValueKey('terminal-split-right-button'),
               tooltip: 'Split right',
               icon: Icons.view_column_outlined,
               onPressed: snapshot.onSplitRight,
             ),
-            _ToolbarIconButton(
+            _ToolbarSerlinkIconButton(
               key: const ValueKey('terminal-split-down-button'),
               tooltip: 'Split down',
               icon: Icons.view_agenda_outlined,
               onPressed: snapshot.onSplitDown,
             ),
             if (snapshot.showSplit)
-              _ToolbarIconButton(
+              _ToolbarSerlinkIconButton(
                 key: const ValueKey('terminal-close-pane-button'),
                 tooltip: 'Close active pane',
                 icon: Icons.close_fullscreen_outlined,
                 onPressed: snapshot.onCloseActivePane,
               ),
-            _ToolbarIconButton(
+            _ToolbarSerlinkIconButton(
               key: const ValueKey('terminal-settings-button'),
               tooltip: 'Terminal settings',
               icon: Icons.tune_outlined,
@@ -133,8 +133,8 @@ class _TerminalToolbarSnapshot {
   }
 }
 
-class _ToolbarIconButton extends StatelessWidget {
-  const _ToolbarIconButton({
+class _ToolbarSerlinkIconButton extends StatelessWidget {
+  const _ToolbarSerlinkIconButton({
     super.key,
     required this.tooltip,
     required this.icon,
@@ -150,47 +150,19 @@ class _ToolbarIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Tooltip(
+    return SerlinkTooltip(
       message: tooltip,
-      child: IconButton(
+      child: SerlinkIconButton(
         isSelected: selected,
         selectedIcon: Icon(icon, size: 18),
-        style: _toolbarIconButtonStyle(t),
+        constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+        padding: EdgeInsets.zero,
+        color: selected ? t.accentPrimary : t.textSecondary,
         onPressed: onPressed,
         icon: Icon(icon, size: 18),
       ),
     );
   }
-}
-
-ButtonStyle _toolbarIconButtonStyle(SerlinkTokens t) {
-  return ButtonStyle(
-    padding: const WidgetStatePropertyAll(EdgeInsets.zero),
-    minimumSize: const WidgetStatePropertyAll(Size.square(30)),
-    fixedSize: const WidgetStatePropertyAll(Size.square(30)),
-    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    shape: WidgetStatePropertyAll(
-      RoundedRectangleBorder(borderRadius: SerlinkRadii.control),
-    ),
-    foregroundColor: WidgetStateProperty.resolveWith((states) {
-      if (states.contains(WidgetState.disabled)) {
-        return t.textMuted.withValues(alpha: 0.5);
-      }
-      if (states.contains(WidgetState.selected)) {
-        return t.accentPrimary;
-      }
-      return t.textSecondary;
-    }),
-    backgroundColor: WidgetStateProperty.resolveWith((states) {
-      if (states.contains(WidgetState.selected)) {
-        return t.accentPrimary.withValues(alpha: 0.14);
-      }
-      if (states.contains(WidgetState.hovered)) {
-        return t.surfaceRaised;
-      }
-      return Colors.transparent;
-    }),
-  );
 }
 
 String _localForwardSignature(_LocalForwardDraft? draft) {

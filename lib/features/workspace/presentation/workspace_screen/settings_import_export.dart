@@ -222,13 +222,13 @@ Future<List<HostId>?> _showHostSelectionDialog(
   required String description,
 }) {
   final selected = {for (final host in hosts) host.id};
-  return showDialog<List<HostId>>(
+  return showSerlinkDialog<List<HostId>>(
     context: context,
     barrierDismissible: false,
     builder: (context) {
       return StatefulBuilder(
         builder: (context, setState) {
-          return AlertDialog(
+          return SerlinkDialog(
             title: Text(title),
             content: SizedBox(
               width: 560,
@@ -247,7 +247,7 @@ Future<List<HostId>?> _showHostSelectionDialog(
                       shrinkWrap: true,
                       children: [
                         for (final host in hosts)
-                          CheckboxListTile(
+                          SerlinkCheckboxListTile(
                             dense: true,
                             value: selected.contains(host.id),
                             title: Text(host.displayName),
@@ -272,11 +272,11 @@ Future<List<HostId>?> _showHostSelectionDialog(
               ),
             ),
             actions: [
-              TextButton(
+              SerlinkTextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Cancel'),
               ),
-              TextButton(
+              SerlinkTextButton(
                 onPressed: () {
                   setState(() {
                     if (selected.length == hosts.length) {
@@ -292,7 +292,7 @@ Future<List<HostId>?> _showHostSelectionDialog(
                   selected.length == hosts.length ? 'Clear all' : 'Select all',
                 ),
               ),
-              FilledButton(
+              SerlinkFilledButton(
                 onPressed: selected.isEmpty
                     ? null
                     : () => Navigator.of(
@@ -513,11 +513,11 @@ Future<bool> _showOpenSshConfigImportDialog(
   OpenSshConfigImportResult preview,
 ) async {
   final warnings = preview.warnings.take(4).toList(growable: false);
-  final result = await showDialog<bool>(
+  final result = await showSerlinkDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (context) {
-      return AlertDialog(
+      return SerlinkDialog(
         title: const Text('Import OpenSSH config?'),
         content: SizedBox(
           width: 520,
@@ -531,29 +531,46 @@ Future<bool> _showOpenSshConfigImportDialog(
               ),
               if (warnings.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                for (final warning in warnings)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(
-                      warning.message,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                SerlinkAlert.warning(
+                  title: 'Import warnings',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < warnings.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 4),
+                        Text(
+                          warnings[i].message,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: context.tokens.textSecondary,
+                                height: 1.35,
+                              ),
+                        ),
+                      ],
+                      if (preview.warnings.length > warnings.length) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '${preview.warnings.length - warnings.length} more warnings.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: context.tokens.textSecondary,
+                                height: 1.35,
+                              ),
+                        ),
+                      ],
+                    ],
                   ),
-                if (preview.warnings.length > warnings.length)
-                  Text(
-                    '${preview.warnings.length - warnings.length} more warnings.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                ),
               ],
             ],
           ),
         ),
         actions: [
-          TextButton(
+          SerlinkTextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancel'),
           ),
-          FilledButton(
+          SerlinkFilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Import'),
           ),

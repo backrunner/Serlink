@@ -105,6 +105,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     final tab = _open(
       hostId: host.id,
       title: host.displayName,
+      sftpDefaultDirectory: host.sftpDefaultDirectory,
       content: TerminalTabContent(
         panes: [
           TerminalPaneState(
@@ -144,6 +145,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     final tab = _open(
       hostId: hostId,
       title: title,
+      sftpDefaultDirectory: source.sftpDefaultDirectory,
       content: TerminalTabContent(
         panes: [
           TerminalPaneState(
@@ -161,11 +163,17 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
   }
 
   void openSftp(HostSummary host) {
+    final rootPath = _normalizeRemotePath(host.sftpDefaultDirectory);
     final sessionId = _newSessionId();
     final tab = _open(
       hostId: host.id,
-      title: '${host.displayName} /',
-      content: SftpTabContent(sessionId: sessionId, currentPath: '/'),
+      title: _sftpTitle(host.displayName, rootPath),
+      sftpDefaultDirectory: rootPath,
+      content: SftpTabContent(
+        sessionId: sessionId,
+        currentPath: rootPath,
+        rootPath: rootPath,
+      ),
       lifecycle: SessionLifecycleState.resolvingProfile,
       switchArea: WorkspaceArea.sessions,
     );
@@ -180,11 +188,17 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     if (source == null || hostId == null) {
       return;
     }
+    final rootPath = _normalizeRemotePath(source.sftpDefaultDirectory);
     final sessionId = _newSessionId();
     final tab = _open(
       hostId: hostId,
-      title: '${_baseTabTitle(source.title)} /',
-      content: SftpTabContent(sessionId: sessionId, currentPath: '/'),
+      title: _sftpTitle(_baseTabTitle(source.title), rootPath),
+      sftpDefaultDirectory: rootPath,
+      content: SftpTabContent(
+        sessionId: sessionId,
+        currentPath: rootPath,
+        rootPath: rootPath,
+      ),
       lifecycle: SessionLifecycleState.resolvingProfile,
       switchArea: WorkspaceArea.sessions,
     );
@@ -288,13 +302,45 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     if (content is! SftpTabContent) {
       return;
     }
+    final rootPath = _normalizeRemotePath(content.rootPath);
+    final nextPath = _clampRemotePathToRoot(
+      _normalizeRemotePath(path),
+      rootPath,
+    );
     _replaceTab(
       tab.copyWith(
-        title: _sftpTitle(tab.title, path),
+        title: _sftpTitle(tab.title, nextPath),
         content: SftpTabContent(
           sessionId: content.sessionId,
-          currentPath: _normalizeRemotePath(path),
+          currentPath: nextPath,
+          rootPath: rootPath,
         ),
+        lastActivityAt: DateTime.now(),
+      ),
+    );
+  }
+
+  void setSftpRootDirectory(WorkspaceTabId tabId, String path) {
+    final tab = state.tabs
+        .where((candidate) => candidate.id == tabId)
+        .firstOrNull;
+    if (tab == null) {
+      return;
+    }
+    final content = tab.content;
+    if (content is! SftpTabContent) {
+      return;
+    }
+    final rootPath = _normalizeRemotePath(path);
+    _replaceTab(
+      tab.copyWith(
+        title: _sftpTitle(tab.title, rootPath),
+        content: SftpTabContent(
+          sessionId: content.sessionId,
+          currentPath: rootPath,
+          rootPath: rootPath,
+        ),
+        sftpDefaultDirectory: rootPath,
         lastActivityAt: DateTime.now(),
       ),
     );
@@ -746,6 +792,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     required WorkspaceTabContent content,
     required SessionLifecycleState lifecycle,
     required WorkspaceArea switchArea,
+    String sftpDefaultDirectory = '/',
   }) {
     final now = DateTime.now();
     final tab = WorkspaceTabState(
@@ -754,6 +801,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       title: title,
       content: content,
       lifecycle: lifecycle,
+      sftpDefaultDirectory: _normalizeRemotePath(sftpDefaultDirectory),
       createdAt: now,
       lastActivityAt: now,
     );
@@ -1505,6 +1553,17 @@ String _normalizeRemotePath(String path) {
     segments.add(segment);
   }
   return '/${segments.join('/')}';
+}
+
+String _clampRemotePathToRoot(String path, String rootPath) {
+  final normalizedPath = _normalizeRemotePath(path);
+  final normalizedRoot = _normalizeRemotePath(rootPath);
+  if (normalizedRoot == '/' ||
+      normalizedPath == normalizedRoot ||
+      normalizedPath.startsWith('$normalizedRoot/')) {
+    return normalizedPath;
+  }
+  return normalizedRoot;
 }
 
 class _StaleConnectionAttempt implements Exception {}

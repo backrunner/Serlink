@@ -108,7 +108,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                       ),
                     ),
                     const SizedBox(height: 24),
-                    TextField(
+                    SerlinkTextField(
                       key: const ValueKey('vault-passphrase-field'),
                       controller: _passphraseController,
                       obscureText: true,
@@ -133,7 +133,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                     if (!isInitializing &&
                         session?.localUnlockAvailable == true) ...[
                       const SizedBox(height: 10),
-                      OutlinedButton.icon(
+                      SerlinkOutlinedButton.icon(
                         key: const ValueKey('vault-local-unlock-button'),
                         onPressed: asyncState.isLoading
                             ? null
@@ -146,7 +146,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                     ],
                     if (showRecoveryCodeAccess) ...[
                       const SizedBox(height: 10),
-                      TextButton.icon(
+                      SerlinkTextButton.icon(
                         key: const ValueKey('vault-recovery-code-button'),
                         onPressed: asyncState.isLoading
                             ? null
@@ -160,7 +160,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                       const SizedBox(height: 20),
                       SelectableText(recoveryKey.value),
                       const SizedBox(height: 8),
-                      OutlinedButton(
+                      SerlinkOutlinedButton(
                         onPressed: () => ref
                             .read(vaultSessionControllerProvider.notifier)
                             .dismissRecoveryKey(),
@@ -348,33 +348,31 @@ class _VaultPrimaryButton extends StatelessWidget {
                 ]
               : null,
         ),
-        child: Material(
-          color: Colors.transparent,
+        child: SerlinkPressable(
+          onTap: onPressed,
           borderRadius: SerlinkRadii.control,
-          child: InkWell(
-            borderRadius: SerlinkRadii.control,
-            onTap: onPressed,
-            child: SizedBox(
-              height: 46,
-              child: Center(
-                child: loading
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.4,
-                          valueColor: AlwaysStoppedAnimation(t.onAccent),
-                        ),
-                      )
-                    : Text(
-                        label,
-                        style: TextStyle(
-                          color: t.onAccent,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
+          hoverColor: Colors.white.withValues(alpha: 0.06),
+          pressedColor: Colors.black.withValues(alpha: 0.08),
+          child: SizedBox(
+            height: 46,
+            child: Center(
+              child: loading
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        valueColor: AlwaysStoppedAnimation(t.onAccent),
                       ),
-              ),
+                    )
+                  : Text(
+                      label,
+                      style: TextStyle(
+                        color: t.onAccent,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
             ),
           ),
         ),
@@ -391,7 +389,6 @@ class _VaultErrorText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     return AnimatedSize(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOut,
@@ -400,19 +397,7 @@ class _VaultErrorText extends StatelessWidget {
           ? const SizedBox(width: double.infinity)
           : Padding(
               padding: const EdgeInsets.only(top: 14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.error_outline, size: 17, color: t.statusDanger),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      message!,
-                      style: TextStyle(color: t.statusDanger, height: 1.35),
-                    ),
-                  ),
-                ],
-              ),
+              child: SerlinkAlert.danger(message: message, compact: true),
             ),
     );
   }

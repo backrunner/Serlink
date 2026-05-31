@@ -50,7 +50,7 @@ class _RecoveryKeyDialogGateState
   }
 
   Future<void> _showRecoveryKeyDialog(String recoveryKey) async {
-    await showDialog<void>(
+    await showSerlinkDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _RecoveryKeyDialog(recoveryKey: recoveryKey),
@@ -78,7 +78,7 @@ class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return AlertDialog(
+    return SerlinkDialog(
       titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
       contentPadding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
       actionsPadding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
@@ -121,36 +121,11 @@ class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
               ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
             ),
             const SizedBox(height: 14),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: scheme.errorContainer.withValues(alpha: 0.44),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: scheme.error.withValues(alpha: 0.22)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: scheme.error,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'This key is shown only once. If it is lost, Serlink cannot retrieve it for you.',
-                        key: const ValueKey('recovery-key-warning'),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onErrorContainer,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const SerlinkAlert.warning(
+              key: ValueKey('recovery-key-warning'),
+              title: 'Save this key now',
+              message:
+                  'This key is shown only once. If it is lost, Serlink cannot retrieve it for you.',
             ),
             const SizedBox(height: 14),
             DecoratedBox(
@@ -175,13 +150,13 @@ class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
         ),
       ),
       actions: [
-        OutlinedButton.icon(
+        SerlinkOutlinedButton.icon(
           key: const ValueKey('recovery-key-copy-button'),
           onPressed: _copyRecoveryKey,
           icon: Icon(_copied ? Icons.check_rounded : Icons.copy_rounded),
           label: Text(_copied ? 'Copied' : 'Copy Recovery Key'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('I have saved it'),
         ),
@@ -209,7 +184,7 @@ class _RecoveryCodeDialog extends ConsumerStatefulWidget {
 }
 
 Future<void> _showVaultRecoveryCodeDialog(BuildContext context) {
-  return showDialog<void>(
+  return showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => const _RecoveryCodeDialog(),
@@ -244,7 +219,7 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
     );
     final dialogWidth = math.min(680.0, availableWidth);
 
-    return AlertDialog(
+    return SerlinkDialog(
       title: Text(_resetMode ? 'Reset Vault' : 'Recovery Code'),
       content: SizedBox(
         width: dialogWidth,
@@ -275,7 +250,7 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
                     }),
                   )
                 else
-                  TextField(
+                  SerlinkTextField(
                     key: const ValueKey('vault-recovery-code-field'),
                     controller: _recoveryCodeController,
                     autofocus: true,
@@ -300,12 +275,12 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         if (_resetMode)
-          TextButton(
+          SerlinkTextButton(
             key: const ValueKey('vault-recovery-code-return-button'),
             onPressed: _busy
                 ? null
@@ -316,7 +291,7 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
             child: const Text('Use recovery code'),
           )
         else
-          TextButton(
+          SerlinkTextButton.danger(
             key: const ValueKey('vault-reset-entry-button'),
             onPressed: _busy
                 ? null
@@ -324,25 +299,18 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
                     _resetMode = true;
                     _errorMessage = null;
                   }),
-            style: TextButton.styleFrom(foregroundColor: scheme.error),
             child: const Text('Reset vault'),
           ),
         if (_resetMode)
-          FilledButton(
+          SerlinkFilledButton.danger(
             key: const ValueKey('vault-reset-confirm-button'),
             onPressed: !_busy && canReset ? _resetVault : null,
-            style: FilledButton.styleFrom(
-              backgroundColor: scheme.error,
-              foregroundColor: scheme.onError,
-              disabledBackgroundColor: scheme.error.withValues(alpha: 0.22),
-              disabledForegroundColor: scheme.error.withValues(alpha: 0.82),
-            ),
             child: _busy
                 ? _DialogButtonSpinner(color: scheme.onError)
                 : const Text('Reset Vault Permanently'),
           )
         else
-          FilledButton(
+          SerlinkFilledButton(
             key: const ValueKey('vault-recovery-unlock-button'),
             onPressed: _busy ? null : _unlockWithRecoveryCode,
             child: _busy
@@ -426,7 +394,7 @@ class _VaultResetConfirmationSection extends StatelessWidget {
       children: [
         const _VaultResetWarning(),
         const SizedBox(height: 14),
-        TextField(
+        SerlinkTextField(
           key: const ValueKey('vault-reset-confirmation-field'),
           controller: controller,
           autofocus: true,
@@ -455,55 +423,26 @@ class _VaultResetWarning extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final t = context.tokens;
-    final textTheme = Theme.of(context).textTheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: t.surfaceSunken,
-        borderRadius: SerlinkRadii.dialog,
-        border: Border.all(color: scheme.error.withValues(alpha: 0.38)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.warning_amber_rounded, color: scheme.error, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'This is permanent on this device',
-                    style: textTheme.titleSmall?.copyWith(
-                      color: t.textPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const _VaultResetWarningLine(
-                    text:
-                        'Encrypted hosts, identities, snippets, transfer history, sync settings, and recovery data will be deleted.',
-                  ),
-                  const SizedBox(height: 6),
-                  const _VaultResetWarningLine(
-                    text:
-                        'Reset does not recover your passphrase or reveal existing secrets.',
-                  ),
-                  const SizedBox(height: 6),
-                  const _VaultResetWarningLine(
-                    text:
-                        'You will need a backup or a new vault before continuing.',
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return const SerlinkAlert.danger(
+      title: 'This is permanent on this device',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _VaultResetWarningLine(
+            text:
+                'Encrypted hosts, identities, snippets, transfer history, sync settings, and recovery data will be deleted.',
+          ),
+          SizedBox(height: 6),
+          _VaultResetWarningLine(
+            text:
+                'Reset does not recover your passphrase or reveal existing secrets.',
+          ),
+          SizedBox(height: 6),
+          _VaultResetWarningLine(
+            text: 'You will need a backup or a new vault before continuing.',
+          ),
+        ],
       ),
     );
   }
@@ -516,14 +455,13 @@ class _VaultResetWarningLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final t = context.tokens;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 7),
-          child: Icon(Icons.circle, size: 5, color: scheme.error),
+          child: Icon(Icons.circle, size: 5, color: t.statusDanger),
         ),
         const SizedBox(width: 8),
         Expanded(

@@ -23,7 +23,7 @@ Future<void> _showSyncDevicesDialog(
   if (!context.mounted) {
     return;
   }
-  await showDialog<void>(
+  await showSerlinkDialog<void>(
     context: context,
     builder: (dialogContext) => _SyncDevicesDialog(
       devices: devices,
@@ -120,38 +120,38 @@ class _SyncDevicesDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return SerlinkDialog(
       title: const Text('Sync Devices'),
       content: SizedBox(
         width: 520,
-        child: ListView.separated(
-          shrinkWrap: true,
-          itemCount: devices.length,
-          separatorBuilder: (context, index) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final device = devices[index];
-            final isLocal = device.id == localDeviceId;
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                isLocal
+        child: _DialogList(
+          empty: const _DialogState(
+            icon: Icons.devices_other_outlined,
+            title: 'No sync devices yet',
+            body:
+                'This device will be registered here after the first successful encrypted sync.',
+          ),
+          items: [
+            for (final device in devices)
+              _DialogListItem(
+                icon: Icons.devices_outlined,
+                title: device.id == localDeviceId
                     ? '${device.displayName} (this device)'
                     : device.displayName,
+                subtitle: _syncDeviceSubtitle(device),
+                trailing: device.id == localDeviceId
+                    ? null
+                    : SerlinkIconButton(
+                        tooltip: 'Remove device',
+                        onPressed: () => onDelete(device),
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                      ),
               ),
-              subtitle: Text(_syncDeviceSubtitle(device)),
-              trailing: isLocal
-                  ? null
-                  : IconButton(
-                      tooltip: 'Remove device',
-                      onPressed: () => onDelete(device),
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                    ),
-            );
-          },
+          ],
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Close'),
         ),

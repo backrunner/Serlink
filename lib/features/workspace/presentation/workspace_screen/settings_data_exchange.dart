@@ -5,7 +5,7 @@ Future<void> _showDataExchangeDialog(
   WidgetRef ref, {
   required bool canImportHostData,
 }) {
-  return showDialog<void>(
+  return showSerlinkDialog<void>(
     context: context,
     builder: (dialogContext) {
       Future<void> runAction(_DataExchangeAction action) async {
@@ -67,10 +67,10 @@ class _DataExchangeDialog extends StatelessWidget {
     final t = context.tokens;
     final lockedSubtitle = 'Unlock the vault to use this action.';
 
-    return Dialog(
-      clipBehavior: Clip.antiAlias,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: ConstrainedBox(
+    return SerlinkDialog(
+      maxWidth: 660,
+      contentPadding: EdgeInsets.zero,
+      content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 660, maxHeight: 720),
         child: SingleChildScrollView(
           child: Padding(
@@ -90,7 +90,7 @@ class _DataExchangeDialog extends StatelessWidget {
                         ),
                       ),
                     ),
-                    IconButton(
+                    SerlinkIconButton(
                       key: const ValueKey('data-exchange-close-button'),
                       visualDensity: VisualDensity.compact,
                       onPressed: () => Navigator.of(context).pop(),
@@ -205,7 +205,7 @@ class _DataExchangeDialog extends StatelessWidget {
   }
 }
 
-class _DataExchangeActionTile extends StatelessWidget {
+class _DataExchangeActionTile extends StatefulWidget {
   const _DataExchangeActionTile({
     required this.icon,
     required this.title,
@@ -223,50 +223,75 @@ class _DataExchangeActionTile extends StatelessWidget {
   final String? disabledSubtitle;
 
   @override
+  State<_DataExchangeActionTile> createState() =>
+      _DataExchangeActionTileState();
+}
+
+class _DataExchangeActionTileState extends State<_DataExchangeActionTile> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final effectiveSubtitle = enabled ? subtitle : disabledSubtitle ?? subtitle;
+    final effectiveSubtitle = widget.enabled
+        ? widget.subtitle
+        : widget.disabledSubtitle ?? widget.subtitle;
+    final interactive = widget.enabled;
+    final foregroundOpacity = interactive ? 1.0 : 0.48;
 
-    return InkWell(
-      onTap: enabled ? onPressed : null,
-      borderRadius: SerlinkRadii.control,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        child: Opacity(
-          opacity: enabled ? 1 : 0.48,
-          child: Row(
-            children: [
-              SizedBox.square(
-                dimension: 40,
-                child: Center(
-                  child: Icon(icon, size: 20, color: t.textSecondary),
+    return MouseRegion(
+      cursor: interactive ? SystemMouseCursors.click : MouseCursor.defer,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: interactive ? widget.onPressed : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: interactive && _hovered
+                ? t.accentPrimary.withValues(alpha: 0.06)
+                : Colors.transparent,
+            borderRadius: SerlinkRadii.control,
+          ),
+          child: Opacity(
+            opacity: foregroundOpacity,
+            child: Row(
+              children: [
+                SizedBox.square(
+                  dimension: 40,
+                  child: Center(
+                    child: Icon(widget.icon, size: 20, color: t.textSecondary),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: t.textPrimary,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: t.textPrimary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      effectiveSubtitle,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
-                    ),
-                  ],
+                      const SizedBox(height: 2),
+                      Text(
+                        effectiveSubtitle,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Icon(Icons.chevron_right, size: 20, color: t.textMuted),
-            ],
+                const SizedBox(width: 12),
+                Icon(Icons.chevron_right, size: 20, color: t.textMuted),
+              ],
+            ),
           ),
         ),
       ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/native.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,10 +11,17 @@ import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/app/serlink_app.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/database/serlink_database.dart';
+import 'package:serlink/design_system/design_system.dart';
+import 'package:serlink/features/hosts/application/host_repository.dart';
+import 'package:serlink/features/hosts/application/host_write_service.dart';
+import 'package:serlink/features/identities/application/identity_repository.dart';
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
+import 'package:serlink/features/sftp/application/sftp_failure.dart';
 import 'package:serlink/features/sftp/domain/sftp_entry.dart';
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
+import 'package:serlink/features/ssh/application/known_host_repository.dart';
+import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_service.dart';
@@ -109,12 +117,14 @@ void main() {
       findsNothing,
     );
     expect(find.text('Recover / Reset'), findsNothing);
-    expect(find.widgetWithText(TextButton, 'Lock'), findsOneWidget);
+    expect(find.widgetWithText(SerlinkTextButton, 'Lock'), findsOneWidget);
     await tester.drag(find.byType(ListView), const Offset(0, -260));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.widgetWithText(TextButton, 'Configure'));
+    await tester.ensureVisible(
+      find.widgetWithText(SerlinkTextButton, 'Configure'),
+    );
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Configure'));
+    await tester.tap(find.widgetWithText(SerlinkTextButton, 'Configure'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('webdav-endpoint-field')),
@@ -131,7 +141,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('webdav-save-button')));
     await tester.pumpAndSettle();
     expect(find.text('Use HTTP WebDAV?'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Allow HTTP'));
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Allow HTTP'));
     await tester.pumpAndSettle();
     expect(find.text('Edit'), findsOneWidget);
     expect(find.textContaining('dav.local/serlink'), findsOneWidget);
@@ -171,6 +181,30 @@ void main() {
       find.byKey(const ValueKey('host-startup-commands-field')),
       'tmux attach || tmux',
     );
+    expect(
+      tester
+          .widget<SerlinkTextField>(
+            find.byKey(const ValueKey('host-password-field')),
+          )
+          .obscureText,
+      isTrue,
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('host-password-visibility-toggle')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('host-password-visibility-toggle')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<SerlinkTextField>(
+            find.byKey(const ValueKey('host-password-field')),
+          )
+          .obscureText,
+      isFalse,
+    );
     await tester.enterText(
       find.byKey(const ValueKey('host-password-field')),
       'server-password',
@@ -181,7 +215,8 @@ void main() {
     expect(find.text('Production Bastion'), findsOneWidget);
     expect(find.text('ops@bastion.internal:22'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Edit host'));
+    await _openHostContextMenu(tester, 'Production Bastion');
+    await tester.tap(find.text('Edit host'));
     await tester.pumpAndSettle();
     expect(find.text('Edit Host'), findsOneWidget);
     expect(find.text('tmux attach || tmux'), findsOneWidget);
@@ -204,10 +239,25 @@ void main() {
     expect(find.text('Renamed Bastion'), findsOneWidget);
     expect(find.text('ops@renamed.internal:22'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Delete host'));
+    await tester.tap(find.byKey(const ValueKey('add-host-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Jump hosts'), findsOneWidget);
+    final jumpHostChip = find.widgetWithText(
+      SerlinkChoiceChip,
+      'Renamed Bastion',
+    );
+    await tester.ensureVisible(jumpHostChip);
+    await tester.pumpAndSettle();
+    await tester.tap(jumpHostChip);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(SerlinkTextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
+    await _openHostContextMenu(tester, 'Renamed Bastion');
+    await tester.tap(find.text('Delete host'));
     await tester.pumpAndSettle();
     expect(find.text('Delete host?'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Delete'));
     await tester.pumpAndSettle();
     expect(find.text('No Hosts'), findsOneWidget);
 
@@ -241,21 +291,21 @@ void main() {
     await tester.pump();
     expect(sshService.shell.writes, contains('tmux attach || tmux\n'));
 
-    await tester.tap(find.byTooltip('Split right'));
+    await tester.tap(_byTooltipLabel('Split right'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Close active pane'), findsOneWidget);
+    expect(_byTooltipLabel('Close active pane'), findsOneWidget);
     expect(find.textContaining('Connected'), findsWidgets);
 
-    await tester.tap(find.byTooltip('Manage port forwarding'));
+    await tester.tap(_byTooltipLabel('Manage port forwarding'));
     await tester.pumpAndSettle();
     expect(find.text('Port Forwarding'), findsOneWidget);
     expect(find.text('Local'), findsOneWidget);
     expect(find.text('Remote'), findsOneWidget);
     expect(find.text('SOCKS Proxy'), findsOneWidget);
-    await tester.tap(find.widgetWithText(TextButton, 'Close'));
+    await tester.tap(find.widgetWithText(SerlinkTextButton, 'Close'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Open SFTP tab'));
+    await tester.tap(_byTooltipLabel('Open SFTP tab'));
     await tester.pumpAndSettle();
     expect(find.text('app.env'), findsOneWidget);
     expect(find.text('.hidden.env'), findsNothing);
@@ -275,12 +325,12 @@ void main() {
       find.byKey(const ValueKey('remote-file-editor')),
       'PORT=9090\n',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Save'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('app.env'));
     await tester.pumpAndSettle();
     expect(find.textContaining('PORT=9090'), findsOneWidget);
-    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.tap(find.widgetWithText(SerlinkTextButton, 'Cancel'));
     await tester.pumpAndSettle();
 
     await tester.enterText(
@@ -304,44 +354,54 @@ void main() {
       find.byKey(const ValueKey('text-input-Folder name')),
       'releases',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Create'));
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Create'));
     await tester.pumpAndSettle();
     expect(find.text('releases'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Rename').first);
+    await tester.tap(find.text('releases'));
+    await tester.pumpAndSettle();
+    expect(find.text('Empty Folder'), findsOneWidget);
+    expect(find.text('/releases'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('sftp-parent-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('/'), findsOneWidget);
+    expect(find.text('releases'), findsOneWidget);
+
+    await tester.tap(_byTooltipLabel('Rename').first);
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('text-input-New name')),
       'archive',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Rename'));
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Rename'));
     await tester.pumpAndSettle();
     expect(find.text('archive'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Change permissions').first);
+    await tester.tap(_byTooltipLabel('Change permissions').first);
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('text-input-Octal permissions')),
       '0700',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Apply'));
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Apply'));
     await tester.pumpAndSettle();
     expect(find.text('0700'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Move').first);
+    await tester.tap(_byTooltipLabel('Move').first);
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('text-input-Target path')),
       '/archive-moved',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Move'));
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Move'));
     await tester.pumpAndSettle();
     expect(find.text('archive-moved'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Delete').first);
+    await tester.tap(_byTooltipLabel('Delete').first);
     await tester.pumpAndSettle();
     expect(find.text('Delete archive-moved?'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Delete'));
     await tester.pumpAndSettle();
     expect(find.text('archive-moved'), findsNothing);
 
@@ -372,6 +432,93 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Unlock Vault'), findsWidgets);
+  });
+
+  testWidgets('sftp prompts for a default folder when root is unavailable', (
+    tester,
+  ) async {
+    final database = SerlinkDatabase(NativeDatabase.memory());
+    final transferQueue = TransferQueueController();
+    final secretStore = InMemorySecretStore();
+    final bootstrapVault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    final initialized = await bootstrapVault.initialize(
+      passphrase: 'correct horse battery staple',
+    );
+    await DriftVaultHeaderStore(database).save(initialized.header);
+    final records = DriftVaultRecordRepository(database);
+    final hosts = EncryptedHostRepository(
+      vault: bootstrapVault,
+      records: records,
+    );
+    final identities = EncryptedIdentityRepository(
+      vault: bootstrapVault,
+      records: records,
+    );
+    final hostWriteService = HostWriteService(
+      hosts: hosts,
+      identities: identities,
+      knownHosts: EncryptedKnownHostRepository(
+        vault: bootstrapVault,
+        records: records,
+      ),
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: bootstrapVault,
+        records: records,
+      ),
+      records: records,
+      vault: bootstrapVault,
+    );
+    final host = await hostWriteService.createPasswordHost(
+      const PasswordHostDraft(
+        displayName: 'Restricted SFTP',
+        hostname: 'restricted.internal',
+        port: 22,
+        username: 'ops',
+        password: 'server-password',
+        tags: {},
+      ),
+    );
+    final sshService = _FakeSshSessionService()..sftp.deniedListPaths.add('/');
+
+    addTearDown(database.close);
+    addTearDown(transferQueue.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          sshSessionServiceProvider.overrideWithValue(sshService),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+          secretStoreProvider.overrideWithValue(secretStore),
+          autoSyncEnabledProvider.overrideWithValue(false),
+        ],
+        child: const SerlinkApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.text('SFTP').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Choose SFTP Start Folder'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('sftp-default-directory-field')),
+      '/home/ops',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('sftp-default-directory-submit-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('/home/ops'), findsOneWidget);
+    expect(find.text('home.env'), findsOneWidget);
+    expect((await hosts.read(host.id))!.sftpDefaultDirectory, '/home/ops');
   });
 
   testWidgets('vault unlock exposes recovery code after repeated failures', (
@@ -431,21 +578,24 @@ void main() {
     final resetButton = find.byKey(
       const ValueKey('vault-reset-confirm-button'),
     );
-    expect(tester.widget<FilledButton>(resetButton).onPressed, isNull);
+    expect(tester.widget<SerlinkFilledButton>(resetButton).onPressed, isNull);
 
     await tester.enterText(
       find.byKey(const ValueKey('vault-reset-confirmation-field')),
       'reset vault',
     );
     await tester.pump();
-    expect(tester.widget<FilledButton>(resetButton).onPressed, isNull);
+    expect(tester.widget<SerlinkFilledButton>(resetButton).onPressed, isNull);
 
     await tester.enterText(
       find.byKey(const ValueKey('vault-reset-confirmation-field')),
       'RESET VAULT',
     );
     await tester.pump();
-    expect(tester.widget<FilledButton>(resetButton).onPressed, isNotNull);
+    expect(
+      tester.widget<SerlinkFilledButton>(resetButton).onPressed,
+      isNotNull,
+    );
 
     await tester.tap(resetButton);
     await tester.pumpAndSettle();
@@ -561,3 +711,10 @@ Future<void> _submitVaultPassphrase(
   await tester.tap(find.byKey(const ValueKey('vault-submit-button')));
   await tester.pumpAndSettle();
 }
+
+Future<void> _openHostContextMenu(WidgetTester tester, String hostName) async {
+  await tester.tap(find.text(hostName), buttons: kSecondaryMouseButton);
+  await tester.pumpAndSettle();
+}
+
+Finder _byTooltipLabel(String label) => find.bySemanticsLabel(label);

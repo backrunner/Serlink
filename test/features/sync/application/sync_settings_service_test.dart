@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/features/sync/application/sync_settings_service.dart';
+import 'package:serlink/features/sync/domain/sync_provider.dart';
 import 'package:serlink/features/sync/domain/webdav_tls_certificate_details.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_record_repository.dart';
@@ -199,5 +200,56 @@ void main() {
 
     expect(await service.readWebDav(), isNull);
     expect(await secrets.read(settings.passwordRef), isNull);
+  });
+
+  test('saves and reads CloudKit settings encrypted', () async {
+    final saved = await service.saveCloudKit(true);
+    expect(saved.enabled, isTrue);
+
+    final restored = await service.readCloudKit();
+    expect(restored!.enabled, isTrue);
+
+    await service.deleteCloudKit();
+    expect(await service.readCloudKit(), isNull);
+  });
+
+  test('CloudKitSyncSettings round-trips through JSON', () {
+    final original = CloudKitSyncSettings(
+      enabled: true,
+      updatedAt: DateTime.utc(2026, 5, 31, 12),
+    );
+    final restored = CloudKitSyncSettings.fromJson(original.toJson());
+    expect(restored.enabled, original.enabled);
+    expect(restored.updatedAt, original.updatedAt);
+  });
+
+  test('activeSyncProvider prefers CloudKit over WebDAV', () async {
+    await service.saveWebDav(
+      const WebDavSyncSettingsDraft(
+        endpoint: 'https://dav.example.test',
+        username: 'ops',
+        password: 'server-password',
+      ),
+    );
+    expect(
+      (await (await service.activeSyncProvider())!.capabilities()).kind,
+      SyncProviderKind.webDav,
+    );
+
+    await service.saveCloudKit(true);
+    expect(
+      (await (await service.activeSyncProvider())!.capabilities()).kind,
+      SyncProviderKind.cloudKit,
+    );
+
+    await service.saveCloudKit(false);
+    expect(
+      (await (await service.activeSyncProvider())!.capabilities()).kind,
+      SyncProviderKind.webDav,
+    );
+  });
+
+  test('activeSyncProvider is null when nothing is enabled', () async {
+    expect(await service.activeSyncProvider(), isNull);
   });
 }

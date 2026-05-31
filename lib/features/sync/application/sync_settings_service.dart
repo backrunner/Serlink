@@ -4,7 +4,9 @@ import '../../../core/ids/entity_id.dart';
 import '../../../platform/secret_store.dart';
 import '../../vault/application/vault_record_repository.dart';
 import '../../vault/application/vault_service.dart';
+import '../data/cloudkit_sync_provider.dart';
 import '../data/webdav_sync_provider.dart';
+import '../domain/sync_provider.dart';
 import '../domain/webdav_tls_certificate_details.dart';
 
 class WebDavSyncSettings {
@@ -75,6 +77,27 @@ class WebDavSyncSettings {
   }
 }
 
+class CloudKitSyncSettings {
+  const CloudKitSyncSettings({required this.enabled, required this.updatedAt});
+
+  final bool enabled;
+  final DateTime updatedAt;
+
+  Map<String, Object?> toJson() {
+    return {
+      'enabled': enabled,
+      'updatedAt': updatedAt.toUtc().toIso8601String(),
+    };
+  }
+
+  factory CloudKitSyncSettings.fromJson(Map<String, Object?> json) {
+    return CloudKitSyncSettings(
+      enabled: json['enabled'] as bool,
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+    );
+  }
+}
+
 class WebDavSyncSettingsDraft {
   const WebDavSyncSettingsDraft({
     required this.endpoint,
@@ -107,6 +130,9 @@ abstract interface class SyncSettingsRepository {
   Future<WebDavSyncSettings?> readWebDav();
   Future<void> saveWebDav(WebDavSyncSettings settings);
   Future<void> deleteWebDav();
+  Future<CloudKitSyncSettings?> readCloudKit();
+  Future<void> saveCloudKit(CloudKitSyncSettings settings);
+  Future<void> deleteCloudKit();
 }
 
 class EncryptedSyncSettingsRepository implements SyncSettingsRepository {
@@ -147,6 +173,33 @@ class EncryptedSyncSettingsRepository implements SyncSettingsRepository {
   @override
   Future<void> deleteWebDav() async {
     await _records.delete(_webDavRecordId);
+  }
+
+  @override
+  Future<CloudKitSyncSettings?> readCloudKit() async {
+    final envelope = await _records.read(_cloudKitRecordId);
+    if (envelope == null) {
+      return null;
+    }
+    final plaintext = await _vault.decryptRecord(envelope);
+    return CloudKitSyncSettings.fromJson(
+      jsonDecode(utf8.decode(plaintext)) as Map<String, Object?>,
+    );
+  }
+
+  @override
+  Future<void> saveCloudKit(CloudKitSyncSettings settings) async {
+    final envelope = await _vault.encryptRecord(
+      id: _cloudKitRecordId,
+      type: recordType,
+      plaintext: utf8.encode(jsonEncode(settings.toJson())),
+    );
+    await _records.upsert(envelope);
+  }
+
+  @override
+  Future<void> deleteCloudKit() async {
+    await _records.delete(_cloudKitRecordId);
   }
 }
 
@@ -276,6 +329,37 @@ class SyncSettingsService {
       pinnedCertificateFingerprint: settings.pinnedCertificateFingerprint,
     );
   }
+
+  Future<CloudKitSyncSettings?> readCloudKit() {
+    return _settings.readCloudKit();
+  }
+
+  Future<CloudKitSyncSettings> saveCloudKit(bool enabled) async {
+    final settings = CloudKitSyncSettings(
+      enabled: enabled,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await _settings.saveCloudKit(settings);
+    return settings;
+  }
+
+  Future<void> deleteCloudKit() {
+    return _settings.deleteCloudKit();
+  }
+
+  /// Resolves the sync provider to use for an auto-sync run. iCloud takes
+  /// priority over WebDAV when both are enabled; returns null when neither is.
+  Future<SyncProvider?> activeSyncProvider() async {
+    final cloudKit = await _settings.readCloudKit();
+    if (cloudKit?.enabled ?? false) {
+      return CloudKitSyncProvider();
+    }
+    final webDav = await _settings.readWebDav();
+    if (webDav?.enabled ?? false) {
+      return buildWebDavProvider();
+    }
+    return null;
+  }
 }
 
 Uri _parseEndpoint(String value) {
@@ -303,6 +387,7 @@ String _normalizeBasePath(String value) {
 }
 
 final _webDavRecordId = VaultRecordId('sync:webdav');
+final _cloudKitRecordId = VaultRecordId('sync:cloudkit');
 
 String? _preservedCertificatePin({
   required WebDavSyncSettings? existing,

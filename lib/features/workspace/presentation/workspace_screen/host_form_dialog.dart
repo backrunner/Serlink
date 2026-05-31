@@ -1,6 +1,6 @@
 part of '../workspace_screen.dart';
 
-enum _HostAuthInputMode { password, privateKey, existingIdentity }
+enum _HostAuthInputMode { password, privateKey, sshAgent, savedOrNone }
 
 class _HostFormDialog extends ConsumerStatefulWidget {
   const _HostFormDialog({this.host});
@@ -25,6 +25,8 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   final TextEditingController _startupCommandsController =
       TextEditingController();
   final TextEditingController _tagsController = TextEditingController();
+  final TextEditingController _sftpDefaultDirectoryController =
+      TextEditingController(text: '/');
   final TextEditingController _connectTimeoutController = TextEditingController(
     text: '20',
   );
@@ -34,6 +36,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       TextEditingController(text: '0');
   final TextEditingController _reconnectBackoffController =
       TextEditingController(text: '5');
+  final ScrollController _scrollController = ScrollController();
 
   _HostAuthInputMode _authMode = _HostAuthInputMode.password;
   List<IdentityConfig> _identityOptions = const [];
@@ -41,6 +44,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   Set<IdentityId> _selectedIdentityIds = const {};
   Set<HostId> _selectedJumpHostIds = const {};
   bool _showAdvancedConnection = false;
+  bool _passwordVisible = false;
   bool _loadingOptions = true;
   bool _saving = false;
   String? _errorMessage;
@@ -81,180 +85,198 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     _keyPassphraseController.dispose();
     _startupCommandsController.dispose();
     _tagsController.dispose();
+    _sftpDefaultDirectoryController.dispose();
     _connectTimeoutController.dispose();
     _keepAliveIntervalController.dispose();
     _reconnectAttemptsController.dispose();
     _reconnectBackoffController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    final mediaSize = MediaQuery.sizeOf(context);
+    final dialogWidth = math.min(680.0, math.max(360.0, mediaSize.width - 96));
+    final dialogHeight = math.min(
+      720.0,
+      math.max(420.0, mediaSize.height - 140),
+    );
+
+    return SerlinkDialog(
       title: Text(_isEditing ? 'Edit Host' : 'Add Host'),
       content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                key: const ValueKey('host-display-name-field'),
-                controller: _displayNameController,
-                decoration: const InputDecoration(labelText: 'Display name'),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const ValueKey('host-hostname-field'),
-                controller: _hostnameController,
-                decoration: const InputDecoration(labelText: 'Hostname'),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 12),
-              Row(
+        width: dialogWidth,
+        height: dialogHeight,
+        child: Scrollbar(
+          controller: _scrollController,
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(2, 8, 10, 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      key: const ValueKey('host-username-field'),
-                      controller: _usernameController,
-                      decoration: const InputDecoration(labelText: 'Username'),
-                      textInputAction: TextInputAction.next,
+                  _HostFormSection(
+                    title: 'Connection',
+                    child: Column(
+                      children: [
+                        SerlinkTextField(
+                          key: const ValueKey('host-display-name-field'),
+                          controller: _displayNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Display name',
+                          ),
+                          textInputAction: TextInputAction.next,
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: SerlinkTextField(
+                                key: const ValueKey('host-hostname-field'),
+                                controller: _hostnameController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Hostname',
+                                ),
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: SerlinkTextField(
+                                controller: _portController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Port',
+                                ),
+                                keyboardType: TextInputType.number,
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        SerlinkTextField(
+                          key: const ValueKey('host-username-field'),
+                          controller: _usernameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Username',
+                          ),
+                          textInputAction: TextInputAction.next,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _portController,
-                      decoration: const InputDecoration(labelText: 'Port'),
-                      keyboardType: TextInputType.number,
-                      textInputAction: TextInputAction.next,
+                  const SizedBox(height: 16),
+                  _HostFormSection(
+                    title: 'Authentication',
+                    child: _HostAuthenticationFields(
+                      isEditing: _isEditing,
+                      authMode: _authMode,
+                      loadingOptions: _loadingOptions,
+                      passwordController: _passwordController,
+                      passwordVisible: _passwordVisible,
+                      privateKeyController: _privateKeyController,
+                      keyPassphraseController: _keyPassphraseController,
+                      identityOptions: _identityOptions,
+                      selectedIdentityIds: _selectedIdentityIds,
+                      onAuthModeChanged: (authMode) {
+                        setState(() {
+                          _authMode = authMode;
+                        });
+                      },
+                      onImportPrivateKey: _importPrivateKey,
+                      onTogglePasswordVisible: () {
+                        setState(() {
+                          _passwordVisible = !_passwordVisible;
+                        });
+                      },
+                      onToggleIdentity: _toggleIdentity,
+                      onEditIdentity: _editIdentity,
+                      onSubmit: _save,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const ValueKey('host-startup-commands-field'),
-                controller: _startupCommandsController,
-                minLines: 2,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  labelText: 'Startup commands',
-                ),
-              ),
-              if (!_isEditing) ...[
-                const SizedBox(height: 12),
-                SegmentedButton<_HostAuthInputMode>(
-                  segments: [
-                    ButtonSegment(
-                      value: _HostAuthInputMode.password,
-                      icon: Icon(Icons.password, size: 16),
-                      label: Text('Password'),
+                  const SizedBox(height: 16),
+                  _HostFormSection(
+                    title: 'Startup',
+                    child: Column(
+                      children: [
+                        SerlinkTextField(
+                          key: const ValueKey('host-startup-commands-field'),
+                          controller: _startupCommandsController,
+                          minLines: 2,
+                          maxLines: 5,
+                          decoration: const InputDecoration(
+                            labelText: 'Startup commands',
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        SerlinkTextField(
+                          controller: _tagsController,
+                          decoration: const InputDecoration(labelText: 'Tags'),
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _save(),
+                        ),
+                      ],
                     ),
-                    ButtonSegment(
-                      value: _HostAuthInputMode.privateKey,
-                      icon: Icon(Icons.key, size: 16),
-                      label: Text('Private Key'),
-                    ),
-                    ButtonSegment(
-                      value: _HostAuthInputMode.existingIdentity,
-                      icon: const Icon(Icons.badge_outlined, size: 16),
-                      label: const Text('Existing'),
-                      enabled: _identityOptions.isNotEmpty,
+                  ),
+                  if (_jumpHostOptions.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _HostFormSection(
+                      title: 'Routing',
+                      child: _JumpHostSelectionSection(
+                        hosts: _jumpHostOptions,
+                        selectedHostIds: _selectedJumpHostIds,
+                        enabled: !_loadingOptions,
+                        onToggle: _toggleJumpHost,
+                      ),
                     ),
                   ],
-                  selected: {_authMode},
-                  onSelectionChanged: (selection) {
-                    setState(() {
-                      _authMode = selection.single;
-                    });
-                  },
-                ),
-                const SizedBox(height: 12),
-                switch (_authMode) {
-                  _HostAuthInputMode.password => TextField(
-                    key: const ValueKey('host-password-field'),
-                    controller: _passwordController,
-                    decoration: const InputDecoration(labelText: 'Password'),
-                    obscureText: true,
-                    onSubmitted: (_) => _save(),
-                  ),
-                  _HostAuthInputMode.privateKey => _PrivateKeyFields(
-                    privateKeyController: _privateKeyController,
-                    passphraseController: _keyPassphraseController,
-                    onImportKey: _importPrivateKey,
-                  ),
-                  _HostAuthInputMode.existingIdentity =>
-                    _IdentitySelectionSection(
-                      identities: _identityOptions,
-                      selectedIdentityIds: _selectedIdentityIds,
-                      enabled: !_loadingOptions,
-                      onToggle: _toggleIdentity,
-                    ),
-                },
-              ],
-              if (_isEditing) ...[
-                const SizedBox(height: 12),
-                _IdentitySelectionSection(
-                  identities: _identityOptions,
-                  selectedIdentityIds: _selectedIdentityIds,
-                  enabled: !_loadingOptions,
-                  onToggle: _toggleIdentity,
-                ),
-              ],
-              if (_jumpHostOptions.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _JumpHostSelectionSection(
-                  hosts: _jumpHostOptions,
-                  selectedHostIds: _selectedJumpHostIds,
-                  enabled: !_loadingOptions,
-                  onToggle: _toggleJumpHost,
-                ),
-              ],
-              const SizedBox(height: 12),
-              TextField(
-                controller: _tagsController,
-                decoration: const InputDecoration(labelText: 'Tags'),
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _save(),
-              ),
-              const SizedBox(height: 12),
-              _AdvancedConnectionSettingsSection(
-                expanded: _showAdvancedConnection,
-                connectTimeoutController: _connectTimeoutController,
-                keepAliveIntervalController: _keepAliveIntervalController,
-                reconnectAttemptsController: _reconnectAttemptsController,
-                reconnectBackoffController: _reconnectBackoffController,
-                onToggle: () {
-                  setState(() {
-                    _showAdvancedConnection = !_showAdvancedConnection;
-                  });
-                },
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _errorMessage!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                  const SizedBox(height: 16),
+                  _HostFormSection(
+                    title: 'SFTP',
+                    child: SerlinkTextField(
+                      key: const ValueKey('host-sftp-default-directory-field'),
+                      controller: _sftpDefaultDirectoryController,
+                      decoration: const InputDecoration(
+                        labelText: 'Start folder',
+                      ),
+                      textInputAction: TextInputAction.next,
                     ),
                   ),
-                ),
-              ],
-            ],
+                  const SizedBox(height: 16),
+                  _AdvancedConnectionSettingsSection(
+                    expanded: _showAdvancedConnection,
+                    connectTimeoutController: _connectTimeoutController,
+                    keepAliveIntervalController: _keepAliveIntervalController,
+                    reconnectAttemptsController: _reconnectAttemptsController,
+                    reconnectBackoffController: _reconnectBackoffController,
+                    onToggle: () {
+                      setState(() {
+                        _showAdvancedConnection = !_showAdvancedConnection;
+                      });
+                    },
+                  ),
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    _HostFormError(message: _errorMessage!),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           key: const ValueKey('host-save-button'),
           onPressed: _saving || _loadingOptions ? null : _save,
           child: Text(_saving ? 'Saving' : 'Save'),
@@ -299,6 +321,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             identityIds: _selectedIdentityIds.toList(growable: false),
             startupCommands: startupCommands,
             jumpHostIds: jumpHostIds,
+            sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
             connectionSettings: connectionSettings,
           ),
         );
@@ -313,6 +336,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             tags: _parseTags(_tagsController.text),
             startupCommands: startupCommands,
             jumpHostIds: jumpHostIds,
+            sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
             connectionSettings: connectionSettings,
           ),
         );
@@ -328,6 +352,21 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             tags: _parseTags(_tagsController.text),
             startupCommands: startupCommands,
             jumpHostIds: jumpHostIds,
+            sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
+            connectionSettings: connectionSettings,
+          ),
+        );
+      } else if (_authMode == _HostAuthInputMode.sshAgent) {
+        await service.createSshAgentHost(
+          SshAgentHostDraft(
+            displayName: _displayNameController.text,
+            hostname: _hostnameController.text,
+            port: port,
+            username: _usernameController.text,
+            tags: _parseTags(_tagsController.text),
+            startupCommands: startupCommands,
+            jumpHostIds: jumpHostIds,
+            sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
             connectionSettings: connectionSettings,
           ),
         );
@@ -342,6 +381,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             tags: _parseTags(_tagsController.text),
             startupCommands: startupCommands,
             jumpHostIds: jumpHostIds,
+            sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
             connectionSettings: connectionSettings,
           ),
         );
@@ -413,6 +453,8 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
           _startupCommandsController.text = hostConfig.startupCommands.join(
             '\n',
           );
+          _sftpDefaultDirectoryController.text =
+              hostConfig.sftpDefaultDirectory;
           _connectTimeoutController.text = hostConfig
               .connectionSettings
               .connectTimeoutSeconds
@@ -429,9 +471,6 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
               .connectionSettings
               .reconnectBackoffSeconds
               .toString();
-        } else if (_authMode == _HostAuthInputMode.existingIdentity &&
-            identities.isEmpty) {
-          _authMode = _HostAuthInputMode.password;
         }
         _loadingOptions = false;
       });
@@ -463,6 +502,29 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     }
     setState(() {
       _selectedJumpHostIds = next;
+    });
+  }
+
+  Future<void> _editIdentity(IdentityConfig identity) async {
+    final updated = await showSerlinkDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _IdentityEditDialog(identity: identity),
+    );
+    if (updated != true || !mounted) {
+      return;
+    }
+    final identities = await ref.read(identityRepositoryProvider).list();
+    identities.sort(
+      (left, right) => left.displayName.toLowerCase().compareTo(
+        right.displayName.toLowerCase(),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _identityOptions = List<IdentityConfig>.unmodifiable(identities);
     });
   }
 

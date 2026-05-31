@@ -31,14 +31,14 @@ class _SyncConflictReviewDialogState
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return SerlinkDialog(
       title: const Text('Review sync conflicts'),
       content: SizedBox(
         width: 820,
         height: 520,
         child: ListView.separated(
           itemCount: widget.conflicts.length,
-          separatorBuilder: (_, _) => const Divider(height: 24),
+          separatorBuilder: (_, _) => const SizedBox(height: 14),
           itemBuilder: (context, index) {
             final conflict = widget.conflicts[index];
             final fieldSet = conflict.fieldSet;
@@ -63,11 +63,11 @@ class _SyncConflictReviewDialogState
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           onPressed: _saving ? null : _apply,
           child: Text(_saving ? 'Applying' : 'Apply merge'),
         ),
@@ -185,18 +185,18 @@ class _ConflictChoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
+    final t = context.tokens;
+    return SerlinkPressable(
       onTap: onSelected,
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: SerlinkRadii.control,
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: SerlinkRadii.control,
           border: Border.all(
-            color: selected ? scheme.primary : scheme.outlineVariant,
+            color: selected ? t.accentPrimary : t.borderSubtle,
           ),
-          color: selected ? scheme.primary.withValues(alpha: 0.08) : null,
+          color: selected ? t.accentPrimary.withValues(alpha: 0.08) : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

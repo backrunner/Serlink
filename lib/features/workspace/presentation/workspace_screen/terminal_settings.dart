@@ -48,7 +48,7 @@ class _TerminalSearchBar extends StatelessWidget {
                     Icon(Icons.search, size: 16, color: t.textMuted),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: TextField(
+                      child: SerlinkTextField(
                         key: const ValueKey('terminal-search-field'),
                         controller: controller,
                         autofocus: true,
@@ -76,18 +76,14 @@ class _TerminalSearchBar extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Container(
-                      width: 1,
-                      height: 18,
-                      color: t.borderSubtle,
-                    ),
-                    IconButton(
+                    Container(width: 1, height: 18, color: t.borderSubtle),
+                    SerlinkIconButton(
                       tooltip: 'Previous match',
                       visualDensity: VisualDensity.compact,
                       onPressed: hasMatches ? onPrevious : null,
                       icon: const Icon(Icons.keyboard_arrow_up, size: 18),
                     ),
-                    IconButton(
+                    SerlinkIconButton(
                       tooltip: 'Next match',
                       visualDensity: VisualDensity.compact,
                       onPressed: hasMatches ? onNext : null,
@@ -98,7 +94,7 @@ class _TerminalSearchBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            IconButton(
+            SerlinkIconButton(
               tooltip: 'Close search',
               onPressed: onClose,
               icon: const Icon(Icons.close, size: 18),
@@ -115,7 +111,7 @@ Future<void> _showTerminalSettingsDialog(
   required WorkspaceTabId tabId,
   required HostId? hostId,
 }) {
-  return showDialog<void>(
+  return showSerlinkDialog<void>(
     context: context,
     builder: (context) => _TerminalSettingsDialog(tabId: tabId, hostId: hostId),
   );
@@ -152,7 +148,7 @@ class _TerminalSettingsDialog extends ConsumerWidget {
       }
     }
 
-    return AlertDialog(
+    return SerlinkDialog(
       title: const Text('Terminal Settings'),
       content: SizedBox(
         width: 560,
@@ -251,18 +247,18 @@ class _TerminalSettingsDialog extends ConsumerWidget {
       ),
       actions: [
         if (hostId != null && hostSettings == null)
-          TextButton(
+          SerlinkTextButton(
             onPressed: () => workspaceController
                 .saveTerminalDisplaySettingsForHost(tabId, settings),
             child: const Text('Save for host'),
           ),
         if (hostId != null && hostSettings != null)
-          TextButton(
+          SerlinkTextButton(
             onPressed: () =>
                 workspaceController.resetTerminalDisplaySettingsForHost(tabId),
             child: const Text('Use global'),
           ),
-        FilledButton(
+        SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Done'),
         ),
@@ -397,13 +393,13 @@ class _TerminalFontPickerState extends State<_TerminalFontPicker> {
         SerlinkLabeledField(
           label: 'Custom family',
           helper: 'Type an installed font family, then apply.',
-          child: TextFormField(
+          child: SerlinkTextFormField(
             controller: _customFontController,
             decoration: InputDecoration(
               isDense: true,
               hintText: 'e.g. JetBrains Mono',
               prefixIcon: const Icon(Icons.edit_outlined, size: 18),
-              suffixIcon: IconButton(
+              suffixIcon: SerlinkIconButton(
                 tooltip: 'Apply custom font',
                 onPressed: _applyCustomFont,
                 icon: const Icon(Icons.check_rounded, size: 18),
@@ -579,12 +575,12 @@ class _SettingsSlider extends StatelessWidget {
             ),
           ],
         ),
-        Slider(
+        const SizedBox(height: 10),
+        SerlinkSlider(
           value: value,
           min: min,
           max: max,
           divisions: divisions,
-          label: displayValue,
           onChanged: onChanged,
         ),
       ],

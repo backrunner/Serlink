@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/core/security/secret_bytes.dart';
 import 'package:serlink/features/ssh/data/dartssh2_ssh_session_service.dart';
+import 'package:serlink/features/ssh/data/ssh_agent_client.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
 
 void main() {
@@ -68,14 +71,35 @@ void main() {
     );
   });
 
-  test('rejects unsupported auth methods before opening a socket', () {
+  test('builds SSH agent auth material from local agent identities', () {
+    final keyPair = SSHKeyPair.fromPem(_legacyEcPrivateKey).single;
+    final agent = _FakeAgentClient([keyPair]);
+
+    final material = DartSsh2AuthMaterial.fromProfile(
+      _profile(const [SshAgentAuth()]),
+      agentClient: agent,
+    );
+
+    expect(material.identities, hasLength(1));
+    expect(material.identities.single.type, 'ecdsa-sha2-nistp256');
+    final signature = material.identities.single.sign(
+      Uint8List.fromList([1, 2, 3]),
+    );
+    expect(signature.encode(), isNotEmpty);
+    expect(agent.signRequests, 1);
+  });
+
+  test('rejects SSH agent auth when agent has no identities', () {
     expect(
-      () => DartSsh2AuthMaterial.fromProfile(_profile(const [SshAgentAuth()])),
+      () => DartSsh2AuthMaterial.fromProfile(
+        _profile(const [SshAgentAuth()]),
+        agentClient: _FakeAgentClient(const []),
+      ),
       throwsA(
         isA<UnsupportedSshAuthException>().having(
           (error) => error.code,
           'code',
-          'ssh_auth.agent_unsupported',
+          'ssh_auth.agent_empty',
         ),
       ),
     );
@@ -182,3 +206,47 @@ YyVRAgEBoUQDQgAEQ3EUZAOS4yK43BKX5gl1BPUWPN3CsU0xrptfxnItUD34jPc0
 ybMM3pZ6HeBa89ariwVsl/wCYzZfgR64JAC1nQ==
 -----END EC PRIVATE KEY-----
 ''';
+
+class _FakeAgentClient implements SshAgentClient {
+  _FakeAgentClient(List<SSHKeyPair> keyPairs) : _keyPairs = keyPairs;
+
+  final List<SSHKeyPair> _keyPairs;
+  int signRequests = 0;
+
+  @override
+  List<SshAgentIdentity> listIdentities() {
+    return [
+      for (final keyPair in _keyPairs)
+        SshAgentIdentity(
+          publicKeyBlob: keyPair.toPublicKey().encode(),
+          comment: 'test-key',
+        ),
+    ];
+  }
+
+  @override
+  Uint8List sign({
+    required Uint8List publicKeyBlob,
+    required Uint8List data,
+    required int flags,
+  }) {
+    signRequests += 1;
+    final keyPair = _keyPairs.singleWhere(
+      (candidate) =>
+          _bytesEqual(candidate.toPublicKey().encode(), publicKeyBlob),
+    );
+    return keyPair.sign(data).encode();
+  }
+}
+
+bool _bytesEqual(Uint8List left, Uint8List right) {
+  if (left.length != right.length) {
+    return false;
+  }
+  for (var index = 0; index < left.length; index += 1) {
+    if (left[index] != right[index]) {
+      return false;
+    }
+  }
+  return true;
+}

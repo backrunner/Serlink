@@ -337,37 +337,37 @@ class _NavItem extends StatelessWidget {
                 ]
               : null,
         ),
-        child: Material(
-          color: Colors.transparent,
+        child: SerlinkPressable(
+          onTap: onTap,
           borderRadius: SerlinkRadii.control,
-          child: InkWell(
-            borderRadius: SerlinkRadii.control,
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-              child: Row(
-                children: [
-                  Icon(
-                    icon,
-                    size: 18,
-                    color: selected ? t.onAccent : t.textSecondary,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      label,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: TextStyle(
-                        color: selected ? t.onAccent : t.textSecondary,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
+          hoverColor: selected
+              ? t.accentSecondary.withValues(alpha: 0.1)
+              : t.accentPrimary.withValues(alpha: 0.06),
+          pressedColor: selected
+              ? t.accentStrong.withValues(alpha: 0.14)
+              : t.accentPrimary.withValues(alpha: 0.1),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? t.onAccent : t.textSecondary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: selected ? t.onAccent : t.textSecondary,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

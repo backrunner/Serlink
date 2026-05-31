@@ -12,7 +12,8 @@ class _HostsSurface extends ConsumerWidget {
     return vaultSession.when(
       loading: () => const _PlaceholderSurface(
         title: 'Vault',
-        body: 'Preparing encrypted storage.',
+        body: 'Preparing encrypted storage',
+        dynamicBody: true,
       ),
       error: (error, stackTrace) => _VaultAccessSurface(error: error),
       data: (session) {
@@ -20,25 +21,26 @@ class _HostsSurface extends ConsumerWidget {
           return _VaultAccessSurface(session: session);
         }
         final hostsAsync = ref.watch(hostSummariesProvider);
-        final content = hostsAsync.when(
-          loading: () => const _PlaceholderSurface(
-            title: 'Hosts',
-            body: 'Loading encrypted host records.',
-          ),
-          error: (error, stackTrace) =>
-              _PlaceholderSurface(title: 'Hosts', body: error.toString()),
-          data: (hosts) {
-            final filteredHosts = filterHostSummaries(hosts, searchQuery);
-            if (hosts.isEmpty) {
-              return _HostsEmptyState(
-                onAddHost: () => _showAddHostDialog(context),
-              );
-            }
-            return Row(
-              children: [
-                SizedBox(
-                  width: 440,
-                  child: Column(
+        final content = hostsAsync.isLoading
+            ? const _PlaceholderSurface(
+                title: 'Hosts',
+                body: 'Loading encrypted host records.',
+              )
+            : hostsAsync.when(
+                loading: () => const _PlaceholderSurface(
+                  title: 'Hosts',
+                  body: 'Loading encrypted host records.',
+                ),
+                error: (error, stackTrace) =>
+                    _PlaceholderSurface(title: 'Hosts', body: error.toString()),
+                data: (hosts) {
+                  final filteredHosts = filterHostSummaries(hosts, searchQuery);
+                  if (hosts.isEmpty) {
+                    return _HostsEmptyState(
+                      onAddHost: () => _showAddHostDialog(context),
+                    );
+                  }
+                  return Column(
                     children: [
                       _HostsHeader(
                         count: filteredHosts.length,
@@ -55,7 +57,7 @@ class _HostsSurface extends ConsumerWidget {
                                 padding: const EdgeInsets.all(16),
                                 itemCount: filteredHosts.length,
                                 separatorBuilder: (context, index) =>
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: 8),
                                 itemBuilder: (context, index) {
                                   final host = filteredHosts[index];
                                   return EntranceFade(
@@ -68,26 +70,22 @@ class _HostsSurface extends ConsumerWidget {
                                       onTerminal: () =>
                                           controller.openTerminal(host),
                                       onSftp: () => controller.openSftp(host),
-                                      onBoth: () =>
-                                          controller.openTerminalAndSftp(host),
                                       onEdit: () =>
                                           _showEditHostDialog(context, host),
-                                      onDelete: () =>
-                                          _confirmDeleteHost(context, ref, host),
+                                      onDelete: () => _confirmDeleteHost(
+                                        context,
+                                        ref,
+                                        host,
+                                      ),
                                     ),
                                   );
                                 },
                               ),
                       ),
                     ],
-                  ),
-                ),
-                const VerticalDivider(width: 1),
-                const Expanded(child: _WorkspaceHint()),
-              ],
-            );
-          },
-        );
+                  );
+                },
+              );
         final recoveryKey = session.recoveryKey;
         if (recoveryKey == null) {
           return content;
@@ -99,7 +97,7 @@ class _HostsSurface extends ConsumerWidget {
 }
 
 Future<void> _showAddHostDialog(BuildContext context) {
-  return showDialog<void>(
+  return showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => const _HostFormDialog(),
@@ -107,7 +105,7 @@ Future<void> _showAddHostDialog(BuildContext context) {
 }
 
 Future<void> _showEditHostDialog(BuildContext context, HostSummary host) {
-  return showDialog<void>(
+  return showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => _HostFormDialog(host: host),
@@ -165,9 +163,9 @@ class _HostsHeader extends StatelessWidget {
           const SizedBox(width: 8),
           _CountBadge(count: count),
           const Spacer(),
-          Tooltip(
+          SerlinkTooltip(
             message: 'Add host',
-            child: IconButton(
+            child: SerlinkIconButton(
               key: const ValueKey('add-host-button'),
               onPressed: onAddHost,
               icon: const Icon(Icons.add),
@@ -209,7 +207,7 @@ class _HostsEmptyState extends StatelessWidget {
               ).textTheme.bodyMedium?.copyWith(color: t.textSecondary),
             ),
             const SizedBox(height: 16),
-            FilledButton.icon(
+            SerlinkFilledButton.icon(
               key: const ValueKey('empty-add-host-button'),
               onPressed: onAddHost,
               icon: const Icon(Icons.add, size: 18),

@@ -134,6 +134,51 @@ void main() {
     );
   });
 
+  test('persists normalized host sftp default directory', () async {
+    final vault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    final records = InMemoryVaultRecordRepository();
+    final hosts = EncryptedHostRepository(vault: vault, records: records);
+    final identities = EncryptedIdentityRepository(
+      vault: vault,
+      records: records,
+    );
+    await vault.initialize(passphrase: 'good passphrase');
+
+    final service = HostWriteService(
+      hosts: hosts,
+      identities: identities,
+      knownHosts: EncryptedKnownHostRepository(vault: vault, records: records),
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ),
+      records: records,
+      vault: vault,
+    );
+
+    final summary = await service.createPasswordHost(
+      const PasswordHostDraft(
+        displayName: 'SFTP Home',
+        hostname: 'sftp.internal',
+        port: 22,
+        username: 'ops',
+        password: 'server-password',
+        tags: {},
+        sftpDefaultDirectory: '/home/ops/../ops/app/',
+      ),
+    );
+
+    var stored = await hosts.read(summary.id);
+    expect(stored, isNotNull);
+    expect(stored!.sftpDefaultDirectory, '/home/ops/app');
+
+    await service.updateSftpDefaultDirectory(summary.id, '/srv/app');
+    stored = await hosts.read(summary.id);
+    expect(stored!.sftpDefaultDirectory, '/srv/app');
+  });
+
   test('rejects invalid host connection settings', () async {
     final vault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),
@@ -477,6 +522,105 @@ void main() {
     );
     expect(stored.startupCommands, ['tmux attach || tmux', 'cd /srv/app']);
     expect(stored.jumpHostIds, [HostId('jump-1')]);
+  });
+
+  test('creates and updates host without selected credentials', () async {
+    final vault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    final records = InMemoryVaultRecordRepository();
+    final hosts = EncryptedHostRepository(vault: vault, records: records);
+    final identities = EncryptedIdentityRepository(
+      vault: vault,
+      records: records,
+    );
+    await vault.initialize(passphrase: 'good passphrase');
+
+    final service = HostWriteService(
+      hosts: hosts,
+      identities: identities,
+      knownHosts: EncryptedKnownHostRepository(vault: vault, records: records),
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ),
+      records: records,
+      vault: vault,
+    );
+
+    final summary = await service.createHostWithExistingIdentities(
+      const ExistingIdentitiesHostDraft(
+        displayName: 'Credential Later',
+        hostname: 'later.internal',
+        port: 22,
+        username: 'ops',
+        identityIds: [],
+        tags: {},
+      ),
+    );
+    final created = await hosts.read(summary.id);
+    expect(created!.identityIds, isEmpty);
+    expect(created.authKinds, isEmpty);
+
+    await service.updateHostMetadata(
+      HostMetadataDraft(
+        id: summary.id,
+        displayName: 'Still Later',
+        hostname: 'later.internal',
+        port: 22,
+        username: 'ops',
+        tags: const {'pending'},
+        identityIds: const [],
+      ),
+    );
+
+    final updated = await hosts.read(summary.id);
+    expect(updated!.displayName, 'Still Later');
+    expect(updated.identityIds, isEmpty);
+    expect(updated.authKinds, isEmpty);
+  });
+
+  test('creates ssh-agent host without storing secret material', () async {
+    final vault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    final records = InMemoryVaultRecordRepository();
+    final hosts = EncryptedHostRepository(vault: vault, records: records);
+    final identities = EncryptedIdentityRepository(
+      vault: vault,
+      records: records,
+    );
+    await vault.initialize(passphrase: 'good passphrase');
+
+    final service = HostWriteService(
+      hosts: hosts,
+      identities: identities,
+      knownHosts: EncryptedKnownHostRepository(vault: vault, records: records),
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ),
+      records: records,
+      vault: vault,
+    );
+
+    final summary = await service.createSshAgentHost(
+      const SshAgentHostDraft(
+        displayName: 'Agent Host',
+        hostname: 'agent.internal',
+        port: 22,
+        username: 'ops',
+        tags: {},
+      ),
+    );
+
+    final stored = await hosts.read(summary.id);
+    expect(stored!.authKinds, {HostAuthKind.sshAgent});
+    expect(stored.identityIds, hasLength(1));
+    final identity = await identities.read(stored.identityIds.single);
+    expect(identity!.kind, IdentityKind.sshAgent);
+    expect(identity.secretRecordId, isNull);
+    expect(await records.list(type: 'identity_secret'), isEmpty);
   });
 
   test('validates required fields before writing records', () async {

@@ -9,6 +9,7 @@ library;
 export 'serlink_context.dart';
 export 'serlink_dimensions.dart';
 export 'serlink_effects.dart';
+export 'serlink_forui.dart';
 export 'serlink_forms.dart';
 export 'serlink_primitives.dart';
 export 'serlink_tokens.dart';

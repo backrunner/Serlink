@@ -58,14 +58,19 @@ class _SettingsSurface extends ConsumerWidget {
                       icon: Icons.lock_outline,
                       title: 'Vault',
                       subtitle: _vaultStateLabel(vaultState),
+                      subtitleWidget: vaultState == null
+                          ? const _DynamicStatusText(
+                              label: 'Preparing encrypted storage',
+                            )
+                          : null,
                       action: switch (vaultState) {
-                        VaultState.unlocked => TextButton(
+                        VaultState.unlocked => SerlinkTextButton(
                           onPressed: () => ref
                               .read(vaultSessionControllerProvider.notifier)
                               .lock(),
                           child: const Text('Lock'),
                         ),
-                        VaultState.locked => TextButton.icon(
+                        VaultState.locked => SerlinkTextButton.icon(
                           key: const ValueKey('settings-vault-recovery-button'),
                           onPressed: () =>
                               _showVaultRecoveryCodeDialog(context),
@@ -80,13 +85,13 @@ class _SettingsSurface extends ConsumerWidget {
                       title: 'Local unlock',
                       subtitle: _localUnlockLabel(vault),
                       action: vaultState == VaultState.unlocked
-                          ? Switch(
+                          ? SerlinkSwitch(
                               value: vault?.localUnlockAvailable ?? false,
                               onChanged: (value) =>
                                   _setLocalVaultUnlock(context, ref, value),
                             )
                           : vault?.localUnlockAvailable == true
-                          ? TextButton(
+                          ? SerlinkTextButton(
                               onPressed: () => ref
                                   .read(vaultSessionControllerProvider.notifier)
                                   .unlockWithLocalKey(),
@@ -97,16 +102,14 @@ class _SettingsSurface extends ConsumerWidget {
                     const _SettingsInfoRow(
                       icon: Icons.verified_user_outlined,
                       title: 'Host key confirmation',
-                      subtitle:
-                          'Unknown or changed fingerprints require modal review.',
                     ),
                     _SettingsActionRow(
                       icon: Icons.badge_outlined,
                       title: 'Credentials',
                       subtitle: canImportHostData
-                          ? 'Review imported passwords, keys, and certificates.'
+                          ? null
                           : 'Unlock the vault to review encrypted credentials.',
-                      action: TextButton(
+                      action: SerlinkTextButton(
                         onPressed: canImportHostData
                             ? () => _showIdentityManagerDialog(context, ref)
                             : null,
@@ -117,9 +120,9 @@ class _SettingsSurface extends ConsumerWidget {
                       icon: Icons.verified_outlined,
                       title: 'Known hosts',
                       subtitle: canImportHostData
-                          ? 'Review trusted host fingerprints stored in the vault.'
+                          ? null
                           : 'Unlock the vault to review trusted host fingerprints.',
-                      action: TextButton(
+                      action: SerlinkTextButton(
                         onPressed: canImportHostData
                             ? () => _showKnownHostsDialog(context, ref)
                             : null,
@@ -139,7 +142,7 @@ class _SettingsSurface extends ConsumerWidget {
                       title: 'Import / Export',
                       subtitle:
                           'Backups, OpenSSH files, certificates, known_hosts, and metadata.',
-                      action: TextButton(
+                      action: SerlinkTextButton(
                         key: const ValueKey('settings-data-exchange-button'),
                         onPressed: () => _showDataExchangeDialog(
                           context,
@@ -158,20 +161,15 @@ class _SettingsSurface extends ConsumerWidget {
                     const _SettingsInfoRow(
                       icon: Icons.bug_report_outlined,
                       title: 'Debug logging',
-                      subtitle: 'Debug builds keep redacted local logs only.',
                     ),
                     const _SettingsInfoRow(
                       icon: Icons.health_and_safety_outlined,
                       title: 'Crash reporting',
-                      subtitle:
-                          'Release Sentry events are redacted before upload.',
                     ),
                     _SettingsActionRow(
                       icon: Icons.support_agent_outlined,
                       title: 'Diagnostic bundle',
-                      subtitle:
-                          'Build info, redacted runtime metadata, and log tail.',
-                      action: TextButton(
+                      action: SerlinkTextButton(
                         onPressed: () => _exportDiagnosticBundle(context, ref),
                         child: Text('Export'),
                       ),

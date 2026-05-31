@@ -151,7 +151,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return SerlinkDialog(
       title: const Text('Port Forwarding'),
       content: SizedBox(
         width: 560,
@@ -183,7 +183,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                           Row(
                             children: [
                               Expanded(
-                                child: TextField(
+                                child: SerlinkTextField(
                                   key: const ValueKey(
                                     'local-forward-local-port-field',
                                   ),
@@ -198,7 +198,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                               const SizedBox(width: 12),
                               Expanded(
                                 flex: 2,
-                                child: TextField(
+                                child: SerlinkTextField(
                                   key: const ValueKey(
                                     'local-forward-remote-host-field',
                                   ),
@@ -212,7 +212,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          TextField(
+                          SerlinkTextField(
                             key: const ValueKey(
                               'local-forward-remote-port-field',
                             ),
@@ -225,14 +225,9 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                           ),
                           if (_localErrorMessage != null) ...[
                             const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                _localErrorMessage!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                              ),
+                            SerlinkAlert.danger(
+                              message: _localErrorMessage!,
+                              compact: true,
                             ),
                           ],
                         ],
@@ -264,7 +259,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                             children: [
                               Expanded(
                                 flex: 2,
-                                child: TextField(
+                                child: SerlinkTextField(
                                   key: const ValueKey(
                                     'remote-forward-bind-host-field',
                                   ),
@@ -277,7 +272,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: TextField(
+                                child: SerlinkTextField(
                                   key: const ValueKey(
                                     'remote-forward-bind-port-field',
                                   ),
@@ -296,7 +291,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                             children: [
                               Expanded(
                                 flex: 2,
-                                child: TextField(
+                                child: SerlinkTextField(
                                   key: const ValueKey(
                                     'remote-forward-local-host-field',
                                   ),
@@ -309,7 +304,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: TextField(
+                                child: SerlinkTextField(
                                   key: const ValueKey(
                                     'remote-forward-local-port-field',
                                   ),
@@ -325,14 +320,9 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                           ),
                           if (_remoteErrorMessage != null) ...[
                             const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                _remoteErrorMessage!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                              ),
+                            SerlinkAlert.danger(
+                              message: _remoteErrorMessage!,
+                              compact: true,
                             ),
                           ],
                         ],
@@ -360,7 +350,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                         children: [
                           Expanded(
                             flex: 2,
-                            child: TextField(
+                            child: SerlinkTextField(
                               key: const ValueKey(
                                 'dynamic-forward-bind-host-field',
                               ),
@@ -373,7 +363,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: TextField(
+                            child: SerlinkTextField(
                               key: const ValueKey(
                                 'dynamic-forward-bind-port-field',
                               ),
@@ -390,14 +380,9 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
               ),
               if (_dynamicErrorMessage != null) ...[
                 const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _dynamicErrorMessage!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
+                SerlinkAlert.danger(
+                  message: _dynamicErrorMessage!,
+                  compact: true,
                 ),
               ],
             ],
@@ -405,7 +390,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Close'),
         ),
@@ -513,20 +498,16 @@ class _ForwardSection extends StatelessWidget {
                 ],
               ),
             ),
-            FilledButton.tonal(
-              onPressed: onPressed,
-              style: destructive
-                  ? FilledButton.styleFrom(
-                      backgroundColor: Theme.of(
-                        context,
-                      ).colorScheme.errorContainer,
-                      foregroundColor: Theme.of(
-                        context,
-                      ).colorScheme.onErrorContainer,
-                    )
-                  : null,
-              child: Text(actionLabel),
-            ),
+            if (destructive)
+              SerlinkFilledButton.danger(
+                onPressed: onPressed,
+                child: Text(actionLabel),
+              )
+            else
+              SerlinkFilledButton.tonal(
+                onPressed: onPressed,
+                child: Text(actionLabel),
+              ),
           ],
         ),
         if (child != null) ...[const SizedBox(height: 12), child!],

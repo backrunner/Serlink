@@ -135,10 +135,12 @@ double _glyphOverhangReserveFor(String fontFamily, double fontSize) {
   if (!enhancedGlyphFont) {
     return 0;
   }
-  // Some Nerd Font and Powerline glyphs paint slightly outside their measured
-  // advance. xterm paints terminal cells independently, so a small reserve
-  // keeps colored prompts and icons from shaving off their right edge.
-  return (fontSize * 0.045).clamp(0.45, 0.75).toDouble();
+  // Some Nerd Font and Powerline glyphs paint outside their measured advance.
+  // xterm paints terminal cells independently, so the cell is too tight and the
+  // glyph gets shaved. Flutter splits letterSpacing evenly before and after the
+  // glyph, so reserving a few percent of the font size widens the cell and frees
+  // both the left and right edges of colored prompts and icons.
+  return (fontSize * 0.16).clamp(1.6, 2.8).toDouble();
 }
 
 SerlinkTerminalThemeId _themeIdFromJson(Object? value) {

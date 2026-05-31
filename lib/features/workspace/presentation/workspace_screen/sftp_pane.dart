@@ -1,20 +1,22 @@
 part of '../workspace_screen.dart';
 
-enum _SftpUploadKind { file, directory }
-
 class _SftpPane extends ConsumerStatefulWidget {
   const _SftpPane({
     super.key,
     required this.tabId,
+    required this.hostId,
     required this.sessionId,
     required this.path,
+    required this.rootPath,
     required this.lifecycle,
     required this.onOpenTerminal,
   });
 
   final WorkspaceTabId tabId;
+  final HostId? hostId;
   final SessionId sessionId;
   final String path;
+  final String rootPath;
   final SessionLifecycleState lifecycle;
   final VoidCallback? onOpenTerminal;
 
@@ -26,7 +28,9 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   final TextEditingController _filterController = TextEditingController();
   Future<List<SftpEntry>>? _entriesFuture;
   String _filterText = '';
+  String? _promptedDefaultDirectoryForPath;
   bool _showHidden = false;
+  bool _showingDefaultDirectoryPrompt = false;
 
   @override
   void initState() {
@@ -53,6 +57,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   @override
   Widget build(BuildContext context) {
     final canList = widget.lifecycle == SessionLifecycleState.connected;
+    final canOpenParent = canList && _showParentEntry;
 
     return Column(
       children: [
@@ -62,34 +67,45 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
             children: [
               const Icon(Icons.folder_open, size: 18),
               const SizedBox(width: 8),
+              SerlinkTooltip(
+                message: 'Go to parent folder',
+                child: SerlinkIconButton(
+                  key: const ValueKey('sftp-parent-button'),
+                  onPressed: canOpenParent ? _openParentDirectory : null,
+                  icon: const Icon(Icons.arrow_upward, size: 18),
+                ),
+              ),
+              const SizedBox(width: 4),
               Expanded(
                 child: Text(widget.path, overflow: TextOverflow.ellipsis),
               ),
               SizedBox(
                 width: 220,
-                child: TextField(
-                  key: const ValueKey('sftp-search-field'),
+                child: _WorkspaceSearchPill(
+                  fieldKey: const ValueKey('sftp-search-field'),
                   controller: _filterController,
+                  placeholder: 'Search files',
                   enabled: canList,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    prefixIcon: Icon(Icons.search, size: 16),
-                    hintText: 'Filter',
-                    border: OutlineInputBorder(),
-                  ),
+                  hasQuery: _filterText.trim().isNotEmpty,
                   onChanged: (value) {
                     setState(() {
                       _filterText = value;
                     });
                   },
+                  onClear: () {
+                    _filterController.clear();
+                    setState(() {
+                      _filterText = '';
+                    });
+                  },
                 ),
               ),
               const SizedBox(width: 8),
-              Tooltip(
+              SerlinkTooltip(
                 message: _showHidden
                     ? 'Hide hidden files'
                     : 'Show hidden files',
-                child: IconButton(
+                child: SerlinkIconButton(
                   key: const ValueKey('sftp-hidden-toggle'),
                   onPressed: canList
                       ? () {
@@ -107,49 +123,43 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
                 ),
               ),
               const SizedBox(width: 4),
-              Tooltip(
+              SerlinkTooltip(
                 message: 'Open terminal tab',
-                child: IconButton(
+                child: SerlinkIconButton(
                   onPressed: widget.onOpenTerminal,
                   icon: const Icon(Icons.terminal_outlined, size: 18),
                 ),
               ),
               const SizedBox(width: 4),
-              PopupMenuButton<_SftpUploadKind>(
+              SerlinkMenuButton(
                 key: const ValueKey('sftp-upload-button'),
                 tooltip: 'Upload',
                 enabled: canList,
                 icon: const Icon(Icons.upload_file_outlined, size: 18),
-                onSelected: (kind) {
-                  switch (kind) {
-                    case _SftpUploadKind.file:
-                      _enqueueUploadFile();
-                    case _SftpUploadKind.directory:
-                      _enqueueUploadDirectory();
-                  }
-                },
-                itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: _SftpUploadKind.file,
-                    child: Text('Upload file'),
+                actions: [
+                  SerlinkMenuAction(
+                    label: 'Upload file',
+                    icon: Icons.insert_drive_file_outlined,
+                    onPressed: _enqueueUploadFile,
                   ),
-                  PopupMenuItem(
-                    value: _SftpUploadKind.directory,
-                    child: Text('Upload folder'),
+                  SerlinkMenuAction(
+                    label: 'Upload folder',
+                    icon: Icons.folder_outlined,
+                    onPressed: _enqueueUploadDirectory,
                   ),
                 ],
               ),
-              Tooltip(
+              SerlinkTooltip(
                 message: 'New folder',
-                child: IconButton(
+                child: SerlinkIconButton(
                   key: const ValueKey('sftp-new-folder-button'),
                   onPressed: canList ? _createDirectory : null,
                   icon: const Icon(Icons.create_new_folder_outlined, size: 18),
                 ),
               ),
-              Tooltip(
+              SerlinkTooltip(
                 message: 'Refresh',
-                child: IconButton(
+                child: SerlinkIconButton(
                   onPressed: canList
                       ? () {
                           setState(_reload);
@@ -183,6 +193,19 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
+          if (_shouldPromptForDefaultDirectory(snapshot.error!)) {
+            _scheduleDefaultDirectoryPrompt(snapshot.error!);
+            return _PlaceholderSurface(
+              title: 'SFTP Start Folder',
+              body:
+                  'Serlink could not list ${widget.path}. Choose a folder this account can access.',
+              action: SerlinkTextButton.icon(
+                onPressed: () => _chooseDefaultDirectory(snapshot.error!),
+                icon: const Icon(Icons.folder_open_outlined, size: 18),
+                label: const Text('Choose Folder'),
+              ),
+            );
+          }
           return _PlaceholderSurface(
             title: 'SFTP Error',
             body: sftpFailureMessage(snapshot.error!),
@@ -257,13 +280,92 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     );
   }
 
-  bool get _showParentEntry => widget.path != '/';
+  bool get _showParentEntry => !_sameRemotePath(widget.path, widget.rootPath);
 
   void _reload() {
     final connection = ref
         .read(workspaceRuntimeRegistryProvider)
         .sftpFor(widget.sessionId);
     _entriesFuture = connection?.list(widget.path);
+  }
+
+  void _openParentDirectory() {
+    _openDirectory(_parentPath(widget.path));
+  }
+
+  bool _shouldPromptForDefaultDirectory(Object error) {
+    if (widget.hostId == null ||
+        !_sameRemotePath(widget.path, widget.rootPath)) {
+      return false;
+    }
+    final failure = sftpFailureFrom(error);
+    return failure.code == SftpFailureCode.notFound ||
+        failure.code == SftpFailureCode.permissionDenied;
+  }
+
+  void _scheduleDefaultDirectoryPrompt(Object error) {
+    if (_showingDefaultDirectoryPrompt ||
+        _promptedDefaultDirectoryForPath == widget.path) {
+      return;
+    }
+    _promptedDefaultDirectoryForPath = widget.path;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_chooseDefaultDirectory(error));
+    });
+  }
+
+  Future<void> _chooseDefaultDirectory(Object error) async {
+    if (_showingDefaultDirectoryPrompt) {
+      return;
+    }
+    setState(() {
+      _showingDefaultDirectoryPrompt = true;
+    });
+    final selectedPath = await showSerlinkDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _SftpDefaultDirectoryDialog(
+        initialValue: _sameRemotePath(widget.rootPath, '/')
+            ? ''
+            : widget.rootPath,
+        failedPath: widget.path,
+        failureMessage: sftpFailureMessage(error),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _showingDefaultDirectoryPrompt = false;
+    });
+    if (selectedPath == null) {
+      return;
+    }
+    final normalizedPath = _joinRemotePath(selectedPath);
+    try {
+      await _connection().list(normalizedPath);
+      final hostId = widget.hostId;
+      if (hostId != null) {
+        await ref
+            .read(hostWriteServiceProvider)
+            .updateSftpDefaultDirectory(hostId, normalizedPath);
+        ref.invalidate(hostSummariesProvider);
+      }
+      ref
+          .read(workspaceTabControllerProvider.notifier)
+          .setSftpRootDirectory(widget.tabId, normalizedPath);
+    } on Object catch (validationError) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _promptedDefaultDirectoryForPath = null;
+      });
+      _showSnackBar(context, sftpFailureMessage(validationError));
+    }
   }
 
   void _openDirectory(String path) {
@@ -577,7 +679,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
       if (!mounted) {
         return;
       }
-      final updatedText = await showDialog<String>(
+      final updatedText = await showSerlinkDialog<String>(
         context: context,
         builder: (context) => _RemoteFileDialog(entry: entry, preview: preview),
       );

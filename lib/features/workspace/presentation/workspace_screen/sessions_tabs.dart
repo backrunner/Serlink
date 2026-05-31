@@ -165,14 +165,19 @@ class _TabPill extends StatelessWidget {
               : t.borderSubtle,
         ),
       ),
-      child: Material(
-        color: Colors.transparent,
+      child: SerlinkPressable(
+        onTap: onTap,
         borderRadius: SerlinkRadii.control,
-        child: InkWell(
-          borderRadius: SerlinkRadii.control,
-          onTap: onTap,
+        hoverColor: selected
+            ? t.accentPrimary.withValues(alpha: 0.08)
+            : t.accentPrimary.withValues(alpha: 0.06),
+        pressedColor: selected
+            ? t.accentPrimary.withValues(alpha: 0.14)
+            : t.accentPrimary.withValues(alpha: 0.1),
+        child: SizedBox(
+          height: 30,
           child: Padding(
-            padding: const EdgeInsets.only(left: 10, right: 4),
+            padding: const EdgeInsets.only(left: 10, right: 6),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -197,25 +202,36 @@ class _TabPill extends StatelessWidget {
                   const SizedBox(width: 6),
                   Icon(stateIcon, size: 14, color: stateColor),
                 ],
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  style: const ButtonStyle(
-                    padding: WidgetStatePropertyAll(EdgeInsets.zero),
-                    minimumSize: WidgetStatePropertyAll(Size.square(24)),
-                    fixedSize: WidgetStatePropertyAll(Size.square(24)),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: WidgetStatePropertyAll(
-                      RoundedRectangleBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(7)),
-                      ),
-                    ),
-                  ),
-                  tooltip: 'Close tab',
-                  onPressed: onClose,
-                  icon: const Icon(Icons.close, size: 15),
-                ),
+                _TabCloseButton(onPressed: onClose),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TabCloseButton extends StatelessWidget {
+  const _TabCloseButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: SerlinkTooltip(
+        message: 'Close tab',
+        child: SerlinkPressable(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(4),
+          hoverColor: t.accentPrimary.withValues(alpha: 0.08),
+          pressedColor: t.accentPrimary.withValues(alpha: 0.14),
+          child: SizedBox.square(
+            dimension: 18,
+            child: Icon(Icons.close, size: 14, color: t.textSecondary),
           ),
         ),
       ),
@@ -231,7 +247,7 @@ class _NewTabButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Tooltip(
+    return SerlinkTooltip(
       message: 'New connection',
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -239,16 +255,12 @@ class _NewTabButton extends StatelessWidget {
           borderRadius: SerlinkRadii.control,
           border: Border.all(color: t.borderSubtle),
         ),
-        child: Material(
-          color: Colors.transparent,
+        child: SerlinkPressable(
+          onTap: onPressed,
           borderRadius: SerlinkRadii.control,
-          child: InkWell(
-            borderRadius: SerlinkRadii.control,
-            onTap: onPressed,
-            child: SizedBox.square(
-              dimension: 30,
-              child: Icon(Icons.add, size: 17, color: t.textSecondary),
-            ),
+          child: SizedBox.square(
+            dimension: 30,
+            child: Icon(Icons.add, size: 17, color: t.textSecondary),
           ),
         ),
       ),
@@ -334,16 +346,23 @@ class _ActiveTabView extends ConsumerWidget {
                 onOpenSftp: null,
                 onToolbarSnapshotChanged: onTerminalToolbarChanged,
               ),
-            SftpTabContent(:final sessionId, :final currentPath) => _SftpPane(
-              key: ValueKey('${sessionId.value}:$currentPath'),
-              tabId: tab.id,
-              sessionId: sessionId,
-              path: currentPath,
-              lifecycle: tab.lifecycle,
-              onOpenTerminal: tab.hostId == null
-                  ? null
-                  : () => controller.openTerminalFromTab(tab.id),
-            ),
+            SftpTabContent(
+              :final sessionId,
+              :final currentPath,
+              :final rootPath,
+            ) =>
+              _SftpPane(
+                key: ValueKey('${sessionId.value}:$rootPath:$currentPath'),
+                tabId: tab.id,
+                hostId: tab.hostId,
+                sessionId: sessionId,
+                path: currentPath,
+                rootPath: rootPath,
+                lifecycle: tab.lifecycle,
+                onOpenTerminal: tab.hostId == null
+                    ? null
+                    : () => controller.openTerminalFromTab(tab.id),
+              ),
           },
         ),
       ],
@@ -381,8 +400,8 @@ class _RecoverableFailureBanner extends StatelessWidget {
             Expanded(
               child: Text(message, style: TextStyle(color: t.textPrimary)),
             ),
-            TextButton(onPressed: onReconnect, child: Text(actionLabel)),
-            TextButton(onPressed: onClose, child: const Text('Close')),
+            SerlinkTextButton(onPressed: onReconnect, child: Text(actionLabel)),
+            SerlinkTextButton(onPressed: onClose, child: const Text('Close')),
           ],
         ),
       ),

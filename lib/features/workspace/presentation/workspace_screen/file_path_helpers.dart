@@ -45,6 +45,10 @@ String _resolveMoveTarget(String target, String entryName) {
   return _joinRemotePath(target);
 }
 
+bool _sameRemotePath(String left, String right) {
+  return _joinRemotePath(left) == _joinRemotePath(right);
+}
+
 bool _isOctalPermissions(String value) {
   return RegExp(r'^[0-7]{3,4}$').hasMatch(value);
 }
@@ -73,7 +77,7 @@ Future<String?> _showTextInputDialog(
   required String confirmLabel,
   String initialValue = '',
 }) {
-  return showDialog<String>(
+  return showSerlinkDialog<String>(
     context: context,
     barrierDismissible: false,
     builder: (context) => _TextInputDialog(
@@ -119,9 +123,9 @@ class _TextInputDialogState extends State<_TextInputDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return SerlinkDialog(
       title: Text(widget.title),
-      content: TextField(
+      content: SerlinkTextField(
         key: ValueKey('text-input-${widget.label}'),
         controller: _controller,
         autofocus: true,
@@ -129,11 +133,11 @@ class _TextInputDialogState extends State<_TextInputDialog> {
         onSubmitted: (value) => Navigator.of(context).pop(value),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(_controller.text),
           child: Text(widget.confirmLabel),
         ),

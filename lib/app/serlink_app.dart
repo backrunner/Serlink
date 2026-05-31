@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 
 import 'app_dependencies.dart';
 import 'app_router.dart';
@@ -20,18 +21,25 @@ class SerlinkApp extends ConsumerWidget {
       theme: SerlinkTheme.light(),
       darkTheme: SerlinkTheme.dark(),
       themeMode: ThemeMode.dark,
+      localizationsDelegates: FLocalizations.localizationsDelegates,
+      supportedLocales: FLocalizations.supportedLocales,
       routerConfig: router,
       builder: (context, child) {
         final body = child ?? const SizedBox.shrink();
+        final themedBody = FTheme(
+          data: SerlinkTheme.foruiDark(),
+          platform: FPlatformVariant.macOS,
+          child: FToaster(child: FTooltipGroup(child: body)),
+        );
         if (!AppWindow.needsFlutterSurfaceClip) {
-          return body;
+          return themedBody;
         }
         return ClipRRect(
           borderRadius: BorderRadius.circular(
             DesktopWindowMetrics.cornerRadius,
           ),
           clipBehavior: Clip.antiAlias,
-          child: body,
+          child: themedBody,
         );
       },
     );

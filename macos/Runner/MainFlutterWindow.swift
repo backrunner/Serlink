@@ -5,6 +5,7 @@ class MainFlutterWindow: NSWindow {
   private static let minimumWindowSize = NSSize(width: 960, height: 600)
 
   private var windowChannel: FlutterMethodChannel?
+  private let cloudKitChannel = CloudKitSyncChannel()
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -13,6 +14,7 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
     configureWindowChrome()
     registerWindowChannel(flutterViewController: flutterViewController)
+    cloudKitChannel.register(with: flutterViewController.engine.binaryMessenger)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 

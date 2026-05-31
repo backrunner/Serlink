@@ -28,12 +28,12 @@ class _SettingsInfoRow extends StatelessWidget {
   const _SettingsInfoRow({
     required this.icon,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -50,23 +50,29 @@ class _SettingsActionRow extends StatelessWidget {
   const _SettingsActionRow({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.action,
+    this.subtitle,
+    this.subtitleWidget,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
+  final String? subtitle;
+  final Widget? subtitleWidget;
   final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final subtitleStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: ListTile(
+      child: SerlinkListTile(
         minLeadingWidth: 28,
         contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        subtitleGap: 1,
         leading: SizedBox.square(
           dimension: 32,
           child: Icon(icon, size: 19, color: t.textSecondary),
@@ -78,15 +84,11 @@ class _SettingsActionRow extends StatelessWidget {
             color: t.textPrimary,
           ),
         ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: Text(
-            subtitle,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
-          ),
-        ),
+        subtitle:
+            subtitleWidget ??
+            (subtitle == null || subtitle!.trim().isEmpty
+                ? null
+                : Text(subtitle!, style: subtitleStyle)),
         trailing: action == null
             ? null
             : Padding(padding: const EdgeInsets.only(left: 16), child: action),
@@ -109,7 +111,7 @@ String _vaultStateLabel(VaultState? state) {
     VaultState.uninitialized => 'Not created.',
     VaultState.locked => 'Locked. Existing connections keep running.',
     VaultState.unlocked => 'Unlocked for new connection profile resolution.',
-    null => 'Preparing encrypted storage.',
+    null => 'Preparing encrypted storage',
   };
 }
 
@@ -167,7 +169,7 @@ Future<void> _showIdentityManagerDialog(
   BuildContext context,
   WidgetRef ref,
 ) async {
-  await showDialog<void>(
+  await showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => const _IdentityManagerDialog(),
@@ -183,54 +185,53 @@ class _IdentityManagerDialog extends ConsumerWidget {
       future: ref.read(identityRepositoryProvider).list(),
       builder: (context, snapshot) {
         final identities = snapshot.data ?? const <IdentityConfig>[];
-        return AlertDialog(
+        return SerlinkDialog(
           title: const Text('Credentials'),
           content: SizedBox(
             width: 640,
-            child: snapshot.connectionState != ConnectionState.done
-                ? const SizedBox(
-                    height: 120,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                : identities.isEmpty
-                ? const SizedBox(
-                    height: 120,
-                    child: Center(
-                      child: Text('No imported credentials are stored yet.'),
-                    ),
-                  )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: identities.length,
-                    separatorBuilder: (context, index) =>
-                        const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final identity = identities[index];
-                      return ListTile(
-                        dense: true,
-                        title: Text(identity.displayName),
-                        subtitle: Text(
-                          [
-                            _identityKindLabel(identity.kind),
-                            if (identity.usernameHint case final username?)
-                              'user $username',
-                            if (identity.certificatePrincipal
-                                case final principal?)
-                              'principal $principal',
-                          ].join(' · '),
+            child: _DialogList(
+              loading: snapshot.connectionState != ConnectionState.done,
+              empty: const _DialogState(
+                icon: Icons.badge_outlined,
+                title: 'No credentials stored',
+                body:
+                    'Imported passwords, private keys, certificates, and identity metadata will appear here.',
+              ),
+              items: [
+                for (final identity in identities)
+                  _DialogListItem(
+                    icon: Icons.badge_outlined,
+                    title: identity.displayName,
+                    subtitle: [
+                      _identityKindLabel(identity.kind),
+                      if (identity.usernameHint case final username?)
+                        'user $username',
+                      if (identity.certificatePrincipal case final principal?)
+                        'principal $principal',
+                    ].join(' · '),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SerlinkIconButton(
+                          tooltip: 'Edit credential',
+                          onPressed: () =>
+                              _editManagedIdentity(context, ref, identity),
+                          icon: const Icon(Icons.edit_outlined, size: 18),
                         ),
-                        trailing: IconButton(
+                        SerlinkIconButton(
                           tooltip: 'Delete credential',
                           onPressed: () =>
                               _deleteIdentity(context, ref, identity),
                           icon: const Icon(Icons.delete_outline, size: 18),
                         ),
-                      );
-                    },
+                      ],
+                    ),
                   ),
+              ],
+            ),
           ),
           actions: [
-            FilledButton(
+            SerlinkFilledButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Done'),
             ),
@@ -238,6 +239,23 @@ class _IdentityManagerDialog extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+Future<void> _editManagedIdentity(
+  BuildContext context,
+  WidgetRef ref,
+  IdentityConfig identity,
+) async {
+  final updated = await showSerlinkDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => _IdentityEditDialog(identity: identity),
+  );
+  if (updated == true && context.mounted) {
+    Navigator.of(context).pop();
+    _showSnackBar(context, 'Credential updated.');
+    await _showIdentityManagerDialog(context, ref);
   }
 }
 
@@ -303,7 +321,7 @@ Future<void> _deleteIdentity(
 }
 
 Future<void> _showKnownHostsDialog(BuildContext context, WidgetRef ref) async {
-  await showDialog<void>(
+  await showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => const _KnownHostsDialog(),
@@ -319,49 +337,35 @@ class _KnownHostsDialog extends ConsumerWidget {
       future: ref.read(knownHostRepositoryProvider).list(),
       builder: (context, snapshot) {
         final records = snapshot.data ?? const <KnownHostRecord>[];
-        return AlertDialog(
+        return SerlinkDialog(
           title: const Text('Known Hosts'),
           content: SizedBox(
             width: 680,
-            child: snapshot.connectionState != ConnectionState.done
-                ? const SizedBox(
-                    height: 120,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                : records.isEmpty
-                ? const SizedBox(
-                    height: 120,
-                    child: Center(
-                      child: Text(
-                        'No trusted host fingerprints are stored yet.',
-                      ),
+            child: _DialogList(
+              loading: snapshot.connectionState != ConnectionState.done,
+              empty: const _DialogState(
+                icon: Icons.verified_user_outlined,
+                title: 'No trusted fingerprints',
+                body:
+                    'Host fingerprints accepted during connection review will be listed here.',
+              ),
+              items: [
+                for (final record in records)
+                  _DialogListItem(
+                    icon: Icons.verified_user_outlined,
+                    title: '${record.hostname}:${record.port}',
+                    subtitle: '${record.algorithm} · ${record.fingerprint}',
+                    trailing: SerlinkIconButton(
+                      tooltip: 'Delete known host',
+                      onPressed: () => _deleteKnownHost(context, ref, record),
+                      icon: const Icon(Icons.delete_outline, size: 18),
                     ),
-                  )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: records.length,
-                    separatorBuilder: (context, index) =>
-                        const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final record = records[index];
-                      return ListTile(
-                        dense: true,
-                        title: Text('${record.hostname}:${record.port}'),
-                        subtitle: Text(
-                          '${record.algorithm} · ${record.fingerprint}',
-                        ),
-                        trailing: IconButton(
-                          tooltip: 'Delete known host',
-                          onPressed: () =>
-                              _deleteKnownHost(context, ref, record),
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                        ),
-                      );
-                    },
                   ),
+              ],
+            ),
           ),
           actions: [
-            FilledButton(
+            SerlinkFilledButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Done'),
             ),

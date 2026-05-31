@@ -34,6 +34,7 @@ class PasswordHostDraft {
     required this.tags,
     this.startupCommands = const [],
     this.jumpHostIds = const [],
+    this.sftpDefaultDirectory = '/',
     this.connectionSettings = const HostConnectionSettings(),
   });
 
@@ -45,6 +46,7 @@ class PasswordHostDraft {
   final Set<String> tags;
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
+  final String sftpDefaultDirectory;
   final HostConnectionSettings connectionSettings;
 }
 
@@ -59,6 +61,7 @@ class PrivateKeyHostDraft {
     required this.tags,
     this.startupCommands = const [],
     this.jumpHostIds = const [],
+    this.sftpDefaultDirectory = '/',
     this.connectionSettings = const HostConnectionSettings(),
   });
 
@@ -71,6 +74,7 @@ class PrivateKeyHostDraft {
   final Set<String> tags;
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
+  final String sftpDefaultDirectory;
   final HostConnectionSettings connectionSettings;
 }
 
@@ -84,6 +88,7 @@ class ExistingIdentitiesHostDraft {
     required this.tags,
     this.startupCommands = const [],
     this.jumpHostIds = const [],
+    this.sftpDefaultDirectory = '/',
     this.connectionSettings = const HostConnectionSettings(),
   });
 
@@ -95,6 +100,31 @@ class ExistingIdentitiesHostDraft {
   final Set<String> tags;
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
+  final String sftpDefaultDirectory;
+  final HostConnectionSettings connectionSettings;
+}
+
+class SshAgentHostDraft {
+  const SshAgentHostDraft({
+    required this.displayName,
+    required this.hostname,
+    required this.port,
+    required this.username,
+    required this.tags,
+    this.startupCommands = const [],
+    this.jumpHostIds = const [],
+    this.sftpDefaultDirectory = '/',
+    this.connectionSettings = const HostConnectionSettings(),
+  });
+
+  final String displayName;
+  final String hostname;
+  final int port;
+  final String username;
+  final Set<String> tags;
+  final List<String> startupCommands;
+  final List<HostId> jumpHostIds;
+  final String sftpDefaultDirectory;
   final HostConnectionSettings connectionSettings;
 }
 
@@ -109,6 +139,7 @@ class HostMetadataDraft {
     required this.identityIds,
     this.startupCommands = const [],
     this.jumpHostIds = const [],
+    this.sftpDefaultDirectory = '/',
     this.connectionSettings = const HostConnectionSettings(),
   });
 
@@ -121,6 +152,7 @@ class HostMetadataDraft {
   final List<IdentityId> identityIds;
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
+  final String sftpDefaultDirectory;
   final HostConnectionSettings connectionSettings;
 }
 
@@ -161,6 +193,9 @@ class HostWriteService {
     );
     final connectionSettings = _normalizeConnectionSettings(
       draft.connectionSettings,
+    );
+    final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
+      draft.sftpDefaultDirectory,
     );
     final password = draft.password;
     if (password.isEmpty) {
@@ -206,6 +241,7 @@ class HostWriteService {
       identityIds: [identityId],
       startupCommands: _normalizeStartupCommands(draft.startupCommands),
       jumpHostIds: _normalizeJumpHostIds(draft.jumpHostIds, hostId: hostId),
+      sftpDefaultDirectory: sftpDefaultDirectory,
       connectionSettings: connectionSettings,
       createdAt: now,
       updatedAt: now,
@@ -223,6 +259,9 @@ class HostWriteService {
     );
     final connectionSettings = _normalizeConnectionSettings(
       draft.connectionSettings,
+    );
+    final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
+      draft.sftpDefaultDirectory,
     );
     final privateKeyPem = draft.privateKeyPem.trim();
     if (!_looksLikePrivateKey(privateKeyPem)) {
@@ -272,6 +311,7 @@ class HostWriteService {
       identityIds: [identityId],
       startupCommands: _normalizeStartupCommands(draft.startupCommands),
       jumpHostIds: _normalizeJumpHostIds(draft.jumpHostIds, hostId: hostId),
+      sftpDefaultDirectory: sftpDefaultDirectory,
       connectionSettings: connectionSettings,
       createdAt: now,
       updatedAt: now,
@@ -292,6 +332,9 @@ class HostWriteService {
     final connectionSettings = _normalizeConnectionSettings(
       draft.connectionSettings,
     );
+    final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
+      draft.sftpDefaultDirectory,
+    );
     final now = DateTime.now().toUtc();
     final hostId = HostId(_uuid.v4());
     final identityIds = _normalizeIdentityIds(draft.identityIds);
@@ -309,6 +352,56 @@ class HostWriteService {
       identityIds: identityIds,
       startupCommands: _normalizeStartupCommands(draft.startupCommands),
       jumpHostIds: _normalizeJumpHostIds(draft.jumpHostIds, hostId: hostId),
+      sftpDefaultDirectory: sftpDefaultDirectory,
+      connectionSettings: connectionSettings,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await _hosts.save(host);
+    return host.toSummary();
+  }
+
+  Future<HostSummary> createSshAgentHost(SshAgentHostDraft draft) async {
+    final normalized = _normalizeHostFields(
+      displayName: draft.displayName,
+      hostname: draft.hostname,
+      port: draft.port,
+      username: draft.username,
+    );
+    final connectionSettings = _normalizeConnectionSettings(
+      draft.connectionSettings,
+    );
+    final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
+      draft.sftpDefaultDirectory,
+    );
+    final now = DateTime.now().toUtc();
+    final hostId = HostId(_uuid.v4());
+    final identityId = IdentityId(_uuid.v4());
+
+    await _identities.save(
+      IdentityConfig(
+        id: identityId,
+        displayName: '${normalized.displayName} SSH Agent',
+        kind: IdentityKind.sshAgent,
+        usernameHint: normalized.username,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    final host = HostConfig(
+      id: hostId,
+      displayName: normalized.displayName,
+      hostname: normalized.hostname,
+      username: normalized.username,
+      port: normalized.port,
+      authKinds: const {HostAuthKind.sshAgent},
+      tags: draft.tags,
+      trustState: HostTrustState.unknown,
+      identityIds: [identityId],
+      startupCommands: _normalizeStartupCommands(draft.startupCommands),
+      jumpHostIds: _normalizeJumpHostIds(draft.jumpHostIds, hostId: hostId),
+      sftpDefaultDirectory: sftpDefaultDirectory,
       connectionSettings: connectionSettings,
       createdAt: now,
       updatedAt: now,
@@ -333,6 +426,9 @@ class HostWriteService {
     final connectionSettings = _normalizeConnectionSettings(
       draft.connectionSettings,
     );
+    final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
+      draft.sftpDefaultDirectory,
+    );
     final updated = HostConfig(
       id: existing.id,
       displayName: normalized.displayName,
@@ -348,7 +444,41 @@ class HostWriteService {
         draft.jumpHostIds,
         hostId: existing.id,
       ),
+      sftpDefaultDirectory: sftpDefaultDirectory,
       connectionSettings: connectionSettings,
+      groupId: existing.groupId,
+      lastConnectedAt: existing.lastConnectedAt,
+      createdAt: existing.createdAt,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await _hosts.save(updated);
+    return updated.toSummary();
+  }
+
+  Future<HostSummary> updateSftpDefaultDirectory(
+    HostId id,
+    String sftpDefaultDirectory,
+  ) async {
+    final existing = await _hosts.read(id);
+    if (existing == null) {
+      throw const HostWriteException('host.not_found', 'Host does not exist.');
+    }
+    final updated = HostConfig(
+      id: existing.id,
+      displayName: existing.displayName,
+      hostname: existing.hostname,
+      username: existing.username,
+      port: existing.port,
+      authKinds: existing.authKinds,
+      tags: existing.tags,
+      trustState: existing.trustState,
+      identityIds: existing.identityIds,
+      startupCommands: existing.startupCommands,
+      jumpHostIds: existing.jumpHostIds,
+      sftpDefaultDirectory: _normalizeSftpDefaultDirectory(
+        sftpDefaultDirectory,
+      ),
+      connectionSettings: existing.connectionSettings,
       groupId: existing.groupId,
       lastConnectedAt: existing.lastConnectedAt,
       createdAt: existing.createdAt,
@@ -408,12 +538,6 @@ class HostWriteService {
       if (!normalized.contains(identityId)) {
         normalized.add(identityId);
       }
-    }
-    if (normalized.isEmpty) {
-      throw const HostWriteException(
-        'host.identity_required',
-        'Select at least one credential.',
-      );
     }
     return List<IdentityId>.unmodifiable(normalized);
   }
@@ -505,6 +629,33 @@ HostConnectionSettings _normalizeConnectionSettings(
     reconnectAttempts: reconnectAttempts,
     reconnectBackoffSeconds: reconnectBackoffSeconds,
   );
+}
+
+String _normalizeSftpDefaultDirectory(String path) {
+  final trimmed = path.trim();
+  if (trimmed.isEmpty) {
+    return '/';
+  }
+  if (!trimmed.startsWith('/')) {
+    throw const HostWriteException(
+      'host.sftp_default_directory_invalid',
+      'SFTP start folder must be an absolute path.',
+    );
+  }
+  final segments = <String>[];
+  for (final segment in trimmed.split('/')) {
+    if (segment.isEmpty || segment == '.') {
+      continue;
+    }
+    if (segment == '..') {
+      if (segments.isNotEmpty) {
+        segments.removeLast();
+      }
+      continue;
+    }
+    segments.add(segment);
+  }
+  return '/${segments.join('/')}';
 }
 
 HostAuthKind _hostAuthKindFor(IdentityKind kind) {

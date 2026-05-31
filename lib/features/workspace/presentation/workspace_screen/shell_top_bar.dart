@@ -47,9 +47,11 @@ class _TopBarState extends ConsumerState<_TopBar> {
           if (widget.showSearch) ...[
             SizedBox(
               width: 320,
-              child: _TopBarSearchPill(
+              child: _WorkspaceSearchPill(
+                fieldKey: const ValueKey('workspace-search-field'),
                 controller: _searchController,
                 placeholder: widget.searchPlaceholder,
+                enabled: true,
                 hasQuery: query.trim().isNotEmpty,
                 onChanged: (value) {
                   ref
@@ -66,20 +68,14 @@ class _TopBarState extends ConsumerState<_TopBar> {
           ],
           const Expanded(child: _WindowDragRegion()),
           if (widget.showLocalTerminal)
-            Tooltip(
+            SerlinkTooltip(
               message: 'Open local terminal tab',
-              child: IconButton(
-                style: const ButtonStyle(
-                  padding: WidgetStatePropertyAll(EdgeInsets.zero),
-                  minimumSize: WidgetStatePropertyAll(Size.square(30)),
-                  fixedSize: WidgetStatePropertyAll(Size.square(30)),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: WidgetStatePropertyAll(
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(8)),
-                    ),
-                  ),
+              child: SerlinkIconButton(
+                constraints: const BoxConstraints.tightFor(
+                  width: 30,
+                  height: 30,
                 ),
+                padding: EdgeInsets.zero,
                 onPressed: widget.onOpenLocalTerminal,
                 icon: const Icon(Icons.terminal_outlined, size: 18),
               ),
@@ -94,28 +90,32 @@ class _TopBarState extends ConsumerState<_TopBar> {
   }
 }
 
-/// Compact pill-shaped search input used in the top bar. Borderless field with
-/// hover/focus border states, prefix glyph, and an inline clear button.
-class _TopBarSearchPill extends StatefulWidget {
-  const _TopBarSearchPill({
+/// Compact pill-shaped search input with hover/focus border states, prefix
+/// glyph, and an inline clear button.
+class _WorkspaceSearchPill extends StatefulWidget {
+  const _WorkspaceSearchPill({
+    required this.fieldKey,
     required this.controller,
     required this.placeholder,
+    required this.enabled,
     required this.hasQuery,
     required this.onChanged,
     required this.onClear,
   });
 
+  final Key fieldKey;
   final TextEditingController controller;
   final String placeholder;
+  final bool enabled;
   final bool hasQuery;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
 
   @override
-  State<_TopBarSearchPill> createState() => _TopBarSearchPillState();
+  State<_WorkspaceSearchPill> createState() => _WorkspaceSearchPillState();
 }
 
-class _TopBarSearchPillState extends State<_TopBarSearchPill> {
+class _WorkspaceSearchPillState extends State<_WorkspaceSearchPill> {
   final FocusNode _focusNode = FocusNode();
   bool _hovered = false;
 
@@ -139,56 +139,63 @@ class _TopBarSearchPillState extends State<_TopBarSearchPill> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final focused = _focusNode.hasFocus;
+    final focused = widget.enabled && _focusNode.hasFocus;
+    final hovered = widget.enabled && _hovered;
     final borderColor = focused
         ? t.accentPrimary
-        : _hovered
+        : hovered
         ? t.borderStrong
         : t.borderSubtle;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
+      child: AnimatedOpacity(
         duration: const Duration(milliseconds: 130),
-        height: 34,
-        padding: const EdgeInsets.only(left: 11, right: 6),
-        decoration: BoxDecoration(
-          color: focused ? t.surfaceBase : t.surfaceSunken,
-          borderRadius: SerlinkRadii.pill,
-          border: Border.all(color: borderColor, width: focused ? 1.4 : 1),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.search,
-              size: 15,
-              color: focused ? t.accentPrimary : t.textMuted,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                key: const ValueKey('workspace-search-field'),
-                controller: widget.controller,
-                focusNode: _focusNode,
-                style: TextStyle(color: t.textPrimary, fontSize: 13.5),
-                decoration: InputDecoration(
-                  isCollapsed: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: false,
-                  hintText: widget.placeholder,
-                  hintStyle: TextStyle(color: t.textMuted, fontSize: 13.5),
-                ),
-                onChanged: widget.onChanged,
+        opacity: widget.enabled ? 1 : 0.56,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 130),
+          height: 34,
+          padding: const EdgeInsets.only(left: 11, right: 6),
+          decoration: BoxDecoration(
+            color: focused ? t.surfaceBase : t.surfaceSunken,
+            borderRadius: SerlinkRadii.pill,
+            border: Border.all(color: borderColor, width: focused ? 1.4 : 1),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.search,
+                size: 15,
+                color: focused ? t.accentPrimary : t.textMuted,
               ),
-            ),
-            if (widget.hasQuery)
-              _ClearChip(onTap: widget.onClear)
-            else
-              const SizedBox(width: 4),
-          ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: SerlinkTextField(
+                  key: widget.fieldKey,
+                  controller: widget.controller,
+                  enabled: widget.enabled,
+                  focusNode: _focusNode,
+                  style: TextStyle(color: t.textPrimary, fontSize: 13.5),
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 9),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    filled: false,
+                    hintText: widget.placeholder,
+                    hintStyle: TextStyle(color: t.textMuted, fontSize: 13.5),
+                  ),
+                  onChanged: widget.onChanged,
+                ),
+              ),
+              if (widget.enabled && widget.hasQuery)
+                _ClearChip(onTap: widget.onClear)
+              else
+                const SizedBox(width: 4),
+            ],
+          ),
         ),
       ),
     );
@@ -213,7 +220,7 @@ class _ClearChipState extends State<_ClearChip> {
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
-      child: Tooltip(
+      child: SerlinkTooltip(
         message: 'Clear search',
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -224,8 +231,8 @@ class _ClearChipState extends State<_ClearChip> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: _hovered
-                  ? t.surfaceOverlay
-                  : t.surfaceOverlay.withValues(alpha: 0.6),
+                  ? t.accentPrimary.withValues(alpha: 0.12)
+                  : t.surfaceOverlay,
             ),
             child: Icon(Icons.close, size: 12, color: t.textSecondary),
           ),

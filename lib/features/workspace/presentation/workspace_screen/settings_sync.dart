@@ -9,6 +9,7 @@ class _SyncSettingsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final canEdit = vaultState == VaultState.unlocked;
     final webDav = canEdit ? ref.watch(webDavSyncSettingsProvider) : null;
+    final iCloudAvailable = ref.watch(iCloudAvailableProvider);
     final knownDevices = canEdit ? ref.watch(syncKnownDevicesProvider) : null;
     final conflicts = ref.watch(syncConflictControllerProvider);
     final autoSync = ref.watch(autoSyncControllerProvider);
@@ -27,7 +28,7 @@ class _SyncSettingsSection extends ConsumerWidget {
             icon: Icons.cloud_queue,
             title: 'WebDAV',
             subtitle: _syncSettingsErrorMessage(error),
-            action: TextButton(
+            action: SerlinkTextButton(
               onPressed: () => _showWebDavSyncDialog(context, ref, null),
               child: const Text('Configure'),
             ),
@@ -36,7 +37,7 @@ class _SyncSettingsSection extends ConsumerWidget {
             icon: Icons.cloud_queue,
             title: 'WebDAV',
             subtitle: _webDavSettingsSubtitle(settings, autoSync),
-            action: TextButton(
+            action: SerlinkTextButton(
               onPressed: () => _showWebDavSyncDialog(context, ref, settings),
               child: Text(settings == null ? 'Configure' : 'Edit'),
             ),
@@ -48,10 +49,61 @@ class _SyncSettingsSection extends ConsumerWidget {
           subtitle: 'Unlock the vault to configure encrypted sync.',
         );
 
+    final iCloudRow = iCloudAvailable.when<Widget?>(
+      loading: () => const _SettingsInfoRow(
+        icon: Icons.cloud_outlined,
+        title: 'iCloud',
+        subtitle: 'Checking iCloud availability.',
+      ),
+      error: (error, stackTrace) => _SettingsInfoRow(
+        icon: Icons.cloud_outlined,
+        title: 'iCloud',
+        subtitle: _syncSettingsErrorMessage(error),
+      ),
+      data: (available) {
+        if (!available) {
+          return null;
+        }
+        final cloudKit = canEdit
+            ? ref.watch(cloudKitSyncSettingsProvider)
+            : null;
+        return cloudKit?.when(
+              loading: () => const _SettingsInfoRow(
+                icon: Icons.cloud_outlined,
+                title: 'iCloud',
+                subtitle: 'Loading encrypted sync settings.',
+              ),
+              error: (error, stackTrace) => _SettingsInfoRow(
+                icon: Icons.cloud_outlined,
+                title: 'iCloud',
+                subtitle: _syncSettingsErrorMessage(error),
+              ),
+              data: (settings) {
+                final enabled = settings?.enabled ?? false;
+                return _SettingsActionRow(
+                  icon: Icons.cloud_outlined,
+                  title: 'iCloud',
+                  subtitle: _iCloudSettingsSubtitle(enabled, autoSync),
+                  action: SerlinkSwitch(
+                    value: enabled,
+                    onChanged: (value) => _setICloudSync(context, ref, value),
+                  ),
+                );
+              },
+            ) ??
+            const _SettingsInfoRow(
+              icon: Icons.cloud_outlined,
+              title: 'iCloud',
+              subtitle: 'Unlock the vault to sync through iCloud.',
+            );
+      },
+    );
+
     return _SettingsSection(
       title: 'Sync',
       children: [
         webDavRow,
+        ?iCloudRow,
         if (repairPlan != null) _SyncRepairRow(plan: repairPlan),
         if (conflicts.isNotEmpty) _SyncConflictRow(conflicts: conflicts),
         if (knownDevices != null)
@@ -73,12 +125,12 @@ class _SyncSettingsSection extends ConsumerWidget {
               action: Wrap(
                 spacing: 4,
                 children: [
-                  TextButton(
+                  SerlinkTextButton(
                     onPressed: () =>
                         _showSyncDevicesDialog(context, ref, devices),
                     child: Text(devices.isEmpty ? 'View' : 'Manage'),
                   ),
-                  TextButton(
+                  SerlinkTextButton(
                     onPressed: () => _rotateSyncDevice(context, ref),
                     child: const Text('Reset'),
                   ),
@@ -102,7 +154,7 @@ class _SyncRepairRow extends ConsumerWidget {
       icon: Icons.build_outlined,
       title: 'Sync repair',
       subtitle: plan.message,
-      action: TextButton(
+      action: SerlinkTextButton(
         onPressed: () => _repairWebDavSync(context, ref, plan),
         child: const Text('Repair'),
       ),
@@ -200,10 +252,10 @@ Future<void> _reviewLocalClock(
   final certificate = lastFailure is SyncProviderException
       ? WebDavTlsCertificateDetails.tryParse(lastFailure.diagnostic)
       : null;
-  await showDialog<void>(
+  await showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (context) => AlertDialog(
+    builder: (context) => SerlinkDialog(
       title: Text(plan.title),
       content: SizedBox(
         width: 520,
@@ -228,7 +280,7 @@ Future<void> _reviewLocalClock(
         ),
       ),
       actions: [
-        FilledButton(
+        SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Done'),
         ),
@@ -252,11 +304,11 @@ class _SyncConflictRow extends ConsumerWidget {
       action: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextButton(
+          SerlinkTextButton(
             onPressed: () => _reviewWebDavConflicts(context, ref, conflicts),
             child: const Text('Review'),
           ),
-          TextButton(
+          SerlinkTextButton(
             onPressed: () => _resolveWebDavConflicts(
               context,
               ref,
@@ -264,7 +316,7 @@ class _SyncConflictRow extends ConsumerWidget {
             ),
             child: const Text('Use remote'),
           ),
-          TextButton(
+          SerlinkTextButton(
             onPressed: () => _resolveWebDavConflicts(
               context,
               ref,
@@ -283,7 +335,7 @@ Future<void> _reviewWebDavConflicts(
   WidgetRef ref,
   List<SyncRecordConflict> conflicts,
 ) async {
-  await showDialog<void>(
+  await showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => _SyncConflictReviewDialog(conflicts: conflicts),
@@ -338,6 +390,37 @@ Future<void> _resolveWebDavConflicts(
       _showSnackBar(context, _syncSettingsErrorMessage(error));
     }
   }
+}
+
+Future<void> _setICloudSync(
+  BuildContext context,
+  WidgetRef ref,
+  bool enabled,
+) async {
+  try {
+    await ref.read(syncSettingsServiceProvider).saveCloudKit(enabled);
+    ref.invalidate(cloudKitSyncSettingsProvider);
+    if (enabled) {
+      ref.read(autoSyncControllerProvider.notifier).requestSync();
+    }
+    if (context.mounted) {
+      _showSnackBar(
+        context,
+        enabled ? 'iCloud sync enabled.' : 'iCloud sync paused.',
+      );
+    }
+  } on Object catch (error) {
+    if (context.mounted) {
+      _showSnackBar(context, _syncSettingsErrorMessage(error));
+    }
+  }
+}
+
+String _iCloudSettingsSubtitle(bool enabled, AutoSyncStatus autoSync) {
+  if (!enabled) {
+    return 'Paused. Encrypted records sync through your private iCloud database.';
+  }
+  return ['Enabled', _autoSyncStatusSubtitle(autoSync)].join(' · ');
 }
 
 String _webDavSettingsSubtitle(

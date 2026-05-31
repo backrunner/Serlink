@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 
 import '../design_system/design_system.dart';
 
-/// Standard interactive height for buttons — taller than the old 32px so
-/// actions read as substantial, commercial-grade controls.
-const double _buttonHeight = 40;
+/// Standard interactive height for buttons. Explicitly paired with standard
+/// density so desktop Material compact density does not shrink dialog actions.
+const double _buttonHeight = 42;
 
 class SerlinkTheme {
   const SerlinkTheme._();
@@ -12,6 +13,124 @@ class SerlinkTheme {
   static ThemeData dark() => _build(SerlinkTokens.dark, Brightness.dark);
 
   static ThemeData light() => _build(SerlinkTokens.light, Brightness.light);
+
+  static FThemeData foruiDark() => _buildForui(
+    tokens: SerlinkTokens.dark,
+    baseColors: FThemes.neutral.dark.desktop.colors,
+    debugLabel: 'Serlink Dark Desktop',
+  );
+
+  static FThemeData foruiLight() => _buildForui(
+    tokens: SerlinkTokens.light,
+    baseColors: FThemes.neutral.light.desktop.colors,
+    debugLabel: 'Serlink Light Desktop',
+  );
+}
+
+FThemeData _buildForui({
+  required SerlinkTokens tokens,
+  required FColors baseColors,
+  required String debugLabel,
+}) {
+  final colors = baseColors.copyWith(
+    barrier: tokens.shadowColor.withValues(alpha: 0.52),
+    background: tokens.surfaceBase,
+    foreground: tokens.textPrimary,
+    primary: tokens.accentPrimary,
+    primaryForeground: tokens.onAccent,
+    secondary: tokens.surfaceSunken,
+    secondaryForeground: tokens.textPrimary,
+    muted: tokens.surfaceSunken,
+    mutedForeground: tokens.textMuted,
+    destructive: tokens.statusDanger,
+    destructiveForeground: tokens.onAccent,
+    error: tokens.statusDanger,
+    errorForeground: tokens.onAccent,
+    card: tokens.surfaceRaised,
+    border: tokens.borderSubtle,
+  );
+  final typography = FTypography.inherit(colors: colors, touch: false);
+  final style =
+      FStyle.inherit(
+        colors: colors,
+        typography: typography,
+        touch: false,
+      ).copyWith(
+        borderRadius: const FBorderRadius(
+          xs2: BorderRadius.all(Radius.circular(4)),
+          xs: BorderRadius.all(Radius.circular(6)),
+          sm: BorderRadius.all(Radius.circular(8)),
+          md: SerlinkRadii.control,
+          lg: SerlinkRadii.dialog,
+          xl: SerlinkRadii.card,
+          xl2: SerlinkRadii.card,
+          xl3: SerlinkRadii.card,
+          pill: SerlinkRadii.pill,
+        ),
+        shadow: serlinkShadow(tokens, elevation: 18),
+      );
+  return FThemeData(
+    touch: false,
+    debugLabel: debugLabel,
+    colors: colors,
+    typography: typography,
+    style: style,
+    cardStyle: _foruiCardStyle(tokens, colors, typography, style),
+    dialogStyle: _foruiDialogStyle(tokens, colors, typography, style),
+  );
+}
+
+FCardStyle _foruiCardStyle(
+  SerlinkTokens tokens,
+  FColors colors,
+  FTypography typography,
+  FStyle style,
+) {
+  return FCardStyle.inherit(
+    colors: colors,
+    typography: typography,
+    style: style,
+    touch: false,
+  ).copyWith(
+    decoration: DecorationDelta.value(
+      ShapeDecoration(
+        color: tokens.surfaceRaised,
+        shape: RoundedRectangleBorder(
+          borderRadius: SerlinkRadii.dialog,
+          side: BorderSide(color: tokens.borderSubtle),
+        ),
+      ),
+    ),
+  );
+}
+
+FDialogStyle _foruiDialogStyle(
+  SerlinkTokens tokens,
+  FColors colors,
+  FTypography typography,
+  FStyle style,
+) {
+  return FDialogStyle.inherit(
+    colors: colors,
+    typography: typography,
+    style: style,
+    hapticFeedback: const FHapticFeedback(),
+    touch: false,
+  ).copyWith(
+    decoration: DecorationDelta.value(
+      ShapeDecoration(
+        color: tokens.surfaceRaised,
+        shape: RoundedRectangleBorder(
+          borderRadius: SerlinkRadii.dialog,
+          side: BorderSide(color: tokens.borderSubtle),
+        ),
+        shadows: serlinkShadow(tokens, elevation: 24),
+      ),
+    ),
+    insetPadding: EdgeInsetsGeometryDelta.value(
+      const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+    ),
+  );
 }
 
 ThemeData _build(SerlinkTokens t, Brightness brightness) {
@@ -72,6 +191,7 @@ ThemeData _build(SerlinkTokens t, Brightness brightness) {
       surfaceTintColor: Colors.transparent,
       elevation: 24,
       shadowColor: t.shadowColor,
+      actionsPadding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
       shape: RoundedRectangleBorder(
         borderRadius: SerlinkRadii.dialog,
         side: BorderSide(color: t.borderSubtle),
@@ -126,6 +246,12 @@ IconButtonThemeData _iconButtonTheme(SerlinkTokens t) {
         }
         return Colors.transparent;
       }),
+      minimumSize: const WidgetStatePropertyAll(Size.square(34)),
+      padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+      iconSize: const WidgetStatePropertyAll(18),
+      visualDensity: VisualDensity.standard,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      alignment: Alignment.center,
       shape: const WidgetStatePropertyAll(
         RoundedRectangleBorder(borderRadius: SerlinkRadii.control),
       ),
@@ -157,11 +283,18 @@ FilledButtonThemeData _filledButtonTheme(SerlinkTokens t) {
         }
         return 2;
       }),
-      shadowColor: WidgetStatePropertyAll(t.accentStrong.withValues(alpha: 0.6)),
+      shadowColor: WidgetStatePropertyAll(
+        t.accentStrong.withValues(alpha: 0.6),
+      ),
       minimumSize: const WidgetStatePropertyAll(Size(0, _buttonHeight)),
       padding: const WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: 20),
+        EdgeInsets.symmetric(horizontal: 22),
       ),
+      iconSize: const WidgetStatePropertyAll(18),
+      iconAlignment: IconAlignment.start,
+      visualDensity: VisualDensity.standard,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      alignment: Alignment.center,
       textStyle: const WidgetStatePropertyAll(
         TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
@@ -174,51 +307,76 @@ FilledButtonThemeData _filledButtonTheme(SerlinkTokens t) {
 
 OutlinedButtonThemeData _outlinedButtonTheme(SerlinkTokens t) {
   return OutlinedButtonThemeData(
-    style: OutlinedButton.styleFrom(
-      foregroundColor: t.textPrimary,
-      backgroundColor: t.surfaceRaised,
-      side: BorderSide(color: t.borderStrong),
-      minimumSize: const Size(0, _buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-      shape: const RoundedRectangleBorder(borderRadius: SerlinkRadii.control),
-    ).copyWith(
-      overlayColor: WidgetStatePropertyAll(
-        t.accentPrimary.withValues(alpha: 0.08),
-      ),
-    ),
+    style:
+        OutlinedButton.styleFrom(
+          foregroundColor: t.textPrimary,
+          backgroundColor: t.surfaceRaised,
+          side: BorderSide(color: t.borderStrong),
+          minimumSize: const Size(0, _buttonHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          iconSize: 18,
+          iconAlignment: IconAlignment.start,
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          shape: const RoundedRectangleBorder(
+            borderRadius: SerlinkRadii.control,
+          ),
+        ).copyWith(
+          overlayColor: WidgetStatePropertyAll(
+            t.accentPrimary.withValues(alpha: 0.08),
+          ),
+          visualDensity: VisualDensity.standard,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          alignment: Alignment.center,
+        ),
   );
 }
 
 TextButtonThemeData _textButtonTheme(SerlinkTokens t) {
   return TextButtonThemeData(
-    style: TextButton.styleFrom(
-      foregroundColor: t.accentPrimary,
-      minimumSize: const Size(0, _buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-      shape: const RoundedRectangleBorder(borderRadius: SerlinkRadii.control),
-    ).copyWith(
-      overlayColor: WidgetStatePropertyAll(
-        t.accentPrimary.withValues(alpha: 0.1),
-      ),
-    ),
+    style:
+        TextButton.styleFrom(
+          foregroundColor: t.accentPrimary,
+          minimumSize: const Size(0, _buttonHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          iconSize: 18,
+          iconAlignment: IconAlignment.start,
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          shape: const RoundedRectangleBorder(
+            borderRadius: SerlinkRadii.control,
+          ),
+        ).copyWith(
+          overlayColor: WidgetStatePropertyAll(
+            t.accentPrimary.withValues(alpha: 0.1),
+          ),
+          visualDensity: VisualDensity.standard,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          alignment: Alignment.center,
+        ),
   );
 }
 
 ElevatedButtonThemeData _elevatedButtonTheme(SerlinkTokens t) {
   return ElevatedButtonThemeData(
-    style: ElevatedButton.styleFrom(
-      elevation: 1,
-      shadowColor: t.shadowColor,
-      backgroundColor: t.surfaceRaised,
-      foregroundColor: t.textPrimary,
-      side: BorderSide(color: t.borderStrong),
-      minimumSize: const Size(0, _buttonHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-      shape: const RoundedRectangleBorder(borderRadius: SerlinkRadii.control),
-    ),
+    style:
+        ElevatedButton.styleFrom(
+          elevation: 1,
+          shadowColor: t.shadowColor,
+          backgroundColor: t.surfaceRaised,
+          foregroundColor: t.textPrimary,
+          side: BorderSide(color: t.borderStrong),
+          minimumSize: const Size(0, _buttonHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          iconSize: 18,
+          iconAlignment: IconAlignment.start,
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          shape: const RoundedRectangleBorder(
+            borderRadius: SerlinkRadii.control,
+          ),
+        ).copyWith(
+          visualDensity: VisualDensity.standard,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          alignment: Alignment.center,
+        ),
   );
 }
 

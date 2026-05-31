@@ -130,8 +130,10 @@ class _TerminalViewportPane extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border.all(color: active ? t.accentPrimary : t.borderSubtle),
       ),
-      child: InkWell(
+      child: SerlinkPressable(
         onTap: onTap,
+        borderRadius: BorderRadius.zero,
+        hoverColor: t.accentPrimary.withValues(alpha: 0.05),
         child: Column(
           children: [
             Container(

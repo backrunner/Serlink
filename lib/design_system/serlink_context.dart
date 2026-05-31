@@ -14,8 +14,8 @@ extension SerlinkContextX on BuildContext {
 }
 
 /// Builds a Material [ColorScheme] whose slots agree with the semantic tokens,
-/// so stock Material widgets (Switch, Chip, dialogs, progress indicators,
-/// FilledButton) render in the same palette as token-driven feature code.
+/// so any remaining Material fallbacks render in the same palette as
+/// token-driven feature code.
 ColorScheme serlinkColorScheme(SerlinkTokens t, Brightness brightness) {
   final base = ColorScheme.fromSeed(
     seedColor: t.accentPrimary,

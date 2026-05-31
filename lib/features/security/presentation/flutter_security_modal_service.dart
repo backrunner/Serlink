@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../design_system/design_system.dart';
 import '../../ssh/application/ssh_session_service.dart';
 import '../../sync/domain/webdav_tls_certificate_details.dart';
 import '../application/security_modal_service.dart';
@@ -18,7 +19,7 @@ class FlutterSecurityModalService implements SecurityModalService {
     if (context == null) {
       return HostKeyDecision.cancel;
     }
-    final decision = await showDialog<HostKeyDecision>(
+    final decision = await showSerlinkDialog<HostKeyDecision>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _HostKeyDialog(prompt: prompt),
@@ -34,7 +35,7 @@ class FlutterSecurityModalService implements SecurityModalService {
     if (context == null) {
       return CertificateTrustDecision.cancel;
     }
-    final decision = await showDialog<CertificateTrustDecision>(
+    final decision = await showSerlinkDialog<CertificateTrustDecision>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _WebDavCertificateDialog(certificate: certificate),
@@ -48,7 +49,7 @@ class FlutterSecurityModalService implements SecurityModalService {
     if (context == null) {
       return DestructiveDecision.cancel;
     }
-    final decision = await showDialog<DestructiveDecision>(
+    final decision = await showSerlinkDialog<DestructiveDecision>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _DestructiveActionDialog(title: title),
@@ -62,7 +63,7 @@ class FlutterSecurityModalService implements SecurityModalService {
     if (context == null) {
       return ExportDecision.cancel;
     }
-    final decision = await showDialog<ExportDecision>(
+    final decision = await showSerlinkDialog<ExportDecision>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _ExportDialog(preview: preview),
@@ -76,7 +77,7 @@ class FlutterSecurityModalService implements SecurityModalService {
     if (context == null) {
       return false;
     }
-    final decision = await showDialog<bool>(
+    final decision = await showSerlinkDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _MultilinePasteDialog(preview: preview),
@@ -95,7 +96,7 @@ class _WebDavCertificateDialog extends StatelessWidget {
     final changed =
         certificate.expectedFingerprint != null &&
         certificate.expectedFingerprint != certificate.fingerprint;
-    return AlertDialog(
+    return SerlinkDialog(
       title: Text(
         changed ? 'WebDAV Certificate Changed' : 'Trust WebDAV Certificate?',
       ),
@@ -132,12 +133,12 @@ class _WebDavCertificateDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: () =>
               Navigator.of(context).pop(CertificateTrustDecision.cancel),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           onPressed: () =>
               Navigator.of(context).pop(CertificateTrustDecision.trustAndSave),
           child: const Text('Trust and Save'),
@@ -155,7 +156,7 @@ class _HostKeyDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final changed = prompt.previousFingerprint != null;
-    return AlertDialog(
+    return SerlinkDialog(
       title: Text(changed ? 'Host Key Changed' : 'Confirm Fingerprint'),
       content: SizedBox(
         width: 520,
@@ -176,15 +177,15 @@ class _HostKeyDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(HostKeyDecision.cancel),
           child: const Text('Cancel'),
         ),
-        TextButton(
+        SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(HostKeyDecision.trustOnce),
           child: const Text('Trust Once'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           onPressed: () =>
               Navigator.of(context).pop(HostKeyDecision.trustAndSave),
           child: const Text('Trust and Save'),
@@ -205,7 +206,7 @@ class _ExportDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return SerlinkDialog(
       title: Text(preview.title),
       content: SizedBox(
         width: 520,
@@ -222,11 +223,11 @@ class _ExportDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(ExportDecision.cancel),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(ExportDecision.confirm),
           child: const Text('Export'),
         ),
@@ -242,16 +243,16 @@ class _DestructiveActionDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return SerlinkDialog(
       title: Text(title),
       content: const Text('This action cannot be undone.'),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: () =>
               Navigator.of(context).pop(DestructiveDecision.cancel),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           onPressed: () =>
               Navigator.of(context).pop(DestructiveDecision.confirm),
           child: const Text('Confirm'),
@@ -269,7 +270,7 @@ class _MultilinePasteDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lineCount = preview.split('\n').length;
-    return AlertDialog(
+    return SerlinkDialog(
       title: const Text('Paste multiple lines?'),
       content: SizedBox(
         width: 560,
@@ -292,11 +293,11 @@ class _MultilinePasteDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        TextButton(
+        SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(false),
           child: const Text('Cancel'),
         ),
-        FilledButton(
+        SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(true),
           child: const Text('Paste'),
         ),

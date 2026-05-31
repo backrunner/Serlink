@@ -21,6 +21,7 @@ class HostSummary {
     required this.authKinds,
     required this.tags,
     required this.trustState,
+    this.sftpDefaultDirectory = '/',
     this.lastConnectedAt,
   });
 
@@ -32,6 +33,7 @@ class HostSummary {
   final Set<HostAuthKind> authKinds;
   final Set<String> tags;
   final HostTrustState trustState;
+  final String sftpDefaultDirectory;
   final DateTime? lastConnectedAt;
 }
 
@@ -50,6 +52,7 @@ class HostConfig {
     required this.jumpHostIds,
     required this.createdAt,
     required this.updatedAt,
+    this.sftpDefaultDirectory = '/',
     this.connectionSettings = const HostConnectionSettings(),
     this.groupId,
     this.lastConnectedAt,
@@ -66,6 +69,7 @@ class HostConfig {
   final List<IdentityId> identityIds;
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
+  final String sftpDefaultDirectory;
   final HostConnectionSettings connectionSettings;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -82,6 +86,7 @@ class HostConfig {
       authKinds: authKinds,
       tags: tags,
       trustState: trustState,
+      sftpDefaultDirectory: sftpDefaultDirectory,
       lastConnectedAt: lastConnectedAt,
     );
   }
@@ -99,6 +104,7 @@ class HostConfig {
       'identityIds': [for (final identityId in identityIds) identityId.value],
       'startupCommands': startupCommands,
       'jumpHostIds': [for (final hostId in jumpHostIds) hostId.value],
+      'sftpDefaultDirectory': sftpDefaultDirectory,
       'connectionSettings': connectionSettings.toJson(),
       'groupId': groupId,
       'createdAt': createdAt.toUtc().toIso8601String(),
@@ -134,6 +140,9 @@ class HostConfig {
         for (final value in json['jumpHostIds'] as List<Object?>)
           HostId(value as String),
       ],
+      sftpDefaultDirectory: _remoteDirectoryFromJson(
+        json['sftpDefaultDirectory'],
+      ),
       connectionSettings: switch (json['connectionSettings']) {
         final Map<Object?, Object?> value => HostConnectionSettings.fromJson(
           Map<String, Object?>.from(value),
@@ -217,6 +226,30 @@ class HostConnectionSettings {
       reconnectBackoffSeconds,
     );
   }
+}
+
+String _remoteDirectoryFromJson(Object? value) {
+  if (value is! String) {
+    return '/';
+  }
+  final trimmed = value.trim();
+  if (trimmed.isEmpty || !trimmed.startsWith('/')) {
+    return '/';
+  }
+  final segments = <String>[];
+  for (final segment in trimmed.split('/')) {
+    if (segment.isEmpty || segment == '.') {
+      continue;
+    }
+    if (segment == '..') {
+      if (segments.isNotEmpty) {
+        segments.removeLast();
+      }
+      continue;
+    }
+    segments.add(segment);
+  }
+  return '/${segments.join('/')}';
 }
 
 int _intFromJson(Object? value, {required int fallback}) {

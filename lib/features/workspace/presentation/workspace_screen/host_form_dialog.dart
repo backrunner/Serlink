@@ -125,15 +125,6 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                     title: l10n.hostSectionConnection,
                     child: Column(
                       children: [
-                        SerlinkTextField(
-                          key: const ValueKey('host-display-name-field'),
-                          controller: _displayNameController,
-                          decoration: InputDecoration(
-                            labelText: l10n.hostDisplayNameLabel,
-                          ),
-                          textInputAction: TextInputAction.next,
-                        ),
-                        const SizedBox(height: 14),
                         Row(
                           children: [
                             Expanded(
@@ -159,6 +150,17 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 14),
+                        SerlinkTextField(
+                          key: const ValueKey('host-display-name-field'),
+                          controller: _displayNameController,
+                          decoration: InputDecoration(
+                            labelText: l10n.hostDisplayNameOptionalLabel,
+                            hintText: l10n.hostDisplayNameHostnameHint,
+                            helperText: l10n.hostDisplayNameHostnameHelper,
+                          ),
+                          textInputAction: TextInputAction.next,
                         ),
                         const SizedBox(height: 14),
                         SerlinkTextField(

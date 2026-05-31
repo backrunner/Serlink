@@ -80,6 +80,46 @@ void main() {
     expect(serializedRecords, isNot(contains('server-password')));
   });
 
+  test('uses hostname as display name when display name is blank', () async {
+    final vault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    final records = InMemoryVaultRecordRepository();
+    final hosts = EncryptedHostRepository(vault: vault, records: records);
+    final identities = EncryptedIdentityRepository(
+      vault: vault,
+      records: records,
+    );
+    await vault.initialize(passphrase: 'good passphrase');
+
+    final service = HostWriteService(
+      hosts: hosts,
+      identities: identities,
+      knownHosts: EncryptedKnownHostRepository(vault: vault, records: records),
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ),
+      records: records,
+      vault: vault,
+    );
+
+    final summary = await service.createPasswordHost(
+      const PasswordHostDraft(
+        displayName: '   ',
+        hostname: 'bastion.internal',
+        port: 22,
+        username: 'ops',
+        password: 'server-password',
+        tags: {},
+      ),
+    );
+
+    final storedHost = await hosts.read(summary.id);
+    expect(summary.displayName, 'bastion.internal');
+    expect(storedHost!.displayName, 'bastion.internal');
+  });
+
   test('persists normalized host connection settings', () async {
     final vault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),

@@ -618,6 +618,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostDisplayNameLabel => '表示名';
 
   @override
+  String get hostDisplayNameOptionalLabel => '表示名（任意）';
+
+  @override
+  String get hostDisplayNameHostnameHint => 'ホスト名と同じ';
+
+  @override
+  String get hostDisplayNameHostnameHelper => '空のままにするとホスト名が使われます。';
+
+  @override
   String get hostHostnameLabel => 'ホスト名';
 
   @override

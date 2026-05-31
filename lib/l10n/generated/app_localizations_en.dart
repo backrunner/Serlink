@@ -670,6 +670,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostDisplayNameLabel => 'Display name';
 
   @override
+  String get hostDisplayNameOptionalLabel => 'Display name (optional)';
+
+  @override
+  String get hostDisplayNameHostnameHint => 'Same as hostname';
+
+  @override
+  String get hostDisplayNameHostnameHelper =>
+      'Leave blank to use the hostname.';
+
+  @override
   String get hostHostnameLabel => 'Hostname';
 
   @override

@@ -166,6 +166,17 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
     await tester.pumpAndSettle();
 
+    expect(find.text('Display name (optional)'), findsOneWidget);
+    expect(find.text('Leave blank to use the hostname.'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('host-hostname-field'))).dy,
+      lessThan(
+        tester
+            .getTopLeft(find.byKey(const ValueKey('host-display-name-field')))
+            .dy,
+      ),
+    );
+
     await tester.enterText(
       find.byKey(const ValueKey('host-display-name-field')),
       'Production Bastion',

@@ -612,6 +612,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostDisplayNameLabel => '显示名称';
 
   @override
+  String get hostDisplayNameOptionalLabel => '显示名称（可选）';
+
+  @override
+  String get hostDisplayNameHostnameHint => '与主机名一致';
+
+  @override
+  String get hostDisplayNameHostnameHelper => '留空则使用主机名。';
+
+  @override
   String get hostHostnameLabel => '主机名';
 
   @override

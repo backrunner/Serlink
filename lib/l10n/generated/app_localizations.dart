@@ -1222,6 +1222,24 @@ abstract class AppLocalizations {
   /// **'Display name'**
   String get hostDisplayNameLabel;
 
+  /// No description provided for @hostDisplayNameOptionalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name (optional)'**
+  String get hostDisplayNameOptionalLabel;
+
+  /// No description provided for @hostDisplayNameHostnameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Same as hostname'**
+  String get hostDisplayNameHostnameHint;
+
+  /// No description provided for @hostDisplayNameHostnameHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank to use the hostname.'**
+  String get hostDisplayNameHostnameHelper;
+
   /// No description provided for @hostHostnameLabel.
   ///
   /// In en, this message translates to:

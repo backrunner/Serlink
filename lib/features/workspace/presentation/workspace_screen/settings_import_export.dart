@@ -1,12 +1,12 @@
 part of '../workspace_screen.dart';
 
 Future<void> _exportVaultBackup(BuildContext context, WidgetRef ref) async {
+  final l10n = context.l10n;
   final confirmed = await _confirmDialog(
     context,
-    title: 'Export encrypted backup?',
-    body:
-        'The backup contains encrypted vault records and the vault header. Keep it private.',
-    confirmLabel: 'Export',
+    title: l10n.exportVaultBackupTitle,
+    body: l10n.exportVaultBackupBody,
+    confirmLabel: l10n.settingsExportAction,
   );
   if (!confirmed || !context.mounted) {
     return;
@@ -30,16 +30,17 @@ Future<void> _exportVaultBackup(BuildContext context, WidgetRef ref) async {
     );
     await file.saveTo(location.path);
     if (context.mounted) {
-      _showSnackBar(context, 'Encrypted backup exported.');
+      _showSnackBar(context, l10n.backupExportedSnack);
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _backupErrorMessage(error));
+      _showSnackBar(context, _backupErrorMessage(l10n, error));
     }
   }
 }
 
 Future<void> _exportHostMetadata(BuildContext context, WidgetRef ref) async {
+  final l10n = context.l10n;
   try {
     final hosts = await ref.read(hostRepositoryProvider).list();
     hosts.sort(
@@ -51,15 +52,14 @@ Future<void> _exportHostMetadata(BuildContext context, WidgetRef ref) async {
       return;
     }
     if (hosts.isEmpty) {
-      _showSnackBar(context, 'No hosts are available to export.');
+      _showSnackBar(context, l10n.noHostsAvailableExportSnack);
       return;
     }
     final selectedHostIds = await _showHostSelectionDialog(
       context,
       hosts,
-      title: 'Export host metadata?',
-      description:
-          'Exports host names, addresses, usernames, tags, jump host links, and connection options. Credentials and private key material are excluded.',
+      title: l10n.exportHostMetadataTitle,
+      description: l10n.exportHostMetadataBody,
     );
     if (selectedHostIds == null ||
         selectedHostIds.isEmpty ||
@@ -85,16 +85,17 @@ Future<void> _exportHostMetadata(BuildContext context, WidgetRef ref) async {
     await file.writeAsBytes(bundle.toBytes(), flush: true);
     await LocalFileSecurity.restrictExistingFile(file);
     if (context.mounted) {
-      _showSnackBar(context, 'Host metadata exported.');
+      _showSnackBar(context, l10n.hostMetadataExportedSnack);
     }
   } on Object {
     if (context.mounted) {
-      _showSnackBar(context, 'Host metadata could not be exported.');
+      _showSnackBar(context, l10n.hostMetadataExportFailedSnack);
     }
   }
 }
 
 Future<void> _exportOpenSshConfig(BuildContext context, WidgetRef ref) async {
+  final l10n = context.l10n;
   try {
     final hosts = await ref.read(hostRepositoryProvider).list();
     hosts.sort(
@@ -106,15 +107,14 @@ Future<void> _exportOpenSshConfig(BuildContext context, WidgetRef ref) async {
       return;
     }
     if (hosts.isEmpty) {
-      _showSnackBar(context, 'No hosts are available to export.');
+      _showSnackBar(context, l10n.noHostsAvailableExportSnack);
       return;
     }
     final selectedHostIds = await _showHostSelectionDialog(
       context,
       hosts,
-      title: 'Export OpenSSH config?',
-      description:
-          'Exports selected hosts and any required jump hosts as an OpenSSH config. Credentials and private key material are excluded.',
+      title: l10n.exportOpenSshConfigTitle,
+      description: l10n.exportOpenSshConfigBody,
     );
     if (selectedHostIds == null ||
         selectedHostIds.isEmpty ||
@@ -124,15 +124,15 @@ Future<void> _exportOpenSshConfig(BuildContext context, WidgetRef ref) async {
     final decision = await ref
         .read(securityModalServiceProvider)
         .confirmExport(
-          const ExportPreview(
-            title: 'Export OpenSSH config?',
+          ExportPreview(
+            title: l10n.exportOpenSshConfigTitle,
             encrypted: false,
             sensitiveFields: [
-              'hostnames',
-              'usernames',
-              'ports',
-              'jump host aliases',
-              'connection settings',
+              l10n.exportFieldHostnames,
+              l10n.exportFieldUsernames,
+              l10n.exportFieldPorts,
+              l10n.exportFieldJumpHostAliases,
+              l10n.exportFieldConnectionSettings,
             ],
           ),
         );
@@ -158,11 +158,11 @@ Future<void> _exportOpenSshConfig(BuildContext context, WidgetRef ref) async {
     await file.writeAsString(bundle.contents, flush: true);
     await LocalFileSecurity.restrictExistingFile(file);
     if (context.mounted) {
-      _showSnackBar(context, 'OpenSSH config exported.');
+      _showSnackBar(context, l10n.openSshConfigExportedSnack);
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _openSshConfigExportErrorMessage(error));
+      _showSnackBar(context, _openSshConfigExportErrorMessage(l10n, error));
     }
   }
 }
@@ -171,17 +171,18 @@ Future<void> _exportIdentityMetadata(
   BuildContext context,
   WidgetRef ref,
 ) async {
+  final l10n = context.l10n;
   final confirmed = await ref
       .read(securityModalServiceProvider)
       .confirmExport(
-        const ExportPreview(
-          title: 'Export identity metadata?',
+        ExportPreview(
+          title: l10n.exportIdentityMetadataTitle,
           encrypted: false,
           sensitiveFields: [
-            'display names',
-            'username hints',
-            'public key fingerprints',
-            'certificate principals',
+            l10n.exportFieldDisplayNames,
+            l10n.exportFieldUsernameHints,
+            l10n.exportFieldPublicKeyFingerprints,
+            l10n.exportFieldCertificatePrincipals,
           ],
         ),
       );
@@ -206,11 +207,11 @@ Future<void> _exportIdentityMetadata(
     await file.writeAsBytes(bundle.toBytes(), flush: true);
     await LocalFileSecurity.restrictExistingFile(file);
     if (context.mounted) {
-      _showSnackBar(context, 'Identity metadata exported.');
+      _showSnackBar(context, l10n.identityMetadataExportedSnack);
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _identityMetadataExportErrorMessage(error));
+      _showSnackBar(context, _identityMetadataExportErrorMessage(l10n, error));
     }
   }
 }
@@ -275,7 +276,7 @@ Future<List<HostId>?> _showHostSelectionDialog(
             actions: [
               SerlinkTextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text(context.l10n.cancelAction),
               ),
               SerlinkTextButton(
                 onPressed: () {
@@ -290,7 +291,9 @@ Future<List<HostId>?> _showHostSelectionDialog(
                   });
                 },
                 child: Text(
-                  selected.length == hosts.length ? 'Clear all' : 'Select all',
+                  selected.length == hosts.length
+                      ? context.l10n.clearAllAction
+                      : context.l10n.selectAllAction,
                 ),
               ),
               SerlinkFilledButton(
@@ -299,7 +302,7 @@ Future<List<HostId>?> _showHostSelectionDialog(
                     : () => Navigator.of(
                         context,
                       ).pop(selected.toList(growable: false)),
-                child: const Text('Export'),
+                child: Text(context.l10n.settingsExportAction),
               ),
             ],
           );
@@ -313,12 +316,12 @@ Future<void> _exportDiagnosticBundle(
   BuildContext context,
   WidgetRef ref,
 ) async {
+  final l10n = context.l10n;
   final confirmed = await _confirmDialog(
     context,
-    title: 'Export diagnostic bundle?',
-    body:
-        'The bundle is redacted and excludes terminal output, commands, hosts, usernames, paths, credentials, and private keys.',
-    confirmLabel: 'Export',
+    title: l10n.exportDiagnosticBundleTitle,
+    body: l10n.exportDiagnosticBundleBody,
+    confirmLabel: l10n.settingsExportAction,
   );
   if (!confirmed || !context.mounted) {
     return;
@@ -341,11 +344,11 @@ Future<void> _exportDiagnosticBundle(
     await file.writeAsBytes(bundle.bytes, flush: true);
     await LocalFileSecurity.restrictExistingFile(file);
     if (context.mounted) {
-      _showSnackBar(context, 'Diagnostic bundle exported.');
+      _showSnackBar(context, l10n.diagnosticBundleExportedSnack);
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _diagnosticErrorMessage(error));
+      _showSnackBar(context, _diagnosticErrorMessage(l10n, error));
     }
   }
 }
@@ -362,10 +365,9 @@ Future<void> _importVaultBackup(BuildContext context, WidgetRef ref) async {
 
   final confirmed = await _confirmDialog(
     context,
-    title: 'Import encrypted backup?',
-    body:
-        'This replaces the local vault header and merges encrypted records from the selected backup.',
-    confirmLabel: 'Import',
+    title: context.l10n.importEncryptedBackupTitle,
+    body: context.l10n.importEncryptedBackupBody,
+    confirmLabel: context.l10n.importAction,
     destructive: true,
   );
   if (!confirmed) {
@@ -378,11 +380,11 @@ Future<void> _importVaultBackup(BuildContext context, WidgetRef ref) async {
     ref.invalidate(vaultSessionControllerProvider);
     ref.invalidate(hostSummariesProvider);
     if (context.mounted) {
-      _showSnackBar(context, 'Encrypted backup imported.');
+      _showSnackBar(context, context.l10n.backupImportedSnack);
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _backupErrorMessage(error));
+      _showSnackBar(context, _backupErrorMessage(context.l10n, error));
     }
   }
 }
@@ -404,7 +406,7 @@ Future<void> _importOpenSshConfig(BuildContext context, WidgetRef ref) async {
     }
     if (preview.entries.isEmpty) {
       if (context.mounted) {
-        _showSnackBar(context, 'No importable OpenSSH hosts found.');
+        _showSnackBar(context, context.l10n.noImportableOpenSshHostsSnack);
       }
       return;
     }
@@ -419,15 +421,20 @@ Future<void> _importOpenSshConfig(BuildContext context, WidgetRef ref) async {
     );
     ref.invalidate(hostSummariesProvider);
     if (context.mounted) {
+      final l10n = context.l10n;
       _showSnackBar(
         context,
-        'Imported ${result.hostsCreated} hosts'
-        '${result.hostsSkipped == 0 ? '' : ', skipped ${result.hostsSkipped}'}.',
+        result.hostsSkipped == 0
+            ? l10n.openSshHostsImportedSnack(result.hostsCreated)
+            : l10n.openSshHostsImportedSkippedSnack(
+                result.hostsCreated,
+                result.hostsSkipped,
+              ),
       );
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _importErrorMessage(error));
+      _showSnackBar(context, _importErrorMessage(context.l10n, error));
     }
   }
 }
@@ -440,10 +447,9 @@ Future<void> _importKnownHosts(BuildContext context, WidgetRef ref) async {
 
   final confirmed = await _confirmDialog(
     context,
-    title: 'Import known_hosts?',
-    body:
-        'Serlink will import fingerprints that match existing hosts by hostname and port. Hostnames and fingerprints are stored as encrypted vault records.',
-    confirmLabel: 'Import',
+    title: context.l10n.importKnownHostsTitle,
+    body: context.l10n.importKnownHostsBody,
+    confirmLabel: context.l10n.importAction,
   );
   if (!confirmed || !context.mounted) {
     return;
@@ -454,15 +460,20 @@ Future<void> _importKnownHosts(BuildContext context, WidgetRef ref) async {
         .read(knownHostsImportServiceProvider)
         .importText(await file.readAsString());
     if (context.mounted) {
+      final l10n = context.l10n;
       _showSnackBar(
         context,
-        'Imported ${result.recordsImported} fingerprints'
-        '${result.unmatchedHosts == 0 ? '' : ', ${result.unmatchedHosts} unmatched'}.',
+        result.unmatchedHosts == 0
+            ? l10n.knownHostsImportedSnack(result.recordsImported)
+            : l10n.knownHostsImportedUnmatchedSnack(
+                result.recordsImported,
+                result.unmatchedHosts,
+              ),
       );
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _importErrorMessage(error));
+      _showSnackBar(context, _importErrorMessage(context.l10n, error));
     }
   }
 }
@@ -500,11 +511,14 @@ Future<void> _importOpenSshCertificate(
     }
     final identity = await service.importIdentity(confirmedDraft);
     if (context.mounted) {
-      _showSnackBar(context, 'Imported ${identity.displayName}.');
+      _showSnackBar(
+        context,
+        context.l10n.identityImportedSnack(identity.displayName),
+      );
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _importErrorMessage(error));
+      _showSnackBar(context, _importErrorMessage(context.l10n, error));
     }
   }
 }
@@ -520,7 +534,7 @@ Future<bool> _showOpenSshConfigImportDialog(
     builder: (context) {
       return SerlinkDialog(
         maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
-        title: const Text('Import OpenSSH config?'),
+        title: Text(context.l10n.importOpenSshConfigTitle),
         content: SizedBox(
           width: 520,
           child: Column(
@@ -528,13 +542,19 @@ Future<bool> _showOpenSshConfigImportDialog(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${preview.entries.length} host${preview.entries.length == 1 ? '' : 's'} ready to import'
-                '${preview.skippedHosts == 0 ? '' : ', ${preview.skippedHosts} skipped'}.',
+                preview.skippedHosts == 0
+                    ? context.l10n.openSshConfigHostsReady(
+                        preview.entries.length,
+                      )
+                    : context.l10n.openSshConfigHostsReadySkipped(
+                        preview.entries.length,
+                        preview.skippedHosts,
+                      ),
               ),
               if (warnings.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 SerlinkAlert.warning(
-                  title: 'Import warnings',
+                  title: context.l10n.importWarningsTitle,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -552,7 +572,9 @@ Future<bool> _showOpenSshConfigImportDialog(
                       if (preview.warnings.length > warnings.length) ...[
                         const SizedBox(height: 4),
                         Text(
-                          '${preview.warnings.length - warnings.length} more warnings.',
+                          context.l10n.moreWarnings(
+                            preview.warnings.length - warnings.length,
+                          ),
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: context.tokens.textSecondary,
@@ -570,11 +592,11 @@ Future<bool> _showOpenSshConfigImportDialog(
         actions: [
           SerlinkTextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancelAction),
           ),
           SerlinkFilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Import'),
+            child: Text(context.l10n.importAction),
           ),
         ],
       );

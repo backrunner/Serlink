@@ -1,15 +1,21 @@
 part of '../workspace_screen.dart';
 
-String _syncDevicesSubtitle(List<SyncDeviceMetadata> devices) {
+String _syncDevicesSubtitle(
+  AppLocalizations l10n,
+  List<SyncDeviceMetadata> devices,
+) {
   if (devices.isEmpty) {
-    return 'This device will be registered on first sync.';
+    return l10n.syncDevicesWillRegister;
   }
   if (devices.length == 1) {
-    return '${devices.single.displayName} registered for encrypted sync.';
+    return l10n.syncDeviceSingleSubtitle(devices.single.displayName);
   }
   final latest = [...devices]
     ..sort((a, b) => b.lastSeenAt.compareTo(a.lastSeenAt));
-  return '${devices.length} devices registered. Last writer: ${latest.first.displayName}.';
+  return l10n.syncDevicesMultipleSubtitle(
+    devices.length,
+    latest.first.displayName,
+  );
 }
 
 Future<void> _showSyncDevicesDialog(
@@ -40,11 +46,12 @@ Future<void> _deleteSyncDevice(
   WidgetRef ref,
   SyncDeviceMetadata device,
 ) async {
+  final l10n = pageContext.l10n;
   final confirmed = await _confirmDialog(
     dialogContext,
-    title: 'Remove ${device.displayName}?',
-    body: 'This removes the encrypted sync device record from this vault.',
-    confirmLabel: 'Remove',
+    title: l10n.syncDeviceRemoveTitle(device.displayName),
+    body: l10n.syncDeviceRemoveBody,
+    confirmLabel: l10n.removeAction,
     destructive: true,
   );
   if (!confirmed) {
@@ -58,7 +65,7 @@ Future<void> _deleteSyncDevice(
       Navigator.of(dialogContext).pop();
     }
     if (pageContext.mounted) {
-      _showSnackBar(pageContext, 'Sync device removed.');
+      _showSnackBar(pageContext, l10n.syncDeviceRemovedSnack);
     }
   } on SyncDeviceException catch (error) {
     if (pageContext.mounted) {
@@ -66,18 +73,18 @@ Future<void> _deleteSyncDevice(
     }
   } on Object {
     if (pageContext.mounted) {
-      _showSnackBar(pageContext, 'Sync device could not be removed.');
+      _showSnackBar(pageContext, l10n.syncDeviceRemoveFailedSnack);
     }
   }
 }
 
 Future<void> _rotateSyncDevice(BuildContext context, WidgetRef ref) async {
+  final l10n = context.l10n;
   final confirmed = await _confirmDialog(
     context,
-    title: 'Reset sync device?',
-    body:
-        'This removes the current device registration from encrypted sync and creates a new local device identity. Other devices will see the old device as removed.',
-    confirmLabel: 'Reset',
+    title: l10n.syncDeviceResetTitle,
+    body: l10n.syncDeviceResetBody,
+    confirmLabel: l10n.syncResetAction,
     destructive: true,
   );
   if (!confirmed || !context.mounted) {
@@ -91,10 +98,7 @@ Future<void> _rotateSyncDevice(BuildContext context, WidgetRef ref) async {
         .read(autoSyncControllerProvider.notifier)
         .requestSync(delay: Duration.zero);
     if (context.mounted) {
-      _showSnackBar(
-        context,
-        'Sync device reset. A new registration will be created on the next sync.',
-      );
+      _showSnackBar(context, l10n.syncDeviceResetSnack);
     }
   } on SyncDeviceException catch (error) {
     if (context.mounted) {
@@ -102,7 +106,7 @@ Future<void> _rotateSyncDevice(BuildContext context, WidgetRef ref) async {
     }
   } on Object {
     if (context.mounted) {
-      _showSnackBar(context, 'Sync device could not be reset.');
+      _showSnackBar(context, l10n.syncDeviceResetFailedSnack);
     }
   }
 }
@@ -120,30 +124,30 @@ class _SyncDevicesDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
-      title: const Text('Sync Devices'),
+      title: Text(l10n.syncDevicesDialogTitle),
       content: SizedBox(
         width: 520,
         child: _DialogList(
-          empty: const _DialogState(
+          empty: _DialogState(
             icon: Icons.devices_other_outlined,
-            title: 'No sync devices yet',
-            body:
-                'This device will be registered here after the first successful encrypted sync.',
+            title: l10n.syncDevicesEmptyTitle,
+            body: l10n.syncDevicesEmptyBody,
           ),
           items: [
             for (final device in devices)
               _DialogListItem(
                 icon: Icons.devices_outlined,
                 title: device.id == localDeviceId
-                    ? '${device.displayName} (this device)'
+                    ? l10n.syncDeviceThisDevice(device.displayName)
                     : device.displayName,
-                subtitle: _syncDeviceSubtitle(device),
+                subtitle: _syncDeviceSubtitle(l10n, device),
                 trailing: device.id == localDeviceId
                     ? null
                     : SerlinkIconButton(
-                        tooltip: 'Remove device',
+                        tooltip: l10n.syncDeviceRemoveTooltip,
                         onPressed: () => onDelete(device),
                         icon: const Icon(Icons.delete_outline, size: 18),
                       ),
@@ -154,15 +158,18 @@ class _SyncDevicesDialog extends StatelessWidget {
       actions: [
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
+          child: Text(l10n.closeAction),
         ),
       ],
     );
   }
 }
 
-String _syncDeviceSubtitle(SyncDeviceMetadata device) {
-  return '${device.platform} / last seen ${_shortLocalDateTime(device.lastSeenAt)}';
+String _syncDeviceSubtitle(AppLocalizations l10n, SyncDeviceMetadata device) {
+  return l10n.syncDeviceSubtitle(
+    device.platform,
+    _shortLocalDateTime(device.lastSeenAt),
+  );
 }
 
 String _shortLocalDateTime(DateTime value) {

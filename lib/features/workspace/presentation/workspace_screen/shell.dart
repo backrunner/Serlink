@@ -23,6 +23,7 @@ class WorkspaceScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final state = ref.watch(workspaceTabControllerProvider);
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final showSearch = _showsWorkspaceSearch(state.area);
@@ -72,6 +73,7 @@ class WorkspaceScreen extends ConsumerWidget {
                               _TopBar(
                                 showSearch: showSearch,
                                 searchPlaceholder: _workspaceSearchPlaceholder(
+                                  l10n,
                                   state.area,
                                 ),
                                 showLocalTerminal: showLocalTerminal,
@@ -160,13 +162,13 @@ bool _showsLocalTerminalAction(WorkspaceArea area) {
   };
 }
 
-String _workspaceSearchPlaceholder(WorkspaceArea area) {
+String _workspaceSearchPlaceholder(AppLocalizations l10n, WorkspaceArea area) {
   return switch (area) {
-    WorkspaceArea.hosts => 'Search hosts, addresses, or tags',
-    WorkspaceArea.snippets => 'Search snippets and commands',
-    WorkspaceArea.sessions => 'Search active sessions',
-    WorkspaceArea.transfers => 'Search transfers',
-    WorkspaceArea.settings => 'Search settings',
+    WorkspaceArea.hosts => l10n.searchHostsPlaceholder,
+    WorkspaceArea.snippets => l10n.searchSnippetsPlaceholder,
+    WorkspaceArea.sessions => l10n.searchSessionsPlaceholder,
+    WorkspaceArea.transfers => l10n.searchTransfersPlaceholder,
+    WorkspaceArea.settings => l10n.searchSettingsPlaceholder,
   };
 }
 
@@ -178,6 +180,7 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SizedBox(
       width: SerlinkSizes.sidebarWidth,
       child: GlassPanel(
@@ -189,32 +192,32 @@ class _Sidebar extends StatelessWidget {
             const _BrandHeader(),
             _NavItem(
               icon: Icons.dns_outlined,
-              label: 'Hosts',
+              label: l10n.navHosts,
               selected: selected == WorkspaceArea.hosts,
               onTap: () => onSelected(WorkspaceArea.hosts),
             ),
             _NavItem(
               icon: Icons.terminal_outlined,
-              label: 'Sessions',
+              label: l10n.navSessions,
               selected: selected == WorkspaceArea.sessions,
               onTap: () => onSelected(WorkspaceArea.sessions),
             ),
             _NavItem(
               icon: Icons.sync_alt_outlined,
-              label: 'Transfers',
+              label: l10n.navTransfers,
               selected: selected == WorkspaceArea.transfers,
               onTap: () => onSelected(WorkspaceArea.transfers),
             ),
             _NavItem(
               icon: Icons.code_outlined,
-              label: 'Snippets',
+              label: l10n.navSnippets,
               selected: selected == WorkspaceArea.snippets,
               onTap: () => onSelected(WorkspaceArea.snippets),
             ),
             const Spacer(),
             _NavItem(
               icon: Icons.settings_outlined,
-              label: 'Settings',
+              label: l10n.navSettings,
               selected: selected == WorkspaceArea.settings,
               onTap: () => onSelected(WorkspaceArea.settings),
             ),

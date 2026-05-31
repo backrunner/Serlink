@@ -65,7 +65,8 @@ class _DataExchangeDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final lockedSubtitle = 'Unlock the vault to use this action.';
+    final l10n = context.l10n;
+    final lockedSubtitle = l10n.dataExchangeLockedSubtitle;
 
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthDataExchange),
@@ -86,7 +87,7 @@ class _DataExchangeDialog extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Import / Export',
+                        l10n.dataExchangeTitle,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: t.textPrimary,
@@ -103,28 +104,28 @@ class _DataExchangeDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Backups stay available anytime. Host, identity, and SSH data require an unlocked vault.',
+                  l10n.dataExchangeSubtitle,
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
                 ),
                 const SizedBox(height: 20),
                 SurfaceSection(
-                  title: 'Export',
+                  title: l10n.dataExchangeExportSection,
                   dividerIndent: 52,
                   children: [
                     _DataExchangeActionTile(
                       icon: Icons.lock_outline,
-                      title: 'Export encrypted backup',
-                      subtitle: 'Encrypted vault records and header.',
+                      title: l10n.dataExchangeExportBackupTitle,
+                      subtitle: l10n.dataExchangeExportBackupSubtitle,
                       onPressed: () => onActionSelected(
                         _DataExchangeAction.exportVaultBackup,
                       ),
                     ),
                     _DataExchangeActionTile(
                       icon: Icons.dns_outlined,
-                      title: 'Export host metadata',
-                      subtitle: 'Host names, addresses, tags, and options.',
+                      title: l10n.dataExchangeExportHostMetadataTitle,
+                      subtitle: l10n.dataExchangeExportHostMetadataSubtitle,
                       enabled: canImportHostData,
                       disabledSubtitle: lockedSubtitle,
                       onPressed: () => onActionSelected(
@@ -133,8 +134,8 @@ class _DataExchangeDialog extends StatelessWidget {
                     ),
                     _DataExchangeActionTile(
                       icon: Icons.terminal_outlined,
-                      title: 'Export OpenSSH config',
-                      subtitle: 'Selected hosts as an OpenSSH config.',
+                      title: l10n.dataExchangeExportOpenSshConfigTitle,
+                      subtitle: l10n.dataExchangeExportOpenSshConfigSubtitle,
                       enabled: canImportHostData,
                       disabledSubtitle: lockedSubtitle,
                       onPressed: () => onActionSelected(
@@ -143,9 +144,8 @@ class _DataExchangeDialog extends StatelessWidget {
                     ),
                     _DataExchangeActionTile(
                       icon: Icons.badge_outlined,
-                      title: 'Export identity metadata',
-                      subtitle:
-                          'Display names, hints, and public fingerprints.',
+                      title: l10n.dataExchangeExportIdentityMetadataTitle,
+                      subtitle: l10n.dataExchangeExportIdentityMetadataSubtitle,
                       enabled: canImportHostData,
                       disabledSubtitle: lockedSubtitle,
                       onPressed: () => onActionSelected(
@@ -156,21 +156,21 @@ class _DataExchangeDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 SurfaceSection(
-                  title: 'Import',
+                  title: l10n.dataExchangeImportSection,
                   dividerIndent: 52,
                   children: [
                     _DataExchangeActionTile(
                       icon: Icons.restore_outlined,
-                      title: 'Import encrypted backup',
-                      subtitle: 'Merge records from a Serlink backup.',
+                      title: l10n.dataExchangeImportBackupTitle,
+                      subtitle: l10n.dataExchangeImportBackupSubtitle,
                       onPressed: () => onActionSelected(
                         _DataExchangeAction.importVaultBackup,
                       ),
                     ),
                     _DataExchangeActionTile(
                       icon: Icons.terminal_outlined,
-                      title: 'Import OpenSSH config',
-                      subtitle: 'Create hosts from an ssh config file.',
+                      title: l10n.dataExchangeImportOpenSshConfigTitle,
+                      subtitle: l10n.dataExchangeImportOpenSshConfigSubtitle,
                       enabled: canImportHostData,
                       disabledSubtitle: lockedSubtitle,
                       onPressed: () => onActionSelected(
@@ -179,8 +179,8 @@ class _DataExchangeDialog extends StatelessWidget {
                     ),
                     _DataExchangeActionTile(
                       icon: Icons.verified_outlined,
-                      title: 'Import known_hosts',
-                      subtitle: 'Add fingerprints for existing hosts.',
+                      title: l10n.dataExchangeImportKnownHostsTitle,
+                      subtitle: l10n.dataExchangeImportKnownHostsSubtitle,
                       enabled: canImportHostData,
                       disabledSubtitle: lockedSubtitle,
                       onPressed: () => onActionSelected(
@@ -189,8 +189,9 @@ class _DataExchangeDialog extends StatelessWidget {
                     ),
                     _DataExchangeActionTile(
                       icon: Icons.key_outlined,
-                      title: 'Import OpenSSH certificate',
-                      subtitle: 'Create an identity from key and certificate.',
+                      title: l10n.dataExchangeImportOpenSshCertificateTitle,
+                      subtitle:
+                          l10n.dataExchangeImportOpenSshCertificateSubtitle,
                       enabled: canImportHostData,
                       disabledSubtitle: lockedSubtitle,
                       onPressed: () => onActionSelected(

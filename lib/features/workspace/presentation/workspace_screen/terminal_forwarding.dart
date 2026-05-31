@@ -151,8 +151,9 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SerlinkDialog(
-      title: const Text('Port Forwarding'),
+      title: Text(l10n.forwardingDialogTitle),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
@@ -161,15 +162,15 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _ForwardSection(
-                title: 'Local',
+                title: l10n.forwardingLocalTitle,
                 subtitle: widget.activeLocalForward == null
-                    ? 'Expose a remote service on this device.'
+                    ? l10n.forwardingLocalSubtitle
                     : '127.0.0.1:${widget.activeLocalForward!.localPort}'
                           ' -> ${widget.activeLocalForward!.remoteHost}'
                           ':${widget.activeLocalForward!.remotePort}',
                 actionLabel: widget.activeLocalForward == null
-                    ? 'Start'
-                    : 'Stop',
+                    ? l10n.startAction
+                    : l10n.stopAction,
                 destructive: widget.activeLocalForward != null,
                 onPressed: widget.activeLocalForward == null
                     ? _submitLocal
@@ -188,8 +189,8 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                                     'local-forward-local-port-field',
                                   ),
                                   controller: _localPortController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Local port',
+                                  decoration: InputDecoration(
+                                    labelText: l10n.forwardingLocalPortLabel,
                                   ),
                                   keyboardType: TextInputType.number,
                                   textInputAction: TextInputAction.next,
@@ -203,8 +204,8 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                                     'local-forward-remote-host-field',
                                   ),
                                   controller: _remoteHostController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Remote host',
+                                  decoration: InputDecoration(
+                                    labelText: l10n.forwardingRemoteHostLabel,
                                   ),
                                   textInputAction: TextInputAction.next,
                                 ),
@@ -217,8 +218,8 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                               'local-forward-remote-port-field',
                             ),
                             controller: _remotePortController,
-                            decoration: const InputDecoration(
-                              labelText: 'Remote port',
+                            decoration: InputDecoration(
+                              labelText: l10n.forwardingRemotePortLabel,
                             ),
                             keyboardType: TextInputType.number,
                             onSubmitted: (_) => _submitLocal(),
@@ -235,16 +236,16 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
               ),
               const SizedBox(height: 16),
               _ForwardSection(
-                title: 'Remote',
+                title: l10n.forwardingRemoteTitle,
                 subtitle: widget.activeRemoteForward == null
-                    ? 'Expose a local service on the remote host.'
+                    ? l10n.forwardingRemoteSubtitle
                     : '${widget.activeRemoteForward!.bindHost}'
                           ':${widget.activeRemoteForward!.bindPort}'
                           ' -> ${widget.activeRemoteForward!.localHost}'
                           ':${widget.activeRemoteForward!.localPort}',
                 actionLabel: widget.activeRemoteForward == null
-                    ? 'Start'
-                    : 'Stop',
+                    ? l10n.startAction
+                    : l10n.stopAction,
                 destructive: widget.activeRemoteForward != null,
                 onPressed: widget.activeRemoteForward == null
                     ? _submitRemote
@@ -264,8 +265,8 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                                     'remote-forward-bind-host-field',
                                   ),
                                   controller: _remoteBindHostController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Bind host',
+                                  decoration: InputDecoration(
+                                    labelText: l10n.forwardingBindHostLabel,
                                   ),
                                   textInputAction: TextInputAction.next,
                                 ),
@@ -277,8 +278,8 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                                     'remote-forward-bind-port-field',
                                   ),
                                   controller: _remoteBindPortController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Bind port',
+                                  decoration: InputDecoration(
+                                    labelText: l10n.forwardingBindPortLabel,
                                   ),
                                   keyboardType: TextInputType.number,
                                   textInputAction: TextInputAction.next,
@@ -296,8 +297,8 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                                     'remote-forward-local-host-field',
                                   ),
                                   controller: _remoteLocalHostController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Local host',
+                                  decoration: InputDecoration(
+                                    labelText: l10n.forwardingLocalHostLabel,
                                   ),
                                   textInputAction: TextInputAction.next,
                                 ),
@@ -309,8 +310,8 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                                     'remote-forward-local-port-field',
                                   ),
                                   controller: _remoteLocalPortController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Local port',
+                                  decoration: InputDecoration(
+                                    labelText: l10n.forwardingLocalPortLabel,
                                   ),
                                   keyboardType: TextInputType.number,
                                   onSubmitted: (_) => _submitRemote(),
@@ -330,14 +331,14 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
               ),
               const SizedBox(height: 16),
               _ForwardSection(
-                title: 'SOCKS Proxy',
+                title: l10n.forwardingSocksTitle,
                 subtitle: widget.activeDynamicForward == null
-                    ? 'Start a local dynamic proxy for this SSH session.'
+                    ? l10n.forwardingSocksSubtitle
                     : '${widget.activeDynamicForward!.bindHost}'
                           ':${widget.activeDynamicForward!.bindPort}',
                 actionLabel: widget.activeDynamicForward == null
-                    ? 'Start'
-                    : 'Stop',
+                    ? l10n.startAction
+                    : l10n.stopAction,
                 destructive: widget.activeDynamicForward != null,
                 onPressed: widget.activeDynamicForward == null
                     ? _submitDynamic
@@ -355,8 +356,8 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                                 'dynamic-forward-bind-host-field',
                               ),
                               controller: _dynamicBindHostController,
-                              decoration: const InputDecoration(
-                                labelText: 'Bind host',
+                              decoration: InputDecoration(
+                                labelText: l10n.forwardingBindHostLabel,
                               ),
                               textInputAction: TextInputAction.next,
                             ),
@@ -368,8 +369,8 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
                                 'dynamic-forward-bind-port-field',
                               ),
                               controller: _dynamicBindPortController,
-                              decoration: const InputDecoration(
-                                labelText: 'Bind port',
+                              decoration: InputDecoration(
+                                labelText: l10n.forwardingBindPortLabel,
                               ),
                               keyboardType: TextInputType.number,
                               onSubmitted: (_) => _submitDynamic(),
@@ -392,7 +393,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
       actions: [
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
+          child: Text(l10n.closeAction),
         ),
       ],
     );
@@ -404,8 +405,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
     final remoteHost = _remoteHostController.text.trim();
     if (localPort == null || remotePort == null || remoteHost.isEmpty) {
       setState(() {
-        _localErrorMessage =
-            'Ports must be 1-65535 and remote host is required.';
+        _localErrorMessage = context.l10n.forwardingLocalValidationError;
       });
       return;
     }
@@ -430,7 +430,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
         bindPort == null ||
         localPort == null) {
       setState(() {
-        _remoteErrorMessage = 'Bind host, local host, and ports must be valid.';
+        _remoteErrorMessage = context.l10n.forwardingRemoteValidationError;
       });
       return;
     }
@@ -451,7 +451,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
     final bindPort = _parsePort(_dynamicBindPortController.text);
     if (bindHost.isEmpty || bindPort == null) {
       setState(() {
-        _dynamicErrorMessage = 'Bind host and port must be valid.';
+        _dynamicErrorMessage = context.l10n.forwardingDynamicValidationError;
       });
       return;
     }

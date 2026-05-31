@@ -43,6 +43,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final t = context.tokens;
     final asyncState = ref.watch(vaultSessionControllerProvider);
     final session = asyncState.value ?? widget.session;
@@ -88,7 +89,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                     _VaultLockBadge(initializing: isInitializing),
                     const SizedBox(height: 22),
                     Text(
-                      isInitializing ? 'Create Vault' : 'Unlock Vault',
+                      isInitializing ? l10n.vaultCreateTitle : l10n.vaultUnlockTitle,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(
@@ -99,8 +100,8 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                     const SizedBox(height: 6),
                     Text(
                       isInitializing
-                          ? 'Choose a strong passphrase to encrypt your hosts, keys, and secrets.'
-                          : 'Enter your passphrase to decrypt your workspace.',
+                          ? l10n.vaultCreateSubtitle
+                          : l10n.vaultUnlockSubtitle,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: t.textSecondary,
@@ -115,8 +116,8 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                       autofocus: true,
                       decoration: InputDecoration(
                         labelText: isInitializing
-                            ? 'New passphrase'
-                            : 'Passphrase',
+                            ? l10n.vaultNewPassphraseLabel
+                            : l10n.vaultPassphraseLabel,
                         prefixIcon: const Icon(Icons.lock_outline, size: 19),
                       ),
                       onSubmitted: (_) => _submit(isInitializing),
@@ -124,7 +125,9 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                     const SizedBox(height: 14),
                     _VaultPrimaryButton(
                       key: const ValueKey('vault-submit-button'),
-                      label: isInitializing ? 'Create Vault' : 'Unlock',
+                      label: isInitializing
+                          ? l10n.vaultCreateAction
+                          : l10n.vaultUnlockAction,
                       loading: asyncState.isLoading,
                       onPressed: asyncState.isLoading
                           ? null
@@ -141,7 +144,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                                   .read(vaultSessionControllerProvider.notifier)
                                   .unlockWithLocalKey(),
                         icon: const Icon(Icons.fingerprint, size: 19),
-                        label: const Text('Unlock with device'),
+                        label: Text(l10n.vaultUnlockWithDeviceAction),
                       ),
                     ],
                     if (showRecoveryCodeAccess) ...[
@@ -152,7 +155,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                             ? null
                             : _showRecoveryCodeDialog,
                         icon: const Icon(Icons.key_outlined, size: 19),
-                        label: const Text('Use recovery code'),
+                        label: Text(l10n.vaultUseRecoveryCodeAction),
                       ),
                     ],
                     _VaultErrorText(message: errorMessage),
@@ -164,7 +167,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                         onPressed: () => ref
                             .read(vaultSessionControllerProvider.notifier)
                             .dismissRecoveryKey(),
-                        child: const Text('Done'),
+                        child: Text(l10n.doneAction),
                       ),
                     ],
                   ],
@@ -185,7 +188,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     final passphrase = _passphraseController.text;
     if (passphrase.isEmpty) {
       setState(() {
-        _localErrorMessage = 'Enter a vault passphrase to continue.';
+        _localErrorMessage = context.l10n.vaultPassphraseRequired;
       });
       return;
     }

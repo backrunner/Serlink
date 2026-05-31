@@ -5,10 +5,12 @@ class _SettingsSurface extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final vaultSession = ref.watch(vaultSessionControllerProvider);
     final vault = vaultSession.value;
     final vaultState = vault?.vaultState;
     final canImportHostData = vaultState == VaultState.unlocked;
+    final language = ref.watch(appLanguageProvider).value ?? AppLanguage.system;
 
     final t = context.tokens;
     return ListView(
@@ -27,7 +29,7 @@ class _SettingsSurface extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Settings',
+                            l10n.settingsTitle,
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(
                                   fontWeight: FontWeight.w700,
@@ -36,7 +38,7 @@ class _SettingsSurface extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Security, sync, import/export, and runtime controls.',
+                            l10n.settingsSubtitle,
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: t.textSecondary),
                           ),
@@ -44,7 +46,7 @@ class _SettingsSurface extends ConsumerWidget {
                       ),
                     ),
                     _SettingsStatusPill(
-                      label: _vaultStatusPillLabel(vaultState),
+                      label: _vaultStatusPillLabel(l10n, vaultState),
                       color: vaultState == VaultState.unlocked
                           ? t.accentPrimary
                           : t.textMuted,
@@ -53,15 +55,37 @@ class _SettingsSurface extends ConsumerWidget {
                 ),
                 const SizedBox(height: 28),
                 _SettingsSection(
-                  title: 'Security',
+                  title: l10n.settingsGeneralSection,
+                  children: [
+                    _SettingsActionRow(
+                      icon: Icons.language_outlined,
+                      title: l10n.settingsLanguageTitle,
+                      subtitle: l10n.settingsLanguageSubtitle,
+                      action: SizedBox(
+                        width: 220,
+                        child: SerlinkSelect<AppLanguage>(
+                          value: language,
+                          items: _languageItems(l10n),
+                          hintText: l10n.selectAction,
+                          searchHint: l10n.searchAction,
+                          onChanged: (value) =>
+                              unawaited(_setAppLanguage(context, ref, value)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 26),
+                _SettingsSection(
+                  title: l10n.settingsSecuritySection,
                   children: [
                     _SettingsActionRow(
                       icon: Icons.lock_outline,
-                      title: 'Vault',
-                      subtitle: _vaultStateLabel(vaultState),
+                      title: l10n.settingsVaultTitle,
+                      subtitle: _vaultStateLabel(l10n, vaultState),
                       subtitleWidget: vaultState == null
-                          ? const _DynamicStatusText(
-                              label: 'Preparing encrypted storage',
+                          ? _DynamicStatusText(
+                              label: l10n.settingsVaultPreparing,
                             )
                           : null,
                       action: switch (vaultState) {
@@ -69,25 +93,25 @@ class _SettingsSurface extends ConsumerWidget {
                           onPressed: () => ref
                               .read(vaultSessionControllerProvider.notifier)
                               .lock(),
-                          child: const Text('Lock'),
+                          child: Text(l10n.settingsLockAction),
                         ),
                         VaultState.locked => SerlinkTextButton.icon(
                           key: const ValueKey('settings-vault-recovery-button'),
                           onPressed: () =>
                               _showVaultRecoveryCodeDialog(context),
                           icon: const Icon(Icons.key_outlined, size: 18),
-                          label: const Text('Recover / Reset'),
+                          label: Text(l10n.settingsRecoverResetAction),
                         ),
                         VaultState.uninitialized || null => null,
                       },
                     ),
                     _SettingsActionRow(
                       icon: Icons.key_outlined,
-                      title: 'Local unlock',
-                      subtitle: _localUnlockLabel(vault),
+                      title: l10n.settingsLocalUnlockTitle,
+                      subtitle: _localUnlockLabel(l10n, vault),
                       action: vaultState == VaultState.unlocked
                           ? SerlinkSwitch(
-                              semanticsLabel: 'Enable local unlock',
+                              semanticsLabel: l10n.settingsLocalUnlockSemantics,
                               value: vault?.localUnlockAvailable ?? false,
                               onChanged: (value) =>
                                   _setLocalVaultUnlock(context, ref, value),
@@ -106,38 +130,38 @@ class _SettingsSurface extends ConsumerWidget {
                                         )
                                         .unlockWithLocalKey(),
                               icon: const Icon(Icons.fingerprint, size: 18),
-                              label: const Text('Unlock with device'),
+                              label: Text(l10n.settingsUnlockWithDeviceAction),
                             )
                           : null,
                     ),
-                    const _SettingsInfoRow(
+                    _SettingsInfoRow(
                       icon: Icons.verified_user_outlined,
-                      title: 'Host key confirmation',
+                      title: l10n.settingsHostKeyConfirmationTitle,
                     ),
                     _SettingsActionRow(
                       icon: Icons.badge_outlined,
-                      title: 'Credentials',
+                      title: l10n.settingsCredentialsTitle,
                       subtitle: canImportHostData
                           ? null
-                          : 'Unlock the vault to review encrypted credentials.',
+                          : l10n.settingsCredentialsLocked,
                       action: SerlinkTextButton(
                         onPressed: canImportHostData
                             ? () => _showIdentityManagerDialog(context, ref)
                             : null,
-                        child: const Text('Manage'),
+                        child: Text(l10n.settingsManageAction),
                       ),
                     ),
                     _SettingsActionRow(
                       icon: Icons.verified_outlined,
-                      title: 'Known hosts',
+                      title: l10n.settingsKnownHostsTitle,
                       subtitle: canImportHostData
                           ? null
-                          : 'Unlock the vault to review trusted host fingerprints.',
+                          : l10n.settingsKnownHostsLocked,
                       action: SerlinkTextButton(
                         onPressed: canImportHostData
                             ? () => _showKnownHostsDialog(context, ref)
                             : null,
-                        child: const Text('Manage'),
+                        child: Text(l10n.settingsManageAction),
                       ),
                     ),
                   ],
@@ -146,13 +170,12 @@ class _SettingsSurface extends ConsumerWidget {
                 _SyncSettingsSection(vaultState: vaultState),
                 const SizedBox(height: 26),
                 _SettingsSection(
-                  title: 'Data',
+                  title: l10n.settingsDataSection,
                   children: [
                     _SettingsActionRow(
                       icon: Icons.import_export_outlined,
-                      title: 'Import / Export',
-                      subtitle:
-                          'Backups, OpenSSH files, certificates, known_hosts, and metadata.',
+                      title: l10n.settingsImportExportTitle,
+                      subtitle: l10n.settingsImportExportSubtitle,
                       action: SerlinkTextButton(
                         key: const ValueKey('settings-data-exchange-button'),
                         onPressed: () => _showDataExchangeDialog(
@@ -160,29 +183,29 @@ class _SettingsSurface extends ConsumerWidget {
                           ref,
                           canImportHostData: canImportHostData,
                         ),
-                        child: const Text('Open'),
+                        child: Text(l10n.settingsOpenAction),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 26),
                 _SettingsSection(
-                  title: 'Runtime',
+                  title: l10n.settingsRuntimeSection,
                   children: [
-                    const _SettingsInfoRow(
+                    _SettingsInfoRow(
                       icon: Icons.bug_report_outlined,
-                      title: 'Debug logging',
+                      title: l10n.settingsDebugLoggingTitle,
                     ),
-                    const _SettingsInfoRow(
+                    _SettingsInfoRow(
                       icon: Icons.health_and_safety_outlined,
-                      title: 'Crash reporting',
+                      title: l10n.settingsCrashReportingTitle,
                     ),
                     _SettingsActionRow(
                       icon: Icons.support_agent_outlined,
-                      title: 'Diagnostic bundle',
+                      title: l10n.settingsDiagnosticBundleTitle,
                       action: SerlinkTextButton(
                         onPressed: () => _exportDiagnosticBundle(context, ref),
-                        child: Text('Export'),
+                        child: Text(l10n.settingsExportAction),
                       ),
                     ),
                   ],

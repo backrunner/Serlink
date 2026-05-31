@@ -46,17 +46,18 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
-      title: const Text('Edit Credential'),
+      title: Text(l10n.credentialEditTitle),
       content: SizedBox(
         width: 560,
         child: _loadingSecret
-            ? const SizedBox(
+            ? SizedBox(
                 height: 132,
                 child: Center(
                   child: SerlinkLoadingIndicator(
-                    semanticsLabel: 'Loading credential secret',
+                    semanticsLabel: l10n.credentialLoadingSecretSemantics,
                   ),
                 ),
               )
@@ -67,8 +68,8 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
                     SerlinkTextField(
                       key: const ValueKey('credential-display-name-field'),
                       controller: _displayNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Credential name',
+                      decoration: InputDecoration(
+                        labelText: l10n.credentialNameLabel,
                       ),
                       textInputAction: TextInputAction.next,
                     ),
@@ -76,8 +77,8 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
                     SerlinkTextField(
                       key: const ValueKey('credential-username-hint-field'),
                       controller: _usernameHintController,
-                      decoration: const InputDecoration(
-                        labelText: 'Username hint',
+                      decoration: InputDecoration(
+                        labelText: l10n.credentialUsernameHintLabel,
                       ),
                       textInputAction: TextInputAction.next,
                     ),
@@ -97,23 +98,24 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
       actions: [
         SerlinkTextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
         SerlinkFilledButton(
           key: const ValueKey('credential-save-button'),
           onPressed: _loadingSecret || _saving ? null : _save,
-          child: Text(_saving ? 'Saving' : 'Save'),
+          child: Text(_saving ? l10n.savingAction : l10n.saveAction),
         ),
       ],
     );
   }
 
   Widget _secretFields() {
+    final l10n = context.l10n;
     return switch (widget.identity.kind) {
       IdentityKind.password => SerlinkTextField(
         key: const ValueKey('credential-password-field'),
         controller: _passwordController,
-        decoration: const InputDecoration(labelText: 'Password'),
+        decoration: InputDecoration(labelText: l10n.credentialPasswordLabel),
         obscureText: true,
         onSubmitted: (_) => _save(),
       ),
@@ -134,14 +136,14 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
         controller: _keyboardResponsesController,
         minLines: 3,
         maxLines: 6,
-        decoration: const InputDecoration(
-          labelText: 'Keyboard responses',
-          helperText: 'One response per line.',
+        decoration: InputDecoration(
+          labelText: l10n.credentialKeyboardResponsesLabel,
+          helperText: l10n.credentialKeyboardResponsesHelper,
         ),
       ),
-      IdentityKind.sshAgent || IdentityKind.hardwareKey => const Align(
+      IdentityKind.sshAgent || IdentityKind.hardwareKey => Align(
         alignment: Alignment.centerLeft,
-        child: Text('This credential has no stored secret material.'),
+        child: Text(l10n.credentialNoSecretMaterial),
       ),
     };
   }
@@ -169,7 +171,7 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
       }
       setState(() {
         _loadingSecret = false;
-        _errorMessage = 'Credential secret could not be loaded.';
+        _errorMessage = context.l10n.credentialSecretLoadFailed;
       });
     }
   }
@@ -224,7 +226,7 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorMessage = 'Credential could not be saved.';
+          _errorMessage = context.l10n.credentialSaveFailed;
         });
       }
     }
@@ -233,8 +235,8 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
   Future<void> _importPrivateKey() async {
     await _importTextFile(
       controller: _privateKeyController,
-      typeGroup: const XTypeGroup(
-        label: 'SSH Private Key',
+      typeGroup: XTypeGroup(
+        label: context.l10n.credentialSshPrivateKeyTypeLabel,
         extensions: ['pem', 'key', 'txt'],
       ),
     );
@@ -243,8 +245,8 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
   Future<void> _importCertificate() async {
     await _importTextFile(
       controller: _certificateController,
-      typeGroup: const XTypeGroup(
-        label: 'OpenSSH Certificate',
+      typeGroup: XTypeGroup(
+        label: context.l10n.credentialOpenSshCertificateTypeLabel,
         extensions: ['pub', 'cert', 'txt'],
       ),
     );
@@ -279,6 +281,7 @@ class _CertificateFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Column(
       children: [
         _PrivateKeyFields(
@@ -295,12 +298,14 @@ class _CertificateFields extends StatelessWidget {
                 controller: certificateController,
                 minLines: 3,
                 maxLines: 5,
-                decoration: const InputDecoration(labelText: 'Certificate'),
+                decoration: InputDecoration(
+                  labelText: l10n.credentialCertificateLabel,
+                ),
               ),
             ),
             const SizedBox(width: 8),
             SerlinkTooltip(
-              message: 'Import certificate',
+              message: l10n.credentialImportCertificateTooltip,
               child: SerlinkIconButton(
                 key: const ValueKey('credential-import-certificate-button'),
                 onPressed: onImportCertificate,

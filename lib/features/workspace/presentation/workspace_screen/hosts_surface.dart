@@ -5,14 +5,15 @@ class _HostsSurface extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final vaultSession = ref.watch(vaultSessionControllerProvider);
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final searchQuery = ref.watch(_workspaceSearchQueryProvider);
 
     return vaultSession.when(
-      loading: () => const _PlaceholderSurface(
-        title: 'Vault',
-        body: 'Preparing encrypted storage',
+      loading: () => _PlaceholderSurface(
+        title: l10n.vaultTitle,
+        body: l10n.settingsVaultPreparing,
         loading: true,
       ),
       error: (error, stackTrace) => _VaultAccessSurface(error: error),
@@ -22,19 +23,21 @@ class _HostsSurface extends ConsumerWidget {
         }
         final hostsAsync = ref.watch(hostSummariesProvider);
         final content = hostsAsync.isLoading
-            ? const _PlaceholderSurface(
-                title: 'Hosts',
-                body: 'Loading encrypted host records',
+            ? _PlaceholderSurface(
+                title: l10n.hostsTitle,
+                body: l10n.hostsLoading,
                 loading: true,
               )
             : hostsAsync.when(
-                loading: () => const _PlaceholderSurface(
-                  title: 'Hosts',
-                  body: 'Loading encrypted host records',
+                loading: () => _PlaceholderSurface(
+                  title: l10n.hostsTitle,
+                  body: l10n.hostsLoading,
                   loading: true,
                 ),
-                error: (error, stackTrace) =>
-                    _PlaceholderSurface(title: 'Hosts', body: error.toString()),
+                error: (error, stackTrace) => _PlaceholderSurface(
+                  title: l10n.hostsTitle,
+                  body: error.toString(),
+                ),
                 data: (hosts) {
                   final filteredHosts = filterHostSummaries(hosts, searchQuery);
                   if (hosts.isEmpty) {
@@ -50,10 +53,9 @@ class _HostsSurface extends ConsumerWidget {
                       ),
                       Expanded(
                         child: filteredHosts.isEmpty
-                            ? const _PlaceholderSurface(
-                                title: 'No Matches',
-                                body:
-                                    'No hosts match the current workspace search.',
+                            ? _PlaceholderSurface(
+                                title: l10n.hostsNoMatchesTitle,
+                                body: l10n.hostsNoMatchesBody,
                               )
                             : ListView.separated(
                                 padding: const EdgeInsets.all(16),
@@ -121,10 +123,9 @@ Future<void> _confirmDeleteHost(
 ) async {
   final confirmed = await _confirmDialog(
     context,
-    title: 'Delete host?',
-    body:
-        'This removes the host and any credentials that are not used by another host.',
-    confirmLabel: 'Delete',
+    title: context.l10n.hostsDeleteTitle,
+    body: context.l10n.hostsDeleteBody,
+    confirmLabel: context.l10n.hostsDeleteAction,
     destructive: true,
   );
   if (!confirmed) {
@@ -134,11 +135,11 @@ Future<void> _confirmDeleteHost(
     await ref.read(hostWriteServiceProvider).deleteHost(host.id);
     ref.invalidate(hostSummariesProvider);
     if (context.mounted) {
-      _showSnackBar(context, 'Host deleted.');
+      _showSnackBar(context, context.l10n.hostsDeletedSnack);
     }
   } on Object {
     if (context.mounted) {
-      _showSnackBar(context, 'Host could not be deleted.');
+      _showSnackBar(context, context.l10n.hostsDeleteFailedSnack);
     }
   }
 }
@@ -151,12 +152,13 @@ class _HostsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final t = context.tokens;
     return SurfaceToolbar(
       child: Row(
         children: [
           Text(
-            'Hosts',
+            l10n.hostsTitle,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
               color: t.textPrimary,
@@ -166,7 +168,7 @@ class _HostsHeader extends StatelessWidget {
           _CountBadge(count: count),
           const Spacer(),
           SerlinkTooltip(
-            message: 'Add host',
+            message: l10n.hostsAddTooltip,
             child: SerlinkIconButton(
               key: const ValueKey('add-host-button'),
               onPressed: onAddHost,
@@ -186,6 +188,7 @@ class _HostsEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final t = context.tokens;
     return Center(
       child: ConstrainedBox(
@@ -194,7 +197,7 @@ class _HostsEmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'No Hosts',
+              l10n.hostsEmptyTitle,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 color: t.textPrimary,
                 fontWeight: FontWeight.w600,
@@ -202,7 +205,7 @@ class _HostsEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Import SSH config or add hosts to start a session.',
+              l10n.hostsEmptyBody,
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,
@@ -213,7 +216,7 @@ class _HostsEmptyState extends StatelessWidget {
               key: const ValueKey('empty-add-host-button'),
               onPressed: onAddHost,
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Host'),
+              label: Text(l10n.hostsAddAction),
             ),
           ],
         ),

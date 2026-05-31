@@ -7,6 +7,7 @@ class _TerminalToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SizedBox(
       height: 44,
       child: Padding(
@@ -16,7 +17,7 @@ class _TerminalToolbar extends StatelessWidget {
           children: [
             _ToolbarSerlinkIconButton(
               key: const ValueKey('terminal-search-button'),
-              tooltip: 'Search terminal',
+              tooltip: l10n.terminalSearchTooltip,
               icon: Icons.search,
               selected: snapshot.searchActive,
               onPressed: snapshot.onToggleSearch,
@@ -25,6 +26,7 @@ class _TerminalToolbar extends StatelessWidget {
               _ToolbarSerlinkIconButton(
                 key: const ValueKey('terminal-forwarding-button'),
                 tooltip: _forwardingTooltip(
+                  l10n,
                   snapshot.activeLocalForward,
                   snapshot.activeRemoteForward,
                   snapshot.activeDynamicForward,
@@ -42,32 +44,32 @@ class _TerminalToolbar extends StatelessWidget {
             if (snapshot.showOpenSftp)
               _ToolbarSerlinkIconButton(
                 key: const ValueKey('terminal-open-sftp-button'),
-                tooltip: 'Open SFTP tab',
+                tooltip: l10n.terminalOpenSftpTooltip,
                 icon: Icons.folder_open_outlined,
                 onPressed: snapshot.onOpenSftp,
               ),
             _ToolbarSerlinkIconButton(
               key: const ValueKey('terminal-split-right-button'),
-              tooltip: 'Split right',
+              tooltip: l10n.terminalSplitRightTooltip,
               icon: Icons.view_column_outlined,
               onPressed: snapshot.onSplitRight,
             ),
             _ToolbarSerlinkIconButton(
               key: const ValueKey('terminal-split-down-button'),
-              tooltip: 'Split down',
+              tooltip: l10n.terminalSplitDownTooltip,
               icon: Icons.view_agenda_outlined,
               onPressed: snapshot.onSplitDown,
             ),
             if (snapshot.showSplit)
               _ToolbarSerlinkIconButton(
                 key: const ValueKey('terminal-close-pane-button'),
-                tooltip: 'Close active pane',
+                tooltip: l10n.terminalClosePaneTooltip,
                 icon: Icons.close_fullscreen_outlined,
                 onPressed: snapshot.onCloseActivePane,
               ),
             _ToolbarSerlinkIconButton(
               key: const ValueKey('terminal-settings-button'),
-              tooltip: 'Terminal settings',
+              tooltip: l10n.terminalSettingsTitle,
               icon: Icons.tune_outlined,
               onPressed: snapshot.onSettings,
             ),
@@ -187,13 +189,14 @@ String _dynamicForwardSignature(_DynamicForwardDraft? draft) {
 }
 
 String _forwardingTooltip(
+  AppLocalizations l10n,
   _LocalForwardDraft? activeForward,
   _RemoteForwardDraft? activeRemoteForward,
   _DynamicForwardDraft? activeDynamicForward, {
   required bool busy,
 }) {
   if (busy) {
-    return 'Updating port forwarding';
+    return l10n.terminalForwardingUpdating;
   }
   final activeCount = [
     activeForward,
@@ -201,7 +204,7 @@ String _forwardingTooltip(
     activeDynamicForward,
   ].whereType<Object>().length;
   if (activeCount == 0) {
-    return 'Manage port forwarding';
+    return l10n.terminalForwardingManage;
   }
-  return 'Manage port forwarding ($activeCount active)';
+  return l10n.terminalForwardingManageActive(activeCount);
 }

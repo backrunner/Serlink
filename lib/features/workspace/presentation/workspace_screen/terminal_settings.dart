@@ -19,11 +19,12 @@ class _TerminalSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final t = context.tokens;
     final hasMatches = result.matchCount > 0;
     final countLabel = hasMatches
         ? '${result.displayIndex}/${result.matchCount}'
-        : 'No results';
+        : l10n.terminalNoSearchResults;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: t.surfaceRaised,
@@ -59,7 +60,7 @@ class _TerminalSearchBar extends StatelessWidget {
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
                           filled: false,
-                          hintText: 'Search terminal',
+                          hintText: l10n.terminalSearchTooltip,
                           hintStyle: TextStyle(color: t.textMuted),
                         ),
                         onChanged: onChanged,
@@ -78,13 +79,13 @@ class _TerminalSearchBar extends StatelessWidget {
                     const SizedBox(width: 4),
                     Container(width: 1, height: 18, color: t.borderSubtle),
                     SerlinkIconButton(
-                      tooltip: 'Previous match',
+                      tooltip: l10n.terminalPreviousMatchTooltip,
                       visualDensity: VisualDensity.compact,
                       onPressed: hasMatches ? onPrevious : null,
                       icon: const Icon(Icons.keyboard_arrow_up, size: 18),
                     ),
                     SerlinkIconButton(
-                      tooltip: 'Next match',
+                      tooltip: l10n.terminalNextMatchTooltip,
                       visualDensity: VisualDensity.compact,
                       onPressed: hasMatches ? onNext : null,
                       icon: const Icon(Icons.keyboard_arrow_down, size: 18),
@@ -95,7 +96,7 @@ class _TerminalSearchBar extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             SerlinkIconButton(
-              tooltip: 'Close search',
+              tooltip: l10n.terminalCloseSearchTooltip,
               onPressed: onClose,
               icon: const Icon(Icons.close, size: 18),
             ),
@@ -125,6 +126,7 @@ class _TerminalSettingsDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final workspaceState = ref.watch(workspaceTabControllerProvider);
     final hostSettings = _terminalDisplaySettingsForTab(workspaceState, tabId);
     final globalSettings =
@@ -150,7 +152,7 @@ class _TerminalSettingsDialog extends ConsumerWidget {
 
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
-      title: const Text('Terminal Settings'),
+      title: Text(l10n.terminalSettingsTitle),
       content: SizedBox(
         width: 560,
         child: ConstrainedBox(
@@ -163,10 +165,10 @@ class _TerminalSettingsDialog extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _TerminalSettingsGroup(
-                  title: 'Appearance',
+                  title: l10n.terminalAppearanceSection,
                   children: [
                     SerlinkLabeledField(
-                      label: 'Theme',
+                      label: l10n.terminalThemeLabel,
                       child: SerlinkSelect<SerlinkTerminalThemeId>(
                         key: ValueKey(
                           'terminal-theme-${settings.themeId.name}-$editingHostProfile',
@@ -201,10 +203,10 @@ class _TerminalSettingsDialog extends ConsumerWidget {
                 ),
                 const SizedBox(height: 22),
                 _TerminalSettingsGroup(
-                  title: 'Layout',
+                  title: l10n.terminalLayoutSection,
                   children: [
                     _SettingsSlider(
-                      label: 'Font size',
+                      label: l10n.terminalFontSizeLabel,
                       value: settings.fontSize,
                       min: 10,
                       max: 24,
@@ -216,7 +218,7 @@ class _TerminalSettingsDialog extends ConsumerWidget {
                     ),
                     const SizedBox(height: 10),
                     _SettingsSlider(
-                      label: 'Line height',
+                      label: l10n.terminalLineHeightLabel,
                       value: settings.lineHeight,
                       min: 1,
                       max: 1.5,
@@ -227,7 +229,7 @@ class _TerminalSettingsDialog extends ConsumerWidget {
                     ),
                     const SizedBox(height: 10),
                     _SettingsSlider(
-                      label: 'Scrollback',
+                      label: l10n.terminalScrollbackLabel,
                       value: settings.scrollbackLines.toDouble(),
                       min: 1000,
                       max: 100000,
@@ -251,17 +253,17 @@ class _TerminalSettingsDialog extends ConsumerWidget {
           SerlinkTextButton(
             onPressed: () => workspaceController
                 .saveTerminalDisplaySettingsForHost(tabId, settings),
-            child: const Text('Save for host'),
+            child: Text(l10n.terminalSaveForHostAction),
           ),
         if (hostId != null && hostSettings != null)
           SerlinkTextButton(
             onPressed: () =>
                 workspaceController.resetTerminalDisplaySettingsForHost(tabId),
-            child: const Text('Use global'),
+            child: Text(l10n.terminalUseGlobalAction),
           ),
         SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Done'),
+          child: Text(l10n.doneAction),
         ),
       ],
     );
@@ -358,12 +360,13 @@ class _TerminalFontPickerState extends State<_TerminalFontPicker> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final fonts = widget.catalog.withCurrentFamily(widget.settings.fontFamily);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SerlinkLabeledField(
-          label: 'Font',
+          label: l10n.terminalFontLabel,
           trailing: _TerminalFontStatus(
             catalog: widget.catalog,
             loading: widget.catalogLoading,
@@ -374,8 +377,8 @@ class _TerminalFontPickerState extends State<_TerminalFontPicker> {
             ),
             value: widget.settings.fontFamily,
             searchable: true,
-            searchHint: 'Search fonts',
-            hintText: 'Select a font',
+            searchHint: l10n.terminalSearchFontsHint,
+            hintText: l10n.terminalSelectFontHint,
             items: [
               for (final font in fonts)
                 SerlinkSelectItem(
@@ -392,16 +395,16 @@ class _TerminalFontPickerState extends State<_TerminalFontPicker> {
         ),
         const SizedBox(height: 16),
         SerlinkLabeledField(
-          label: 'Custom family',
-          helper: 'Type an installed font family, then apply.',
+          label: l10n.terminalCustomFamilyLabel,
+          helper: l10n.terminalCustomFamilyHelper,
           child: SerlinkTextFormField(
             controller: _customFontController,
             decoration: InputDecoration(
               isDense: true,
-              hintText: 'e.g. JetBrains Mono',
+              hintText: l10n.terminalCustomFamilyHint,
               prefixIcon: const Icon(Icons.edit_outlined, size: 18),
               suffixIcon: SerlinkIconButton(
-                tooltip: 'Apply custom font',
+                tooltip: l10n.terminalApplyCustomFontTooltip,
                 onPressed: _applyCustomFont,
                 icon: const Icon(Icons.check_rounded, size: 18),
               ),
@@ -436,13 +439,14 @@ class _TerminalFontStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final l10n = context.l10n;
     final hasNerdFont = catalog.hasNerdFont;
     final color = hasNerdFont ? t.statusSuccess : t.textMuted;
     final text = loading
-        ? 'Scanning fonts'
+        ? l10n.terminalScanningFonts
         : hasNerdFont
-        ? 'Nerd Font ready'
-        : 'No Nerd Font';
+        ? l10n.terminalNerdFontReady
+        : l10n.terminalNoNerdFont;
 
     return Row(
       mainAxisSize: MainAxisSize.min,

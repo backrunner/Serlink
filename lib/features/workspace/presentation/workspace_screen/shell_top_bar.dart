@@ -34,6 +34,7 @@ class _TopBarState extends ConsumerState<_TopBar> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final query = ref.watch(_workspaceSearchQueryProvider);
     if (_searchController.text != query) {
       _searchController.value = TextEditingValue(
@@ -69,7 +70,7 @@ class _TopBarState extends ConsumerState<_TopBar> {
           const Expanded(child: _WindowDragRegion()),
           if (widget.showLocalTerminal)
             SerlinkTooltip(
-              message: 'Open local terminal tab',
+              message: l10n.openLocalTerminalTooltip,
               child: SerlinkIconButton(
                 constraints: const BoxConstraints.tightFor(
                   width: 30,
@@ -215,13 +216,14 @@ class _ClearChipState extends State<_ClearChip> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final t = context.tokens;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       cursor: SystemMouseCursors.click,
       child: SerlinkTooltip(
-        message: 'Clear search',
+        message: l10n.clearSearchTooltip,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.onTap,

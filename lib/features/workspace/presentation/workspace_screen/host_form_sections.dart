@@ -13,6 +13,7 @@ class _PrivateKeyFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Column(
       children: [
         Row(
@@ -23,12 +24,12 @@ class _PrivateKeyFields extends StatelessWidget {
                 controller: privateKeyController,
                 minLines: 5,
                 maxLines: 8,
-                decoration: const InputDecoration(labelText: 'Private key'),
+                decoration: InputDecoration(labelText: l10n.hostPrivateKeyLabel),
               ),
             ),
             const SizedBox(width: 8),
             SerlinkTooltip(
-              message: 'Import private key',
+              message: l10n.hostImportPrivateKeyTooltip,
               child: SerlinkIconButton(
                 key: const ValueKey('host-import-private-key-button'),
                 onPressed: onImportKey,
@@ -41,7 +42,7 @@ class _PrivateKeyFields extends StatelessWidget {
         SerlinkTextField(
           key: const ValueKey('host-key-passphrase-field'),
           controller: passphraseController,
-          decoration: const InputDecoration(labelText: 'Key passphrase'),
+          decoration: InputDecoration(labelText: l10n.hostKeyPassphraseLabel),
           obscureText: true,
         ),
       ],
@@ -68,6 +69,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final t = context.tokens;
     return SurfacePanel(
       padding: EdgeInsets.zero,
@@ -85,7 +87,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Advanced connection',
+                      l10n.hostAdvancedConnectionTitle,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: t.textPrimary,
                         fontWeight: FontWeight.w700,
@@ -115,7 +117,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
                         child: _ConnectionNumberField(
                           key: const ValueKey('host-connect-timeout-field'),
                           controller: connectTimeoutController,
-                          label: 'Timeout (s)',
+                          label: l10n.hostTimeoutLabel,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -123,7 +125,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
                         child: _ConnectionNumberField(
                           key: const ValueKey('host-keepalive-interval-field'),
                           controller: keepAliveIntervalController,
-                          label: 'Keepalive (s)',
+                          label: l10n.hostKeepaliveLabel,
                         ),
                       ),
                     ],
@@ -135,7 +137,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
                         child: _ConnectionNumberField(
                           key: const ValueKey('host-reconnect-attempts-field'),
                           controller: reconnectAttemptsController,
-                          label: 'Auto reconnect',
+                          label: l10n.hostAutoReconnectLabel,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -143,7 +145,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
                         child: _ConnectionNumberField(
                           key: const ValueKey('host-reconnect-backoff-field'),
                           controller: reconnectBackoffController,
-                          label: 'Backoff (s)',
+                          label: l10n.hostBackoffLabel,
                         ),
                       ),
                     ],
@@ -250,6 +252,7 @@ class _HostAuthenticationFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     if (isEditing) {
       return _SavedCredentialFields(
         identityOptions: identityOptions,
@@ -266,26 +269,26 @@ class _HostAuthenticationFields extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: SerlinkSegmentedControl<_HostAuthInputMode>(
             value: authMode,
-            segments: const [
+            segments: [
               SerlinkSegment(
                 value: _HostAuthInputMode.password,
                 icon: Icons.password,
-                label: 'Password',
+                label: l10n.hostAuthPasswordSegment,
               ),
               SerlinkSegment(
                 value: _HostAuthInputMode.privateKey,
                 icon: Icons.key,
-                label: 'Key',
+                label: l10n.hostAuthKeySegment,
               ),
               SerlinkSegment(
                 value: _HostAuthInputMode.sshAgent,
                 icon: Icons.vpn_key_outlined,
-                label: 'Agent',
+                label: l10n.hostAuthAgentSegment,
               ),
               SerlinkSegment(
                 value: _HostAuthInputMode.savedOrNone,
                 icon: Icons.badge_outlined,
-                label: 'Saved',
+                label: l10n.hostAuthSavedSegment,
               ),
             ],
             onChanged: onAuthModeChanged,
@@ -297,10 +300,12 @@ class _HostAuthenticationFields extends StatelessWidget {
             key: const ValueKey('host-password-field'),
             controller: passwordController,
             decoration: InputDecoration(
-              labelText: 'Password',
+              labelText: l10n.hostPasswordLabel,
               suffixIcon: SerlinkIconButton(
                 key: const ValueKey('host-password-visibility-toggle'),
-                tooltip: passwordVisible ? 'Hide password' : 'Show password',
+                tooltip: passwordVisible
+                    ? l10n.hostHidePasswordTooltip
+                    : l10n.hostShowPasswordTooltip,
                 onPressed: onTogglePasswordVisible,
                 icon: Icon(
                   passwordVisible
@@ -338,8 +343,7 @@ class _SshAgentAuthNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SerlinkAlert.info(
-      message:
-          'Uses identities from the local SSH agent. On macOS, keys loaded into ssh-agent can be backed by Keychain.',
+      message: context.l10n.hostSshAgentNote,
       compact: true,
     );
   }
@@ -408,16 +412,19 @@ class _IdentitySelectionSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (identities.isEmpty) {
-      return const Align(
+      return Align(
         alignment: Alignment.centerLeft,
-        child: Text('No saved credentials are available yet.'),
+        child: Text(context.l10n.hostNoSavedCredentials),
       );
     }
     final t = context.tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Credentials', style: Theme.of(context).textTheme.labelLarge),
+        Text(
+          context.l10n.hostCredentialsHeading,
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
         const SizedBox(height: 8),
         ClipRRect(
           borderRadius: SerlinkRadii.control,
@@ -474,12 +481,14 @@ class _CredentialSelectionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final t = context.tokens;
     final subtitle = [
-      _identityKindLabel(identity.kind),
-      if (identity.usernameHint case final username?) 'user $username',
+      _identityKindLabel(l10n, identity.kind),
+      if (identity.usernameHint case final username?)
+        l10n.identityUserLabel(username),
       if (identity.certificatePrincipal case final principal?)
-        'principal $principal',
+        l10n.identityPrincipalLabel(principal),
     ].join(' · ');
     return Opacity(
       opacity: enabled ? 1 : 0.54,
@@ -518,7 +527,7 @@ class _CredentialSelectionRow extends StatelessWidget {
               ),
             ),
             SerlinkTooltip(
-              message: 'Edit credential',
+              message: l10n.hostEditCredentialTooltip,
               child: SerlinkIconButton(
                 key: ValueKey('credential-edit-${identity.id.value}'),
                 onPressed: enabled ? () => onEdit(identity) : null,
@@ -540,7 +549,7 @@ class _CredentialOptionalNote extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Text(
-        'You can save the host without credentials and add one later.',
+        context.l10n.hostCredentialOptionalNote,
         style: Theme.of(
           context,
         ).textTheme.bodySmall?.copyWith(color: context.tokens.textSecondary),
@@ -567,7 +576,10 @@ class _JumpHostSelectionSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Jump hosts', style: Theme.of(context).textTheme.labelLarge),
+        Text(
+          context.l10n.hostJumpHostsHeading,
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,

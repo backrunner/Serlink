@@ -17,6 +17,7 @@ class _HostRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final t = context.tokens;
     final subtitle = '${host.username}@${host.hostname}:${host.port}';
     final trustState = _visibleTrustState(host.trustState);
@@ -24,12 +25,12 @@ class _HostRow extends StatelessWidget {
     return SerlinkContextMenu(
       actions: [
         SerlinkMenuAction(
-          label: 'Edit host',
+          label: l10n.hostEditMenu,
           icon: Icons.edit_outlined,
           onPressed: onEdit,
         ),
         SerlinkMenuAction(
-          label: 'Delete host',
+          label: l10n.hostDeleteMenu,
           icon: Icons.delete_outline,
           onPressed: onDelete,
         ),
@@ -86,14 +87,14 @@ class _HostRow extends StatelessWidget {
             _HostActionButton(
               onPressed: onTerminal,
               icon: Icons.terminal,
-              label: 'Terminal',
+              label: l10n.hostTerminalAction,
               primary: true,
             ),
             const SizedBox(width: 10),
             _HostActionButton(
               onPressed: onSftp,
               icon: Icons.folder_open,
-              label: 'SFTP',
+              label: l10n.hostSftpAction,
             ),
           ],
         ),
@@ -190,9 +191,9 @@ class _TrustText extends StatelessWidget {
       HostTrustState.changed => t.statusDanger,
     };
     final label = switch (state) {
-      HostTrustState.trusted => 'trusted',
-      HostTrustState.unknown => 'verify',
-      HostTrustState.changed => 'changed',
+      HostTrustState.trusted => context.l10n.hostTrustTrusted,
+      HostTrustState.unknown => context.l10n.hostTrustVerify,
+      HostTrustState.changed => context.l10n.hostTrustChanged,
     };
     return StatusPill(label: label, color: color);
   }

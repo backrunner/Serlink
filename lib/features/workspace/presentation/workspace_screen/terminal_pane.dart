@@ -264,6 +264,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
   }
 
   Future<void> _startLocalForward(_LocalForwardDraft draft) async {
+    final l10n = context.l10n;
     setState(() {
       _forwardBusy = true;
     });
@@ -283,7 +284,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         _activeLocalForward = draft;
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'Local port forward started.');
+      _showSnackBar(context, l10n.forwardingLocalStartedSnack);
     } on Object {
       if (!mounted) {
         return;
@@ -291,11 +292,12 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
       setState(() {
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'Local port forward could not start.');
+      _showSnackBar(context, l10n.forwardingLocalStartFailedSnack);
     }
   }
 
   Future<void> _stopLocalForward() async {
+    final l10n = context.l10n;
     setState(() {
       _forwardBusy = true;
     });
@@ -310,7 +312,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         _activeLocalForward = null;
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'Local port forward stopped.');
+      _showSnackBar(context, l10n.forwardingLocalStoppedSnack);
     } on Object {
       if (!mounted) {
         return;
@@ -318,11 +320,12 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
       setState(() {
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'Local port forward could not stop.');
+      _showSnackBar(context, l10n.forwardingLocalStopFailedSnack);
     }
   }
 
   Future<void> _startRemoteForward(_RemoteForwardDraft draft) async {
+    final l10n = context.l10n;
     setState(() {
       _forwardBusy = true;
     });
@@ -348,7 +351,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         );
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'Remote port forward started.');
+      _showSnackBar(context, l10n.forwardingRemoteStartedSnack);
     } on Object {
       if (!mounted) {
         return;
@@ -356,11 +359,12 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
       setState(() {
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'Remote port forward could not start.');
+      _showSnackBar(context, l10n.forwardingRemoteStartFailedSnack);
     }
   }
 
   Future<void> _stopRemoteForward() async {
+    final l10n = context.l10n;
     setState(() {
       _forwardBusy = true;
     });
@@ -375,7 +379,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         _activeRemoteForward = null;
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'Remote port forward stopped.');
+      _showSnackBar(context, l10n.forwardingRemoteStoppedSnack);
     } on Object {
       if (!mounted) {
         return;
@@ -383,11 +387,12 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
       setState(() {
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'Remote port forward could not stop.');
+      _showSnackBar(context, l10n.forwardingRemoteStopFailedSnack);
     }
   }
 
   Future<void> _startDynamicForward(_DynamicForwardDraft draft) async {
+    final l10n = context.l10n;
     setState(() {
       _forwardBusy = true;
     });
@@ -409,7 +414,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         );
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'SOCKS proxy started.');
+      _showSnackBar(context, l10n.forwardingSocksStartedSnack);
     } on Object {
       if (!mounted) {
         return;
@@ -417,11 +422,12 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
       setState(() {
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'SOCKS proxy could not start.');
+      _showSnackBar(context, l10n.forwardingSocksStartFailedSnack);
     }
   }
 
   Future<void> _stopDynamicForward() async {
+    final l10n = context.l10n;
     setState(() {
       _forwardBusy = true;
     });
@@ -436,7 +442,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         _activeDynamicForward = null;
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'SOCKS proxy stopped.');
+      _showSnackBar(context, l10n.forwardingSocksStoppedSnack);
     } on Object {
       if (!mounted) {
         return;
@@ -444,7 +450,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
       setState(() {
         _forwardBusy = false;
       });
-      _showSnackBar(context, 'SOCKS proxy could not stop.');
+      _showSnackBar(context, l10n.forwardingSocksStopFailedSnack);
     }
   }
 

@@ -26,9 +26,9 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
     }
 
     if (state.tabs.isEmpty || active == null) {
-      return const _PlaceholderSurface(
-        title: 'No active tabs',
-        body: 'Open a host from Hosts to create a terminal or SFTP tab.',
+      return _PlaceholderSurface(
+        title: context.l10n.sessionsEmptyTitle,
+        body: context.l10n.sessionsEmptyBody,
       );
     }
 
@@ -223,7 +223,7 @@ class _TabCloseButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: SerlinkTooltip(
-        message: 'Close tab',
+        message: context.l10n.tabsCloseTooltip,
         child: SerlinkPressable(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(4),
@@ -248,7 +248,7 @@ class _NewTabButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return SerlinkTooltip(
-      message: 'New connection',
+      message: context.l10n.tabsNewConnectionTooltip,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: t.surfaceSunken,
@@ -279,6 +279,7 @@ class _ActiveTabView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final isLocalTerminal = tab.content is LocalTerminalTabContent;
     final showBanner =
@@ -289,9 +290,11 @@ class _ActiveTabView extends ConsumerWidget {
             message:
                 tab.failure?.message ??
                 (isLocalTerminal
-                    ? 'Local shell is not running.'
-                    : 'Connection is not active.'),
-            actionLabel: isLocalTerminal ? 'Restart' : 'Reconnect',
+                    ? l10n.localShellInactive
+                    : l10n.connectionInactive),
+            actionLabel: isLocalTerminal
+                ? l10n.restartAction
+                : l10n.reconnectAction,
             onReconnect: () => controller.reconnect(tab.id),
             onClose: () => controller.closeTab(tab.id),
           )
@@ -337,7 +340,7 @@ class _ActiveTabView extends ConsumerWidget {
                 ),
                 tabId: tab.id,
                 hostId: null,
-                title: 'Local Shell',
+                title: l10n.localShellTitle,
                 panes: panes,
                 showSplit: showSplit,
                 layout: layout,
@@ -355,7 +358,10 @@ class _ActiveTabView extends ConsumerWidget {
                 key: ValueKey('${sessionId.value}:$rootPath:$currentPath'),
                 tabId: tab.id,
                 hostId: tab.hostId,
-                sourceMachineName: _sourceMachineNameFromTabTitle(tab.title),
+                sourceMachineName: _sourceMachineNameFromTabTitle(
+                  l10n,
+                  tab.title,
+                ),
                 sessionId: sessionId,
                 path: currentPath,
                 rootPath: rootPath,
@@ -402,7 +408,10 @@ class _RecoverableFailureBanner extends StatelessWidget {
               child: Text(message, style: TextStyle(color: t.textPrimary)),
             ),
             SerlinkTextButton(onPressed: onReconnect, child: Text(actionLabel)),
-            SerlinkTextButton(onPressed: onClose, child: const Text('Close')),
+            SerlinkTextButton(
+              onPressed: onClose,
+              child: Text(context.l10n.closeAction),
+            ),
           ],
         ),
       ),

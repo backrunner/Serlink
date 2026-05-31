@@ -7,6 +7,7 @@ class _SyncSettingsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final canEdit = vaultState == VaultState.unlocked;
     final webDav = canEdit ? ref.watch(webDavSyncSettingsProvider) : null;
     final iCloudAvailable = ref.watch(iCloudAvailableProvider);
@@ -19,46 +20,50 @@ class _SyncSettingsSection extends ConsumerWidget {
         : ref.watch(syncRepairServiceProvider).planFor(lastFailure);
     final webDavRow =
         webDav?.when(
-          loading: () => const _SettingsInfoRow(
+          loading: () => _SettingsInfoRow(
             icon: Icons.cloud_queue,
             title: 'WebDAV',
-            subtitle: 'Loading encrypted sync settings.',
+            subtitle: l10n.syncLoadingEncryptedSettings,
           ),
           error: (error, stackTrace) => _SettingsActionRow(
             icon: Icons.cloud_queue,
             title: 'WebDAV',
-            subtitle: _syncSettingsErrorMessage(error),
+            subtitle: _syncSettingsErrorMessage(l10n, error),
             action: SerlinkTextButton(
               onPressed: () => _showWebDavSyncDialog(context, ref, null),
-              child: const Text('Configure'),
+              child: Text(l10n.syncConfigureAction),
             ),
           ),
           data: (settings) => _SettingsActionRow(
             icon: Icons.cloud_queue,
             title: 'WebDAV',
-            subtitle: _webDavSettingsSubtitle(settings, autoSync),
+            subtitle: _webDavSettingsSubtitle(l10n, settings, autoSync),
             action: SerlinkTextButton(
               onPressed: () => _showWebDavSyncDialog(context, ref, settings),
-              child: Text(settings == null ? 'Configure' : 'Edit'),
+              child: Text(
+                settings == null
+                    ? l10n.syncConfigureAction
+                    : l10n.syncEditAction,
+              ),
             ),
           ),
         ) ??
-        const _SettingsInfoRow(
+        _SettingsInfoRow(
           icon: Icons.cloud_queue,
           title: 'WebDAV',
-          subtitle: 'Unlock the vault to configure encrypted sync.',
+          subtitle: l10n.syncWebDavLocked,
         );
 
     final iCloudRow = iCloudAvailable.when<Widget?>(
-      loading: () => const _SettingsInfoRow(
+      loading: () => _SettingsInfoRow(
         icon: Icons.cloud_outlined,
         title: 'iCloud',
-        subtitle: 'Checking iCloud availability.',
+        subtitle: l10n.syncICloudChecking,
       ),
       error: (error, stackTrace) => _SettingsInfoRow(
         icon: Icons.cloud_outlined,
         title: 'iCloud',
-        subtitle: _syncSettingsErrorMessage(error),
+        subtitle: _syncSettingsErrorMessage(l10n, error),
       ),
       data: (available) {
         if (!available) {
@@ -68,22 +73,22 @@ class _SyncSettingsSection extends ConsumerWidget {
             ? ref.watch(cloudKitSyncSettingsProvider)
             : null;
         return cloudKit?.when(
-              loading: () => const _SettingsInfoRow(
+              loading: () => _SettingsInfoRow(
                 icon: Icons.cloud_outlined,
                 title: 'iCloud',
-                subtitle: 'Loading encrypted sync settings.',
+                subtitle: l10n.syncLoadingEncryptedSettings,
               ),
               error: (error, stackTrace) => _SettingsInfoRow(
                 icon: Icons.cloud_outlined,
                 title: 'iCloud',
-                subtitle: _syncSettingsErrorMessage(error),
+                subtitle: _syncSettingsErrorMessage(l10n, error),
               ),
               data: (settings) {
                 final enabled = settings?.enabled ?? false;
                 return _SettingsActionRow(
                   icon: Icons.cloud_outlined,
                   title: 'iCloud',
-                  subtitle: _iCloudSettingsSubtitle(enabled, autoSync),
+                  subtitle: _iCloudSettingsSubtitle(l10n, enabled, autoSync),
                   action: SerlinkSwitch(
                     value: enabled,
                     onChanged: (value) => _setICloudSync(context, ref, value),
@@ -91,16 +96,16 @@ class _SyncSettingsSection extends ConsumerWidget {
                 );
               },
             ) ??
-            const _SettingsInfoRow(
+            _SettingsInfoRow(
               icon: Icons.cloud_outlined,
               title: 'iCloud',
-              subtitle: 'Unlock the vault to sync through iCloud.',
+              subtitle: l10n.syncICloudLocked,
             );
       },
     );
 
     return _SettingsSection(
-      title: 'Sync',
+      title: l10n.syncSectionTitle,
       children: [
         webDavRow,
         ?iCloudRow,
@@ -108,31 +113,35 @@ class _SyncSettingsSection extends ConsumerWidget {
         if (conflicts.isNotEmpty) _SyncConflictRow(conflicts: conflicts),
         if (knownDevices != null)
           knownDevices.when(
-            loading: () => const _SettingsInfoRow(
+            loading: () => _SettingsInfoRow(
               icon: Icons.devices_outlined,
-              title: 'Devices',
-              subtitle: 'Loading encrypted device records.',
+              title: l10n.syncDevicesTitle,
+              subtitle: l10n.syncDevicesLoading,
             ),
             error: (error, stackTrace) => _SettingsInfoRow(
               icon: Icons.devices_outlined,
-              title: 'Devices',
-              subtitle: _syncSettingsErrorMessage(error),
+              title: l10n.syncDevicesTitle,
+              subtitle: _syncSettingsErrorMessage(l10n, error),
             ),
             data: (devices) => _SettingsActionRow(
               icon: Icons.devices_outlined,
-              title: 'Devices',
-              subtitle: _syncDevicesSubtitle(devices),
+              title: l10n.syncDevicesTitle,
+              subtitle: _syncDevicesSubtitle(l10n, devices),
               action: Wrap(
                 spacing: 4,
                 children: [
                   SerlinkTextButton(
                     onPressed: () =>
                         _showSyncDevicesDialog(context, ref, devices),
-                    child: Text(devices.isEmpty ? 'View' : 'Manage'),
+                    child: Text(
+                      devices.isEmpty
+                          ? l10n.syncViewAction
+                          : l10n.settingsManageAction,
+                    ),
                   ),
                   SerlinkTextButton(
                     onPressed: () => _rotateSyncDevice(context, ref),
-                    child: const Text('Reset'),
+                    child: Text(l10n.syncResetAction),
                   ),
                 ],
               ),
@@ -150,13 +159,14 @@ class _SyncRepairRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     return _SettingsActionRow(
       icon: Icons.build_outlined,
-      title: 'Sync repair',
+      title: l10n.syncRepairTitle,
       subtitle: plan.message,
       action: SerlinkTextButton(
         onPressed: () => _repairWebDavSync(context, ref, plan),
-        child: const Text('Repair'),
+        child: Text(l10n.syncRepairAction),
       ),
     );
   }
@@ -179,12 +189,13 @@ Future<void> _repairWebDavSync(
     context,
     title: plan.title,
     body: plan.message,
-    confirmLabel: 'Repair',
+    confirmLabel: context.l10n.syncRepairAction,
     destructive: plan.destructive,
   );
   if (!confirmed || !context.mounted) {
     return;
   }
+  final l10n = context.l10n;
   try {
     final provider = await ref
         .read(syncSettingsServiceProvider)
@@ -197,11 +208,11 @@ Future<void> _repairWebDavSync(
         .markConflictResolution(result);
     ref.invalidate(syncKnownDevicesProvider);
     if (context.mounted) {
-      _showSnackBar(context, 'Remote sync repaired.');
+      _showSnackBar(context, l10n.syncRemoteRepaired);
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _syncSettingsErrorMessage(error));
+      _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
     }
   }
 }
@@ -219,6 +230,7 @@ Future<void> _trustWebDavCertificate(
     _showSnackBar(context, plan.message);
     return;
   }
+  final l10n = context.l10n;
   final decision = await ref
       .read(securityModalServiceProvider)
       .confirmWebDavCertificate(certificate);
@@ -234,11 +246,11 @@ Future<void> _trustWebDavCertificate(
         .read(autoSyncControllerProvider.notifier)
         .requestSync(delay: Duration.zero);
     if (context.mounted) {
-      _showSnackBar(context, 'WebDAV certificate trust saved.');
+      _showSnackBar(context, l10n.syncWebDavCertificateTrustSaved);
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _syncSettingsErrorMessage(error));
+      _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
     }
   }
 }
@@ -266,15 +278,25 @@ Future<void> _reviewLocalClock(
           children: [
             Text(plan.message),
             const SizedBox(height: 12),
-            Text('Local time: ${_shortLocalDateTime(DateTime.now())}'),
+            Text(
+              context.l10n.syncLocalTimeLabel(
+                _shortLocalDateTime(DateTime.now()),
+              ),
+            ),
             if (certificate != null) ...[
               const SizedBox(height: 8),
-              Text('Endpoint: ${certificate.endpoint}'),
-              const SizedBox(height: 8),
-              Text('Valid from: ${_shortLocalDateTime(certificate.validFrom)}'),
+              Text(context.l10n.syncEndpointLabel('${certificate.endpoint}')),
               const SizedBox(height: 8),
               Text(
-                'Valid until: ${_shortLocalDateTime(certificate.validUntil)}',
+                context.l10n.syncValidFromLabel(
+                  _shortLocalDateTime(certificate.validFrom),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                context.l10n.syncValidUntilLabel(
+                  _shortLocalDateTime(certificate.validUntil),
+                ),
               ),
             ],
           ],
@@ -283,7 +305,7 @@ Future<void> _reviewLocalClock(
       actions: [
         SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Done'),
+          child: Text(context.l10n.doneAction),
         ),
       ],
     ),
@@ -297,17 +319,17 @@ class _SyncConflictRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     return _SettingsActionRow(
       icon: Icons.report_problem_outlined,
-      title: 'Sync conflicts',
-      subtitle:
-          '${conflicts.length} encrypted record${conflicts.length == 1 ? '' : 's'} need review.',
+      title: l10n.syncConflictsTitle,
+      subtitle: l10n.syncConflictsSubtitle(conflicts.length),
       action: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           SerlinkTextButton(
             onPressed: () => _reviewWebDavConflicts(context, ref, conflicts),
-            child: const Text('Review'),
+            child: Text(l10n.syncReviewAction),
           ),
           SerlinkTextButton(
             onPressed: () => _resolveWebDavConflicts(
@@ -315,7 +337,7 @@ class _SyncConflictRow extends ConsumerWidget {
               ref,
               SyncConflictResolution.useRemote,
             ),
-            child: const Text('Use remote'),
+            child: Text(l10n.syncUseRemoteAction),
           ),
           SerlinkTextButton(
             onPressed: () => _resolveWebDavConflicts(
@@ -323,7 +345,7 @@ class _SyncConflictRow extends ConsumerWidget {
               ref,
               SyncConflictResolution.keepLocal,
             ),
-            child: const Text('Keep local'),
+            child: Text(l10n.syncKeepLocalAction),
           ),
         ],
       ),
@@ -351,16 +373,21 @@ Future<void> _resolveWebDavConflicts(
   final useRemote = resolution == SyncConflictResolution.useRemote;
   final confirmed = await _confirmDialog(
     context,
-    title: useRemote ? 'Use remote records?' : 'Keep local records?',
+    title: useRemote
+        ? context.l10n.syncUseRemoteTitle
+        : context.l10n.syncKeepLocalTitle,
     body: useRemote
-        ? 'Remote encrypted records will replace conflicting local records before syncing.'
-        : 'Local encrypted records will overwrite conflicting remote records.',
-    confirmLabel: useRemote ? 'Use remote' : 'Keep local',
+        ? context.l10n.syncUseRemoteBody
+        : context.l10n.syncKeepLocalBody,
+    confirmLabel: useRemote
+        ? context.l10n.syncUseRemoteAction
+        : context.l10n.syncKeepLocalAction,
     destructive: true,
   );
   if (!confirmed || !context.mounted) {
     return;
   }
+  final l10n = context.l10n;
   try {
     final provider = await ref
         .read(syncSettingsServiceProvider)
@@ -376,7 +403,7 @@ Future<void> _resolveWebDavConflicts(
     if (context.mounted) {
       _showSnackBar(
         context,
-        'Resolved sync conflicts. Synced ${result.recordsUploaded} encrypted records.',
+        l10n.syncConflictsResolvedSnack(result.recordsUploaded),
       );
     }
   } on SyncRunConflictException catch (error) {
@@ -384,11 +411,11 @@ Future<void> _resolveWebDavConflicts(
         .read(syncConflictControllerProvider.notifier)
         .setConflicts(error.conflicts);
     if (context.mounted) {
-      _showSnackBar(context, _syncSettingsErrorMessage(error));
+      _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _syncSettingsErrorMessage(error));
+      _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
     }
   }
 }
@@ -398,6 +425,7 @@ Future<void> _setICloudSync(
   WidgetRef ref,
   bool enabled,
 ) async {
+  final l10n = context.l10n;
   try {
     await ref.read(syncSettingsServiceProvider).saveCloudKit(enabled);
     ref.invalidate(cloudKitSyncSettingsProvider);
@@ -407,33 +435,47 @@ Future<void> _setICloudSync(
     if (context.mounted) {
       _showSnackBar(
         context,
-        enabled ? 'iCloud sync enabled.' : 'iCloud sync paused.',
+        enabled ? l10n.syncICloudEnabledSnack : l10n.syncICloudPausedSnack,
       );
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _syncSettingsErrorMessage(error));
+      _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
     }
   }
 }
 
-String _iCloudSettingsSubtitle(bool enabled, AutoSyncStatus autoSync) {
+String _iCloudSettingsSubtitle(
+  AppLocalizations l10n,
+  bool enabled,
+  AutoSyncStatus autoSync,
+) {
   if (!enabled) {
-    return 'Paused. Encrypted records sync through your private iCloud database.';
+    return l10n.syncPausedICloudSubtitle;
   }
-  return ['Enabled', _autoSyncStatusSubtitle(autoSync)].join(' · ');
+  return [
+    l10n.syncEnabledStatus,
+    _autoSyncStatusSubtitle(l10n, autoSync),
+  ].join(' · ');
 }
 
 String _webDavSettingsSubtitle(
+  AppLocalizations l10n,
   WebDavSyncSettings? settings,
   AutoSyncStatus autoSync,
 ) {
   if (settings == null) {
-    return 'Not configured. Encrypted manifest and records only.';
+    return l10n.syncWebDavNotConfiguredSubtitle;
   }
-  final state = settings.enabled ? 'Enabled' : 'Paused';
-  final security = settings.allowInsecureHttp ? 'HTTP allowed' : 'HTTPS';
-  final sync = settings.enabled ? _autoSyncStatusSubtitle(autoSync) : null;
+  final state = settings.enabled
+      ? l10n.syncEnabledStatus
+      : l10n.syncPausedStatus;
+  final security = settings.allowInsecureHttp
+      ? l10n.syncHttpAllowedStatus
+      : l10n.syncHttpsStatus;
+  final sync = settings.enabled
+      ? _autoSyncStatusSubtitle(l10n, autoSync)
+      : null;
   return [
     state,
     security,
@@ -442,22 +484,22 @@ String _webDavSettingsSubtitle(
   ].join(' · ');
 }
 
-String _autoSyncStatusSubtitle(AutoSyncStatus status) {
+String _autoSyncStatusSubtitle(AppLocalizations l10n, AutoSyncStatus status) {
   return switch (status.phase) {
-    AutoSyncPhase.disabled => 'auto-sync waiting',
+    AutoSyncPhase.disabled => l10n.syncAutoSyncWaiting,
     AutoSyncPhase.idle =>
       status.lastCompletedAt == null
-          ? 'auto-sync ready'
-          : 'last synced ${_shortLocalDateTime(status.lastCompletedAt!)}',
-    AutoSyncPhase.scheduled => 'auto-sync queued',
-    AutoSyncPhase.syncing => 'syncing automatically',
-    AutoSyncPhase.conflicts =>
-      '${status.conflictCount} conflict${status.conflictCount == 1 ? '' : 's'}',
-    AutoSyncPhase.failed => status.lastFailureMessage ?? 'auto-sync failed',
+          ? l10n.syncAutoSyncReady
+          : l10n.syncLastSynced(_shortLocalDateTime(status.lastCompletedAt!)),
+    AutoSyncPhase.scheduled => l10n.syncAutoSyncQueued,
+    AutoSyncPhase.syncing => l10n.syncSyncingAutomatically,
+    AutoSyncPhase.conflicts => l10n.syncConflictCount(status.conflictCount),
+    AutoSyncPhase.failed =>
+      status.lastFailureMessage ?? l10n.syncAutoSyncFailed,
   };
 }
 
-String _syncSettingsErrorMessage(Object error) {
+String _syncSettingsErrorMessage(AppLocalizations l10n, Object error) {
   if (error is SyncSettingsException) {
     return error.message;
   }
@@ -473,5 +515,5 @@ String _syncSettingsErrorMessage(Object error) {
   if (error is VaultException) {
     return error.message;
   }
-  return 'Sync settings could not be loaded.';
+  return l10n.syncSettingsLoadFailed;
 }

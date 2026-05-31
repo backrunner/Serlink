@@ -58,6 +58,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final canList = widget.lifecycle == SessionLifecycleState.connected;
     final canOpenParent = canList && _showParentEntry;
 
@@ -70,7 +71,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
               const Icon(Icons.folder_open, size: 18),
               const SizedBox(width: 8),
               SerlinkTooltip(
-                message: 'Go to parent folder',
+                message: l10n.sftpParentFolderTooltip,
                 child: SerlinkIconButton(
                   key: const ValueKey('sftp-parent-button'),
                   onPressed: canOpenParent ? _openParentDirectory : null,
@@ -86,7 +87,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
                 child: _WorkspaceSearchPill(
                   fieldKey: const ValueKey('sftp-search-field'),
                   controller: _filterController,
-                  placeholder: 'Search files',
+                  placeholder: l10n.sftpSearchPlaceholder,
                   enabled: canList,
                   hasQuery: _filterText.trim().isNotEmpty,
                   onChanged: (value) {
@@ -105,8 +106,8 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
               const SizedBox(width: 8),
               SerlinkTooltip(
                 message: _showHidden
-                    ? 'Hide hidden files'
-                    : 'Show hidden files',
+                    ? l10n.sftpHideHiddenFilesTooltip
+                    : l10n.sftpShowHiddenFilesTooltip,
                 child: SerlinkIconButton(
                   key: const ValueKey('sftp-hidden-toggle'),
                   onPressed: canList
@@ -126,7 +127,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
               ),
               const SizedBox(width: 4),
               SerlinkTooltip(
-                message: 'Open terminal tab',
+                message: l10n.sftpOpenTerminalTooltip,
                 child: SerlinkIconButton(
                   onPressed: widget.onOpenTerminal,
                   icon: const Icon(Icons.terminal_outlined, size: 18),
@@ -135,24 +136,24 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
               const SizedBox(width: 4),
               SerlinkMenuButton(
                 key: const ValueKey('sftp-upload-button'),
-                tooltip: 'Upload',
+                tooltip: l10n.uploadAction,
                 enabled: canList,
                 icon: const Icon(Icons.upload_file_outlined, size: 18),
                 actions: [
                   SerlinkMenuAction(
-                    label: 'Upload file',
+                    label: l10n.sftpUploadFileAction,
                     icon: Icons.insert_drive_file_outlined,
                     onPressed: _enqueueUploadFile,
                   ),
                   SerlinkMenuAction(
-                    label: 'Upload folder',
+                    label: l10n.sftpUploadFolderAction,
                     icon: Icons.folder_outlined,
                     onPressed: _enqueueUploadDirectory,
                   ),
                 ],
               ),
               SerlinkTooltip(
-                message: 'New folder',
+                message: l10n.sftpNewFolderTooltip,
                 child: SerlinkIconButton(
                   key: const ValueKey('sftp-new-folder-button'),
                   onPressed: canList ? _createDirectory : null,
@@ -160,7 +161,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
                 ),
               ),
               SerlinkTooltip(
-                message: 'Refresh',
+                message: l10n.sftpRefreshTooltip,
                 child: SerlinkIconButton(
                   onPressed: canList
                       ? () {
@@ -180,11 +181,12 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   }
 
   Widget _buildBody(BuildContext context, {required bool canList}) {
+    final l10n = context.l10n;
     final future = _entriesFuture;
     if (!canList || future == null) {
-      return const _PlaceholderSurface(
-        title: 'SFTP',
-        body: 'Waiting for the SFTP connection.',
+      return _PlaceholderSurface(
+        title: l10n.sftpWaitingTitle,
+        body: l10n.sftpWaitingBody,
       );
     }
 
@@ -198,18 +200,17 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
           if (_shouldPromptForDefaultDirectory(snapshot.error!)) {
             _scheduleDefaultDirectoryPrompt(snapshot.error!);
             return _PlaceholderSurface(
-              title: 'SFTP Start Folder',
-              body:
-                  'Serlink could not list ${widget.path}. Choose a folder this account can access.',
+              title: l10n.sftpStartFolderTitle,
+              body: l10n.sftpStartFolderBody(widget.path),
               action: SerlinkTextButton.icon(
                 onPressed: () => _chooseDefaultDirectory(snapshot.error!),
                 icon: const Icon(Icons.folder_open_outlined, size: 18),
-                label: const Text('Choose Folder'),
+                label: Text(l10n.chooseFolderAction),
               ),
             );
           }
           return _PlaceholderSurface(
-            title: 'SFTP Error',
+            title: l10n.sftpErrorTitle,
             body: sftpFailureMessage(snapshot.error!),
           );
         }
@@ -223,8 +224,11 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
         final entries = _filterEntries(visibleEntries, _filterText);
         if (entries.isEmpty) {
           return _PlaceholderSurface(
-            title: _filterText.trim().isEmpty ? 'Empty Folder' : 'No Matches',
+            title: _filterText.trim().isEmpty
+                ? l10n.sftpEmptyFolderTitle
+                : l10n.hostsNoMatchesTitle,
             body: _sftpEmptyBody(
+              l10n,
               allEntries: allEntries,
               visibleEntries: visibleEntries,
               filterText: _filterText,
@@ -239,7 +243,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
             if (_showParentEntry && index == 0) {
               return _SftpEntryRow(
                 name: '..',
-                typeLabel: 'Directory',
+                typeLabel: l10n.sftpDirectoryLabel,
                 icon: Icons.drive_folder_upload_outlined,
                 sizeLabel: '',
                 permissionsLabel: '',
@@ -256,7 +260,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
             final isDirectory = entry.type == SftpEntryType.directory;
             return _SftpEntryRow(
               name: entry.name,
-              typeLabel: _entryTypeLabel(entry.type),
+              typeLabel: _entryTypeLabel(l10n, entry.type),
               icon: isDirectory
                   ? Icons.folder_outlined
                   : Icons.description_outlined,
@@ -377,22 +381,24 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   }
 
   Future<void> _createDirectory() async {
+    final l10n = context.l10n;
     final name = await _showTextInputDialog(
       context,
-      title: 'New Folder',
-      label: 'Folder name',
-      confirmLabel: 'Create',
+      title: l10n.sftpNewFolderTitle,
+      label: l10n.sftpFolderNameLabel,
+      confirmLabel: l10n.createAction,
     );
     if (name == null || name.trim().isEmpty) {
       return;
     }
     await _runSftpOperation(
       () => _connection().mkdir(_remoteChildPath(widget.path, name.trim())),
-      successMessage: 'Folder created.',
+      successMessage: l10n.sftpFolderCreatedSnack,
     );
   }
 
   Future<void> _enqueueUploadFile() async {
+    final l10n = context.l10n;
     final file = await openFile();
     if (file == null) {
       return;
@@ -400,7 +406,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     final localPath = file.path;
     if (localPath.isEmpty) {
       if (mounted) {
-        _showSnackBar(context, 'Selected file has no local path.');
+        _showSnackBar(context, l10n.sftpSelectedFileNoPathSnack);
       }
       return;
     }
@@ -422,12 +428,15 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
           remotePath: remotePath,
         );
     if (mounted) {
-      _showSnackBar(context, 'Upload queued.');
+      _showSnackBar(context, l10n.sftpUploadQueuedSnack);
     }
   }
 
   Future<void> _enqueueUploadDirectory() async {
-    final directoryPath = await getDirectoryPath(confirmButtonText: 'Upload');
+    final l10n = context.l10n;
+    final directoryPath = await getDirectoryPath(
+      confirmButtonText: l10n.uploadAction,
+    );
     if (directoryPath == null || directoryPath.isEmpty) {
       return;
     }
@@ -450,11 +459,12 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
           remotePath: remotePath,
         );
     if (mounted) {
-      _showSnackBar(context, 'Folder upload queued.');
+      _showSnackBar(context, l10n.sftpFolderUploadQueuedSnack);
     }
   }
 
   Future<void> _enqueueDownload(SftpEntry entry) async {
+    final l10n = context.l10n;
     final itemKind = entry.type == SftpEntryType.directory
         ? TransferItemKind.directory
         : TransferItemKind.file;
@@ -479,8 +489,8 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
       _showSnackBar(
         context,
         itemKind == TransferItemKind.directory
-            ? 'Folder download queued.'
-            : 'Download queued.',
+            ? l10n.sftpFolderDownloadQueuedSnack
+            : l10n.sftpDownloadQueuedSnack,
       );
     }
   }
@@ -497,8 +507,9 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   }
 
   Future<String?> _pickDirectoryDownloadPath(SftpEntry entry) async {
+    final l10n = context.l10n;
     final parentPath = await getDirectoryPath(
-      confirmButtonText: 'Download',
+      confirmButtonText: l10n.downloadAction,
       canCreateDirectories: true,
     );
     if (parentPath == null || parentPath.isEmpty) {
@@ -523,14 +534,14 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     final action = await _showTransferConflictDialog(
       context,
       title: itemKind == TransferItemKind.directory
-          ? 'Merge remote folder?'
-          : 'Replace remote file?',
+          ? context.l10n.sftpMergeRemoteFolderTitle
+          : context.l10n.sftpReplaceRemoteFileTitle,
       body: itemKind == TransferItemKind.directory
-          ? '$desiredRemotePath already exists on the server. Matching files may be overwritten.'
-          : '$desiredRemotePath already exists on the server.',
+          ? context.l10n.sftpRemoteExistsOverwriteBody(desiredRemotePath)
+          : context.l10n.sftpRemoteExistsBody(desiredRemotePath),
       replaceLabel: itemKind == TransferItemKind.directory
-          ? 'Merge'
-          : 'Replace',
+          ? context.l10n.mergeAction
+          : context.l10n.replaceAction,
     );
     return switch (action) {
       TransferConflictAction.replace => desiredRemotePath,
@@ -555,14 +566,14 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     final action = await _showTransferConflictDialog(
       context,
       title: itemKind == TransferItemKind.directory
-          ? 'Merge local folder?'
-          : 'Replace local file?',
+          ? context.l10n.sftpMergeLocalFolderTitle
+          : context.l10n.sftpReplaceLocalFileTitle,
       body: itemKind == TransferItemKind.directory
-          ? '$desiredLocalPath already exists on this device. Matching files may be overwritten.'
-          : '$desiredLocalPath already exists on this device.',
+          ? context.l10n.sftpLocalExistsOverwriteBody(desiredLocalPath)
+          : context.l10n.sftpLocalExistsBody(desiredLocalPath),
       replaceLabel: itemKind == TransferItemKind.directory
-          ? 'Merge'
-          : 'Replace',
+          ? context.l10n.mergeAction
+          : context.l10n.replaceAction,
     );
     return switch (action) {
       TransferConflictAction.replace => desiredLocalPath,
@@ -594,12 +605,13 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   }
 
   Future<void> _renameEntry(SftpEntry entry) async {
+    final l10n = context.l10n;
     final name = await _showTextInputDialog(
       context,
-      title: 'Rename',
-      label: 'New name',
+      title: l10n.renameAction,
+      label: l10n.sftpNewNameLabel,
       initialValue: entry.name,
-      confirmLabel: 'Rename',
+      confirmLabel: l10n.renameAction,
     );
     if (name == null || name.trim().isEmpty || name.trim() == entry.name) {
       return;
@@ -609,17 +621,18 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
         entry.path,
         _remoteChildPath(_parentPath(entry.path), name.trim()),
       ),
-      successMessage: 'Entry renamed.',
+      successMessage: l10n.sftpEntryRenamedSnack,
     );
   }
 
   Future<void> _moveEntry(SftpEntry entry) async {
+    final l10n = context.l10n;
     final target = await _showTextInputDialog(
       context,
-      title: 'Move',
-      label: 'Target path',
+      title: l10n.moveAction,
+      label: l10n.sftpTargetPathLabel,
       initialValue: entry.path,
-      confirmLabel: 'Move',
+      confirmLabel: l10n.moveAction,
     );
     if (target == null || target.trim().isEmpty) {
       return;
@@ -630,44 +643,46 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     }
     if (await _remoteEntryExists(resolvedTarget)) {
       if (mounted) {
-        _showSnackBar(context, 'Target path already exists.');
+        _showSnackBar(context, l10n.sftpTargetExistsSnack);
       }
       return;
     }
     await _runSftpOperation(
       () => _connection().rename(entry.path, resolvedTarget),
-      successMessage: 'Entry moved.',
+      successMessage: l10n.sftpEntryMovedSnack,
     );
   }
 
   Future<void> _chmodEntry(SftpEntry entry) async {
+    final l10n = context.l10n;
     final octal = await _showTextInputDialog(
       context,
-      title: 'Change Permissions',
-      label: 'Octal permissions',
+      title: l10n.sftpChangePermissionsTitle,
+      label: l10n.sftpOctalPermissionsLabel,
       initialValue: entry.permissions?.octal ?? '',
-      confirmLabel: 'Apply',
+      confirmLabel: l10n.applyAction,
     );
     if (octal == null || !_isOctalPermissions(octal.trim())) {
       if (mounted && octal != null) {
-        _showSnackBar(context, 'Permissions must be a 3 or 4 digit octal.');
+        _showSnackBar(context, l10n.sftpPermissionsOctalError);
       }
       return;
     }
     await _runSftpOperation(
       () => _connection().chmod(entry.path, SftpPermissions(octal.trim())),
-      successMessage: 'Permissions updated.',
+      successMessage: l10n.sftpPermissionsUpdatedSnack,
     );
   }
 
   Future<void> _deleteEntry(SftpEntry entry) async {
+    final l10n = context.l10n;
     final confirmed = await _confirmDialog(
       context,
-      title: 'Delete ${entry.name}?',
+      title: l10n.sftpDeleteEntryTitle(entry.name),
       body: entry.type == SftpEntryType.directory
-          ? 'This deletes the remote directory and its contents.'
-          : 'This deletes the remote file.',
-      confirmLabel: 'Delete',
+          ? l10n.sftpDeleteDirectoryBody
+          : l10n.sftpDeleteFileBody,
+      confirmLabel: l10n.deleteAction,
       destructive: true,
     );
     if (!confirmed) {
@@ -678,10 +693,11 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
         return _connection().deleteDirectory(entry.path, recursive: true);
       }
       return _connection().deleteFile(entry.path);
-    }, successMessage: 'Entry deleted.');
+    }, successMessage: l10n.sftpEntryDeletedSnack);
   }
 
   Future<void> _previewFile(SftpEntry entry) async {
+    final l10n = context.l10n;
     try {
       final preview = await _connection().readTextPreview(entry.path);
       if (!mounted) {
@@ -696,7 +712,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
       }
       await _runSftpOperation(
         () => _connection().writeTextFile(entry.path, updatedText),
-        successMessage: 'File saved.',
+        successMessage: l10n.sftpFileSavedSnack,
       );
     } on Object catch (error) {
       if (mounted) {

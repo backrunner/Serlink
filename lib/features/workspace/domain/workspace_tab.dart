@@ -21,6 +21,23 @@ enum SessionLifecycleState {
   failed,
 }
 
+extension SessionLifecycleActivity on SessionLifecycleState {
+  bool get keepsTerminalAlive {
+    return switch (this) {
+      SessionLifecycleState.idle ||
+      SessionLifecycleState.disconnected ||
+      SessionLifecycleState.failed => false,
+      SessionLifecycleState.resolvingProfile ||
+      SessionLifecycleState.connecting ||
+      SessionLifecycleState.verifyingHostKey ||
+      SessionLifecycleState.authenticating ||
+      SessionLifecycleState.connected ||
+      SessionLifecycleState.reconnecting ||
+      SessionLifecycleState.disconnecting => true,
+    };
+  }
+}
+
 sealed class WorkspaceTabContent {
   const WorkspaceTabContent();
 
@@ -41,6 +58,8 @@ class TerminalPaneState {
   final SessionLifecycleState lifecycle;
   final AppFailure? failure;
   final TerminalDisplaySettings? displaySettings;
+
+  bool get keepsTerminalAlive => lifecycle.keepsTerminalAlive;
 
   TerminalPaneState copyWith({
     SessionId? sessionId,
@@ -351,6 +370,21 @@ class WorkspaceState {
     }
     return tabs.isEmpty ? null : tabs.first;
   }
+
+  int get activeTerminalPaneCount {
+    var count = 0;
+    for (final tab in tabs) {
+      final panes = switch (tab.content) {
+        TerminalTabContent(:final panes) => panes,
+        LocalTerminalTabContent(:final panes) => panes,
+        SftpTabContent() => const <TerminalPaneState>[],
+      };
+      count += panes.where((pane) => pane.keepsTerminalAlive).length;
+    }
+    return count;
+  }
+
+  bool get hasActiveTerminalPanes => activeTerminalPaneCount > 0;
 
   WorkspaceState copyWith({
     WorkspaceArea? area,

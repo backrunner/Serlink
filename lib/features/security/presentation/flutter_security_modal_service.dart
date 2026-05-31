@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../design_system/design_system.dart';
+import '../../../l10n/l10n.dart';
 import '../../ssh/application/ssh_session_service.dart';
 import '../../sync/domain/webdav_tls_certificate_details.dart';
 import '../application/security_modal_service.dart';
@@ -93,12 +94,15 @@ class _WebDavCertificateDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final changed =
         certificate.expectedFingerprint != null &&
         certificate.expectedFingerprint != certificate.fingerprint;
     return SerlinkDialog(
       title: Text(
-        changed ? 'WebDAV Certificate Changed' : 'Trust WebDAV Certificate?',
+        changed
+            ? l10n.securityWebDavCertificateChangedTitle
+            : l10n.securityTrustWebDavCertificateTitle,
       ),
       content: SizedBox(
         width: 560,
@@ -108,26 +112,29 @@ class _WebDavCertificateDialog extends StatelessWidget {
           children: [
             Text(certificate.endpoint.toString()),
             const SizedBox(height: 12),
-            Text('Algorithm: ${certificate.algorithm}'),
+            Text(l10n.securityAlgorithmLabel(certificate.algorithm)),
             const SizedBox(height: 8),
             SelectableText(certificate.fingerprint),
             if (certificate.expectedFingerprint != null) ...[
               const SizedBox(height: 12),
-              Text('Previous: ${certificate.expectedFingerprint}'),
+              Text(
+                l10n.securityPreviousLabel(certificate.expectedFingerprint!),
+              ),
             ],
             const SizedBox(height: 12),
-            Text('Subject: ${certificate.subject}'),
+            Text(l10n.securitySubjectLabel(certificate.subject)),
             const SizedBox(height: 8),
-            Text('Issuer: ${certificate.issuer}'),
+            Text(l10n.securityIssuerLabel(certificate.issuer)),
             const SizedBox(height: 8),
             Text(
-              'Valid: ${_shortUtc(certificate.validFrom)} to ${_shortUtc(certificate.validUntil)}',
+              l10n.securityValidRangeLabel(
+                _shortUtc(certificate.validFrom),
+                _shortUtc(certificate.validUntil),
+              ),
             ),
             if (certificate.requiresClockReview) ...[
               const SizedBox(height: 12),
-              const Text(
-                'This certificate is not valid yet. Check this device clock before trusting it.',
-              ),
+              Text(l10n.securityCertificateClockWarning),
             ],
           ],
         ),
@@ -136,12 +143,12 @@ class _WebDavCertificateDialog extends StatelessWidget {
         SerlinkTextButton(
           onPressed: () =>
               Navigator.of(context).pop(CertificateTrustDecision.cancel),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
         SerlinkFilledButton(
           onPressed: () =>
               Navigator.of(context).pop(CertificateTrustDecision.trustAndSave),
-          child: const Text('Trust and Save'),
+          child: Text(l10n.securityTrustAndSaveAction),
         ),
       ],
     );
@@ -155,9 +162,14 @@ class _HostKeyDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final changed = prompt.previousFingerprint != null;
     return SerlinkDialog(
-      title: Text(changed ? 'Host Key Changed' : 'Confirm Fingerprint'),
+      title: Text(
+        changed
+            ? l10n.securityHostKeyChangedTitle
+            : l10n.securityConfirmFingerprintTitle,
+      ),
       content: SizedBox(
         width: 520,
         child: Column(
@@ -166,12 +178,12 @@ class _HostKeyDialog extends StatelessWidget {
           children: [
             Text('${prompt.hostname}:${prompt.port}'),
             const SizedBox(height: 12),
-            Text('Algorithm: ${prompt.algorithm}'),
+            Text(l10n.securityAlgorithmLabel(prompt.algorithm)),
             const SizedBox(height: 8),
             SelectableText(prompt.fingerprint),
             if (prompt.previousFingerprint != null) ...[
               const SizedBox(height: 12),
-              Text('Previous: ${prompt.previousFingerprint}'),
+              Text(l10n.securityPreviousLabel(prompt.previousFingerprint!)),
             ],
           ],
         ),
@@ -179,16 +191,16 @@ class _HostKeyDialog extends StatelessWidget {
       actions: [
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(HostKeyDecision.cancel),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(HostKeyDecision.trustOnce),
-          child: const Text('Trust Once'),
+          child: Text(l10n.securityTrustOnceAction),
         ),
         SerlinkFilledButton(
           onPressed: () =>
               Navigator.of(context).pop(HostKeyDecision.trustAndSave),
-          child: const Text('Trust and Save'),
+          child: Text(l10n.securityTrustAndSaveAction),
         ),
       ],
     );
@@ -206,6 +218,7 @@ class _ExportDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SerlinkDialog(
       title: Text(preview.title),
       content: SizedBox(
@@ -214,10 +227,18 @@ class _ExportDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(preview.encrypted ? 'Encrypted export' : 'Unencrypted export'),
+            Text(
+              preview.encrypted
+                  ? l10n.securityEncryptedExport
+                  : l10n.securityUnencryptedExport,
+            ),
             if (preview.sensitiveFields.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text('Sensitive fields: ${preview.sensitiveFields.join(', ')}'),
+              Text(
+                l10n.securitySensitiveFields(
+                  preview.sensitiveFields.join(', '),
+                ),
+              ),
             ],
           ],
         ),
@@ -225,11 +246,11 @@ class _ExportDialog extends StatelessWidget {
       actions: [
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(ExportDecision.cancel),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
         SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(ExportDecision.confirm),
-          child: const Text('Export'),
+          child: Text(l10n.settingsExportAction),
         ),
       ],
     );
@@ -243,19 +264,20 @@ class _DestructiveActionDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SerlinkDialog(
       title: Text(title),
-      content: const Text('This action cannot be undone.'),
+      content: Text(l10n.securityCannotBeUndone),
       actions: [
         SerlinkTextButton(
           onPressed: () =>
               Navigator.of(context).pop(DestructiveDecision.cancel),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
         SerlinkFilledButton(
           onPressed: () =>
               Navigator.of(context).pop(DestructiveDecision.confirm),
-          child: const Text('Confirm'),
+          child: Text(l10n.confirmAction),
         ),
       ],
     );
@@ -269,16 +291,17 @@ class _MultilinePasteDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final lineCount = preview.split('\n').length;
     return SerlinkDialog(
-      title: const Text('Paste multiple lines?'),
+      title: Text(l10n.securityPasteMultipleLinesTitle),
       content: SizedBox(
         width: 560,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('$lineCount lines will be sent to the active terminal.'),
+            Text(l10n.securityPasteMultipleLinesBody(lineCount)),
             const SizedBox(height: 12),
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 240),
@@ -295,11 +318,11 @@ class _MultilinePasteDialog extends StatelessWidget {
       actions: [
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
         SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Paste'),
+          child: Text(l10n.pasteAction),
         ),
       ],
     );

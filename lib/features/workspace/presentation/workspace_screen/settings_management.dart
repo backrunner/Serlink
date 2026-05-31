@@ -97,32 +97,74 @@ class _SettingsActionRow extends StatelessWidget {
   }
 }
 
-String _vaultStatusPillLabel(VaultState? state) {
+List<SerlinkSelectItem<AppLanguage>> _languageItems(AppLocalizations l10n) {
+  return [
+    SerlinkSelectItem(
+      value: AppLanguage.system,
+      label: l10n.settingsLanguageSystem,
+      icon: Icons.computer_outlined,
+    ),
+    SerlinkSelectItem(
+      value: AppLanguage.english,
+      label: l10n.settingsLanguageEnglish,
+      icon: Icons.language_outlined,
+    ),
+    SerlinkSelectItem(
+      value: AppLanguage.simplifiedChinese,
+      label: l10n.settingsLanguageChinese,
+      icon: Icons.language_outlined,
+    ),
+    SerlinkSelectItem(
+      value: AppLanguage.japanese,
+      label: l10n.settingsLanguageJapanese,
+      icon: Icons.language_outlined,
+    ),
+  ];
+}
+
+Future<void> _setAppLanguage(
+  BuildContext context,
+  WidgetRef ref,
+  AppLanguage language,
+) async {
+  try {
+    await ref.read(appLanguageProvider.notifier).setLanguage(language);
+    if (context.mounted) {
+      _showSnackBar(context, context.l10n.settingsLanguageSaved);
+    }
+  } on Object {
+    if (context.mounted) {
+      _showSnackBar(context, context.l10n.settingsLanguageSaveFailed);
+    }
+  }
+}
+
+String _vaultStatusPillLabel(AppLocalizations l10n, VaultState? state) {
   return switch (state) {
-    VaultState.uninitialized => 'Vault not created',
-    VaultState.locked => 'Vault locked',
-    VaultState.unlocked => 'Vault unlocked',
-    null => 'Vault loading',
+    VaultState.uninitialized => l10n.settingsVaultNotCreatedPill,
+    VaultState.locked => l10n.settingsVaultLockedPill,
+    VaultState.unlocked => l10n.settingsVaultUnlockedPill,
+    null => l10n.settingsVaultLoadingPill,
   };
 }
 
-String _vaultStateLabel(VaultState? state) {
+String _vaultStateLabel(AppLocalizations l10n, VaultState? state) {
   return switch (state) {
-    VaultState.uninitialized => 'Not created.',
-    VaultState.locked => 'Locked. Existing connections keep running.',
-    VaultState.unlocked => 'Unlocked for new connection profile resolution.',
-    null => 'Preparing encrypted storage',
+    VaultState.uninitialized => l10n.settingsVaultNotCreated,
+    VaultState.locked => l10n.settingsVaultLocked,
+    VaultState.unlocked => l10n.settingsVaultUnlocked,
+    null => l10n.settingsVaultPreparing,
   };
 }
 
-String _localUnlockLabel(VaultSessionState? session) {
+String _localUnlockLabel(AppLocalizations l10n, VaultSessionState? session) {
   if (session?.vaultState == VaultState.uninitialized) {
-    return 'Create the vault before enabling device-protected unlock.';
+    return l10n.settingsLocalUnlockNeedsVault;
   }
   if (session?.localUnlockAvailable == true) {
-    return 'Enabled. Lock the vault to unlock with this device.';
+    return l10n.settingsLocalUnlockEnabled;
   }
-  return 'Disabled. Passphrase or recovery key is required after lock.';
+  return l10n.settingsLocalUnlockDisabled;
 }
 
 Future<void> _setLocalVaultUnlock(
@@ -130,13 +172,18 @@ Future<void> _setLocalVaultUnlock(
   WidgetRef ref,
   bool enabled,
 ) async {
+  final l10n = context.l10n;
   final confirmed = await _confirmDialog(
     context,
-    title: enabled ? 'Enable local unlock?' : 'Disable local unlock?',
+    title: enabled
+        ? l10n.settingsEnableLocalUnlockTitle
+        : l10n.settingsDisableLocalUnlockTitle,
     body: enabled
-        ? 'Serlink will store a random device key in OS secure storage. Your vault passphrase is not stored.'
-        : 'This removes this device key from OS secure storage. Existing connections keep running.',
-    confirmLabel: enabled ? 'Enable' : 'Disable',
+        ? l10n.settingsEnableLocalUnlockBody
+        : l10n.settingsDisableLocalUnlockBody,
+    confirmLabel: enabled
+        ? l10n.settingsEnableAction
+        : l10n.settingsDisableAction,
     destructive: !enabled,
   );
   if (!confirmed) {
@@ -158,25 +205,25 @@ Future<void> _setLocalVaultUnlock(
         context,
         enabled
             ? updated
-                  ? 'Local unlock enabled. Lock the vault to use device unlock.'
-                  : 'Local unlock could not be verified.'
+                  ? l10n.settingsLocalUnlockEnabledSnack
+                  : l10n.settingsLocalUnlockVerifyFailedSnack
             : updated
-            ? 'Local unlock disabled.'
-            : 'Local unlock is still available on this device.',
+            ? l10n.settingsLocalUnlockDisabledSnack
+            : l10n.settingsLocalUnlockStillAvailableSnack,
       );
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _localUnlockErrorMessage(error));
+      _showSnackBar(context, _localUnlockErrorMessage(l10n, error));
     }
   }
 }
 
-String _localUnlockErrorMessage(Object error) {
+String _localUnlockErrorMessage(AppLocalizations l10n, Object error) {
   if (error is VaultException) {
     return error.message;
   }
-  return 'Local unlock could not be updated.';
+  return l10n.settingsLocalUnlockUpdateFailed;
 }
 
 Future<void> _showIdentityManagerDialog(
@@ -195,22 +242,22 @@ class _IdentityManagerDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     return FutureBuilder<List<IdentityConfig>>(
       future: ref.read(identityRepositoryProvider).list(),
       builder: (context, snapshot) {
         final identities = snapshot.data ?? const <IdentityConfig>[];
         return SerlinkDialog(
           maxWidth: _adaptiveDialogWidth(context, _dialogWidthManagement),
-          title: const Text('Credentials'),
+          title: Text(l10n.credentialsDialogTitle),
           content: SizedBox(
             width: 640,
             child: _DialogList(
               loading: snapshot.connectionState != ConnectionState.done,
-              empty: const _DialogState(
+              empty: _DialogState(
                 icon: Icons.badge_outlined,
-                title: 'No credentials stored',
-                body:
-                    'Imported passwords, private keys, certificates, and identity metadata will appear here.',
+                title: l10n.credentialsEmptyTitle,
+                body: l10n.credentialsEmptyBody,
               ),
               items: [
                 for (final identity in identities)
@@ -218,23 +265,23 @@ class _IdentityManagerDialog extends ConsumerWidget {
                     icon: Icons.badge_outlined,
                     title: identity.displayName,
                     subtitle: [
-                      _identityKindLabel(identity.kind),
+                      _identityKindLabel(l10n, identity.kind),
                       if (identity.usernameHint case final username?)
-                        'user $username',
+                        l10n.identityUserLabel(username),
                       if (identity.certificatePrincipal case final principal?)
-                        'principal $principal',
+                        l10n.identityPrincipalLabel(principal),
                     ].join(' · '),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         SerlinkIconButton(
-                          tooltip: 'Edit credential',
+                          tooltip: l10n.credentialsEditTooltip,
                           onPressed: () =>
                               _editManagedIdentity(context, ref, identity),
                           icon: const Icon(Icons.edit_outlined, size: 18),
                         ),
                         SerlinkIconButton(
-                          tooltip: 'Delete credential',
+                          tooltip: l10n.credentialsDeleteTooltip,
                           onPressed: () =>
                               _deleteIdentity(context, ref, identity),
                           icon: const Icon(Icons.delete_outline, size: 18),
@@ -248,7 +295,7 @@ class _IdentityManagerDialog extends ConsumerWidget {
           actions: [
             SerlinkFilledButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
+              child: Text(l10n.doneAction),
             ),
           ],
         );
@@ -269,7 +316,7 @@ Future<void> _editManagedIdentity(
   );
   if (updated == true && context.mounted) {
     Navigator.of(context).pop();
-    _showSnackBar(context, 'Credential updated.');
+    _showSnackBar(context, context.l10n.credentialUpdatedSnack);
     await _showIdentityManagerDialog(context, ref);
   }
 }
@@ -289,12 +336,13 @@ Future<void> _deleteIdentity(
   ];
   final confirmed = await _confirmDialog(
     context,
-    title: 'Delete credential?',
+    title: context.l10n.credentialDeleteTitle,
     body: linkedHosts.isEmpty
-        ? 'This removes the credential and its encrypted secret material.'
-        : 'This credential is still linked to: ${linkedHosts.join(', ')}. '
-              'Delete it only after removing those host links.',
-    confirmLabel: linkedHosts.isEmpty ? 'Delete' : 'Close',
+        ? context.l10n.credentialDeleteBody
+        : context.l10n.credentialDeleteLinkedBody(linkedHosts.join(', ')),
+    confirmLabel: linkedHosts.isEmpty
+        ? context.l10n.deleteAction
+        : context.l10n.closeAction,
     destructive: linkedHosts.isEmpty,
   );
   if (!confirmed || linkedHosts.isNotEmpty) {
@@ -325,12 +373,12 @@ Future<void> _deleteIdentity(
     await ref.read(identityRepositoryProvider).delete(identity.id);
     if (context.mounted) {
       Navigator.of(context).pop();
-      _showSnackBar(context, 'Credential deleted.');
+      _showSnackBar(context, context.l10n.credentialDeletedSnack);
       await _showIdentityManagerDialog(context, ref);
     }
   } on Object {
     if (context.mounted) {
-      _showSnackBar(context, 'Credential could not be deleted.');
+      _showSnackBar(context, context.l10n.credentialDeleteFailedSnack);
     }
   }
 }
@@ -348,22 +396,22 @@ class _KnownHostsDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     return FutureBuilder<List<KnownHostRecord>>(
       future: ref.read(knownHostRepositoryProvider).list(),
       builder: (context, snapshot) {
         final records = snapshot.data ?? const <KnownHostRecord>[];
         return SerlinkDialog(
           maxWidth: _adaptiveDialogWidth(context, _dialogWidthWide),
-          title: const Text('Known Hosts'),
+          title: Text(l10n.knownHostsDialogTitle),
           content: SizedBox(
             width: 680,
             child: _DialogList(
               loading: snapshot.connectionState != ConnectionState.done,
-              empty: const _DialogState(
+              empty: _DialogState(
                 icon: Icons.verified_user_outlined,
-                title: 'No trusted fingerprints',
-                body:
-                    'Host fingerprints accepted during connection review will be listed here.',
+                title: l10n.knownHostsEmptyTitle,
+                body: l10n.knownHostsEmptyBody,
               ),
               items: [
                 for (final record in records)
@@ -372,7 +420,7 @@ class _KnownHostsDialog extends ConsumerWidget {
                     title: '${record.hostname}:${record.port}',
                     subtitle: '${record.algorithm} · ${record.fingerprint}',
                     trailing: SerlinkIconButton(
-                      tooltip: 'Delete known host',
+                      tooltip: l10n.knownHostDeleteTooltip,
                       onPressed: () => _deleteKnownHost(context, ref, record),
                       icon: const Icon(Icons.delete_outline, size: 18),
                     ),
@@ -383,7 +431,7 @@ class _KnownHostsDialog extends ConsumerWidget {
           actions: [
             SerlinkFilledButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
+              child: Text(l10n.doneAction),
             ),
           ],
         );
@@ -399,10 +447,11 @@ Future<void> _deleteKnownHost(
 ) async {
   final confirmed = await _confirmDialog(
     context,
-    title: 'Delete known host?',
-    body:
-        'This removes the stored fingerprint for ${record.hostname}:${record.port}. The next connection will require confirmation again.',
-    confirmLabel: 'Delete',
+    title: context.l10n.knownHostDeleteTitle,
+    body: context.l10n.knownHostDeleteBody(
+      '${record.hostname}:${record.port}',
+    ),
+    confirmLabel: context.l10n.deleteAction,
     destructive: true,
   );
   if (!confirmed) {
@@ -421,12 +470,12 @@ Future<void> _deleteKnownHost(
     await ref.read(knownHostRepositoryProvider).delete(record.hostId);
     if (context.mounted) {
       Navigator.of(context).pop();
-      _showSnackBar(context, 'Known host deleted.');
+      _showSnackBar(context, context.l10n.knownHostDeletedSnack);
       await _showKnownHostsDialog(context, ref);
     }
   } on Object {
     if (context.mounted) {
-      _showSnackBar(context, 'Known host could not be deleted.');
+      _showSnackBar(context, context.l10n.knownHostDeleteFailedSnack);
     }
   }
 }

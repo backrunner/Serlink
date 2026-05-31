@@ -1,13 +1,46 @@
 part of '../workspace_screen.dart';
 
-class _MacWindowControls extends StatefulWidget {
+var _windowCloseConfirmationInFlight = false;
+
+Future<void> _requestWindowClose(BuildContext context, WidgetRef ref) async {
+  if (_windowCloseConfirmationInFlight) {
+    return;
+  }
+  final activeTerminalPaneCount = ref
+      .read(workspaceTabControllerProvider)
+      .activeTerminalPaneCount;
+  if (activeTerminalPaneCount == 0) {
+    await AppWindow.close();
+    return;
+  }
+
+  _windowCloseConfirmationInFlight = true;
+  try {
+    final l10n = context.l10n;
+    final confirmed = await _confirmDialog(
+      context,
+      title: l10n.windowCloseActiveTerminalsTitle,
+      body: l10n.windowCloseActiveTerminalsBody(activeTerminalPaneCount),
+      confirmLabel: l10n.windowCloseWindowAction,
+      destructive: true,
+    );
+    if (!context.mounted || !confirmed) {
+      return;
+    }
+    await AppWindow.close();
+  } finally {
+    _windowCloseConfirmationInFlight = false;
+  }
+}
+
+class _MacWindowControls extends ConsumerStatefulWidget {
   const _MacWindowControls();
 
   @override
-  State<_MacWindowControls> createState() => _MacWindowControlsState();
+  ConsumerState<_MacWindowControls> createState() => _MacWindowControlsState();
 }
 
-class _MacWindowControlsState extends State<_MacWindowControls> {
+class _MacWindowControlsState extends ConsumerState<_MacWindowControls> {
   bool _hovered = false;
 
   @override
@@ -23,17 +56,17 @@ class _MacWindowControlsState extends State<_MacWindowControls> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _MacWindowControlButton(
-            label: 'Close window',
+            label: context.l10n.windowCloseLabel,
             color: const Color(0xFFFF5F57),
             pressedColor: const Color(0xFFBF4943),
             borderColor: const Color(0xFFE0443E),
             glyphColor: const Color(0xFF7E0F0A),
             glyph: _MacWindowControlGlyph.close,
             showIcon: _hovered,
-            onPressed: () => unawaited(AppWindow.close()),
+            onPressed: () => unawaited(_requestWindowClose(context, ref)),
           ),
           _MacWindowControlButton(
-            label: 'Minimize window',
+            label: context.l10n.windowMinimizeLabel,
             color: const Color(0xFFFFBD2E),
             pressedColor: const Color(0xFFBF9123),
             borderColor: const Color(0xFFDEA123),
@@ -43,7 +76,7 @@ class _MacWindowControlsState extends State<_MacWindowControls> {
             onPressed: () => unawaited(AppWindow.minimize()),
           ),
           _MacWindowControlButton(
-            label: 'Zoom window',
+            label: context.l10n.windowZoomLabel,
             color: const Color(0xFF28C840),
             pressedColor: const Color(0xFF1F9E32),
             borderColor: const Color(0xFF1DAC2B),
@@ -233,14 +266,14 @@ class _WindowDragRegion extends StatelessWidget {
   }
 }
 
-class _WindowControls extends StatefulWidget {
+class _WindowControls extends ConsumerStatefulWidget {
   const _WindowControls();
 
   @override
-  State<_WindowControls> createState() => _WindowControlsState();
+  ConsumerState<_WindowControls> createState() => _WindowControlsState();
 }
 
-class _WindowControlsState extends State<_WindowControls> {
+class _WindowControlsState extends ConsumerState<_WindowControls> {
   bool _isMaximized = false;
 
   @override
@@ -287,7 +320,7 @@ class _WindowControlsState extends State<_WindowControls> {
         _WindowControlButton(
           icon: Icons.close_rounded,
           isClose: true,
-          onPressed: () => unawaited(AppWindow.close()),
+          onPressed: () => unawaited(_requestWindowClose(context, ref)),
         ),
       ],
     );

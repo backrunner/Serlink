@@ -32,17 +32,24 @@ class _OpenSshCertificateImportDialogState
   late final TextEditingController _displayNameController;
   late final TextEditingController _usernameController;
   late final TextEditingController _passphraseController;
+  var _controllersInitialized = false;
   String? _errorMessage;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_controllersInitialized) {
+      return;
+    }
     final comment = widget.preview.comment?.trim();
     _displayNameController = TextEditingController(
-      text: comment == null || comment.isEmpty ? '' : 'Certificate $comment',
+      text: comment == null || comment.isEmpty
+          ? ''
+          : context.l10n.certificateDefaultName(comment),
     );
     _usernameController = TextEditingController();
     _passphraseController = TextEditingController();
+    _controllersInitialized = true;
   }
 
   @override
@@ -55,10 +62,11 @@ class _OpenSshCertificateImportDialogState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final warnings = widget.preview.warnings.take(3).toList(growable: false);
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
-      title: const Text('Import OpenSSH certificate?'),
+      title: Text(l10n.importOpenSshCertificateTitle),
       content: SizedBox(
         width: 560,
         child: Column(
@@ -66,18 +74,18 @@ class _OpenSshCertificateImportDialogState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _ImportPreviewLine(
-              label: 'Algorithm',
+              label: l10n.importAlgorithmLabel,
               value: widget.preview.algorithm,
             ),
             if (widget.preview.comment != null)
               _ImportPreviewLine(
-                label: 'Comment',
+                label: l10n.importCommentLabel,
                 value: widget.preview.comment!,
               ),
             if (warnings.isNotEmpty) ...[
               const SizedBox(height: 8),
               SerlinkAlert.warning(
-                title: 'Import warnings',
+                title: l10n.importWarningsTitle,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -99,8 +107,8 @@ class _OpenSshCertificateImportDialogState
             SerlinkTextField(
               key: const ValueKey('openssh-cert-display-name-field'),
               controller: _displayNameController,
-              decoration: const InputDecoration(
-                labelText: 'Display name',
+              decoration: InputDecoration(
+                labelText: l10n.hostDisplayNameLabel,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -108,8 +116,8 @@ class _OpenSshCertificateImportDialogState
             SerlinkTextField(
               key: const ValueKey('openssh-cert-username-field'),
               controller: _usernameController,
-              decoration: const InputDecoration(
-                labelText: 'Username hint',
+              decoration: InputDecoration(
+                labelText: l10n.credentialUsernameHintLabel,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -118,8 +126,8 @@ class _OpenSshCertificateImportDialogState
               key: const ValueKey('openssh-cert-passphrase-field'),
               controller: _passphraseController,
               obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Private key passphrase',
+              decoration: InputDecoration(
+                labelText: l10n.hostKeyPassphraseLabel,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -133,9 +141,12 @@ class _OpenSshCertificateImportDialogState
       actions: [
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
-        SerlinkFilledButton(onPressed: _confirm, child: const Text('Import')),
+        SerlinkFilledButton(
+          onPressed: _confirm,
+          child: Text(l10n.importAction),
+        ),
       ],
     );
   }
@@ -144,7 +155,7 @@ class _OpenSshCertificateImportDialogState
     final passphrase = _passphraseController.text;
     if (passphrase.trim() != passphrase) {
       setState(() {
-        _errorMessage = 'Passphrase cannot have leading or trailing spaces.';
+        _errorMessage = context.l10n.passphraseWhitespaceError;
       });
       return;
     }

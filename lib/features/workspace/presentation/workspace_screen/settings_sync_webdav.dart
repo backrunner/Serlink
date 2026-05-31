@@ -60,9 +60,10 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
-      title: const Text('WebDAV Sync'),
+      title: Text(l10n.webDavSyncTitle),
       content: SizedBox(
         width: 560,
         child: Column(
@@ -71,9 +72,9 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
             SerlinkTextField(
               key: const ValueKey('webdav-endpoint-field'),
               controller: _endpointController,
-              decoration: const InputDecoration(
-                labelText: 'Endpoint',
-                hintText: 'https://example.com/webdav',
+              decoration: InputDecoration(
+                labelText: l10n.webDavEndpointLabel,
+                hintText: l10n.webDavEndpointHint,
               ),
               textInputAction: TextInputAction.next,
             ),
@@ -81,7 +82,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
             SerlinkTextField(
               key: const ValueKey('webdav-username-field'),
               controller: _usernameController,
-              decoration: const InputDecoration(labelText: 'Username'),
+              decoration: InputDecoration(labelText: l10n.webDavUsernameLabel),
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 12),
@@ -90,8 +91,8 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
               controller: _passwordController,
               decoration: InputDecoration(
                 labelText: _isEditing
-                    ? 'Password (leave blank to keep)'
-                    : 'Password',
+                    ? l10n.webDavPasswordKeepLabel
+                    : l10n.webDavPasswordLabel,
               ),
               obscureText: true,
               textInputAction: TextInputAction.next,
@@ -100,7 +101,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
             SerlinkTextField(
               key: const ValueKey('webdav-base-path-field'),
               controller: _basePathController,
-              decoration: const InputDecoration(labelText: 'Base path'),
+              decoration: InputDecoration(labelText: l10n.webDavBasePathLabel),
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => _save(),
             ),
@@ -108,7 +109,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
             SerlinkSwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _enabled,
-              title: const Text('Enable WebDAV sync'),
+              title: Text(l10n.webDavEnableTitle),
               onChanged: (value) {
                 setState(() {
                   _enabled = value;
@@ -118,7 +119,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
             SerlinkCheckboxListTile(
               contentPadding: EdgeInsets.zero,
               value: _allowInsecureHttp,
-              title: const Text('Allow HTTP endpoint'),
+              title: Text(l10n.webDavAllowHttpTitle),
               onChanged: (value) {
                 setState(() {
                   _allowInsecureHttp = value ?? false;
@@ -136,31 +137,31 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
         if (_isEditing)
           SerlinkTextButton(
             onPressed: _saving ? null : _delete,
-            child: const Text('Remove'),
+            child: Text(l10n.removeAction),
           ),
         SerlinkTextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
         SerlinkFilledButton(
           key: const ValueKey('webdav-save-button'),
           onPressed: _saving ? null : _save,
-          child: Text(_saving ? 'Saving' : 'Save'),
+          child: Text(_saving ? l10n.savingAction : l10n.saveAction),
         ),
       ],
     );
   }
 
   Future<void> _save() async {
+    final l10n = context.l10n;
     var allowInsecureHttp = _allowInsecureHttp;
     final endpoint = Uri.tryParse(_endpointController.text.trim());
     if (endpoint?.scheme == 'http' && !allowInsecureHttp) {
       final confirmed = await _confirmDialog(
         context,
-        title: 'Use HTTP WebDAV?',
-        body:
-            'HTTP sync can expose metadata and credentials in transit. Use only for trusted local test servers.',
-        confirmLabel: 'Allow HTTP',
+        title: l10n.webDavUseHttpTitle,
+        body: l10n.webDavUseHttpBody,
+        confirmLabel: l10n.webDavAllowHttpAction,
         destructive: true,
       );
       if (!confirmed) {
@@ -194,24 +195,25 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
       ref.invalidate(webDavSyncSettingsProvider);
       if (mounted) {
         Navigator.of(context).pop();
-        _showSnackBar(context, 'WebDAV sync settings saved.');
+        _showSnackBar(context, l10n.webDavSavedSnack);
       }
     } on Object catch (error) {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorMessage = _syncSettingsErrorMessage(error);
+          _errorMessage = _syncSettingsErrorMessage(l10n, error);
         });
       }
     }
   }
 
   Future<void> _delete() async {
+    final l10n = context.l10n;
     final confirmed = await _confirmDialog(
       context,
-      title: 'Remove WebDAV sync?',
-      body: 'This removes the local WebDAV configuration and stored password.',
-      confirmLabel: 'Remove',
+      title: l10n.webDavRemoveTitle,
+      body: l10n.webDavRemoveBody,
+      confirmLabel: l10n.removeAction,
       destructive: true,
     );
     if (!confirmed) {
@@ -226,13 +228,13 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
       ref.invalidate(webDavSyncSettingsProvider);
       if (mounted) {
         Navigator.of(context).pop();
-        _showSnackBar(context, 'WebDAV sync settings removed.');
+        _showSnackBar(context, l10n.webDavRemovedSnack);
       }
     } on Object catch (error) {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorMessage = _syncSettingsErrorMessage(error);
+          _errorMessage = _syncSettingsErrorMessage(l10n, error);
         });
       }
     }

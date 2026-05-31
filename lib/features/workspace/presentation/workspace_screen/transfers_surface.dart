@@ -5,6 +5,7 @@ class _TransfersSurface extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final queue = ref.watch(transferQueueStateProvider);
     final state = queue.value;
     return Column(
@@ -18,17 +19,19 @@ class _TransfersSurface extends ConsumerWidget {
         ),
         Expanded(
           child: queue.when(
-            loading: () => const _PlaceholderSurface(
-              title: 'Transfers',
-              body: 'Preparing transfer queue.',
+            loading: () => _PlaceholderSurface(
+              title: l10n.transfersTitle,
+              body: l10n.transfersPreparing,
             ),
-            error: (error, stackTrace) =>
-                _PlaceholderSurface(title: 'Transfers', body: error.toString()),
+            error: (error, stackTrace) => _PlaceholderSurface(
+              title: l10n.transfersTitle,
+              body: error.toString(),
+            ),
             data: (state) {
               if (state.tasks.isEmpty) {
-                return const _PlaceholderSurface(
-                  title: 'No Transfers',
-                  body: 'SFTP uploads and downloads will appear here.',
+                return _PlaceholderSurface(
+                  title: l10n.transfersEmptyTitle,
+                  body: l10n.transfersEmptyBody,
                 );
               }
               return _TransferTaskList(tasks: state.tasks);
@@ -48,6 +51,7 @@ class _TransfersHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final t = context.tokens;
     final tasks = state?.tasks ?? const <TransferTask>[];
     final activeCount = tasks.where(_transferIsActive).length;
@@ -59,23 +63,26 @@ class _TransfersHeader extends StatelessWidget {
           Icon(Icons.swap_vert, size: 19, color: t.textSecondary),
           const SizedBox(width: 10),
           Text(
-            'Transfers',
+            l10n.transfersTitle,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: t.textPrimary,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(width: 10),
-          SerlinkTag(label: '${tasks.length} ${_plural(tasks.length, 'item')}'),
+          SerlinkTag(label: l10n.transfersItemCount(tasks.length)),
           if (activeCount > 0) ...[
             const SizedBox(width: 6),
-            StatusPill(label: '$activeCount active', color: t.statusInfo),
+            StatusPill(
+              label: l10n.transfersActiveCount(activeCount),
+              color: t.statusInfo,
+            ),
           ],
           const Spacer(),
           SerlinkTextButton.icon(
             onPressed: onClear,
             icon: const Icon(Icons.delete_sweep_outlined, size: 17),
-            label: const Text('Clear'),
+            label: Text(l10n.transfersClearAction),
           ),
         ],
       ),
@@ -126,6 +133,7 @@ class _TransferTaskRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     final t = context.tokens;
     final queue = ref.read(transferQueueControllerProvider);
     final progress = task.totalBytes == null || task.totalBytes == 0
@@ -139,7 +147,7 @@ class _TransferTaskRow extends ConsumerWidget {
     return SerlinkContextMenu(
       actions: [
         SerlinkMenuAction(
-          label: 'Delete transfer',
+          label: l10n.transferDeleteMenu,
           icon: Icons.delete_outline,
           onPressed: () => unawaited(_deleteTransfer(context, ref, task)),
         ),
@@ -181,7 +189,7 @@ class _TransferTaskRow extends ConsumerWidget {
                     ),
                     const SizedBox(width: 10),
                     StatusPill(
-                      label: _transferStateLabel(task.state),
+                      label: _transferStateLabel(l10n, task.state),
                       color: _transferStateColor(task.state, t),
                     ),
                   ],
@@ -191,7 +199,7 @@ class _TransferTaskRow extends ConsumerWidget {
                   children: [
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 180),
-                      child: SerlinkTag(label: _transferMachineTag(task)),
+                      child: SerlinkTag(label: _transferMachineTag(l10n, task)),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -220,7 +228,7 @@ class _TransferTaskRow extends ConsumerWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    _transferProgressLabel(task),
+                    _transferProgressLabel(l10n, task),
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
@@ -229,7 +237,7 @@ class _TransferTaskRow extends ConsumerWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${_formatBytes(task.bytesPerSecond!.round())}/s'
-                      '${task.eta == null ? '' : ' · ${_formatDuration(task.eta!)} left'}',
+                      '${task.eta == null ? '' : ' · ${l10n.transferEtaLeft(_formatDuration(task.eta!))}'}',
                       style: Theme.of(
                         context,
                       ).textTheme.bodySmall?.copyWith(color: t.textMuted),
@@ -255,24 +263,24 @@ class _TransferTaskRow extends ConsumerWidget {
                       if (task.state == TransferState.running)
                         SerlinkTextButton(
                           onPressed: () => queue.pause(task.id),
-                          child: const Text('Pause'),
+                          child: Text(l10n.pauseAction),
                         ),
                       if (task.state == TransferState.paused)
                         SerlinkTextButton(
                           onPressed: () => queue.resume(task.id),
-                          child: const Text('Resume'),
+                          child: Text(l10n.resumeAction),
                         ),
                       if (queue.canRetry(task.id))
                         SerlinkTextButton(
                           onPressed: () => queue.retry(task.id),
-                          child: const Text('Retry'),
+                          child: Text(l10n.retryAction),
                         ),
                       if (task.state == TransferState.running ||
                           task.state == TransferState.paused ||
                           task.state == TransferState.queued)
                         SerlinkTextButton(
                           onPressed: () => queue.cancel(task.id),
-                          child: const Text('Cancel'),
+                          child: Text(l10n.cancelAction),
                         ),
                     ],
                   ),
@@ -291,14 +299,15 @@ Future<void> _clearTransfers(
   WidgetRef ref,
   TransferQueueState state,
 ) async {
+  final l10n = context.l10n;
   final activeCount = state.tasks.where(_transferIsActive).length;
   final confirmed = await _confirmDialog(
     context,
-    title: 'Clear transfers?',
+    title: l10n.transferClearTitle,
     body: activeCount == 0
-        ? 'Remove ${state.tasks.length} transfer ${_plural(state.tasks.length, 'record')} from history.'
-        : 'Remove ${state.tasks.length} transfer ${_plural(state.tasks.length, 'record')} from history and cancel $activeCount active ${_plural(activeCount, 'transfer')}.',
-    confirmLabel: 'Clear',
+        ? l10n.transferClearBody(state.tasks.length)
+        : l10n.transferClearActiveBody(state.tasks.length, activeCount),
+    confirmLabel: l10n.transfersClearAction,
     destructive: true,
   );
   if (!context.mounted || !confirmed) {
@@ -306,7 +315,7 @@ Future<void> _clearTransfers(
   }
   await ref.read(transferQueueControllerProvider).clear();
   if (context.mounted) {
-    _showSnackBar(context, 'Transfers cleared.');
+    _showSnackBar(context, l10n.transferClearedSnack);
   }
 }
 
@@ -315,6 +324,7 @@ Future<void> _deleteTransfer(
   WidgetRef ref,
   TransferTask task,
 ) async {
+  final l10n = context.l10n;
   final localType = await FileSystemEntity.type(
     task.localPath,
     followLinks: false,
@@ -342,10 +352,7 @@ Future<void> _deleteTransfer(
       await _deleteLocalPath(task.localPath, localType);
     } on Object {
       if (context.mounted) {
-        _showSnackBar(
-          context,
-          'Transfer removed, but the local file could not be deleted.',
-        );
+        _showSnackBar(context, l10n.transferRemoveLocalFailedSnack);
       }
       return;
     }
@@ -354,8 +361,8 @@ Future<void> _deleteTransfer(
     _showSnackBar(
       context,
       deleteLocalFile
-          ? 'Transfer and local file deleted.'
-          : 'Transfer deleted.',
+          ? l10n.transferAndLocalDeletedSnack
+          : l10n.transferDeletedSnack,
     );
   }
 }
@@ -372,14 +379,14 @@ Future<void> _openCompletedTransfer(
     return;
   }
   if (localType == FileSystemEntityType.notFound) {
-    _showSnackBar(context, 'Completed item is no longer available locally.');
+    _showSnackBar(context, context.l10n.transferCompletedMissingSnack);
     return;
   }
   try {
     await _openLocalPath(task.localPath);
   } on Object {
     if (context.mounted) {
-      _showSnackBar(context, 'Completed item could not be opened.');
+      _showSnackBar(context, context.l10n.transferOpenFailedSnack);
     }
   }
 }
@@ -391,32 +398,32 @@ Future<_TransferDeleteChoice?> _showTransferDeleteDialog(
   required TransferTask task,
   required FileSystemEntityType localType,
 }) {
-  final localKind = _localEntityKindLabel(localType);
+  final l10n = context.l10n;
+  final localKind = _localEntityKindLabel(l10n, localType);
   return showSerlinkDialog<_TransferDeleteChoice>(
     context: context,
     barrierDismissible: false,
     builder: (context) {
       return SerlinkDialog(
-        title: const Text('Delete transfer?'),
+        title: Text(l10n.transferDeleteTitle),
         content: SerlinkAlert.warning(
-          message:
-              'A local $localKind still exists at ${task.localPath}. Remove the transfer only, or also delete the local $localKind?',
+          message: l10n.transferDeleteLocalBody(localKind, task.localPath),
         ),
         actions: [
           SerlinkTextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancelAction),
           ),
           SerlinkTextButton(
             onPressed: () =>
                 Navigator.of(context).pop(_TransferDeleteChoice.transferOnly),
-            child: const Text('Remove transfer'),
+            child: Text(l10n.transferRemoveOnlyAction),
           ),
           SerlinkFilledButton.danger(
             onPressed: () => Navigator.of(
               context,
             ).pop(_TransferDeleteChoice.transferAndLocalFile),
-            child: Text('Delete $localKind too'),
+            child: Text(l10n.transferDeleteLocalTooAction(localKind)),
           ),
         ],
       );
@@ -458,29 +465,27 @@ bool _transferIsActive(TransferTask task) {
       task.state == TransferState.paused;
 }
 
-String _transferMachineTag(TransferTask task) {
+String _transferMachineTag(AppLocalizations l10n, TransferTask task) {
   final machine = task.sourceMachineName?.trim();
-  final displayName = machine == null || machine.isEmpty ? 'unknown' : machine;
+  final displayName = machine == null || machine.isEmpty
+      ? l10n.transferRemoteMachineFallback
+      : machine;
   return task.direction == TransferDirection.download
-      ? 'From $displayName'
-      : 'To $displayName';
+      ? l10n.transferMachineFrom(displayName)
+      : l10n.transferMachineTo(displayName);
 }
 
-String _localEntityKindLabel(FileSystemEntityType type) {
+String _localEntityKindLabel(AppLocalizations l10n, FileSystemEntityType type) {
   return switch (type) {
-    FileSystemEntityType.directory => 'folder',
-    FileSystemEntityType.link => 'link',
-    _ => 'file',
+    FileSystemEntityType.directory => l10n.transferFolderKind,
+    FileSystemEntityType.link => l10n.transferLinkKind,
+    _ => l10n.transferFileKind,
   };
 }
 
-String _plural(int count, String singular) {
-  return count == 1 ? singular : '${singular}s';
-}
-
-String _sourceMachineNameFromTabTitle(String title) {
+String _sourceMachineNameFromTabTitle(AppLocalizations l10n, String title) {
   final name = title.split(' /').first.trim();
-  return name.isEmpty ? 'Remote machine' : name;
+  return name.isEmpty ? l10n.transferRemoteMachineFallback : name;
 }
 
 Color _transferStateColor(TransferState state, SerlinkTokens t) {
@@ -520,19 +525,20 @@ List<SftpEntry> _filterEntries(List<SftpEntry> entries, String filter) {
   ];
 }
 
-String _sftpEmptyBody({
+String _sftpEmptyBody(
+  AppLocalizations l10n, {
   required List<SftpEntry> allEntries,
   required List<SftpEntry> visibleEntries,
   required String filterText,
   required bool showHidden,
 }) {
   if (filterText.trim().isNotEmpty) {
-    return 'No entries match the current filter.';
+    return l10n.sftpNoEntriesFilter;
   }
   if (!showHidden && allEntries.isNotEmpty && visibleEntries.isEmpty) {
-    return 'This remote directory only contains hidden entries.';
+    return l10n.sftpHiddenOnly;
   }
-  return 'This remote directory has no visible entries.';
+  return l10n.sftpNoVisible;
 }
 
 String _sftpEntryMetadataLabel(SftpEntry entry) {
@@ -564,12 +570,12 @@ int _entryRank(SftpEntryType type) {
   };
 }
 
-String _entryTypeLabel(SftpEntryType type) {
+String _entryTypeLabel(AppLocalizations l10n, SftpEntryType type) {
   return switch (type) {
-    SftpEntryType.directory => 'Directory',
-    SftpEntryType.file => 'File',
-    SftpEntryType.symlink => 'Symlink',
-    SftpEntryType.unknown => 'Unknown',
+    SftpEntryType.directory => l10n.sftpDirectoryLabel,
+    SftpEntryType.file => l10n.sftpFileLabel,
+    SftpEntryType.symlink => l10n.sftpSymlinkLabel,
+    SftpEntryType.unknown => l10n.sftpUnknownLabel,
   };
 }
 
@@ -590,22 +596,22 @@ String _formatBytes(int? bytes) {
   return '${value.toStringAsFixed(value >= 10 ? 0 : 1)} ${units[unit]}';
 }
 
-String _transferProgressLabel(TransferTask task) {
+String _transferProgressLabel(AppLocalizations l10n, TransferTask task) {
   final total = task.totalBytes;
   if (total == null) {
-    return '${_formatBytes(task.transferredBytes)} transferred';
+    return l10n.transferBytesTransferred(_formatBytes(task.transferredBytes));
   }
   return '${_formatBytes(task.transferredBytes)} / ${_formatBytes(total)}';
 }
 
-String _transferStateLabel(TransferState state) {
+String _transferStateLabel(AppLocalizations l10n, TransferState state) {
   return switch (state) {
-    TransferState.queued => 'queued',
-    TransferState.running => 'running',
-    TransferState.paused => 'paused',
-    TransferState.completed => 'completed',
-    TransferState.failed => 'failed',
-    TransferState.canceled => 'canceled',
+    TransferState.queued => l10n.transferStateQueued,
+    TransferState.running => l10n.transferStateRunning,
+    TransferState.paused => l10n.transferStatePaused,
+    TransferState.completed => l10n.transferStateCompleted,
+    TransferState.failed => l10n.transferStateFailed,
+    TransferState.canceled => l10n.transferStateCanceled,
   };
 }
 

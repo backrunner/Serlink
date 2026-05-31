@@ -32,7 +32,7 @@ Future<bool> _confirmDialog(
         actions: [
           SerlinkTextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancelAction),
           ),
           if (destructive)
             SerlinkFilledButton.danger(
@@ -69,12 +69,12 @@ Future<TransferConflictAction?> _showTransferConflictDialog(
           SerlinkTextButton(
             onPressed: () =>
                 Navigator.of(context).pop(TransferConflictAction.skip),
-            child: const Text('Skip'),
+            child: Text(context.l10n.skipAction),
           ),
           SerlinkTextButton(
             onPressed: () =>
                 Navigator.of(context).pop(TransferConflictAction.rename),
-            child: const Text('Rename'),
+            child: Text(context.l10n.renameAction),
           ),
           SerlinkFilledButton(
             onPressed: () =>
@@ -87,26 +87,29 @@ Future<TransferConflictAction?> _showTransferConflictDialog(
   );
 }
 
-String _backupErrorMessage(Object error) {
+String _backupErrorMessage(AppLocalizations l10n, Object error) {
   if (error is VaultException) {
     return error.message;
   }
-  return 'Backup operation failed.';
+  return l10n.backupOperationFailed;
 }
 
-String _diagnosticErrorMessage(Object error) {
-  return 'Diagnostic bundle could not be exported.';
+String _diagnosticErrorMessage(AppLocalizations l10n, Object error) {
+  return l10n.diagnosticExportFailed;
 }
 
-String _openSshConfigExportErrorMessage(Object error) {
-  return 'OpenSSH config could not be exported.';
+String _openSshConfigExportErrorMessage(AppLocalizations l10n, Object error) {
+  return l10n.openSshConfigExportFailed;
 }
 
-String _identityMetadataExportErrorMessage(Object error) {
-  return 'Identity metadata could not be exported.';
+String _identityMetadataExportErrorMessage(
+  AppLocalizations l10n,
+  Object error,
+) {
+  return l10n.identityMetadataExportFailed;
 }
 
-String _importErrorMessage(Object error) {
+String _importErrorMessage(AppLocalizations l10n, Object error) {
   if (error is OpenSshConfigImportException) {
     return error.message;
   }
@@ -116,7 +119,7 @@ String _importErrorMessage(Object error) {
   if (error is VaultException) {
     return error.message;
   }
-  return 'Import failed.';
+  return l10n.importFailed;
 }
 
 /// One entry rendered as a modern card row inside a management dialog.
@@ -261,8 +264,10 @@ class _DialogStateView extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     if (loading) {
-      return const Center(
-        child: SerlinkLoadingIndicator(semanticsLabel: 'Loading'),
+      return Center(
+        child: SerlinkLoadingIndicator(
+          semanticsLabel: context.l10n.loadingSemantics,
+        ),
       );
     }
     final state = this.state;
@@ -364,7 +369,9 @@ class _PlaceholderSurface extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (loading) ...[
-              const SerlinkLoadingIndicator(semanticsLabel: 'Loading'),
+              SerlinkLoadingIndicator(
+                semanticsLabel: context.l10n.loadingSemantics,
+              ),
               const SizedBox(height: 16),
             ],
             Text(

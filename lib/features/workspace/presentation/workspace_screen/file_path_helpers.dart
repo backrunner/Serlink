@@ -136,7 +136,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
       actions: [
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.cancelAction),
         ),
         SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(_controller.text),

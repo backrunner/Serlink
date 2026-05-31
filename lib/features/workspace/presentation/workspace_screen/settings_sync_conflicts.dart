@@ -31,9 +31,10 @@ class _SyncConflictReviewDialogState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthReview),
-      title: const Text('Review sync conflicts'),
+      title: Text(l10n.syncConflictReviewDialogTitle),
       content: SizedBox(
         width: 820,
         height: 520,
@@ -66,17 +67,22 @@ class _SyncConflictReviewDialogState
       actions: [
         SerlinkTextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
         SerlinkFilledButton(
           onPressed: _saving ? null : _apply,
-          child: Text(_saving ? 'Applying' : 'Apply merge'),
+          child: Text(
+            _saving
+                ? l10n.syncConflictApplying
+                : l10n.syncConflictApplyMergeAction,
+          ),
         ),
       ],
     );
   }
 
   Future<void> _apply() async {
+    final l10n = context.l10n;
     setState(() {
       _saving = true;
     });
@@ -112,7 +118,7 @@ class _SyncConflictReviewDialogState
       setState(() {
         _saving = false;
       });
-      _showSnackBar(context, _syncSettingsErrorMessage(error));
+      _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
     }
   }
 }
@@ -132,6 +138,7 @@ class _SyncConflictFieldCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -147,7 +154,7 @@ class _SyncConflictFieldCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _ConflictChoiceTile(
-                  title: 'Local',
+                  title: l10n.syncConflictLocalLabel,
                   value: describeConflictValue(field.localValue),
                   selected: !(useRemoteByField[field.key] ?? false),
                   onSelected: () => onChanged(field.key, false),
@@ -156,7 +163,7 @@ class _SyncConflictFieldCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _ConflictChoiceTile(
-                  title: 'Remote',
+                  title: l10n.syncConflictRemoteLabel,
                   value: describeConflictValue(field.remoteValue),
                   selected: useRemoteByField[field.key] ?? false,
                   onSelected: () => onChanged(field.key, true),
@@ -232,9 +239,7 @@ class _SyncConflictUnsupportedCard extends StatelessWidget {
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 8),
-        const Text(
-          'This record type currently requires whole-record resolution. Use the existing local or remote action for this conflict.',
-        ),
+        Text(context.l10n.syncConflictUnsupportedBody),
       ],
     );
   }

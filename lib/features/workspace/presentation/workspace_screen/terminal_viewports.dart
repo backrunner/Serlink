@@ -145,7 +145,7 @@ class _TerminalViewportPane extends StatelessWidget {
                   ? t.accentPrimary.withValues(alpha: 0.12)
                   : t.surfaceBase,
               child: Text(
-                '$label · ${_terminalPaneLifecycleLabel(lifecycle, local: local)}',
+                '$label · ${_terminalPaneLifecycleLabel(context.l10n, lifecycle, local: local)}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -173,33 +173,35 @@ class _TerminalViewportPane extends StatelessWidget {
 }
 
 String _terminalPaneLifecycleLabel(
+  AppLocalizations l10n,
   SessionLifecycleState lifecycle, {
   required bool local,
 }) {
   if (local) {
     return switch (lifecycle) {
-      SessionLifecycleState.connected => 'Running',
+      SessionLifecycleState.connected => l10n.terminalLifecycleRunning,
       SessionLifecycleState.connecting ||
       SessionLifecycleState.reconnecting ||
-      SessionLifecycleState.resolvingProfile => 'Starting',
-      SessionLifecycleState.disconnected => 'Exited',
-      SessionLifecycleState.failed => 'Failed',
-      SessionLifecycleState.disconnecting => 'Stopping',
+      SessionLifecycleState.resolvingProfile => l10n.terminalLifecycleStarting,
+      SessionLifecycleState.disconnected => l10n.terminalLifecycleExited,
+      SessionLifecycleState.failed => l10n.terminalLifecycleFailed,
+      SessionLifecycleState.disconnecting => l10n.terminalLifecycleStopping,
       SessionLifecycleState.verifyingHostKey ||
       SessionLifecycleState.authenticating ||
-      SessionLifecycleState.idle => 'Starting',
+      SessionLifecycleState.idle => l10n.terminalLifecycleStarting,
     };
   }
   return switch (lifecycle) {
-    SessionLifecycleState.connected => 'Connected',
-    SessionLifecycleState.connecting => 'Connecting',
-    SessionLifecycleState.reconnecting => 'Reconnecting',
-    SessionLifecycleState.disconnected => 'Disconnected',
-    SessionLifecycleState.failed => 'Failed',
-    SessionLifecycleState.resolvingProfile => 'Preparing',
-    SessionLifecycleState.verifyingHostKey => 'Verifying',
-    SessionLifecycleState.authenticating => 'Authenticating',
-    SessionLifecycleState.disconnecting => 'Disconnecting',
-    SessionLifecycleState.idle => 'Idle',
+    SessionLifecycleState.connected => l10n.terminalLifecycleConnected,
+    SessionLifecycleState.connecting => l10n.terminalLifecycleConnecting,
+    SessionLifecycleState.reconnecting => l10n.terminalLifecycleReconnecting,
+    SessionLifecycleState.disconnected => l10n.terminalLifecycleDisconnected,
+    SessionLifecycleState.failed => l10n.terminalLifecycleFailed,
+    SessionLifecycleState.resolvingProfile => l10n.terminalLifecyclePreparing,
+    SessionLifecycleState.verifyingHostKey => l10n.terminalLifecycleVerifying,
+    SessionLifecycleState.authenticating =>
+      l10n.terminalLifecycleAuthenticating,
+    SessionLifecycleState.disconnecting => l10n.terminalLifecycleDisconnecting,
+    SessionLifecycleState.idle => l10n.terminalLifecycleIdle,
   };
 }

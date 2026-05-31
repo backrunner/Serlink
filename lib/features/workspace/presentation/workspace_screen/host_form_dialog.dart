@@ -96,6 +96,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final mediaSize = MediaQuery.sizeOf(context);
     final dialogWidth = math.min(680.0, math.max(360.0, mediaSize.width - 96));
     final dialogHeight = math.min(
@@ -104,7 +105,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     );
 
     return SerlinkDialog(
-      title: Text(_isEditing ? 'Edit Host' : 'Add Host'),
+      title: Text(_isEditing ? l10n.hostEditTitle : l10n.hostAddTitle),
       content: SizedBox(
         width: dialogWidth,
         height: dialogHeight,
@@ -121,14 +122,14 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _HostFormSection(
-                    title: 'Connection',
+                    title: l10n.hostSectionConnection,
                     child: Column(
                       children: [
                         SerlinkTextField(
                           key: const ValueKey('host-display-name-field'),
                           controller: _displayNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Display name',
+                          decoration: InputDecoration(
+                            labelText: l10n.hostDisplayNameLabel,
                           ),
                           textInputAction: TextInputAction.next,
                         ),
@@ -140,8 +141,8 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                               child: SerlinkTextField(
                                 key: const ValueKey('host-hostname-field'),
                                 controller: _hostnameController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Hostname',
+                                decoration: InputDecoration(
+                                  labelText: l10n.hostHostnameLabel,
                                 ),
                                 textInputAction: TextInputAction.next,
                               ),
@@ -150,8 +151,8 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                             Expanded(
                               child: SerlinkTextField(
                                 controller: _portController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Port',
+                                decoration: InputDecoration(
+                                  labelText: l10n.hostPortLabel,
                                 ),
                                 keyboardType: TextInputType.number,
                                 textInputAction: TextInputAction.next,
@@ -163,8 +164,8 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                         SerlinkTextField(
                           key: const ValueKey('host-username-field'),
                           controller: _usernameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Username',
+                          decoration: InputDecoration(
+                            labelText: l10n.hostUsernameLabel,
                           ),
                           textInputAction: TextInputAction.next,
                         ),
@@ -173,7 +174,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                   ),
                   const SizedBox(height: 16),
                   _HostFormSection(
-                    title: 'Authentication',
+                    title: l10n.hostSectionAuthentication,
                     child: _HostAuthenticationFields(
                       isEditing: _isEditing,
                       authMode: _authMode,
@@ -202,7 +203,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                   ),
                   const SizedBox(height: 16),
                   _HostFormSection(
-                    title: 'Startup',
+                    title: l10n.hostSectionStartup,
                     child: Column(
                       children: [
                         SerlinkTextField(
@@ -210,14 +211,16 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                           controller: _startupCommandsController,
                           minLines: 2,
                           maxLines: 5,
-                          decoration: const InputDecoration(
-                            labelText: 'Startup commands',
+                          decoration: InputDecoration(
+                            labelText: l10n.hostStartupCommandsLabel,
                           ),
                         ),
                         const SizedBox(height: 14),
                         SerlinkTextField(
                           controller: _tagsController,
-                          decoration: const InputDecoration(labelText: 'Tags'),
+                          decoration: InputDecoration(
+                            labelText: l10n.hostTagsLabel,
+                          ),
                           textInputAction: TextInputAction.done,
                           onSubmitted: (_) => _save(),
                         ),
@@ -227,7 +230,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                   if (_jumpHostOptions.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     _HostFormSection(
-                      title: 'Routing',
+                      title: l10n.hostSectionRouting,
                       child: _JumpHostSelectionSection(
                         hosts: _jumpHostOptions,
                         selectedHostIds: _selectedJumpHostIds,
@@ -242,8 +245,8 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                     child: SerlinkTextField(
                       key: const ValueKey('host-sftp-default-directory-field'),
                       controller: _sftpDefaultDirectoryController,
-                      decoration: const InputDecoration(
-                        labelText: 'Start folder',
+                      decoration: InputDecoration(
+                        labelText: l10n.hostStartFolderLabel,
                       ),
                       textInputAction: TextInputAction.next,
                     ),
@@ -274,12 +277,12 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       actions: [
         SerlinkTextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
         SerlinkFilledButton(
           key: const ValueKey('host-save-button'),
           onPressed: _saving || _loadingOptions ? null : _save,
-          child: Text(_saving ? 'Saving' : 'Save'),
+          child: Text(_saving ? l10n.savingAction : l10n.saveAction),
         ),
       ],
     );
@@ -289,7 +292,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     final port = int.tryParse(_portController.text.trim());
     if (port == null) {
       setState(() {
-        _errorMessage = 'Port must be a number.';
+        _errorMessage = context.l10n.hostPortNumberError;
       });
       return;
     }
@@ -401,7 +404,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _errorMessage = 'Host could not be saved.';
+          _errorMessage = context.l10n.hostSaveFailed;
         });
       }
     }
@@ -480,7 +483,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       }
       setState(() {
         _loadingOptions = false;
-        _errorMessage = 'Host configuration could not be loaded.';
+        _errorMessage = context.l10n.hostConfigurationLoadFailed;
       });
     }
   }
@@ -542,7 +545,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
         reconnectAttempts == null ||
         reconnectBackoff == null) {
       setState(() {
-        _errorMessage = 'Connection settings must be whole numbers.';
+        _errorMessage = context.l10n.hostConnectionSettingsWholeNumbers;
       });
       return null;
     }
@@ -569,13 +572,13 @@ List<String> _parseStartupCommands(String value) {
   ];
 }
 
-String _identityKindLabel(IdentityKind kind) {
+String _identityKindLabel(AppLocalizations l10n, IdentityKind kind) {
   return switch (kind) {
-    IdentityKind.password => 'Password',
-    IdentityKind.privateKey => 'Private Key',
-    IdentityKind.keyboardInteractive => 'Keyboard',
-    IdentityKind.openSshCertificate => 'Certificate',
-    IdentityKind.sshAgent => 'SSH Agent',
-    IdentityKind.hardwareKey => 'Hardware Key',
+    IdentityKind.password => l10n.identityKindPassword,
+    IdentityKind.privateKey => l10n.identityKindPrivateKey,
+    IdentityKind.keyboardInteractive => l10n.identityKindKeyboard,
+    IdentityKind.openSshCertificate => l10n.identityKindCertificate,
+    IdentityKind.sshAgent => l10n.identityKindSshAgent,
+    IdentityKind.hardwareKey => l10n.identityKindHardwareKey,
   };
 }

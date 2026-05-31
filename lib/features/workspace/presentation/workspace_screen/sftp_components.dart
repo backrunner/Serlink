@@ -28,6 +28,7 @@ class _RemoteFileDialogState extends State<_RemoteFileDialog> {
   @override
   Widget build(BuildContext context) {
     final preview = widget.preview;
+    final l10n = context.l10n;
     return SerlinkDialog(
       title: Text(widget.entry.name, overflow: TextOverflow.ellipsis),
       content: SizedBox(
@@ -38,8 +39,9 @@ class _RemoteFileDialogState extends State<_RemoteFileDialog> {
           children: [
             if (preview.truncated) ...[
               SerlinkAlert.info(
-                message:
-                    'Preview limited to ${_formatBytes(preview.bytesRead)}.',
+                message: l10n.remoteFilePreviewLimited(
+                  _formatBytes(preview.bytesRead),
+                ),
                 compact: true,
               ),
               const SizedBox(height: 8),
@@ -66,12 +68,12 @@ class _RemoteFileDialogState extends State<_RemoteFileDialog> {
       actions: [
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(preview.truncated ? 'Close' : 'Cancel'),
+          child: Text(preview.truncated ? l10n.closeAction : l10n.cancelAction),
         ),
         if (!preview.truncated)
           SerlinkFilledButton(
             onPressed: () => Navigator.of(context).pop(_controller.text),
-            child: const Text('Save'),
+            child: Text(l10n.saveAction),
           ),
       ],
     );
@@ -113,8 +115,9 @@ class _SftpDefaultDirectoryDialogState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SerlinkDialog(
-      title: const Text('Choose SFTP Start Folder'),
+      title: Text(l10n.sftpDefaultDirectoryDialogTitle),
       content: SizedBox(
         width: 480,
         child: Column(
@@ -122,8 +125,10 @@ class _SftpDefaultDirectoryDialogState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SerlinkAlert.warning(
-              message:
-                  '${widget.failedPath} could not be listed. ${widget.failureMessage}',
+              message: l10n.sftpDefaultDirectoryFailedMessage(
+                widget.failedPath,
+                widget.failureMessage,
+              ),
               compact: true,
             ),
             const SizedBox(height: 12),
@@ -132,8 +137,8 @@ class _SftpDefaultDirectoryDialogState
               controller: _controller,
               autofocus: true,
               decoration: InputDecoration(
-                labelText: 'Start folder',
-                hintText: '/home/user',
+                labelText: l10n.sftpStartFolderLabel,
+                hintText: l10n.sftpStartFolderHint,
                 errorText: _errorMessage,
               ),
               textInputAction: TextInputAction.done,
@@ -145,12 +150,12 @@ class _SftpDefaultDirectoryDialogState
       actions: [
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancelAction),
         ),
         SerlinkFilledButton(
           key: const ValueKey('sftp-default-directory-submit-button'),
           onPressed: _submit,
-          child: const Text('Connect'),
+          child: Text(l10n.connectAction),
         ),
       ],
     );
@@ -160,7 +165,7 @@ class _SftpDefaultDirectoryDialogState
     final value = _controller.text.trim();
     if (value.isEmpty || !value.startsWith('/')) {
       setState(() {
-        _errorMessage = 'Enter an absolute remote path.';
+        _errorMessage = context.l10n.sftpAbsolutePathError;
       });
       return;
     }
@@ -199,6 +204,7 @@ class _SftpEntryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SerlinkListTile(
       dense: true,
       leading: Icon(icon),
@@ -217,31 +223,31 @@ class _SftpEntryRow extends StatelessWidget {
             SizedBox(width: 44, child: Text(permissionsLabel)),
             SerlinkIconButton(
               visualDensity: VisualDensity.compact,
-              tooltip: 'Download',
+              tooltip: l10n.downloadAction,
               onPressed: onDownload,
               icon: const Icon(Icons.download_outlined, size: 16),
             ),
             SerlinkIconButton(
               visualDensity: VisualDensity.compact,
-              tooltip: 'Rename',
+              tooltip: l10n.renameAction,
               onPressed: onRename,
               icon: const Icon(Icons.drive_file_rename_outline, size: 16),
             ),
             SerlinkIconButton(
               visualDensity: VisualDensity.compact,
-              tooltip: 'Move',
+              tooltip: l10n.moveAction,
               onPressed: onMove,
               icon: const Icon(Icons.drive_file_move_outline, size: 16),
             ),
             SerlinkIconButton(
               visualDensity: VisualDensity.compact,
-              tooltip: 'Change permissions',
+              tooltip: l10n.sftpChangePermissionsTitle,
               onPressed: onChmod,
               icon: const Icon(Icons.admin_panel_settings_outlined, size: 16),
             ),
             SerlinkIconButton(
               visualDensity: VisualDensity.compact,
-              tooltip: 'Delete',
+              tooltip: l10n.deleteAction,
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline, size: 16),
             ),

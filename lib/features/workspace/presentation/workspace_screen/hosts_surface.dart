@@ -11,6 +11,8 @@ class _HostsSurface extends ConsumerWidget {
     final searchQuery = ref.watch(_workspaceSearchQueryProvider);
 
     return vaultSession.when(
+      skipLoadingOnReload: false,
+      skipLoadingOnRefresh: false,
       loading: () => _PlaceholderSurface(
         title: l10n.vaultTitle,
         body: l10n.settingsVaultPreparing,
@@ -21,7 +23,9 @@ class _HostsSurface extends ConsumerWidget {
         if (session.vaultState != VaultState.unlocked) {
           return _VaultAccessSurface(session: session);
         }
-        final hostsAsync = ref.watch(hostSummariesProvider);
+        final hostsAsync = ref.watch(
+          hostSummariesProvider(session.unlockGeneration),
+        );
         final content = hostsAsync.isLoading
             ? _PlaceholderSurface(
                 title: l10n.hostsTitle,
@@ -29,6 +33,8 @@ class _HostsSurface extends ConsumerWidget {
                 loading: true,
               )
             : hostsAsync.when(
+                skipLoadingOnReload: false,
+                skipLoadingOnRefresh: false,
                 loading: () => _PlaceholderSurface(
                   title: l10n.hostsTitle,
                   body: l10n.hostsLoading,

@@ -212,14 +212,18 @@ final snippetWriteServiceProvider = Provider<SnippetWriteService>((ref) {
   );
 });
 
-final snippetsProvider = FutureProvider<List<CommandSnippet>>((ref) {
-  final vaultSession = ref.watch(vaultSessionControllerProvider).value;
-  if (vaultSession?.vaultState != VaultState.unlocked) {
-    return const [];
-  }
-  ref.watch(vaultRecordChangesProvider);
-  return ref.watch(snippetRepositoryProvider).list();
-});
+final snippetsProvider = FutureProvider.autoDispose
+    .family<List<CommandSnippet>, int>((ref, unlockGeneration) async {
+      final vaultSession = await ref.watch(
+        vaultSessionControllerProvider.future,
+      );
+      if (vaultSession.vaultState != VaultState.unlocked ||
+          vaultSession.unlockGeneration != unlockGeneration) {
+        return Completer<List<CommandSnippet>>().future;
+      }
+      ref.watch(vaultRecordChangesProvider);
+      return ref.watch(snippetRepositoryProvider).list();
+    });
 
 final syncSettingsRepositoryProvider = Provider<SyncSettingsRepository>((ref) {
   return EncryptedSyncSettingsRepository(
@@ -662,6 +666,7 @@ class VaultSessionState {
     this.recoveryKey,
     this.failureMessage,
     this.unlockFailureCount = 0,
+    this.unlockGeneration = 0,
   });
 
   final VaultState vaultState;
@@ -669,6 +674,7 @@ class VaultSessionState {
   final VaultRecoveryKey? recoveryKey;
   final String? failureMessage;
   final int unlockFailureCount;
+  final int unlockGeneration;
 
   VaultSessionState copyWith({
     VaultState? vaultState,
@@ -679,6 +685,7 @@ class VaultSessionState {
     bool clearFailure = false,
     int? unlockFailureCount,
     bool clearUnlockFailures = false,
+    int? unlockGeneration,
   }) {
     return VaultSessionState(
       vaultState: vaultState ?? this.vaultState,
@@ -690,6 +697,7 @@ class VaultSessionState {
       unlockFailureCount: clearUnlockFailures
           ? 0
           : unlockFailureCount ?? this.unlockFailureCount,
+      unlockGeneration: unlockGeneration ?? this.unlockGeneration,
     );
   }
 }
@@ -734,6 +742,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         VaultSessionState(
           vaultState: VaultState.unlocked,
           recoveryKey: result.recoveryKey,
+          unlockGeneration: previous.unlockGeneration + 1,
         ),
       );
       unawaited(
@@ -760,6 +769,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           vaultState: VaultState.unlocked,
           clearFailure: true,
           clearUnlockFailures: true,
+          unlockGeneration: previous.unlockGeneration + 1,
         ),
       );
       unawaited(
@@ -787,6 +797,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           vaultState: VaultState.unlocked,
           clearFailure: true,
           clearUnlockFailures: true,
+          unlockGeneration: previous.unlockGeneration + 1,
         ),
       );
       unawaited(
@@ -813,6 +824,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           vaultState: VaultState.unlocked,
           clearFailure: true,
           clearUnlockFailures: true,
+          unlockGeneration: previous.unlockGeneration + 1,
         ),
       );
       unawaited(

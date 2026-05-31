@@ -324,14 +324,29 @@ String? _defaultImportUsername() {
   return trimmed == null || trimmed.isEmpty ? null : trimmed;
 }
 
+const double _snackBarMaxWidth = 320;
+const double _snackBarMargin = 16;
+
 void _showSnackBar(BuildContext context, String message) {
   final t = context.tokens;
+  final screenWidth = MediaQuery.sizeOf(context).width;
+  final availableWidth = math.max(0.0, screenWidth - (_snackBarMargin * 2));
+  final snackBarWidth = math.min(_snackBarMaxWidth, availableWidth);
+  final leftMargin = math.max(
+    _snackBarMargin,
+    screenWidth - snackBarWidth - _snackBarMargin,
+  );
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
     ..showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(256, 0, 16, 16),
+        margin: EdgeInsets.fromLTRB(
+          leftMargin,
+          0,
+          _snackBarMargin,
+          _snackBarMargin,
+        ),
         backgroundColor: t.surfaceRaised,
         elevation: 8,
         shape: RoundedRectangleBorder(

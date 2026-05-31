@@ -1,0 +1,1034 @@
+{
+  "@@locale": "en",
+  "appTitle": "Serlink",
+  "@appTitle": {
+    "description": "Application title."
+  },
+  "navHosts": "Hosts",
+  "navSessions": "Sessions",
+  "navTransfers": "Transfers",
+  "navSnippets": "Snippets",
+  "navSettings": "Settings",
+  "searchHostsPlaceholder": "Search hosts, addresses, or tags",
+  "searchSnippetsPlaceholder": "Search snippets and commands",
+  "searchSessionsPlaceholder": "Search active sessions",
+  "searchTransfersPlaceholder": "Search transfers",
+  "searchSettingsPlaceholder": "Search settings",
+  "openLocalTerminalTooltip": "Open local terminal tab",
+  "clearSearchTooltip": "Clear search",
+  "vaultTitle": "Vault",
+  "hostsTitle": "Hosts",
+  "hostsLoading": "Loading encrypted host records",
+  "hostsNoMatchesTitle": "No Matches",
+  "hostsNoMatchesBody": "No hosts match the current workspace search.",
+  "hostsDeleteTitle": "Delete host?",
+  "hostsDeleteBody": "This removes the host and any credentials that are not used by another host.",
+  "hostsDeleteAction": "Delete",
+  "hostsDeletedSnack": "Host deleted.",
+  "hostsDeleteFailedSnack": "Host could not be deleted.",
+  "hostsAddTooltip": "Add host",
+  "hostsEmptyTitle": "No Hosts",
+  "hostsEmptyBody": "Import SSH config or add hosts to start a session.",
+  "hostsAddAction": "Add Host",
+  "sessionsEmptyTitle": "No active tabs",
+  "sessionsEmptyBody": "Open a host from Hosts to create a terminal or SFTP tab.",
+  "snippetsTitle": "Snippets",
+  "snippetsLockedBody": "Unlock the vault to manage command snippets.",
+  "snippetsLoading": "Loading encrypted snippets.",
+  "snippetsNoMatchesBody": "No snippets match the current workspace search.",
+  "snippetsAddTooltip": "Add snippet",
+  "snippetsAddAction": "Add Snippet",
+  "transfersTitle": "Transfers",
+  "transfersPreparing": "Preparing transfer queue.",
+  "transfersEmptyTitle": "No Transfers",
+  "transfersEmptyBody": "SFTP uploads and downloads will appear here.",
+  "transfersItemCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "@transfersItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "transfersActiveCount": "{count, plural, =1{1 active} other{{count} active}}",
+  "@transfersActiveCount": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "transfersClearAction": "Clear",
+  "settingsTitle": "Settings",
+  "settingsSubtitle": "Security, sync, import/export, and runtime controls.",
+  "settingsGeneralSection": "General",
+  "settingsLanguageTitle": "Language",
+  "settingsLanguageSubtitle": "Choose the app display language.",
+  "settingsLanguageSystem": "System",
+  "settingsLanguageEnglish": "English",
+  "settingsLanguageChinese": "Simplified Chinese",
+  "settingsLanguageJapanese": "Japanese",
+  "settingsLanguageSaved": "Language updated.",
+  "settingsLanguageSaveFailed": "Language could not be updated.",
+  "settingsSecuritySection": "Security",
+  "settingsVaultTitle": "Vault",
+  "settingsVaultPreparing": "Preparing encrypted storage",
+  "settingsVaultNotCreatedPill": "Vault not created",
+  "settingsVaultLockedPill": "Vault locked",
+  "settingsVaultUnlockedPill": "Vault unlocked",
+  "settingsVaultLoadingPill": "Vault loading",
+  "settingsVaultNotCreated": "Not created.",
+  "settingsVaultLocked": "Locked. Existing connections keep running.",
+  "settingsVaultUnlocked": "Unlocked for new connection profile resolution.",
+  "settingsLockAction": "Lock",
+  "settingsRecoverResetAction": "Recover / Reset",
+  "settingsLocalUnlockTitle": "Local unlock",
+  "settingsLocalUnlockSemantics": "Enable local unlock",
+  "settingsLocalUnlockNeedsVault": "Create the vault before enabling device-protected unlock.",
+  "settingsLocalUnlockEnabled": "Enabled. Lock the vault to unlock with this device.",
+  "settingsLocalUnlockDisabled": "Disabled. Passphrase or recovery key is required after lock.",
+  "settingsUnlockWithDeviceAction": "Unlock with device",
+  "settingsHostKeyConfirmationTitle": "Host key confirmation",
+  "settingsCredentialsTitle": "Credentials",
+  "settingsCredentialsLocked": "Unlock the vault to review encrypted credentials.",
+  "settingsKnownHostsTitle": "Known hosts",
+  "settingsKnownHostsLocked": "Unlock the vault to review trusted host fingerprints.",
+  "settingsManageAction": "Manage",
+  "settingsDataSection": "Data",
+  "settingsImportExportTitle": "Import / Export",
+  "settingsImportExportSubtitle": "Backups, OpenSSH files, certificates, known_hosts, and metadata.",
+  "settingsOpenAction": "Open",
+  "settingsRuntimeSection": "Runtime",
+  "settingsDebugLoggingTitle": "Debug logging",
+  "settingsCrashReportingTitle": "Crash reporting",
+  "settingsDiagnosticBundleTitle": "Diagnostic bundle",
+  "settingsExportAction": "Export",
+  "settingsEnableLocalUnlockTitle": "Enable local unlock?",
+  "settingsDisableLocalUnlockTitle": "Disable local unlock?",
+  "settingsEnableLocalUnlockBody": "Serlink will store a random device key in OS secure storage. Your vault passphrase is not stored.",
+  "settingsDisableLocalUnlockBody": "This removes this device key from OS secure storage. Existing connections keep running.",
+  "settingsEnableAction": "Enable",
+  "settingsDisableAction": "Disable",
+  "settingsLocalUnlockEnabledSnack": "Local unlock enabled. Lock the vault to use device unlock.",
+  "settingsLocalUnlockVerifyFailedSnack": "Local unlock could not be verified.",
+  "settingsLocalUnlockDisabledSnack": "Local unlock disabled.",
+  "settingsLocalUnlockStillAvailableSnack": "Local unlock is still available on this device.",
+  "settingsLocalUnlockUpdateFailed": "Local unlock could not be updated.",
+  "syncSectionTitle": "Sync",
+  "syncLoadingEncryptedSettings": "Loading encrypted sync settings.",
+  "syncConfigureAction": "Configure",
+  "syncEditAction": "Edit",
+  "syncWebDavLocked": "Unlock the vault to configure encrypted sync.",
+  "syncICloudChecking": "Checking iCloud availability.",
+  "syncICloudLocked": "Unlock the vault to sync through iCloud.",
+  "syncDevicesTitle": "Devices",
+  "syncDevicesLoading": "Loading encrypted device records.",
+  "syncViewAction": "View",
+  "syncResetAction": "Reset",
+  "syncRepairTitle": "Sync repair",
+  "syncRepairAction": "Repair",
+  "syncRemoteRepaired": "Remote sync repaired.",
+  "syncWebDavCertificateTrustSaved": "WebDAV certificate trust saved.",
+  "syncICloudEnabledSnack": "iCloud sync enabled.",
+  "syncICloudPausedSnack": "iCloud sync paused.",
+  "syncConflictsResolvedSnack": "{count, plural, =1{Resolved sync conflicts. Synced 1 encrypted record.} other{Resolved sync conflicts. Synced {count} encrypted records.}}",
+  "@syncConflictsResolvedSnack": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "syncSettingsLoadFailed": "Sync settings could not be loaded.",
+  "syncLocalTimeLabel": "Local time: {time}",
+  "@syncLocalTimeLabel": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "syncEndpointLabel": "Endpoint: {endpoint}",
+  "@syncEndpointLabel": {
+    "placeholders": {
+      "endpoint": {
+        "type": "String"
+      }
+    }
+  },
+  "syncValidFromLabel": "Valid from: {time}",
+  "@syncValidFromLabel": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "syncValidUntilLabel": "Valid until: {time}",
+  "@syncValidUntilLabel": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "doneAction": "Done",
+  "syncConflictsTitle": "Sync conflicts",
+  "syncConflictsSubtitle": "{count, plural, =1{1 encrypted record needs review.} other{{count} encrypted records need review.}}",
+  "@syncConflictsSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "syncReviewAction": "Review",
+  "syncUseRemoteAction": "Use remote",
+  "syncKeepLocalAction": "Keep local",
+  "syncUseRemoteTitle": "Use remote records?",
+  "syncKeepLocalTitle": "Keep local records?",
+  "syncUseRemoteBody": "Remote encrypted records will replace conflicting local records before syncing.",
+  "syncKeepLocalBody": "Local encrypted records will overwrite conflicting remote records.",
+  "syncPausedICloudSubtitle": "Paused. Encrypted records sync through your private iCloud database.",
+  "syncEnabledStatus": "Enabled",
+  "syncPausedStatus": "Paused",
+  "syncWebDavNotConfiguredSubtitle": "Not configured. Encrypted manifest and records only.",
+  "syncHttpAllowedStatus": "HTTP allowed",
+  "syncHttpsStatus": "HTTPS",
+  "syncAutoSyncWaiting": "auto-sync waiting",
+  "syncAutoSyncReady": "auto-sync ready",
+  "syncLastSynced": "last synced {time}",
+  "@syncLastSynced": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "syncAutoSyncQueued": "auto-sync queued",
+  "syncSyncingAutomatically": "syncing automatically",
+  "syncConflictCount": "{count, plural, =1{1 conflict} other{{count} conflicts}}",
+  "@syncConflictCount": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "syncAutoSyncFailed": "auto-sync failed",
+  "saveAction": "Save",
+  "savingAction": "Saving",
+  "closeAction": "Close",
+  "removeAction": "Remove",
+  "importAction": "Import",
+  "deleteAction": "Delete",
+  "renameAction": "Rename",
+  "skipAction": "Skip",
+  "pasteAction": "Paste",
+  "confirmAction": "Confirm",
+  "applyAction": "Apply",
+  "createAction": "Create",
+  "runAction": "Run",
+  "pauseAction": "Pause",
+  "resumeAction": "Resume",
+  "retryAction": "Retry",
+  "connectAction": "Connect",
+  "chooseFolderAction": "Choose Folder",
+  "loadingSemantics": "Loading",
+  "securityWebDavCertificateChangedTitle": "WebDAV Certificate Changed",
+  "securityTrustWebDavCertificateTitle": "Trust WebDAV Certificate?",
+  "securityHostKeyChangedTitle": "Host Key Changed",
+  "securityConfirmFingerprintTitle": "Confirm Fingerprint",
+  "securityAlgorithmLabel": "Algorithm: {value}",
+  "@securityAlgorithmLabel": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "securityPreviousLabel": "Previous: {value}",
+  "@securityPreviousLabel": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "securitySubjectLabel": "Subject: {value}",
+  "@securitySubjectLabel": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "securityIssuerLabel": "Issuer: {value}",
+  "@securityIssuerLabel": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "securityValidRangeLabel": "Valid: {from} to {to}",
+  "@securityValidRangeLabel": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "securityCertificateClockWarning": "This certificate is not valid yet. Check this device clock before trusting it.",
+  "securityTrustOnceAction": "Trust Once",
+  "securityTrustAndSaveAction": "Trust and Save",
+  "securityEncryptedExport": "Encrypted export",
+  "securityUnencryptedExport": "Unencrypted export",
+  "securitySensitiveFields": "Sensitive fields: {fields}",
+  "@securitySensitiveFields": {
+    "placeholders": {
+      "fields": {
+        "type": "String"
+      }
+    }
+  },
+  "securityCannotBeUndone": "This action cannot be undone.",
+  "securityPasteMultipleLinesTitle": "Paste multiple lines?",
+  "securityPasteMultipleLinesBody": "{count, plural, =1{1 line will be sent to the active terminal.} other{{count} lines will be sent to the active terminal.}}",
+  "@securityPasteMultipleLinesBody": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "hostEditTitle": "Edit Host",
+  "hostAddTitle": "Add Host",
+  "hostSectionConnection": "Connection",
+  "hostSectionAuthentication": "Authentication",
+  "hostSectionStartup": "Startup",
+  "hostSectionRouting": "Routing",
+  "hostDisplayNameLabel": "Display name",
+  "hostHostnameLabel": "Hostname",
+  "hostPortLabel": "Port",
+  "hostUsernameLabel": "Username",
+  "hostStartupCommandsLabel": "Startup commands",
+  "hostTagsLabel": "Tags",
+  "hostStartFolderLabel": "Start folder",
+  "hostPrivateKeyLabel": "Private key",
+  "hostImportPrivateKeyTooltip": "Import private key",
+  "hostKeyPassphraseLabel": "Key passphrase",
+  "hostAdvancedConnectionTitle": "Advanced connection",
+  "hostTimeoutLabel": "Timeout (s)",
+  "hostKeepaliveLabel": "Keepalive (s)",
+  "hostAutoReconnectLabel": "Auto reconnect",
+  "hostBackoffLabel": "Backoff (s)",
+  "hostAuthPasswordSegment": "Password",
+  "hostAuthKeySegment": "Key",
+  "hostAuthAgentSegment": "Agent",
+  "hostAuthSavedSegment": "Saved",
+  "hostPasswordLabel": "Password",
+  "hostShowPasswordTooltip": "Show password",
+  "hostHidePasswordTooltip": "Hide password",
+  "hostSshAgentNote": "Uses identities from the local SSH agent. On macOS, keys loaded into ssh-agent can be backed by Keychain.",
+  "hostNoSavedCredentials": "No saved credentials are available yet.",
+  "hostCredentialsHeading": "Credentials",
+  "hostEditCredentialTooltip": "Edit credential",
+  "hostCredentialOptionalNote": "You can save the host without credentials and add one later.",
+  "hostJumpHostsHeading": "Jump hosts",
+  "hostPortNumberError": "Port must be a number.",
+  "hostSaveFailed": "Host could not be saved.",
+  "hostConfigurationLoadFailed": "Host configuration could not be loaded.",
+  "hostConnectionSettingsWholeNumbers": "Connection settings must be whole numbers.",
+  "identityKindPassword": "Password",
+  "identityKindPrivateKey": "Private Key",
+  "identityKindKeyboard": "Keyboard",
+  "identityKindCertificate": "Certificate",
+  "identityKindSshAgent": "SSH Agent",
+  "identityKindHardwareKey": "Hardware Key",
+  "identityUserLabel": "user {username}",
+  "@identityUserLabel": {
+    "placeholders": {
+      "username": {
+        "type": "String"
+      }
+    }
+  },
+  "identityPrincipalLabel": "principal {principal}",
+  "@identityPrincipalLabel": {
+    "placeholders": {
+      "principal": {
+        "type": "String"
+      }
+    }
+  },
+  "snippetInsertTooltip": "Insert into active terminal",
+  "snippetRunTooltip": "Run in active terminal",
+  "snippetEditTooltip": "Edit snippet",
+  "snippetDeleteTooltip": "Delete snippet",
+  "snippetDialogEditTitle": "Edit Snippet",
+  "snippetDialogAddTitle": "Add Snippet",
+  "snippetNameLabel": "Name",
+  "snippetCommandLabel": "Command",
+  "snippetTagsLabel": "Tags",
+  "snippetConfirmBeforeRun": "Confirm before run",
+  "snippetAddTagsHint": "Add tags",
+  "snippetAddTagHint": "Add tag",
+  "snippetRemoveTagTooltip": "Remove tag",
+  "snippetRunTitle": "Run snippet?",
+  "snippetDeleteTitle": "Delete snippet?",
+  "snippetSaveFailed": "Snippet could not be saved.",
+  "snippetSentSnack": "Snippet sent to terminal.",
+  "snippetInsertedSnack": "Snippet inserted into terminal.",
+  "snippetNoTerminalSnack": "Open a connected terminal tab first.",
+  "snippetDeletedSnack": "Snippet deleted.",
+  "snippetDeleteFailedSnack": "Snippet could not be deleted.",
+  "syncDevicesDialogTitle": "Sync Devices",
+  "syncDeviceRemoveTitle": "Remove {name}?",
+  "@syncDeviceRemoveTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "syncDeviceRemoveBody": "This removes the encrypted sync device record from this vault.",
+  "syncDeviceRemovedSnack": "Sync device removed.",
+  "syncDeviceRemoveFailedSnack": "Sync device could not be removed.",
+  "syncDeviceResetTitle": "Reset sync device?",
+  "syncDeviceResetBody": "This removes the current device registration from encrypted sync and creates a new local device identity. Other devices will see the old device as removed.",
+  "syncDeviceResetSnack": "Sync device reset. A new registration will be created on the next sync.",
+  "syncDeviceResetFailedSnack": "Sync device could not be reset.",
+  "syncDevicesEmptyTitle": "No sync devices yet",
+  "syncDevicesEmptyBody": "This device will be registered here after the first successful encrypted sync.",
+  "syncDeviceRemoveTooltip": "Remove device",
+  "syncDevicesWillRegister": "This device will be registered on first sync.",
+  "syncDeviceSingleSubtitle": "{name} registered for encrypted sync.",
+  "@syncDeviceSingleSubtitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "syncDevicesMultipleSubtitle": "{count} devices registered. Last writer: {name}.",
+  "@syncDevicesMultipleSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "syncDeviceThisDevice": "{name} (this device)",
+  "@syncDeviceThisDevice": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "syncDeviceSubtitle": "{platform} / last seen {time}",
+  "@syncDeviceSubtitle": {
+    "placeholders": {
+      "platform": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "webDavSyncTitle": "WebDAV Sync",
+  "webDavEndpointLabel": "Endpoint",
+  "webDavEndpointHint": "https://example.com/webdav",
+  "webDavUsernameLabel": "Username",
+  "webDavPasswordLabel": "Password",
+  "webDavPasswordKeepLabel": "Password (leave blank to keep)",
+  "webDavBasePathLabel": "Base path",
+  "webDavEnableTitle": "Enable WebDAV sync",
+  "webDavAllowHttpTitle": "Allow HTTP endpoint",
+  "webDavUseHttpTitle": "Use HTTP WebDAV?",
+  "webDavUseHttpBody": "HTTP sync can expose metadata and credentials in transit. Use only for trusted local test servers.",
+  "webDavAllowHttpAction": "Allow HTTP",
+  "webDavSavedSnack": "WebDAV sync settings saved.",
+  "webDavRemoveTitle": "Remove WebDAV sync?",
+  "webDavRemoveBody": "This removes the local WebDAV configuration and stored password.",
+  "webDavRemovedSnack": "WebDAV sync settings removed.",
+  "credentialsDialogTitle": "Credentials",
+  "credentialsEmptyTitle": "No credentials stored",
+  "credentialsEmptyBody": "Imported passwords, private keys, certificates, and identity metadata will appear here.",
+  "credentialsEditTooltip": "Edit credential",
+  "credentialsDeleteTooltip": "Delete credential",
+  "credentialUpdatedSnack": "Credential updated.",
+  "credentialDeleteTitle": "Delete credential?",
+  "credentialDeleteBody": "This removes the credential and its encrypted secret material.",
+  "credentialDeleteLinkedBody": "This credential is still linked to: {hosts}. Delete it only after removing those host links.",
+  "@credentialDeleteLinkedBody": {
+    "placeholders": {
+      "hosts": {
+        "type": "String"
+      }
+    }
+  },
+  "credentialDeletedSnack": "Credential deleted.",
+  "credentialDeleteFailedSnack": "Credential could not be deleted.",
+  "knownHostsDialogTitle": "Known Hosts",
+  "knownHostsEmptyTitle": "No trusted fingerprints",
+  "knownHostsEmptyBody": "Host fingerprints accepted during connection review will be listed here.",
+  "knownHostDeleteTooltip": "Delete known host",
+  "knownHostDeleteTitle": "Delete known host?",
+  "knownHostDeleteBody": "This removes the stored fingerprint for {host}. The next connection will require confirmation again.",
+  "@knownHostDeleteBody": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "knownHostDeletedSnack": "Known host deleted.",
+  "knownHostDeleteFailedSnack": "Known host could not be deleted.",
+  "startAction": "Start",
+  "stopAction": "Stop",
+  "uploadAction": "Upload",
+  "downloadAction": "Download",
+  "moveAction": "Move",
+  "replaceAction": "Replace",
+  "mergeAction": "Merge",
+  "copiedAction": "Copied",
+  "clearAllAction": "Clear all",
+  "selectAllAction": "Select all",
+  "restartAction": "Restart",
+  "reconnectAction": "Reconnect",
+  "windowCloseActiveTerminalsTitle": "Close active terminals?",
+  "windowCloseActiveTerminalsBody": "{count, plural, =1{1 active terminal pane is still running. Closing this window will disconnect it.} other{{count} active terminal panes are still running. Closing this window will disconnect them.}}",
+  "@windowCloseActiveTerminalsBody": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "windowCloseWindowAction": "Close Window",
+  "windowCloseLabel": "Close window",
+  "windowMinimizeLabel": "Minimize window",
+  "windowZoomLabel": "Zoom window",
+  "hostEditMenu": "Edit host",
+  "hostDeleteMenu": "Delete host",
+  "hostTerminalAction": "Terminal",
+  "hostSftpAction": "SFTP",
+  "hostTrustTrusted": "trusted",
+  "hostTrustVerify": "verify",
+  "hostTrustChanged": "changed",
+  "tabsCloseTooltip": "Close tab",
+  "tabsNewConnectionTooltip": "New connection",
+  "localShellInactive": "Local shell is not running.",
+  "connectionInactive": "Connection is not active.",
+  "localShellTitle": "Local Shell",
+  "terminalSearchTooltip": "Search terminal",
+  "terminalOpenSftpTooltip": "Open SFTP tab",
+  "terminalSplitRightTooltip": "Split right",
+  "terminalSplitDownTooltip": "Split down",
+  "terminalClosePaneTooltip": "Close active pane",
+  "terminalSettingsTitle": "Terminal Settings",
+  "terminalForwardingUpdating": "Updating port forwarding",
+  "terminalForwardingManage": "Manage port forwarding",
+  "terminalForwardingManageActive": "Manage port forwarding ({count} active)",
+  "@terminalForwardingManageActive": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "terminalNoSearchResults": "No results",
+  "terminalPreviousMatchTooltip": "Previous match",
+  "terminalNextMatchTooltip": "Next match",
+  "terminalCloseSearchTooltip": "Close search",
+  "terminalAppearanceSection": "Appearance",
+  "terminalThemeLabel": "Theme",
+  "terminalLayoutSection": "Layout",
+  "terminalFontSizeLabel": "Font size",
+  "terminalLineHeightLabel": "Line height",
+  "terminalScrollbackLabel": "Scrollback",
+  "terminalSaveForHostAction": "Save for host",
+  "terminalUseGlobalAction": "Use global",
+  "terminalFontLabel": "Font",
+  "terminalSearchFontsHint": "Search fonts",
+  "terminalSelectFontHint": "Select a font",
+  "terminalCustomFamilyLabel": "Custom family",
+  "terminalCustomFamilyHelper": "Type an installed font family, then apply.",
+  "terminalCustomFamilyHint": "e.g. JetBrains Mono",
+  "terminalApplyCustomFontTooltip": "Apply custom font",
+  "terminalScanningFonts": "Scanning fonts",
+  "terminalNerdFontReady": "Nerd Font ready",
+  "terminalNoNerdFont": "No Nerd Font",
+  "terminalLifecycleRunning": "Running",
+  "terminalLifecycleStarting": "Starting",
+  "terminalLifecycleExited": "Exited",
+  "terminalLifecycleFailed": "Failed",
+  "terminalLifecycleStopping": "Stopping",
+  "terminalLifecycleConnected": "Connected",
+  "terminalLifecycleConnecting": "Connecting",
+  "terminalLifecycleReconnecting": "Reconnecting",
+  "terminalLifecycleDisconnected": "Disconnected",
+  "terminalLifecyclePreparing": "Preparing",
+  "terminalLifecycleVerifying": "Verifying",
+  "terminalLifecycleAuthenticating": "Authenticating",
+  "terminalLifecycleDisconnecting": "Disconnecting",
+  "terminalLifecycleIdle": "Idle",
+  "forwardingDialogTitle": "Port Forwarding",
+  "forwardingLocalTitle": "Local",
+  "forwardingLocalSubtitle": "Expose a remote service on this device.",
+  "forwardingRemoteTitle": "Remote",
+  "forwardingRemoteSubtitle": "Expose a local service on the remote host.",
+  "forwardingSocksTitle": "SOCKS Proxy",
+  "forwardingSocksSubtitle": "Start a local dynamic proxy for this SSH session.",
+  "forwardingLocalPortLabel": "Local port",
+  "forwardingRemoteHostLabel": "Remote host",
+  "forwardingRemotePortLabel": "Remote port",
+  "forwardingBindHostLabel": "Bind host",
+  "forwardingBindPortLabel": "Bind port",
+  "forwardingLocalHostLabel": "Local host",
+  "forwardingLocalValidationError": "Ports must be 1-65535 and remote host is required.",
+  "forwardingRemoteValidationError": "Bind host, local host, and ports must be valid.",
+  "forwardingDynamicValidationError": "Bind host and port must be valid.",
+  "forwardingLocalStartedSnack": "Local port forward started.",
+  "forwardingLocalStartFailedSnack": "Local port forward could not start.",
+  "forwardingLocalStoppedSnack": "Local port forward stopped.",
+  "forwardingLocalStopFailedSnack": "Local port forward could not stop.",
+  "forwardingRemoteStartedSnack": "Remote port forward started.",
+  "forwardingRemoteStartFailedSnack": "Remote port forward could not start.",
+  "forwardingRemoteStoppedSnack": "Remote port forward stopped.",
+  "forwardingRemoteStopFailedSnack": "Remote port forward could not stop.",
+  "forwardingSocksStartedSnack": "SOCKS proxy started.",
+  "forwardingSocksStartFailedSnack": "SOCKS proxy could not start.",
+  "forwardingSocksStoppedSnack": "SOCKS proxy stopped.",
+  "forwardingSocksStopFailedSnack": "SOCKS proxy could not stop.",
+  "vaultCreateTitle": "Create Vault",
+  "vaultUnlockTitle": "Unlock Vault",
+  "vaultCreateSubtitle": "Choose a strong passphrase to encrypt your hosts, keys, and secrets.",
+  "vaultUnlockSubtitle": "Enter your passphrase to decrypt your workspace.",
+  "vaultNewPassphraseLabel": "New passphrase",
+  "vaultPassphraseLabel": "Passphrase",
+  "vaultCreateAction": "Create Vault",
+  "vaultUnlockAction": "Unlock",
+  "vaultUnlockWithDeviceAction": "Unlock with device",
+  "vaultUseRecoveryCodeAction": "Use recovery code",
+  "vaultPassphraseRequired": "Enter a vault passphrase to continue.",
+  "vaultRecoveryKeyTitle": "Recovery Key",
+  "vaultRecoveryKeySaveInstruction": "Save this key before continuing.",
+  "vaultRecoveryKeyWarningTitle": "Save this key now",
+  "vaultRecoveryKeyWarningBody": "This key is shown only once. If it is lost, Serlink cannot retrieve it for you.",
+  "vaultCopyRecoveryKeyAction": "Copy Recovery Key",
+  "vaultRecoveryKeySavedAction": "I have saved it",
+  "vaultResetTitle": "Reset Vault",
+  "vaultRecoveryCodeTitle": "Recovery Code",
+  "vaultResetSubtitle": "Reset only if you cannot unlock this vault with your passphrase or recovery code.",
+  "vaultRecoveryCodeSubtitle": "Enter your recovery code to unlock this vault.",
+  "vaultRecoveryCodeLabel": "Recovery code",
+  "vaultRecoveryCodeHelper": "Paste the full recovery code.",
+  "vaultResetVaultAction": "Reset vault",
+  "vaultResetPermanentlyAction": "Reset Vault Permanently",
+  "vaultRecoveryCodeRequired": "Enter a recovery code to continue.",
+  "vaultResetTypePhraseError": "Type {phrase} to confirm reset.",
+  "@vaultResetTypePhraseError": {
+    "placeholders": {
+      "phrase": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultResetTypePhraseLabel": "Type {phrase}",
+  "@vaultResetTypePhraseLabel": {
+    "placeholders": {
+      "phrase": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultResetPhraseHelper": "The phrase is case-sensitive and required to reset.",
+  "vaultResetWarningTitle": "This is permanent on this device",
+  "vaultResetWarningRecords": "Encrypted hosts, identities, snippets, transfer history, sync settings, and recovery data will be deleted.",
+  "vaultResetWarningSecrets": "Reset does not recover your passphrase or reveal existing secrets.",
+  "vaultResetWarningBackup": "You will need a backup or a new vault before continuing.",
+  "credentialEditTitle": "Edit Credential",
+  "credentialLoadingSecretSemantics": "Loading credential secret",
+  "credentialNameLabel": "Credential name",
+  "credentialUsernameHintLabel": "Username hint",
+  "credentialPasswordLabel": "Password",
+  "credentialKeyboardResponsesLabel": "Keyboard responses",
+  "credentialKeyboardResponsesHelper": "One response per line.",
+  "credentialNoSecretMaterial": "This credential has no stored secret material.",
+  "credentialSecretLoadFailed": "Credential secret could not be loaded.",
+  "credentialSaveFailed": "Credential could not be saved.",
+  "credentialSshPrivateKeyTypeLabel": "SSH Private Key",
+  "credentialOpenSshCertificateTypeLabel": "OpenSSH Certificate",
+  "credentialCertificateLabel": "Certificate",
+  "credentialImportCertificateTooltip": "Import certificate",
+  "syncConflictReviewDialogTitle": "Review sync conflicts",
+  "syncConflictApplying": "Applying",
+  "syncConflictApplyMergeAction": "Apply merge",
+  "syncConflictLocalLabel": "Local",
+  "syncConflictRemoteLabel": "Remote",
+  "syncConflictUnsupportedBody": "This record type currently requires whole-record resolution. Use the existing local or remote action for this conflict.",
+  "sftpParentFolderTooltip": "Go to parent folder",
+  "sftpSearchPlaceholder": "Search files",
+  "sftpHideHiddenFilesTooltip": "Hide hidden files",
+  "sftpShowHiddenFilesTooltip": "Show hidden files",
+  "sftpOpenTerminalTooltip": "Open terminal tab",
+  "sftpUploadFileAction": "Upload file",
+  "sftpUploadFolderAction": "Upload folder",
+  "sftpNewFolderTooltip": "New folder",
+  "sftpRefreshTooltip": "Refresh",
+  "sftpWaitingTitle": "SFTP",
+  "sftpWaitingBody": "Waiting for the SFTP connection.",
+  "sftpStartFolderTitle": "SFTP Start Folder",
+  "sftpStartFolderBody": "Serlink could not list {path}. Choose a folder this account can access.",
+  "@sftpStartFolderBody": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "sftpErrorTitle": "SFTP Error",
+  "sftpEmptyFolderTitle": "Empty Folder",
+  "sftpNoEntriesFilter": "No entries match the current filter.",
+  "sftpHiddenOnly": "This remote directory only contains hidden entries.",
+  "sftpNoVisible": "This remote directory has no visible entries.",
+  "sftpDirectoryLabel": "Directory",
+  "sftpFileLabel": "File",
+  "sftpSymlinkLabel": "Symlink",
+  "sftpUnknownLabel": "Unknown",
+  "sftpNewFolderTitle": "New Folder",
+  "sftpFolderNameLabel": "Folder name",
+  "sftpFolderCreatedSnack": "Folder created.",
+  "sftpSelectedFileNoPathSnack": "Selected file has no local path.",
+  "sftpUploadQueuedSnack": "Upload queued.",
+  "sftpFolderUploadQueuedSnack": "Folder upload queued.",
+  "sftpFolderDownloadQueuedSnack": "Folder download queued.",
+  "sftpDownloadQueuedSnack": "Download queued.",
+  "sftpMergeRemoteFolderTitle": "Merge remote folder?",
+  "sftpReplaceRemoteFileTitle": "Replace remote file?",
+  "sftpRemoteExistsOverwriteBody": "{path} already exists on the server. Matching files may be overwritten.",
+  "@sftpRemoteExistsOverwriteBody": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "sftpRemoteExistsBody": "{path} already exists on the server.",
+  "@sftpRemoteExistsBody": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "sftpMergeLocalFolderTitle": "Merge local folder?",
+  "sftpReplaceLocalFileTitle": "Replace local file?",
+  "sftpLocalExistsOverwriteBody": "{path} already exists on this device. Matching files may be overwritten.",
+  "@sftpLocalExistsOverwriteBody": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "sftpLocalExistsBody": "{path} already exists on this device.",
+  "@sftpLocalExistsBody": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "sftpNewNameLabel": "New name",
+  "sftpTargetPathLabel": "Target path",
+  "sftpTargetExistsSnack": "Target path already exists.",
+  "sftpEntryRenamedSnack": "Entry renamed.",
+  "sftpEntryMovedSnack": "Entry moved.",
+  "sftpChangePermissionsTitle": "Change permissions",
+  "sftpOctalPermissionsLabel": "Octal permissions",
+  "sftpPermissionsOctalError": "Permissions must be a 3 or 4 digit octal.",
+  "sftpPermissionsUpdatedSnack": "Permissions updated.",
+  "sftpDeleteEntryTitle": "Delete {name}?",
+  "@sftpDeleteEntryTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "sftpDeleteDirectoryBody": "This deletes the remote directory and its contents.",
+  "sftpDeleteFileBody": "This deletes the remote file.",
+  "sftpEntryDeletedSnack": "Entry deleted.",
+  "sftpFileSavedSnack": "File saved.",
+  "remoteFilePreviewLimited": "Preview limited to {bytes}.",
+  "@remoteFilePreviewLimited": {
+    "placeholders": {
+      "bytes": {
+        "type": "String"
+      }
+    }
+  },
+  "sftpDefaultDirectoryDialogTitle": "Choose SFTP Start Folder",
+  "sftpDefaultDirectoryFailedMessage": "{path} could not be listed. {reason}",
+  "@sftpDefaultDirectoryFailedMessage": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "sftpStartFolderLabel": "Start folder",
+  "sftpStartFolderHint": "/home/user",
+  "sftpAbsolutePathError": "Enter an absolute remote path.",
+  "transferDeleteMenu": "Delete transfer",
+  "transferEtaLeft": "{time} left",
+  "@transferEtaLeft": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "transferClearTitle": "Clear transfers?",
+  "transferClearBody": "{count, plural, =1{Remove 1 transfer record from history.} other{Remove {count} transfer records from history.}}",
+  "@transferClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "transferClearActiveBody": "Remove {count} transfer records from history and cancel {activeCount} active transfers.",
+  "@transferClearActiveBody": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      },
+      "activeCount": {
+        "type": "num"
+      }
+    }
+  },
+  "transferClearedSnack": "Transfers cleared.",
+  "transferRemoveLocalFailedSnack": "Transfer removed, but the local file could not be deleted.",
+  "transferAndLocalDeletedSnack": "Transfer and local file deleted.",
+  "transferDeletedSnack": "Transfer deleted.",
+  "transferCompletedMissingSnack": "Completed item is no longer available locally.",
+  "transferOpenFailedSnack": "Completed item could not be opened.",
+  "transferDeleteTitle": "Delete transfer?",
+  "transferDeleteLocalBody": "A local {kind} still exists at {path}. Remove the transfer only, or also delete the local {kind}?",
+  "@transferDeleteLocalBody": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      },
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "transferRemoveOnlyAction": "Remove transfer",
+  "transferDeleteLocalTooAction": "Delete {kind} too",
+  "@transferDeleteLocalTooAction": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "transferMachineFrom": "From {name}",
+  "@transferMachineFrom": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "transferMachineTo": "To {name}",
+  "@transferMachineTo": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "transferRemoteMachineFallback": "Remote machine",
+  "transferFolderKind": "folder",
+  "transferLinkKind": "link",
+  "transferFileKind": "file",
+  "transferBytesTransferred": "{bytes} transferred",
+  "@transferBytesTransferred": {
+    "placeholders": {
+      "bytes": {
+        "type": "String"
+      }
+    }
+  },
+  "transferStateQueued": "queued",
+  "transferStateRunning": "running",
+  "transferStatePaused": "paused",
+  "transferStateCompleted": "completed",
+  "transferStateFailed": "failed",
+  "transferStateCanceled": "canceled",
+  "dataExchangeLockedSubtitle": "Unlock the vault to use this action.",
+  "dataExchangeTitle": "Import / Export",
+  "dataExchangeSubtitle": "Backups stay available anytime. Host, identity, and SSH data require an unlocked vault.",
+  "dataExchangeExportSection": "Export",
+  "dataExchangeImportSection": "Import",
+  "dataExchangeExportBackupTitle": "Export encrypted backup",
+  "dataExchangeExportBackupSubtitle": "Encrypted vault records and header.",
+  "dataExchangeExportHostMetadataTitle": "Export host metadata",
+  "dataExchangeExportHostMetadataSubtitle": "Host names, addresses, tags, and options.",
+  "dataExchangeExportOpenSshConfigTitle": "Export OpenSSH config",
+  "dataExchangeExportOpenSshConfigSubtitle": "Selected hosts as an OpenSSH config.",
+  "dataExchangeExportIdentityMetadataTitle": "Export identity metadata",
+  "dataExchangeExportIdentityMetadataSubtitle": "Display names, hints, and public fingerprints.",
+  "dataExchangeImportBackupTitle": "Import encrypted backup",
+  "dataExchangeImportBackupSubtitle": "Merge records from a Serlink backup.",
+  "dataExchangeImportOpenSshConfigTitle": "Import OpenSSH config",
+  "dataExchangeImportOpenSshConfigSubtitle": "Create hosts from an ssh config file.",
+  "dataExchangeImportKnownHostsTitle": "Import known_hosts",
+  "dataExchangeImportKnownHostsSubtitle": "Add fingerprints for existing hosts.",
+  "dataExchangeImportOpenSshCertificateTitle": "Import OpenSSH certificate",
+  "dataExchangeImportOpenSshCertificateSubtitle": "Create an identity from key and certificate.",
+  "exportVaultBackupTitle": "Export encrypted backup?",
+  "exportVaultBackupBody": "The backup contains encrypted vault records and the vault header. Keep it private.",
+  "backupExportedSnack": "Encrypted backup exported.",
+  "noHostsAvailableExportSnack": "No hosts are available to export.",
+  "exportHostMetadataTitle": "Export host metadata?",
+  "exportHostMetadataBody": "Exports host names, addresses, usernames, tags, jump host links, and connection options. Credentials and private key material are excluded.",
+  "hostMetadataExportedSnack": "Host metadata exported.",
+  "hostMetadataExportFailedSnack": "Host metadata could not be exported.",
+  "exportOpenSshConfigTitle": "Export OpenSSH config?",
+  "exportOpenSshConfigBody": "Exports selected hosts and any required jump hosts as an OpenSSH config. Credentials and private key material are excluded.",
+  "openSshConfigExportedSnack": "OpenSSH config exported.",
+  "exportIdentityMetadataTitle": "Export identity metadata?",
+  "identityMetadataExportedSnack": "Identity metadata exported.",
+  "exportDiagnosticBundleTitle": "Export diagnostic bundle?",
+  "exportDiagnosticBundleBody": "The bundle is redacted and excludes terminal output, commands, hosts, usernames, paths, credentials, and private keys.",
+  "diagnosticBundleExportedSnack": "Diagnostic bundle exported.",
+  "backupOperationFailed": "Backup operation failed.",
+  "diagnosticExportFailed": "Diagnostic bundle could not be exported.",
+  "openSshConfigExportFailed": "OpenSSH config could not be exported.",
+  "identityMetadataExportFailed": "Identity metadata could not be exported.",
+  "importFailed": "Import failed.",
+  "importEncryptedBackupTitle": "Import encrypted backup?",
+  "importEncryptedBackupBody": "This replaces the local vault header and merges encrypted records from the selected backup.",
+  "backupImportedSnack": "Encrypted backup imported.",
+  "noImportableOpenSshHostsSnack": "No importable OpenSSH hosts found.",
+  "openSshHostsImportedSnack": "{count, plural, =1{Imported 1 host.} other{Imported {count} hosts.}}",
+  "@openSshHostsImportedSnack": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "openSshHostsImportedSkippedSnack": "{count, plural, =1{Imported 1 host, skipped {skipped}.} other{Imported {count} hosts, skipped {skipped}.}}",
+  "@openSshHostsImportedSkippedSnack": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      },
+      "skipped": {
+        "type": "num"
+      }
+    }
+  },
+  "importKnownHostsTitle": "Import known_hosts?",
+  "importKnownHostsBody": "Serlink will import fingerprints that match existing hosts by hostname and port. Hostnames and fingerprints are stored as encrypted vault records.",
+  "knownHostsImportedSnack": "{count, plural, =1{Imported 1 fingerprint.} other{Imported {count} fingerprints.}}",
+  "@knownHostsImportedSnack": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "knownHostsImportedUnmatchedSnack": "{count, plural, =1{Imported 1 fingerprint, {unmatched} unmatched.} other{Imported {count} fingerprints, {unmatched} unmatched.}}",
+  "@knownHostsImportedUnmatchedSnack": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      },
+      "unmatched": {
+        "type": "num"
+      }
+    }
+  },
+  "identityImportedSnack": "Imported {name}.",
+  "@identityImportedSnack": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "importOpenSshConfigTitle": "Import OpenSSH config?",
+  "openSshConfigHostsReady": "{count, plural, =1{1 host ready to import.} other{{count} hosts ready to import.}}",
+  "@openSshConfigHostsReady": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "openSshConfigHostsReadySkipped": "{count, plural, =1{1 host ready to import, {skipped} skipped.} other{{count} hosts ready to import, {skipped} skipped.}}",
+  "@openSshConfigHostsReadySkipped": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      },
+      "skipped": {
+        "type": "num"
+      }
+    }
+  },
+  "importWarningsTitle": "Import warnings",
+  "moreWarnings": "{count, plural, =1{1 more warning.} other{{count} more warnings.}}",
+  "@moreWarnings": {
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "certificateDefaultName": "Certificate {comment}",
+  "@certificateDefaultName": {
+    "placeholders": {
+      "comment": {
+        "type": "String"
+      }
+    }
+  },
+  "importOpenSshCertificateTitle": "Import OpenSSH certificate?",
+  "importAlgorithmLabel": "Algorithm",
+  "importCommentLabel": "Comment",
+  "passphraseWhitespaceError": "Passphrase cannot have leading or trailing spaces.",
+  "exportFieldHostnames": "hostnames",
+  "exportFieldUsernames": "usernames",
+  "exportFieldPorts": "ports",
+  "exportFieldJumpHostAliases": "jump host aliases",
+  "exportFieldConnectionSettings": "connection settings",
+  "exportFieldDisplayNames": "display names",
+  "exportFieldUsernameHints": "username hints",
+  "exportFieldPublicKeyFingerprints": "public key fingerprints",
+  "exportFieldCertificatePrincipals": "certificate principals",
+  "cancelAction": "Cancel",
+  "selectAction": "Select",
+  "searchAction": "Search"
+}

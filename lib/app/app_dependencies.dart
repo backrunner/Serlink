@@ -17,6 +17,7 @@ import '../features/import_export/application/open_ssh_config_import_service.dar
 import '../features/import_export/application/vault_backup_service.dart';
 import '../features/security/application/security_modal_service.dart';
 import '../features/security/presentation/flutter_security_modal_service.dart';
+import '../features/settings/application/app_language_settings.dart';
 import '../features/snippets/application/snippet_repository.dart';
 import '../features/snippets/application/snippet_write_service.dart';
 import '../features/snippets/domain/snippet.dart';
@@ -84,6 +85,38 @@ final vaultRecordRepositoryProvider = Provider<VaultRecordRepository>((ref) {
 final secretStoreProvider = Provider<SecretStore>((ref) {
   return const FlutterSecureStorageSecretStore();
 });
+
+final appLanguageSettingsRepositoryProvider =
+    Provider<AppLanguageSettingsRepository>((ref) {
+      return const FileAppLanguageSettingsRepository();
+    });
+
+final appLanguageProvider =
+    AsyncNotifierProvider<AppLanguageController, AppLanguage>(
+      AppLanguageController.new,
+    );
+
+class AppLanguageController extends AsyncNotifier<AppLanguage> {
+  @override
+  Future<AppLanguage> build() async {
+    try {
+      return await ref.watch(appLanguageSettingsRepositoryProvider).read();
+    } on Object {
+      return AppLanguage.system;
+    }
+  }
+
+  Future<void> setLanguage(AppLanguage language) async {
+    final previous = state;
+    state = AsyncData(language);
+    try {
+      await ref.read(appLanguageSettingsRepositoryProvider).save(language);
+    } on Object catch (error, stackTrace) {
+      state = previous;
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+}
 
 final vaultCryptoConfigProvider = Provider<VaultCryptoConfig>((ref) {
   return const VaultCryptoConfig();

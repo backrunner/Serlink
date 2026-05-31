@@ -57,6 +57,7 @@ Desktop-first architecture is being kept compatible with future mobile expansion
 - Split terminal panes inside a tab
 - Local/remote/SOCKS dynamic port forwarding UI and lifecycle
 - Startup commands after shell attach
+- ZMODEM `rz` / `sz` transfers from terminal sessions
 
 ### SFTP and Transfers
 
@@ -110,7 +111,6 @@ These areas are still open before a production desktop release:
 - iCloud Drive sync
 - SSH Agent auth
 - FIDO2 / hardware security key SSH auth
-- Zmodem / `rz` / `sz`
 - PuTTY PPK import
 - Explorer-style SFTP file manager mode
 - Full vault cryptographic rekey flow

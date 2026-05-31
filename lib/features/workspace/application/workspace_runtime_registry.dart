@@ -7,11 +7,16 @@ import '../../sftp/application/sftp_connection.dart';
 import '../../ssh/application/ssh_session_service.dart';
 import '../../terminal/application/terminal_adapter.dart';
 import '../../terminal/application/terminal_paste_guard.dart';
+import '../../terminal/application/terminal_zmodem_transfer.dart';
 
 class WorkspaceRuntimeRegistry {
-  WorkspaceRuntimeRegistry({this.confirmMultilinePaste});
+  WorkspaceRuntimeRegistry({
+    this.confirmMultilinePaste,
+    this.zmodemTransferHandler,
+  });
 
   final MultilinePasteConfirmation? confirmMultilinePaste;
+  final TerminalZModemTransferHandler? zmodemTransferHandler;
   final Map<SessionId, Terminal> _terminals = {};
   final Map<SessionId, TerminalAdapter> _terminalAdapters = {};
   final Map<SessionId, SftpConnection> _sftpConnections = {};
@@ -65,6 +70,7 @@ class WorkspaceRuntimeRegistry {
       terminal: terminal,
       session: session,
       confirmMultilinePaste: confirmMultilinePaste,
+      zmodemTransferHandler: zmodemTransferHandler,
     );
     adapter.attach();
     _terminalAdapters[sessionId] = adapter;

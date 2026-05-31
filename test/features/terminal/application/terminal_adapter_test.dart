@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/terminal/application/terminal_adapter.dart';
+import 'package:serlink/features/terminal/application/terminal_zmodem_transfer.dart';
 import 'package:xterm/xterm.dart';
 
 void main() {
@@ -77,6 +78,47 @@ void main() {
     final text = terminal.buffer.getText();
     expect(text, contains('hello'));
     expect(text, contains('warning'));
+
+    await adapter.close();
+  });
+
+  test(
+    'writes stdout through zmodem mux when transfer handler is configured',
+    () async {
+      final terminal = Terminal();
+      final session = _FakeShellSession();
+      final adapter = TerminalAdapter(
+        terminal: terminal,
+        session: session,
+        zmodemTransferHandler: const _NoopZModemTransferHandler(),
+      );
+
+      adapter.attach();
+      session.emitStdout(utf8.encode('hello\r\n'));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(terminal.buffer.getText(), contains('hello'));
+
+      await adapter.close();
+    },
+  );
+
+  test('forwards terminal output through zmodem mux', () async {
+    final terminal = Terminal();
+    final session = _FakeShellSession();
+    final adapter = TerminalAdapter(
+      terminal: terminal,
+      session: session,
+      zmodemTransferHandler: const _NoopZModemTransferHandler(),
+    );
+
+    adapter.attach();
+    terminal.onOutput?.call('pwd\r');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(utf8.decode(session.writes.single), 'pwd\r');
 
     await adapter.close();
   });
@@ -166,6 +208,19 @@ void main() {
 
     await adapter.close();
   });
+}
+
+class _NoopZModemTransferHandler implements TerminalZModemTransferHandler {
+  const _NoopZModemTransferHandler();
+
+  @override
+  Future<bool> receiveOffer(ZModemOffer offer) async {
+    offer.skip();
+    return false;
+  }
+
+  @override
+  Future<Iterable<ZModemOffer>> requestFiles() async => const [];
 }
 
 class _FakeShellSession implements SshShellSession {

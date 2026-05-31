@@ -15,6 +15,7 @@ import '../../ssh/data/dartssh2_ssh_session_service.dart';
 import '../../ssh/domain/connection_profile.dart';
 import '../../terminal/application/local_terminal_service.dart';
 import '../../terminal/application/terminal_display_settings.dart';
+import '../../terminal/data/file_selector_terminal_zmodem_transfer_handler.dart';
 import '../../terminal/data/flutter_pty_local_terminal_service.dart';
 import '../../vault/application/vault_service.dart';
 import '../domain/workspace_tab.dart';
@@ -54,6 +55,7 @@ final workspaceRuntimeRegistryProvider = Provider<WorkspaceRuntimeRegistry>((
     confirmMultilinePaste: ref
         .watch(securityModalServiceProvider)
         .confirmMultilinePaste,
+    zmodemTransferHandler: const FileSelectorTerminalZModemTransferHandler(),
   );
   ref.onDispose(() {
     unawaited(registry.dispose());

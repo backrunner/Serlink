@@ -121,6 +121,7 @@ class _SyncDevicesDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
       title: const Text('Sync Devices'),
       content: SizedBox(
         width: 520,

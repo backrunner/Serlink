@@ -25,6 +25,8 @@ void main() {
       id: TransferTaskId('transfer-1'),
       direction: TransferDirection.upload,
       itemKind: TransferItemKind.directory,
+      sourceHostId: HostId('host-1'),
+      sourceMachineName: 'Build Server',
       localPath: '/Users/person/secrets.env',
       remotePath: '/srv/app/secrets.env',
       state: TransferState.completed,
@@ -47,6 +49,8 @@ void main() {
     expect(restored, hasLength(1));
     expect(restored.single.remotePath, task.remotePath);
     expect(restored.single.itemKind, TransferItemKind.directory);
+    expect(restored.single.sourceHostId, HostId('host-1'));
+    expect(restored.single.sourceMachineName, 'Build Server');
     expect(restored.single.state, TransferState.completed);
 
     await vault.lock();

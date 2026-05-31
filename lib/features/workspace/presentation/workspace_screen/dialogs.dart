@@ -1,5 +1,19 @@
 part of '../workspace_screen.dart';
 
+const double _dialogWidthCompact = 420;
+const double _dialogWidthPrompt = 480;
+const double _dialogWidthSmall = 568;
+const double _dialogWidthMedium = 608;
+const double _dialogWidthDataExchange = 660;
+const double _dialogWidthManagement = 688;
+const double _dialogWidthWide = 728;
+const double _dialogWidthReview = 868;
+
+double _adaptiveDialogWidth(BuildContext context, double preferredWidth) {
+  final availableWidth = math.max(360.0, MediaQuery.sizeOf(context).width - 96);
+  return math.min(preferredWidth, availableWidth);
+}
+
 Future<bool> _confirmDialog(
   BuildContext context, {
   required String title,
@@ -12,6 +26,7 @@ Future<bool> _confirmDialog(
     barrierDismissible: false,
     builder: (context) {
       return SerlinkDialog(
+        maxWidth: _adaptiveDialogWidth(context, _dialogWidthPrompt),
         title: Text(title),
         content: destructive ? SerlinkAlert.danger(message: body) : Text(body),
         actions: [
@@ -47,6 +62,7 @@ Future<TransferConflictAction?> _showTransferConflictDialog(
     barrierDismissible: false,
     builder: (context) {
       return SerlinkDialog(
+        maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
         title: Text(title),
         content: SerlinkAlert.warning(message: body),
         actions: [
@@ -326,13 +342,13 @@ class _PlaceholderSurface extends StatelessWidget {
   const _PlaceholderSurface({
     required this.title,
     required this.body,
-    this.dynamicBody = false,
+    this.loading = false,
     this.action,
   });
 
   final String title;
   final String body;
-  final bool dynamicBody;
+  final bool loading;
   final Widget? action;
 
   @override
@@ -347,6 +363,10 @@ class _PlaceholderSurface extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (loading) ...[
+              const SerlinkLoadingIndicator(semanticsLabel: 'Loading'),
+              const SizedBox(height: 16),
+            ],
             Text(
               title,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -355,13 +375,7 @@ class _PlaceholderSurface extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            dynamicBody
-                ? _DynamicStatusText(
-                    label: body,
-                    textAlign: TextAlign.center,
-                    style: bodyStyle,
-                  )
-                : Text(body, textAlign: TextAlign.center, style: bodyStyle),
+            Text(body, textAlign: TextAlign.center, style: bodyStyle),
             if (action != null) ...[const SizedBox(height: 14), action!],
           ],
         ),
@@ -370,47 +384,32 @@ class _PlaceholderSurface extends StatelessWidget {
   }
 }
 
-class _DynamicStatusText extends StatefulWidget {
-  const _DynamicStatusText({required this.label, this.textAlign, this.style});
+class _DynamicStatusText extends StatelessWidget {
+  const _DynamicStatusText({required this.label});
 
   final String label;
-  final TextAlign? textAlign;
-  final TextStyle? style;
-
-  @override
-  State<_DynamicStatusText> createState() => _DynamicStatusTextState();
-}
-
-class _DynamicStatusTextState extends State<_DynamicStatusText> {
-  Timer? _timer;
-  int _dotCount = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(milliseconds: 450), (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _dotCount = (_dotCount % 3) + 1;
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      '${widget.label}${List.filled(_dotCount, '.').join()}',
+    final t = context.tokens;
+    final style = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
+    return Wrap(
       key: const ValueKey('dynamic-status-text'),
-      textAlign: widget.textAlign,
-      style: widget.style,
+      alignment: WrapAlignment.start,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      children: [
+        SizedBox.square(
+          dimension: 14,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation(t.accentPrimary),
+          ),
+        ),
+        Text(label, style: style),
+      ],
     );
   }
 }

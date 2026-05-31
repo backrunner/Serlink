@@ -149,6 +149,7 @@ class _TerminalSettingsDialog extends ConsumerWidget {
     }
 
     return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
       title: const Text('Terminal Settings'),
       content: SizedBox(
         width: 560,

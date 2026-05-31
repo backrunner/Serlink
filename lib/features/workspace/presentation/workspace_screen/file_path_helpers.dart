@@ -124,6 +124,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
   @override
   Widget build(BuildContext context) {
     return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthCompact),
       title: Text(widget.title),
       content: SerlinkTextField(
         key: ValueKey('text-input-${widget.label}'),

@@ -120,7 +120,7 @@ String _localUnlockLabel(VaultSessionState? session) {
     return 'Create the vault before enabling device-protected unlock.';
   }
   if (session?.localUnlockAvailable == true) {
-    return 'Enabled on this device through OS secure storage.';
+    return 'Enabled. Lock the vault to unlock with this device.';
   }
   return 'Disabled. Passphrase or recovery key is required after lock.';
 }
@@ -143,26 +143,40 @@ Future<void> _setLocalVaultUnlock(
     return;
   }
   try {
+    bool updated;
     if (enabled) {
-      await ref
+      updated = await ref
           .read(vaultSessionControllerProvider.notifier)
           .enableLocalUnlock();
     } else {
-      await ref
+      updated = await ref
           .read(vaultSessionControllerProvider.notifier)
           .disableLocalUnlock();
     }
     if (context.mounted) {
       _showSnackBar(
         context,
-        enabled ? 'Local unlock enabled.' : 'Local unlock disabled.',
+        enabled
+            ? updated
+                  ? 'Local unlock enabled. Lock the vault to use device unlock.'
+                  : 'Local unlock could not be verified.'
+            : updated
+            ? 'Local unlock disabled.'
+            : 'Local unlock is still available on this device.',
       );
     }
   } on Object catch (error) {
     if (context.mounted) {
-      _showSnackBar(context, _backupErrorMessage(error));
+      _showSnackBar(context, _localUnlockErrorMessage(error));
     }
   }
+}
+
+String _localUnlockErrorMessage(Object error) {
+  if (error is VaultException) {
+    return error.message;
+  }
+  return 'Local unlock could not be updated.';
 }
 
 Future<void> _showIdentityManagerDialog(
@@ -186,6 +200,7 @@ class _IdentityManagerDialog extends ConsumerWidget {
       builder: (context, snapshot) {
         final identities = snapshot.data ?? const <IdentityConfig>[];
         return SerlinkDialog(
+          maxWidth: _adaptiveDialogWidth(context, _dialogWidthManagement),
           title: const Text('Credentials'),
           content: SizedBox(
             width: 640,
@@ -338,6 +353,7 @@ class _KnownHostsDialog extends ConsumerWidget {
       builder: (context, snapshot) {
         final records = snapshot.data ?? const <KnownHostRecord>[];
         return SerlinkDialog(
+          maxWidth: _adaptiveDialogWidth(context, _dialogWidthWide),
           title: const Text('Known Hosts'),
           content: SizedBox(
             width: 680,

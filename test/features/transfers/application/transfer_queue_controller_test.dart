@@ -214,6 +214,67 @@ void main() {
     expect(connection.lastDownloadKind, TransferItemKind.directory);
   });
 
+  test('stores source machine metadata on queued transfers', () {
+    final taskId = queue.enqueueDownload(
+      connection: connection,
+      sourceHostId: HostId('host-1'),
+      sourceMachineName: 'Build Server',
+      remotePath: '/remote/report.txt',
+      localPath: '/local/report.txt',
+    );
+
+    final task = queue.state.byId(taskId)!;
+    expect(task.sourceHostId, HostId('host-1'));
+    expect(task.sourceMachineName, 'Build Server');
+  });
+
+  test('deletes a transfer from state and repository', () async {
+    final repository = InMemoryTransferTaskRepository();
+    final localQueue = TransferQueueController(
+      maxConcurrentTransfers: 1,
+      repository: repository,
+    );
+    addTearDown(localQueue.dispose);
+    final taskId = localQueue.enqueueUpload(
+      connection: connection,
+      localPath: '/local/remove-me',
+      remotePath: '/remote/remove-me',
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    await localQueue.delete(taskId);
+
+    expect(localQueue.state.byId(taskId), isNull);
+    expect(await repository.list(), isEmpty);
+    expect(connection.cancelCount, 1);
+  });
+
+  test('clears all transfers from state and repository', () async {
+    final repository = InMemoryTransferTaskRepository();
+    final localQueue = TransferQueueController(
+      maxConcurrentTransfers: 1,
+      repository: repository,
+    );
+    addTearDown(localQueue.dispose);
+    localQueue.enqueueUpload(
+      connection: connection,
+      localPath: '/local/a',
+      remotePath: '/remote/a',
+    );
+    localQueue.enqueueDownload(
+      connection: connection,
+      remotePath: '/remote/b',
+      localPath: '/local/b',
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    await localQueue.clear();
+
+    expect(localQueue.state.tasks, isEmpty);
+    expect(await repository.list(), isEmpty);
+    expect(connection.cancelCount, 1);
+  });
+
   test('persists completed transfer history', () async {
     final repository = InMemoryTransferTaskRepository();
     final firstQueue = TransferQueueController(

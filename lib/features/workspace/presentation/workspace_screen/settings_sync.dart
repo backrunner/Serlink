@@ -256,6 +256,7 @@ Future<void> _reviewLocalClock(
     context: context,
     barrierDismissible: false,
     builder: (context) => SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
       title: Text(plan.title),
       content: SizedBox(
         width: 520,

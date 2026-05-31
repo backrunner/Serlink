@@ -53,7 +53,9 @@ void main() {
       fontSize: 14,
     );
 
-    expect(settings.textStyle.toTextStyle().letterSpacing, greaterThan(0));
+    final spacing = settings.textStyle.toTextStyle().letterSpacing!;
+    expect(spacing, greaterThan(0));
+    expect(spacing, lessThanOrEqualTo(1));
   });
 
   test('ordinary terminal fonts do not add glyph overhang reserve', () {

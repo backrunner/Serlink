@@ -5,6 +5,7 @@ class _SftpPane extends ConsumerStatefulWidget {
     super.key,
     required this.tabId,
     required this.hostId,
+    required this.sourceMachineName,
     required this.sessionId,
     required this.path,
     required this.rootPath,
@@ -14,6 +15,7 @@ class _SftpPane extends ConsumerStatefulWidget {
 
   final WorkspaceTabId tabId;
   final HostId? hostId;
+  final String sourceMachineName;
   final SessionId sessionId;
   final String path;
   final String rootPath;
@@ -414,6 +416,8 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
         .enqueueUpload(
           connection: _connection(),
           itemKind: TransferItemKind.file,
+          sourceHostId: widget.hostId,
+          sourceMachineName: widget.sourceMachineName,
           localPath: localPath,
           remotePath: remotePath,
         );
@@ -440,6 +444,8 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
         .enqueueUpload(
           connection: _connection(),
           itemKind: TransferItemKind.directory,
+          sourceHostId: widget.hostId,
+          sourceMachineName: widget.sourceMachineName,
           localPath: directoryPath,
           remotePath: remotePath,
         );
@@ -464,6 +470,8 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
         .enqueueDownload(
           connection: _connection(),
           itemKind: itemKind,
+          sourceHostId: widget.hostId,
+          sourceMachineName: widget.sourceMachineName,
           remotePath: entry.path,
           localPath: localPath,
         );

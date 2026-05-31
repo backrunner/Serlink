@@ -5,7 +5,8 @@ class _SettingsSurface extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final vault = ref.watch(vaultSessionControllerProvider).value;
+    final vaultSession = ref.watch(vaultSessionControllerProvider);
+    final vault = vaultSession.value;
     final vaultState = vault?.vaultState;
     final canImportHostData = vaultState == VaultState.unlocked;
 
@@ -86,16 +87,26 @@ class _SettingsSurface extends ConsumerWidget {
                       subtitle: _localUnlockLabel(vault),
                       action: vaultState == VaultState.unlocked
                           ? SerlinkSwitch(
+                              semanticsLabel: 'Enable local unlock',
                               value: vault?.localUnlockAvailable ?? false,
                               onChanged: (value) =>
                                   _setLocalVaultUnlock(context, ref, value),
                             )
                           : vault?.localUnlockAvailable == true
-                          ? SerlinkTextButton(
-                              onPressed: () => ref
-                                  .read(vaultSessionControllerProvider.notifier)
-                                  .unlockWithLocalKey(),
-                              child: const Text('Unlock'),
+                          ? SerlinkTextButton.icon(
+                              key: const ValueKey(
+                                'settings-local-unlock-button',
+                              ),
+                              onPressed: vaultSession.isLoading
+                                  ? null
+                                  : () => ref
+                                        .read(
+                                          vaultSessionControllerProvider
+                                              .notifier,
+                                        )
+                                        .unlockWithLocalKey(),
+                              icon: const Icon(Icons.fingerprint, size: 18),
+                              label: const Text('Unlock with device'),
                             )
                           : null,
                     ),

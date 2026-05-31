@@ -355,6 +355,7 @@ class _ActiveTabView extends ConsumerWidget {
                 key: ValueKey('${sessionId.value}:$rootPath:$currentPath'),
                 tabId: tab.id,
                 hostId: tab.hostId,
+                sourceMachineName: _sourceMachineNameFromTabTitle(tab.title),
                 sessionId: sessionId,
                 path: currentPath,
                 rootPath: rootPath,

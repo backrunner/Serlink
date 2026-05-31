@@ -32,6 +32,7 @@ class _SyncConflictReviewDialogState
   @override
   Widget build(BuildContext context) {
     return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthReview),
       title: const Text('Review sync conflicts'),
       content: SizedBox(
         width: 820,

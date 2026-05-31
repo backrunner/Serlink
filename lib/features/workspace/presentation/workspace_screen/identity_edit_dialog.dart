@@ -47,6 +47,7 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
   @override
   Widget build(BuildContext context) {
     return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
       title: const Text('Edit Credential'),
       content: SizedBox(
         width: 560,

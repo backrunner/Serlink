@@ -7,6 +7,8 @@ class TransferTask {
     required this.id,
     required this.direction,
     this.itemKind = TransferItemKind.file,
+    this.sourceHostId,
+    this.sourceMachineName,
     required this.localPath,
     required this.remotePath,
     required this.state,
@@ -24,6 +26,8 @@ class TransferTask {
   final TransferTaskId id;
   final TransferDirection direction;
   final TransferItemKind itemKind;
+  final HostId? sourceHostId;
+  final String? sourceMachineName;
   final String localPath;
   final String remotePath;
   final TransferState state;
@@ -42,6 +46,8 @@ class TransferTask {
       'id': id.value,
       'direction': direction.name,
       'itemKind': itemKind.name,
+      'sourceHostId': sourceHostId?.value,
+      'sourceMachineName': sourceMachineName,
       'localPath': localPath,
       'remotePath': remotePath,
       'state': state.name,
@@ -64,6 +70,10 @@ class TransferTask {
       itemKind: json['itemKind'] == null
           ? TransferItemKind.file
           : TransferItemKind.values.byName(json['itemKind'] as String),
+      sourceHostId: json['sourceHostId'] == null
+          ? null
+          : HostId(json['sourceHostId'] as String),
+      sourceMachineName: json['sourceMachineName'] as String?,
       localPath: json['localPath'] as String,
       remotePath: json['remotePath'] as String,
       state: TransferState.values.byName(json['state'] as String),
@@ -103,6 +113,8 @@ class TransferTask {
       id: id,
       direction: direction,
       itemKind: itemKind,
+      sourceHostId: sourceHostId,
+      sourceMachineName: sourceMachineName,
       localPath: localPath,
       remotePath: remotePath,
       state: state ?? this.state,

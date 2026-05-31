@@ -14,6 +14,7 @@ import 'package:serlink/database/serlink_database.dart';
 import 'package:serlink/design_system/design_system.dart';
 import 'package:serlink/features/hosts/application/host_repository.dart';
 import 'package:serlink/features/hosts/application/host_write_service.dart';
+import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/identities/application/identity_repository.dart';
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
 import 'package:serlink/features/sftp/application/sftp_failure.dart';
@@ -628,6 +629,84 @@ void main() {
     expect(find.text('Reset Vault Permanently'), findsOneWidget);
   });
 
+  testWidgets(
+    'hosts show loading while encrypted records initialize after unlock',
+    (tester) async {
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final secretStore = InMemorySecretStore();
+      final bootstrapVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      final initialized = await bootstrapVault.initialize(
+        passphrase: 'correct horse battery staple',
+      );
+      await DriftVaultHeaderStore(database).save(initialized.header);
+      final now = DateTime.utc(2026);
+      final hosts = _DelayedHostRepository([
+        HostConfig(
+          id: HostId('persisted-host'),
+          displayName: 'Persisted Bastion',
+          hostname: 'persisted.internal',
+          username: 'ops',
+          port: 22,
+          authKinds: const {HostAuthKind.password},
+          tags: const {},
+          trustState: HostTrustState.unknown,
+          identityIds: const [],
+          startupCommands: const [],
+          jumpHostIds: const [],
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ]);
+
+      addTearDown(database.close);
+      addTearDown(transferQueue.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            serlinkDatabaseProvider.overrideWithValue(database),
+            vaultCryptoConfigProvider.overrideWithValue(
+              const VaultCryptoConfig.testing(),
+            ),
+            hostRepositoryProvider.overrideWithValue(hosts),
+            sshSessionServiceProvider.overrideWithValue(
+              _FakeSshSessionService(),
+            ),
+            transferQueueControllerProvider.overrideWithValue(transferQueue),
+            secretStoreProvider.overrideWithValue(secretStore),
+            autoSyncEnabledProvider.overrideWithValue(false),
+          ],
+          child: const SerlinkApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('vault-passphrase-field')),
+        'correct horse battery staple',
+      );
+      await tester.tap(find.byKey(const ValueKey('vault-submit-button')));
+      await _pumpUntilFound(
+        tester,
+        find.text('Loading encrypted host records'),
+      );
+
+      expect(find.text('Loading encrypted host records'), findsOneWidget);
+      expect(find.text('Loading encrypted host records.'), findsNothing);
+      expect(find.byType(SerlinkLoadingIndicator), findsOneWidget);
+      expect(find.text('No Hosts'), findsNothing);
+
+      hosts.completeList();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Persisted Bastion'), findsOneWidget);
+      expect(find.text('ops@persisted.internal:22'), findsOneWidget);
+    },
+  );
+
   testWidgets('vault unlock error resets after switching workspace tabs', (
     tester,
   ) async {
@@ -712,9 +791,57 @@ Future<void> _submitVaultPassphrase(
   await tester.pumpAndSettle();
 }
 
+Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
+  for (var attempt = 0; attempt < 30; attempt += 1) {
+    await tester.pump(const Duration(milliseconds: 20));
+    if (finder.evaluate().isNotEmpty) {
+      return;
+    }
+  }
+}
+
 Future<void> _openHostContextMenu(WidgetTester tester, String hostName) async {
   await tester.tap(find.text(hostName), buttons: kSecondaryMouseButton);
   await tester.pumpAndSettle();
 }
 
 Finder _byTooltipLabel(String label) => find.bySemanticsLabel(label);
+
+class _DelayedHostRepository implements HostRepository {
+  _DelayedHostRepository(this._hosts);
+
+  final List<HostConfig> _hosts;
+  final Completer<void> _listReady = Completer<void>();
+
+  void completeList() {
+    if (!_listReady.isCompleted) {
+      _listReady.complete();
+    }
+  }
+
+  @override
+  Future<void> save(HostConfig host) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<HostConfig?> read(HostId id) async {
+    for (final host in _hosts) {
+      if (host.id == id) {
+        return host;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<List<HostConfig>> list() async {
+    await _listReady.future;
+    return _hosts;
+  }
+
+  @override
+  Future<void> delete(HostId id) {
+    throw UnimplementedError();
+  }
+}

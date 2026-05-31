@@ -57,6 +57,7 @@ class _OpenSshCertificateImportDialogState
   Widget build(BuildContext context) {
     final warnings = widget.preview.warnings.take(3).toList(growable: false);
     return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
       title: const Text('Import OpenSSH certificate?'),
       content: SizedBox(
         width: 560,

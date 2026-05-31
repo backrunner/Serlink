@@ -13,7 +13,7 @@ class _HostsSurface extends ConsumerWidget {
       loading: () => const _PlaceholderSurface(
         title: 'Vault',
         body: 'Preparing encrypted storage',
-        dynamicBody: true,
+        loading: true,
       ),
       error: (error, stackTrace) => _VaultAccessSurface(error: error),
       data: (session) {
@@ -24,12 +24,14 @@ class _HostsSurface extends ConsumerWidget {
         final content = hostsAsync.isLoading
             ? const _PlaceholderSurface(
                 title: 'Hosts',
-                body: 'Loading encrypted host records.',
+                body: 'Loading encrypted host records',
+                loading: true,
               )
             : hostsAsync.when(
                 loading: () => const _PlaceholderSurface(
                   title: 'Hosts',
-                  body: 'Loading encrypted host records.',
+                  body: 'Loading encrypted host records',
+                  loading: true,
                 ),
                 error: (error, stackTrace) =>
                     _PlaceholderSurface(title: 'Hosts', body: error.toString()),

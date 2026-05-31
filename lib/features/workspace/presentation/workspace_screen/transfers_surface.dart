@@ -6,28 +6,113 @@ class _TransfersSurface extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final queue = ref.watch(transferQueueStateProvider);
-    return queue.when(
-      loading: () => const _PlaceholderSurface(
-        title: 'Transfers',
-        body: 'Preparing transfer queue.',
+    final state = queue.value;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _TransfersHeader(
+          state: state,
+          onClear: state == null || state.tasks.isEmpty
+              ? null
+              : () => unawaited(_clearTransfers(context, ref, state)),
+        ),
+        Expanded(
+          child: queue.when(
+            loading: () => const _PlaceholderSurface(
+              title: 'Transfers',
+              body: 'Preparing transfer queue.',
+            ),
+            error: (error, stackTrace) =>
+                _PlaceholderSurface(title: 'Transfers', body: error.toString()),
+            data: (state) {
+              if (state.tasks.isEmpty) {
+                return const _PlaceholderSurface(
+                  title: 'No Transfers',
+                  body: 'SFTP uploads and downloads will appear here.',
+                );
+              }
+              return _TransferTaskList(tasks: state.tasks);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TransfersHeader extends StatelessWidget {
+  const _TransfersHeader({required this.state, required this.onClear});
+
+  final TransferQueueState? state;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final tasks = state?.tasks ?? const <TransferTask>[];
+    final activeCount = tasks.where(_transferIsActive).length;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      child: Row(
+        children: [
+          Icon(Icons.swap_vert, size: 19, color: t.textSecondary),
+          const SizedBox(width: 10),
+          Text(
+            'Transfers',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: t.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 10),
+          SerlinkTag(label: '${tasks.length} ${_plural(tasks.length, 'item')}'),
+          if (activeCount > 0) ...[
+            const SizedBox(width: 6),
+            StatusPill(label: '$activeCount active', color: t.statusInfo),
+          ],
+          const Spacer(),
+          SerlinkTextButton.icon(
+            onPressed: onClear,
+            icon: const Icon(Icons.delete_sweep_outlined, size: 17),
+            label: const Text('Clear'),
+          ),
+        ],
       ),
-      error: (error, stackTrace) =>
-          _PlaceholderSurface(title: 'Transfers', body: error.toString()),
-      data: (state) {
-        if (state.tasks.isEmpty) {
-          return const _PlaceholderSurface(
-            title: 'No Transfers',
-            body: 'SFTP uploads and downloads will appear here.',
-          );
+    );
+  }
+}
+
+class _TransferTaskList extends StatelessWidget {
+  const _TransferTaskList({required this.tasks});
+
+  final List<TransferTask> tasks;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      key: const PageStorageKey('transfers-list'),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      scrollCacheExtent: const ScrollCacheExtent.pixels(960),
+      itemCount: tasks.length,
+      addAutomaticKeepAlives: false,
+      addSemanticIndexes: false,
+      findChildIndexCallback: (key) {
+        if (key is! ValueKey<String>) {
+          return null;
         }
-        final tasks = [...state.tasks.reversed];
-        return ListView.separated(
-          padding: const EdgeInsets.all(12),
-          itemCount: tasks.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 8),
-          itemBuilder: (context, index) {
-            return _TransferTaskRow(task: tasks[index]);
-          },
+        final position = tasks.indexWhere((task) => task.id.value == key.value);
+        if (position == -1) {
+          return null;
+        }
+        return tasks.length - 1 - position;
+      },
+      itemBuilder: (context, index) {
+        final task = tasks[tasks.length - 1 - index];
+        return Padding(
+          key: ValueKey(task.id.value),
+          padding: EdgeInsets.only(bottom: index == tasks.length - 1 ? 0 : 8),
+          child: RepaintBoundary(child: _TransferTaskRow(task: task)),
         );
       },
     );
@@ -49,122 +134,353 @@ class _TransferTaskRow extends ConsumerWidget {
     final isActive =
         task.state == TransferState.running ||
         task.state == TransferState.paused;
+    final canOpen = task.state == TransferState.completed;
 
-    return ListRow(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(
-                task.itemKind == TransferItemKind.directory
-                    ? Icons.folder_outlined
-                    : task.direction == TransferDirection.upload
-                    ? Icons.upload_outlined
-                    : Icons.download_outlined,
-                size: 18,
-                color: t.textSecondary,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  task.direction == TransferDirection.upload
-                      ? _fileName(task.localPath)
-                      : _fileName(task.remotePath),
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: t.textPrimary,
-                    fontWeight: FontWeight.w600,
+    return SerlinkContextMenu(
+      actions: [
+        SerlinkMenuAction(
+          label: 'Delete transfer',
+          icon: Icons.delete_outline,
+          onPressed: () => unawaited(_deleteTransfer(context, ref, task)),
+        ),
+      ],
+      child: MouseRegion(
+        cursor: canOpen ? SystemMouseCursors.click : MouseCursor.defer,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onDoubleTap: canOpen
+              ? () => unawaited(_openCompletedTransfer(context, task))
+              : null,
+          child: ListRow(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      task.itemKind == TransferItemKind.directory
+                          ? Icons.folder_outlined
+                          : task.direction == TransferDirection.upload
+                          ? Icons.upload_outlined
+                          : Icons.download_outlined,
+                      size: 18,
+                      color: t.textSecondary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        task.direction == TransferDirection.upload
+                            ? _fileName(task.localPath)
+                            : _fileName(task.remotePath),
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: t.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    StatusPill(
+                      label: _transferStateLabel(task.state),
+                      color: _transferStateColor(task.state, t),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 180),
+                      child: SerlinkTag(label: _transferMachineTag(task)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        task.direction == TransferDirection.upload
+                            ? '${task.localPath} -> ${task.remotePath}'
+                            : '${task.remotePath} -> ${task.localPath}',
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+                if (isActive) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: SerlinkRadii.pill,
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 5,
+                      backgroundColor: t.surfaceSunken,
+                      color: t.accentPrimary,
+                    ),
                   ),
-                ),
-              ),
-              StatusPill(
-                label: _transferStateLabel(task.state),
-                color: _transferStateColor(task.state, t),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            task.direction == TransferDirection.upload
-                ? '${task.localPath} -> ${task.remotePath}'
-                : '${task.remotePath} -> ${task.localPath}',
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
-          ),
-          if (isActive) ...[
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: SerlinkRadii.pill,
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 5,
-                backgroundColor: t.surfaceSunken,
-                color: t.accentPrimary,
-              ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _transferProgressLabel(task),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                  ),
+                  if (task.bytesPerSecond != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_formatBytes(task.bytesPerSecond!.round())}/s'
+                      '${task.eta == null ? '' : ' · ${_formatDuration(task.eta!)} left'}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: t.textMuted),
+                    ),
+                  ],
+                ],
+                if (task.state == TransferState.failed &&
+                    task.failure != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    task.failure!.message,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: t.statusDanger),
+                  ),
+                ],
+                if (_transferHasInlineActions(task, queue)) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (task.state == TransferState.running)
+                        SerlinkTextButton(
+                          onPressed: () => queue.pause(task.id),
+                          child: const Text('Pause'),
+                        ),
+                      if (task.state == TransferState.paused)
+                        SerlinkTextButton(
+                          onPressed: () => queue.resume(task.id),
+                          child: const Text('Resume'),
+                        ),
+                      if (queue.canRetry(task.id))
+                        SerlinkTextButton(
+                          onPressed: () => queue.retry(task.id),
+                          child: const Text('Retry'),
+                        ),
+                      if (task.state == TransferState.running ||
+                          task.state == TransferState.paused ||
+                          task.state == TransferState.queued)
+                        SerlinkTextButton(
+                          onPressed: () => queue.cancel(task.id),
+                          child: const Text('Cancel'),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              _transferProgressLabel(task),
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
-            ),
-            if (task.bytesPerSecond != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                '${_formatBytes(task.bytesPerSecond!.round())}/s'
-                '${task.eta == null ? '' : ' · ${_formatDuration(task.eta!)} left'}',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: t.textMuted),
-              ),
-            ],
-          ],
-          if (task.state == TransferState.failed && task.failure != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              task.failure!.message,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: t.statusDanger),
-            ),
-          ],
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (task.state == TransferState.running)
-                SerlinkTextButton(
-                  onPressed: () => queue.pause(task.id),
-                  child: const Text('Pause'),
-                ),
-              if (task.state == TransferState.paused)
-                SerlinkTextButton(
-                  onPressed: () => queue.resume(task.id),
-                  child: const Text('Resume'),
-                ),
-              if (queue.canRetry(task.id))
-                SerlinkTextButton(
-                  onPressed: () => queue.retry(task.id),
-                  child: const Text('Retry'),
-                ),
-              if (task.state == TransferState.running ||
-                  task.state == TransferState.paused ||
-                  task.state == TransferState.queued)
-                SerlinkTextButton(
-                  onPressed: () => queue.cancel(task.id),
-                  child: const Text('Cancel'),
-                ),
-            ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+Future<void> _clearTransfers(
+  BuildContext context,
+  WidgetRef ref,
+  TransferQueueState state,
+) async {
+  final activeCount = state.tasks.where(_transferIsActive).length;
+  final confirmed = await _confirmDialog(
+    context,
+    title: 'Clear transfers?',
+    body: activeCount == 0
+        ? 'Remove ${state.tasks.length} transfer ${_plural(state.tasks.length, 'record')} from history.'
+        : 'Remove ${state.tasks.length} transfer ${_plural(state.tasks.length, 'record')} from history and cancel $activeCount active ${_plural(activeCount, 'transfer')}.',
+    confirmLabel: 'Clear',
+    destructive: true,
+  );
+  if (!context.mounted || !confirmed) {
+    return;
+  }
+  await ref.read(transferQueueControllerProvider).clear();
+  if (context.mounted) {
+    _showSnackBar(context, 'Transfers cleared.');
+  }
+}
+
+Future<void> _deleteTransfer(
+  BuildContext context,
+  WidgetRef ref,
+  TransferTask task,
+) async {
+  final localType = await FileSystemEntity.type(
+    task.localPath,
+    followLinks: false,
+  );
+  if (!context.mounted) {
+    return;
+  }
+
+  var deleteLocalFile = false;
+  if (localType != FileSystemEntityType.notFound) {
+    final choice = await _showTransferDeleteDialog(
+      context,
+      task: task,
+      localType: localType,
+    );
+    if (!context.mounted || choice == null) {
+      return;
+    }
+    deleteLocalFile = choice == _TransferDeleteChoice.transferAndLocalFile;
+  }
+
+  await ref.read(transferQueueControllerProvider).delete(task.id);
+  if (deleteLocalFile) {
+    try {
+      await _deleteLocalPath(task.localPath, localType);
+    } on Object {
+      if (context.mounted) {
+        _showSnackBar(
+          context,
+          'Transfer removed, but the local file could not be deleted.',
+        );
+      }
+      return;
+    }
+  }
+  if (context.mounted) {
+    _showSnackBar(
+      context,
+      deleteLocalFile
+          ? 'Transfer and local file deleted.'
+          : 'Transfer deleted.',
+    );
+  }
+}
+
+Future<void> _openCompletedTransfer(
+  BuildContext context,
+  TransferTask task,
+) async {
+  if (task.state != TransferState.completed) {
+    return;
+  }
+  final localType = await FileSystemEntity.type(task.localPath);
+  if (!context.mounted) {
+    return;
+  }
+  if (localType == FileSystemEntityType.notFound) {
+    _showSnackBar(context, 'Completed item is no longer available locally.');
+    return;
+  }
+  try {
+    await _openLocalPath(task.localPath);
+  } on Object {
+    if (context.mounted) {
+      _showSnackBar(context, 'Completed item could not be opened.');
+    }
+  }
+}
+
+enum _TransferDeleteChoice { transferOnly, transferAndLocalFile }
+
+Future<_TransferDeleteChoice?> _showTransferDeleteDialog(
+  BuildContext context, {
+  required TransferTask task,
+  required FileSystemEntityType localType,
+}) {
+  final localKind = _localEntityKindLabel(localType);
+  return showSerlinkDialog<_TransferDeleteChoice>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return SerlinkDialog(
+        title: const Text('Delete transfer?'),
+        content: SerlinkAlert.warning(
+          message:
+              'A local $localKind still exists at ${task.localPath}. Remove the transfer only, or also delete the local $localKind?',
+        ),
+        actions: [
+          SerlinkTextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          SerlinkTextButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_TransferDeleteChoice.transferOnly),
+            child: const Text('Remove transfer'),
+          ),
+          SerlinkFilledButton.danger(
+            onPressed: () => Navigator.of(
+              context,
+            ).pop(_TransferDeleteChoice.transferAndLocalFile),
+            child: Text('Delete $localKind too'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Future<void> _deleteLocalPath(String path, FileSystemEntityType localType) {
+  return switch (localType) {
+    FileSystemEntityType.directory => Directory(path).delete(recursive: true),
+    FileSystemEntityType.link => Link(path).delete(),
+    _ => File(path).delete(),
+  };
+}
+
+Future<void> _openLocalPath(String path) async {
+  final (command, arguments) = switch (Platform.operatingSystem) {
+    'macos' => ('open', [path]),
+    'windows' => ('explorer', [path]),
+    'linux' => ('xdg-open', [path]),
+    _ => throw UnsupportedError('Opening files is not supported.'),
+  };
+  await Process.start(command, arguments, mode: ProcessStartMode.detached);
+}
+
+bool _transferHasInlineActions(
+  TransferTask task,
+  TransferQueueController queue,
+) {
+  return task.state == TransferState.running ||
+      task.state == TransferState.paused ||
+      task.state == TransferState.queued ||
+      queue.canRetry(task.id);
+}
+
+bool _transferIsActive(TransferTask task) {
+  return task.state == TransferState.queued ||
+      task.state == TransferState.running ||
+      task.state == TransferState.paused;
+}
+
+String _transferMachineTag(TransferTask task) {
+  final machine = task.sourceMachineName?.trim();
+  final displayName = machine == null || machine.isEmpty ? 'unknown' : machine;
+  return task.direction == TransferDirection.download
+      ? 'From $displayName'
+      : 'To $displayName';
+}
+
+String _localEntityKindLabel(FileSystemEntityType type) {
+  return switch (type) {
+    FileSystemEntityType.directory => 'folder',
+    FileSystemEntityType.link => 'link',
+    _ => 'file',
+  };
+}
+
+String _plural(int count, String singular) {
+  return count == 1 ? singular : '${singular}s';
+}
+
+String _sourceMachineNameFromTabTitle(String title) {
+  final name = title.split(' /').first.trim();
+  return name.isEmpty ? 'Remote machine' : name;
 }
 
 Color _transferStateColor(TransferState state, SerlinkTokens t) {

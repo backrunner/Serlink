@@ -85,6 +85,8 @@ class TransferQueueController {
   TransferTaskId enqueueUpload({
     required SftpConnection connection,
     TransferItemKind itemKind = TransferItemKind.file,
+    HostId? sourceHostId,
+    String? sourceMachineName,
     required String localPath,
     required String remotePath,
   }) {
@@ -92,6 +94,8 @@ class TransferQueueController {
       connection: connection,
       direction: TransferDirection.upload,
       itemKind: itemKind,
+      sourceHostId: sourceHostId,
+      sourceMachineName: sourceMachineName,
       localPath: localPath,
       remotePath: remotePath,
     );
@@ -100,6 +104,8 @@ class TransferQueueController {
   TransferTaskId enqueueDownload({
     required SftpConnection connection,
     TransferItemKind itemKind = TransferItemKind.file,
+    HostId? sourceHostId,
+    String? sourceMachineName,
     required String remotePath,
     required String localPath,
   }) {
@@ -107,6 +113,8 @@ class TransferQueueController {
       connection: connection,
       direction: TransferDirection.download,
       itemKind: itemKind,
+      sourceHostId: sourceHostId,
+      sourceMachineName: sourceMachineName,
       localPath: localPath,
       remotePath: remotePath,
     );
@@ -144,6 +152,37 @@ class TransferQueueController {
       ),
     );
     _pump();
+  }
+
+  Future<void> delete(TransferTaskId taskId) async {
+    final task = _state.byId(taskId);
+    if (task == null) {
+      return;
+    }
+    await _subscriptions.remove(taskId)?.cancel();
+    _operations.removeWhere((operation) => operation.task.id == taskId);
+    _setState(
+      TransferQueueState(
+        tasks: [
+          for (final existing in _state.tasks)
+            if (existing.id != taskId) existing,
+        ],
+      ),
+    );
+    await _deletePersistedTask(taskId);
+    if (!_isTerminal(task.state)) {
+      _pump();
+    }
+  }
+
+  Future<void> clear() async {
+    for (final subscription in _subscriptions.values) {
+      await subscription.cancel();
+    }
+    _subscriptions.clear();
+    _operations.clear();
+    _setState(const TransferQueueState(tasks: []));
+    await _clearPersistedTasks();
   }
 
   Future<void> retry(TransferTaskId taskId) async {
@@ -196,6 +235,8 @@ class TransferQueueController {
     required SftpConnection connection,
     required TransferDirection direction,
     required TransferItemKind itemKind,
+    HostId? sourceHostId,
+    String? sourceMachineName,
     required String localPath,
     required String remotePath,
   }) {
@@ -204,6 +245,8 @@ class TransferQueueController {
       id: TransferTaskId(_uuid.v4()),
       direction: direction,
       itemKind: itemKind,
+      sourceHostId: sourceHostId,
+      sourceMachineName: _normalizedSourceMachineName(sourceMachineName),
       localPath: localPath,
       remotePath: remotePath,
       state: TransferState.queued,
@@ -423,6 +466,24 @@ class TransferQueueController {
       // already-established SSH/SFTP connections.
     }
   }
+
+  Future<void> _deletePersistedTask(TransferTaskId taskId) async {
+    try {
+      await _repository.delete(taskId);
+    } on Object {
+      // Transfer persistence is best-effort so UI cleanup can still proceed
+      // when the vault is unavailable.
+    }
+  }
+
+  Future<void> _clearPersistedTasks() async {
+    try {
+      await _repository.clear();
+    } on Object {
+      // Transfer persistence is best-effort so UI cleanup can still proceed
+      // when the vault is unavailable.
+    }
+  }
 }
 
 class _TransferOperation {
@@ -450,6 +511,11 @@ AppFailure _failureFrom(Object error) {
     message: 'Transfer failed.',
     diagnostic: error.toString(),
   );
+}
+
+String? _normalizedSourceMachineName(String? value) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
 }
 
 TransferTask _markInterruptedIfActive(TransferTask task, DateTime now) {

@@ -831,28 +831,36 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     }
   }
 
-  Future<void> enableLocalUnlock() async {
-    final header = await service.enableLocalUnlock(
-      secrets: ref.read(secretStoreProvider),
-    );
+  Future<bool> enableLocalUnlock() async {
+    final secrets = ref.read(secretStoreProvider);
+    final header = await service.enableLocalUnlock(secrets: secrets);
     await ref.read(vaultHeaderStoreProvider).save(header);
+    final localUnlockAvailable = await service.hasLocalUnlock(secrets: secrets);
     final current =
         state.value ?? const VaultSessionState(vaultState: VaultState.unlocked);
     state = AsyncData(
-      current.copyWith(localUnlockAvailable: true, clearFailure: true),
+      current.copyWith(
+        localUnlockAvailable: localUnlockAvailable,
+        clearFailure: true,
+      ),
     );
+    return localUnlockAvailable;
   }
 
-  Future<void> disableLocalUnlock() async {
-    final header = await service.disableLocalUnlock(
-      secrets: ref.read(secretStoreProvider),
-    );
+  Future<bool> disableLocalUnlock() async {
+    final secrets = ref.read(secretStoreProvider);
+    final header = await service.disableLocalUnlock(secrets: secrets);
     await ref.read(vaultHeaderStoreProvider).save(header);
+    final localUnlockAvailable = await service.hasLocalUnlock(secrets: secrets);
     final current =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
     state = AsyncData(
-      current.copyWith(localUnlockAvailable: false, clearFailure: true),
+      current.copyWith(
+        localUnlockAvailable: localUnlockAvailable,
+        clearFailure: true,
+      ),
     );
+    return !localUnlockAvailable;
   }
 
   void dismissRecoveryKey() {

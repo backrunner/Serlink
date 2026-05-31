@@ -68,10 +68,13 @@ class _DataExchangeDialog extends StatelessWidget {
     final lockedSubtitle = 'Unlock the vault to use this action.';
 
     return SerlinkDialog(
-      maxWidth: 660,
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthDataExchange),
       contentPadding: EdgeInsets.zero,
       content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 660, maxHeight: 720),
+        constraints: BoxConstraints(
+          maxWidth: _adaptiveDialogWidth(context, _dialogWidthDataExchange),
+          maxHeight: 720,
+        ),
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),

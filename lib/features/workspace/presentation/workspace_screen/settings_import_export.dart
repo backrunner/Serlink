@@ -229,6 +229,7 @@ Future<List<HostId>?> _showHostSelectionDialog(
       return StatefulBuilder(
         builder: (context, setState) {
           return SerlinkDialog(
+            maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
             title: Text(title),
             content: SizedBox(
               width: 560,
@@ -518,6 +519,7 @@ Future<bool> _showOpenSshConfigImportDialog(
     barrierDismissible: false,
     builder: (context) {
       return SerlinkDialog(
+        maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
         title: const Text('Import OpenSSH config?'),
         content: SizedBox(
           width: 520,

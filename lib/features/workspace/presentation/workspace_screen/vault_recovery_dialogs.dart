@@ -79,6 +79,7 @@ class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
     final scheme = Theme.of(context).colorScheme;
 
     return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
       titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 0),
       contentPadding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
       actionsPadding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
@@ -217,9 +218,10 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
       320.0,
       MediaQuery.sizeOf(context).width - 96,
     );
-    final dialogWidth = math.min(680.0, availableWidth);
+    final dialogWidth = math.min(_dialogWidthWide, availableWidth);
 
     return SerlinkDialog(
+      maxWidth: dialogWidth,
       title: Text(_resetMode ? 'Reset Vault' : 'Recovery Code'),
       content: SizedBox(
         width: dialogWidth,

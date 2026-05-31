@@ -61,6 +61,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
   @override
   Widget build(BuildContext context) {
     return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
       title: const Text('WebDAV Sync'),
       content: SizedBox(
         width: 560,

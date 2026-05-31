@@ -6,7 +6,9 @@ import '../../../app/app_dependencies.dart';
 import '../../vault/application/vault_service.dart';
 import '../domain/host.dart';
 
-final hostSummariesProvider = FutureProvider<List<HostSummary>>((ref) async {
+final hostSummariesProvider = FutureProvider.autoDispose<List<HostSummary>>((
+  ref,
+) async {
   final vault = await ref.watch(vaultSessionControllerProvider.future);
   if (vault.vaultState != VaultState.unlocked) {
     // Stay pending while locked: resolving to an empty list here would linger

@@ -58,6 +58,10 @@ dependencies:
   ffi: ^2.2.0
   forui: ^0.22.3
 
+dependency_overrides:
+  xterm:
+    path: third_party/xterm
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

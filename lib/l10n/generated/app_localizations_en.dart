@@ -290,10 +290,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDebugLoggingTitle => 'Debug logging';
 
   @override
-  String get settingsCrashReportingTitle => 'Crash reporting';
-
-  @override
-  String get settingsDiagnosticBundleTitle => 'Diagnostic bundle';
+  String get settingsDiagnosticBundleTitle => 'Diagnostic information';
 
   @override
   String get settingsExportAction => 'Export';
@@ -1976,21 +1973,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get identityMetadataExportedSnack => 'Identity metadata exported.';
 
   @override
-  String get exportDiagnosticBundleTitle => 'Export diagnostic bundle?';
+  String get exportRuntimeDebugLogTitle => 'Export runtime debug log?';
+
+  @override
+  String get exportRuntimeDebugLogBody =>
+      'The log export is redacted and includes the runtime debug log tail only.';
+
+  @override
+  String get runtimeDebugLogExportedSnack => 'Runtime debug log exported.';
+
+  @override
+  String get runtimeDebugLogExportFailed =>
+      'Runtime debug log could not be exported.';
+
+  @override
+  String get exportDiagnosticBundleTitle => 'Export diagnostic information?';
 
   @override
   String get exportDiagnosticBundleBody =>
-      'The bundle is redacted and excludes terminal output, commands, hosts, usernames, paths, credentials, and private keys.';
+      'The diagnostic information is redacted and excludes terminal output, commands, hosts, usernames, paths, credentials, and private keys.';
 
   @override
-  String get diagnosticBundleExportedSnack => 'Diagnostic bundle exported.';
+  String get diagnosticBundleExportedSnack =>
+      'Diagnostic information exported.';
 
   @override
   String get backupOperationFailed => 'Backup operation failed.';
 
   @override
   String get diagnosticExportFailed =>
-      'Diagnostic bundle could not be exported.';
+      'Diagnostic information could not be exported.';
 
   @override
   String get openSshConfigExportFailed =>

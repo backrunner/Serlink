@@ -598,16 +598,10 @@ abstract class AppLocalizations {
   /// **'Debug logging'**
   String get settingsDebugLoggingTitle;
 
-  /// No description provided for @settingsCrashReportingTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Crash reporting'**
-  String get settingsCrashReportingTitle;
-
   /// No description provided for @settingsDiagnosticBundleTitle.
   ///
   /// In en, this message translates to:
-  /// **'Diagnostic bundle'**
+  /// **'Diagnostic information'**
   String get settingsDiagnosticBundleTitle;
 
   /// No description provided for @settingsExportAction.
@@ -3568,22 +3562,46 @@ abstract class AppLocalizations {
   /// **'Identity metadata exported.'**
   String get identityMetadataExportedSnack;
 
+  /// No description provided for @exportRuntimeDebugLogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export runtime debug log?'**
+  String get exportRuntimeDebugLogTitle;
+
+  /// No description provided for @exportRuntimeDebugLogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The log export is redacted and includes the runtime debug log tail only.'**
+  String get exportRuntimeDebugLogBody;
+
+  /// No description provided for @runtimeDebugLogExportedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime debug log exported.'**
+  String get runtimeDebugLogExportedSnack;
+
+  /// No description provided for @runtimeDebugLogExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime debug log could not be exported.'**
+  String get runtimeDebugLogExportFailed;
+
   /// No description provided for @exportDiagnosticBundleTitle.
   ///
   /// In en, this message translates to:
-  /// **'Export diagnostic bundle?'**
+  /// **'Export diagnostic information?'**
   String get exportDiagnosticBundleTitle;
 
   /// No description provided for @exportDiagnosticBundleBody.
   ///
   /// In en, this message translates to:
-  /// **'The bundle is redacted and excludes terminal output, commands, hosts, usernames, paths, credentials, and private keys.'**
+  /// **'The diagnostic information is redacted and excludes terminal output, commands, hosts, usernames, paths, credentials, and private keys.'**
   String get exportDiagnosticBundleBody;
 
   /// No description provided for @diagnosticBundleExportedSnack.
   ///
   /// In en, this message translates to:
-  /// **'Diagnostic bundle exported.'**
+  /// **'Diagnostic information exported.'**
   String get diagnosticBundleExportedSnack;
 
   /// No description provided for @backupOperationFailed.
@@ -3595,7 +3613,7 @@ abstract class AppLocalizations {
   /// No description provided for @diagnosticExportFailed.
   ///
   /// In en, this message translates to:
-  /// **'Diagnostic bundle could not be exported.'**
+  /// **'Diagnostic information could not be exported.'**
   String get diagnosticExportFailed;
 
   /// No description provided for @openSshConfigExportFailed.

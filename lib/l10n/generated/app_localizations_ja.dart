@@ -264,10 +264,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsDebugLoggingTitle => 'デバッグログ';
 
   @override
-  String get settingsCrashReportingTitle => 'クラッシュレポート';
-
-  @override
-  String get settingsDiagnosticBundleTitle => '診断バンドル';
+  String get settingsDiagnosticBundleTitle => '診断情報';
 
   @override
   String get settingsExportAction => 'エクスポート';
@@ -1879,20 +1876,33 @@ class AppLocalizationsJa extends AppLocalizations {
   String get identityMetadataExportedSnack => 'ID メタデータをエクスポートしました。';
 
   @override
-  String get exportDiagnosticBundleTitle => '診断バンドルをエクスポートしますか？';
+  String get exportRuntimeDebugLogTitle => '実行時デバッグログをエクスポートしますか？';
+
+  @override
+  String get exportRuntimeDebugLogBody =>
+      'ログのエクスポートは編集済みで、実行時デバッグログの末尾のみを含みます。';
+
+  @override
+  String get runtimeDebugLogExportedSnack => '実行時デバッグログをエクスポートしました。';
+
+  @override
+  String get runtimeDebugLogExportFailed => '実行時デバッグログをエクスポートできませんでした。';
+
+  @override
+  String get exportDiagnosticBundleTitle => '診断情報をエクスポートしますか？';
 
   @override
   String get exportDiagnosticBundleBody =>
-      'バンドルは編集済みで、端末出力、コマンド、ホスト、ユーザー名、パス、認証情報、秘密鍵は含まれません。';
+      '診断情報は編集済みで、端末出力、コマンド、ホスト、ユーザー名、パス、認証情報、秘密鍵は含まれません。';
 
   @override
-  String get diagnosticBundleExportedSnack => '診断バンドルをエクスポートしました。';
+  String get diagnosticBundleExportedSnack => '診断情報をエクスポートしました。';
 
   @override
   String get backupOperationFailed => 'バックアップ操作に失敗しました。';
 
   @override
-  String get diagnosticExportFailed => '診断バンドルをエクスポートできませんでした。';
+  String get diagnosticExportFailed => '診断情報をエクスポートできませんでした。';
 
   @override
   String get openSshConfigExportFailed => 'OpenSSH 設定をエクスポートできませんでした。';

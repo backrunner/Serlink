@@ -355,7 +355,7 @@ class _ActiveTabView extends ConsumerWidget {
               :final rootPath,
             ) =>
               _SftpPane(
-                key: ValueKey('${sessionId.value}:$rootPath:$currentPath'),
+                key: ValueKey('${sessionId.value}:$rootPath'),
                 tabId: tab.id,
                 hostId: tab.hostId,
                 sourceMachineName: _sourceMachineNameFromTabTitle(

@@ -27,21 +27,34 @@ class _SftpPane extends ConsumerStatefulWidget {
 }
 
 class _SftpPaneState extends ConsumerState<_SftpPane> {
+  static const _listCacheTtl = Duration(seconds: 5);
+
   final TextEditingController _filterController = TextEditingController();
+  final TextEditingController _pathController = TextEditingController();
+  final FocusNode _pathFocusNode = FocusNode();
+  final Map<String, _SftpListCacheEntry> _listCache = {};
   Future<List<SftpEntry>>? _entriesFuture;
   String _filterText = '';
   String? _promptedDefaultDirectoryForPath;
+  bool _dropUploadActive = false;
+  bool _editingPath = false;
+  bool _pathSubmitting = false;
   bool _showHidden = false;
   bool _showingDefaultDirectoryPrompt = false;
 
   @override
   void initState() {
     super.initState();
+    _pathController.text = widget.path;
+    _pathFocusNode.addListener(_handlePathFocusChanged);
     _reload();
   }
 
   @override
   void dispose() {
+    _pathFocusNode.removeListener(_handlePathFocusChanged);
+    _pathFocusNode.dispose();
+    _pathController.dispose();
     _filterController.dispose();
     super.dispose();
   }
@@ -49,9 +62,17 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   @override
   void didUpdateWidget(_SftpPane oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.sessionId != widget.sessionId ||
-        oldWidget.path != widget.path ||
+    if (oldWidget.sessionId != widget.sessionId) {
+      _invalidateListCache();
+      _syncPathControllerToCurrentPath();
+      _reload(bypassCache: true);
+      return;
+    }
+    if (oldWidget.path != widget.path ||
         oldWidget.lifecycle != widget.lifecycle) {
+      if (oldWidget.path != widget.path) {
+        _syncPathControllerToCurrentPath();
+      }
       _reload();
     }
   }
@@ -63,12 +84,11 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     final canList = widget.lifecycle == SessionLifecycleState.connected;
     final canOpenParent = canList && _showParentEntry;
     final canTransferDirectories = capabilities.localDirectoryTransfer;
+    final canDropUpload = canList && capabilities.isDesktop;
+    final pathContent = _buildPathContent(context, enabled: canList);
     final pathWidget = capabilities.prefersTouchUi
-        ? SizedBox(
-            width: _sftpToolbarPathWidth(context),
-            child: Text(widget.path, overflow: TextOverflow.ellipsis),
-          )
-        : Expanded(child: Text(widget.path, overflow: TextOverflow.ellipsis));
+        ? SizedBox(width: _sftpToolbarPathWidth(context), child: pathContent)
+        : Expanded(child: pathContent);
 
     return Column(
       children: [
@@ -177,7 +197,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
                   child: SerlinkIconButton(
                     onPressed: canList
                         ? () {
-                            setState(_reload);
+                            setState(() => _reload(bypassCache: true));
                           }
                         : null,
                     icon: const Icon(Icons.refresh, size: 18),
@@ -189,13 +209,44 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
         ),
         const Divider(height: 1),
         Expanded(
-          child: _buildBody(
-            context,
-            canList: canList,
+          child: _buildDropUploadTarget(
+            enabled: canDropUpload,
             canTransferDirectories: canTransferDirectories,
+            child: _SftpDropUploadSurface(
+              active: canDropUpload && _dropUploadActive,
+              child: _buildBody(
+                context,
+                canList: canList,
+                canTransferDirectories: canTransferDirectories,
+              ),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDropUploadTarget({
+    required bool enabled,
+    required bool canTransferDirectories,
+    required Widget child,
+  }) {
+    if (!enabled) {
+      return child;
+    }
+    return DropTarget(
+      enable: enabled,
+      onDragEntered: (_) => _setDropUploadActive(true),
+      onDragExited: (_) => _setDropUploadActive(false),
+      onDragDone: (details) {
+        unawaited(
+          _enqueueDroppedUploads(
+            details.files,
+            canTransferDirectories: canTransferDirectories,
+          ),
+        );
+      },
+      child: child,
     );
   }
 
@@ -288,7 +339,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
                   ? Icons.folder_outlined
                   : Icons.description_outlined,
               sizeLabel: isDirectory ? '' : _formatBytes(entry.size),
-              permissionsLabel: entry.permissions?.octal ?? '',
+              permissionsLabel: entry.permissions?.symbolic ?? '',
               metadataLabel: _sftpEntryMetadataLabel(entry),
               onTap: isDirectory
                   ? () => _openDirectory(entry.path)
@@ -312,11 +363,173 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
 
   bool get _showParentEntry => !_sameRemotePath(widget.path, widget.rootPath);
 
-  void _reload() {
+  Widget _buildPathContent(BuildContext context, {required bool enabled}) {
+    final t = context.tokens;
+    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: enabled ? t.textPrimary : t.textMuted,
+    );
+    if (_editingPath) {
+      return SerlinkTextField(
+        key: const ValueKey('sftp-path-field'),
+        controller: _pathController,
+        enabled: enabled,
+        focusNode: _pathFocusNode,
+        readOnly: _pathSubmitting,
+        autofocus: true,
+        autocorrect: false,
+        enableSuggestions: false,
+        selectAllOnFocus: true,
+        textInputAction: TextInputAction.go,
+        style: style,
+        decoration: const InputDecoration(
+          isCollapsed: true,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          filled: false,
+        ),
+        onSubmitted: (_) => _submitPath(),
+      );
+    }
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : MouseCursor.defer,
+      child: GestureDetector(
+        key: const ValueKey('sftp-path-display'),
+        behavior: HitTestBehavior.translucent,
+        onTap: enabled ? _startPathEditing : null,
+        child: Text(widget.path, overflow: TextOverflow.ellipsis, style: style),
+      ),
+    );
+  }
+
+  void _startPathEditing() {
+    if (_editingPath) {
+      return;
+    }
+    setState(() {
+      _editingPath = true;
+      _pathSubmitting = false;
+      _pathController.text = widget.path;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_editingPath) {
+        return;
+      }
+      _pathFocusNode.requestFocus();
+      _selectPathText();
+    });
+  }
+
+  void _handlePathFocusChanged() {
+    if (_pathFocusNode.hasFocus || !_editingPath || _pathSubmitting) {
+      return;
+    }
+    setState(() {
+      _editingPath = false;
+      _pathController.text = widget.path;
+    });
+  }
+
+  Future<void> _submitPath() async {
+    if (_pathSubmitting) {
+      return;
+    }
+    final rawPath = _pathController.text.trim();
+    if (rawPath.isEmpty || !rawPath.startsWith('/')) {
+      _showPathValidationMessage(context.l10n.sftpAbsolutePathError);
+      return;
+    }
+    final normalizedPath = _joinRemotePath(rawPath);
+    if (_sameRemotePath(normalizedPath, widget.path)) {
+      setState(() {
+        _editingPath = false;
+        _pathController.text = widget.path;
+      });
+      _pathFocusNode.unfocus();
+      return;
+    }
+    setState(() {
+      _pathSubmitting = true;
+    });
+    try {
+      await _listDirectory(_connection(), normalizedPath, bypassCache: true);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _editingPath = false;
+        _pathSubmitting = false;
+        _pathController.text = normalizedPath;
+      });
+      _pathFocusNode.unfocus();
+      _openDirectory(normalizedPath);
+    } on Object catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _pathSubmitting = false;
+      });
+      _showPathValidationMessage(sftpFailureMessage(error));
+    }
+  }
+
+  void _showPathValidationMessage(String message) {
+    _pathFocusNode.requestFocus();
+    _selectPathText();
+    _showSnackBar(context, message);
+  }
+
+  void _selectPathText() {
+    _pathController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _pathController.text.length,
+    );
+  }
+
+  void _syncPathControllerToCurrentPath() {
+    _editingPath = false;
+    _pathSubmitting = false;
+    _pathController.text = widget.path;
+  }
+
+  void _reload({bool bypassCache = false}) {
     final connection = ref
         .read(workspaceRuntimeRegistryProvider)
         .sftpFor(widget.sessionId);
-    _entriesFuture = connection?.list(widget.path);
+    _entriesFuture = connection == null
+        ? null
+        : _listDirectory(connection, widget.path, bypassCache: bypassCache);
+  }
+
+  Future<List<SftpEntry>> _listDirectory(
+    SftpConnection connection,
+    String path, {
+    bool bypassCache = false,
+  }) async {
+    final normalizedPath = _joinRemotePath(path);
+    if (!bypassCache) {
+      final cached = _listCache[normalizedPath];
+      if (cached != null &&
+          DateTime.now().difference(cached.cachedAt) < _listCacheTtl) {
+        return cached.entries;
+      }
+    }
+    final entries = await connection.list(normalizedPath);
+    _listCache[normalizedPath] = _SftpListCacheEntry(
+      entries: List<SftpEntry>.unmodifiable(entries),
+      cachedAt: DateTime.now(),
+    );
+    return entries;
+  }
+
+  void _invalidateListCache([String? path]) {
+    if (path == null) {
+      _listCache.clear();
+      return;
+    }
+    _listCache.remove(_joinRemotePath(path));
   }
 
   void _openParentDirectory() {
@@ -376,7 +589,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     }
     final normalizedPath = _joinRemotePath(selectedPath);
     try {
-      await _connection().list(normalizedPath);
+      await _listDirectory(_connection(), normalizedPath, bypassCache: true);
       final hostId = widget.hostId;
       if (hostId != null) {
         await ref
@@ -402,6 +615,15 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     ref
         .read(workspaceTabControllerProvider.notifier)
         .changeSftpDirectory(widget.tabId, path);
+  }
+
+  void _setDropUploadActive(bool value) {
+    if (!mounted || _dropUploadActive == value) {
+      return;
+    }
+    setState(() {
+      _dropUploadActive = value;
+    });
   }
 
   Future<void> _createDirectory() async {
@@ -446,6 +668,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
           localPath: file.path,
           remotePath: remotePath,
         );
+    _invalidateListCache(widget.path);
     if (mounted) {
       _showSnackBar(context, l10n.sftpUploadQueuedSnack);
     }
@@ -477,9 +700,102 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
           localPath: directoryPath,
           remotePath: remotePath,
         );
+    _invalidateListCache(widget.path);
     if (mounted) {
       _showSnackBar(context, l10n.sftpFolderUploadQueuedSnack);
     }
+  }
+
+  Future<void> _enqueueDroppedUploads(
+    List<DropItem> items, {
+    required bool canTransferDirectories,
+  }) async {
+    _setDropUploadActive(false);
+    var queued = 0;
+    var queuedDirectory = false;
+    for (final item in items) {
+      if (!mounted) {
+        return;
+      }
+      final kind = await _enqueueDroppedUpload(
+        item,
+        canTransferDirectories: canTransferDirectories,
+      );
+      if (kind == null) {
+        continue;
+      }
+      queued += 1;
+      queuedDirectory = queuedDirectory || kind == TransferItemKind.directory;
+    }
+    if (queued == 0 || !mounted) {
+      return;
+    }
+    _invalidateListCache(widget.path);
+    _showSnackBar(
+      context,
+      queued == 1 && queuedDirectory
+          ? context.l10n.sftpFolderUploadQueuedSnack
+          : context.l10n.sftpUploadQueuedSnack,
+    );
+  }
+
+  Future<TransferItemKind?> _enqueueDroppedUpload(
+    DropItem item, {
+    required bool canTransferDirectories,
+  }) async {
+    final localPath = item.path.trim();
+    if (localPath.isEmpty) {
+      return null;
+    }
+    final itemKind = await _droppedItemKind(
+      item,
+      localPath,
+      canTransferDirectories: canTransferDirectories,
+    );
+    if (itemKind == null) {
+      return null;
+    }
+    final name = _droppedItemName(item, localPath);
+    if (name == null) {
+      return null;
+    }
+    final remotePath = await _resolveRemoteTransferConflict(
+      desiredRemotePath: _remoteChildPath(widget.path, name),
+      itemKind: itemKind,
+    );
+    if (remotePath == null) {
+      return null;
+    }
+    ref
+        .read(transferQueueControllerProvider)
+        .enqueueUpload(
+          connection: _connection(),
+          itemKind: itemKind,
+          sourceHostId: widget.hostId,
+          sourceMachineName: widget.sourceMachineName,
+          localPath: localPath,
+          remotePath: remotePath,
+        );
+    return itemKind;
+  }
+
+  Future<TransferItemKind?> _droppedItemKind(
+    DropItem item,
+    String localPath, {
+    required bool canTransferDirectories,
+  }) async {
+    if (item is DropItemDirectory) {
+      return canTransferDirectories ? TransferItemKind.directory : null;
+    }
+    final type = await FileSystemEntity.type(localPath);
+    return switch (type) {
+      FileSystemEntityType.directory =>
+        canTransferDirectories ? TransferItemKind.directory : null,
+      FileSystemEntityType.file ||
+      FileSystemEntityType.link => TransferItemKind.file,
+      FileSystemEntityType.notFound => null,
+      _ => null,
+    };
   }
 
   Future<void> _enqueueDownload(SftpEntry entry) async {
@@ -609,7 +925,11 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
 
   Future<String> _nextAvailableRemotePath(String desiredRemotePath) async {
     final parent = _parentPath(desiredRemotePath);
-    final entries = await _connection().list(parent);
+    final entries = await _listDirectory(
+      _connection(),
+      parent,
+      bypassCache: true,
+    );
     return nextRemoteConflictPath(desiredRemotePath, {
       for (final entry in entries) entry.path,
     });
@@ -678,21 +998,22 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
 
   Future<void> _chmodEntry(SftpEntry entry) async {
     final l10n = context.l10n;
-    final octal = await _showTextInputDialog(
+    final input = await _showTextInputDialog(
       context,
       title: l10n.sftpChangePermissionsTitle,
       label: l10n.sftpOctalPermissionsLabel,
-      initialValue: entry.permissions?.octal ?? '',
+      initialValue: entry.permissions?.symbolic ?? '',
       confirmLabel: l10n.applyAction,
     );
-    if (octal == null || !_isOctalPermissions(octal.trim())) {
-      if (mounted && octal != null) {
+    final permissions = input == null ? null : SftpPermissions.tryParse(input);
+    if (permissions == null) {
+      if (mounted && input != null) {
         _showSnackBar(context, l10n.sftpPermissionsOctalError);
       }
       return;
     }
     await _runSftpOperation(
-      () => _connection().chmod(entry.path, SftpPermissions(octal.trim())),
+      () => _connection().chmod(entry.path, permissions),
       successMessage: l10n.sftpPermissionsUpdatedSnack,
     );
   }
@@ -753,7 +1074,10 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
       if (!mounted) {
         return;
       }
-      setState(_reload);
+      setState(() {
+        _invalidateListCache();
+        _reload(bypassCache: true);
+      });
       _showSnackBar(context, successMessage);
     } on Object catch (error) {
       if (mounted) {
@@ -774,8 +1098,68 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
 
   Future<bool> _remoteEntryExists(String remotePath) async {
     final parent = _parentPath(remotePath);
-    final entries = await _connection().list(parent);
+    final entries = await _listDirectory(
+      _connection(),
+      parent,
+      bypassCache: true,
+    );
     return entries.any((entry) => entry.path == remotePath);
+  }
+}
+
+class _SftpListCacheEntry {
+  const _SftpListCacheEntry({required this.entries, required this.cachedAt});
+
+  final List<SftpEntry> entries;
+  final DateTime cachedAt;
+}
+
+class _SftpDropUploadSurface extends StatelessWidget {
+  const _SftpDropUploadSurface({required this.active, required this.child});
+
+  final bool active;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Stack(
+      children: [
+        Positioned.fill(child: child),
+        if (active)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: t.accentPrimary.withValues(alpha: 0.08),
+                  border: Border.all(
+                    color: t.accentPrimary.withValues(alpha: 0.7),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: t.surfaceGlass,
+                      border: Border.all(
+                        color: t.accentPrimary.withValues(alpha: 0.45),
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.upload_file_outlined,
+                      size: 30,
+                      color: t.accentPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
 

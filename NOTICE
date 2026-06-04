@@ -1,0 +1,14 @@
+Serlink
+Copyright 2026 BackRunner
+
+Serlink source code is licensed under the GNU Affero General Public License
+version 3 or any later version. See LICENSE for the license text.
+
+The Serlink name, logos, icons, app store assets, screenshots, and related
+branding materials are not licensed under the AGPL. See TRADEMARKS.md for the
+brand and trademark policy.
+
+This product includes a local copy of xterm.dart 4.0.0 with Serlink-specific
+rendering changes. The bundled xterm.dart code is licensed under the MIT
+License. See third_party/xterm/LICENSE for its license text and
+third_party/xterm/README.serlink.md for the local patch note.

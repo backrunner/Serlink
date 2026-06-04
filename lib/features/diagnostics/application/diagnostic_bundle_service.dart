@@ -11,6 +11,7 @@ import '../../vault/application/vault_service.dart';
 
 typedef PackageInfoLoader = Future<PackageInfo> Function();
 typedef SentryLastEventIdReader = SentryId Function();
+typedef DiagnosticLogTailReader = Future<List<String>> Function();
 
 class DiagnosticBundle {
   const DiagnosticBundle({
@@ -24,25 +25,46 @@ class DiagnosticBundle {
   final List<int> bytes;
 }
 
+class RuntimeDebugLogExport {
+  const RuntimeDebugLogExport({
+    required this.createdAt,
+    required this.lines,
+    required this.bytes,
+  });
+
+  final DateTime createdAt;
+  final List<String> lines;
+  final List<int> bytes;
+}
+
 class DiagnosticBundleService {
   const DiagnosticBundleService({
     required VaultService vault,
     RuntimeCapabilities runtime = RuntimeCapabilities.current,
     PackageInfoLoader packageInfoLoader = PackageInfo.fromPlatform,
     SentryLastEventIdReader sentryLastEventId = _readSentryLastEventId,
-  }) : this._(vault, runtime, packageInfoLoader, sentryLastEventId);
+    DiagnosticLogTailReader? logTailReader,
+  }) : this._(
+         vault,
+         runtime,
+         packageInfoLoader,
+         sentryLastEventId,
+         logTailReader,
+       );
 
   const DiagnosticBundleService._(
     this._vault,
     this._runtime,
     this._packageInfoLoader,
     this._sentryLastEventId,
+    this._logTailReader,
   );
 
   final VaultService _vault;
   final RuntimeCapabilities _runtime;
   final PackageInfoLoader _packageInfoLoader;
   final SentryLastEventIdReader _sentryLastEventId;
+  final DiagnosticLogTailReader? _logTailReader;
 
   Future<DiagnosticBundle> buildRedactedBundle() async {
     final createdAt = DateTime.now().toUtc();
@@ -92,6 +114,24 @@ class DiagnosticBundleService {
     );
   }
 
+  Future<RuntimeDebugLogExport> buildRedactedRuntimeDebugLog() async {
+    final createdAt = DateTime.now().toUtc();
+    final lines = await _readRedactedLogTail();
+    final contents = [
+      'Serlink Runtime Debug Log',
+      'createdAt=${createdAt.toIso8601String()}',
+      'redacted=true',
+      'tailLines=${lines.length}',
+      '',
+      if (lines.isEmpty) 'No runtime debug log was found.' else ...lines,
+    ].join('\n');
+    return RuntimeDebugLogExport(
+      createdAt: createdAt,
+      lines: lines,
+      bytes: utf8.encode('$contents\n'),
+    );
+  }
+
   Future<DiagnosticAppInfo> _loadPackageInfo() async {
     try {
       final info = await _packageInfoLoader();
@@ -119,6 +159,16 @@ class DiagnosticBundleService {
   }
 
   Future<List<String>> _readRedactedLogTail() async {
+    final logTailReader = _logTailReader;
+    if (logTailReader != null) {
+      try {
+        return [
+          for (final line in await logTailReader()) Redactor.redact(line),
+        ];
+      } on Object {
+        return const [];
+      }
+    }
     try {
       final appDir = await getApplicationSupportDirectory();
       final logFile = File('${appDir.path}/Serlink/logs/serlink.log');
@@ -169,8 +219,10 @@ class DiagnosticAppInfo {
       'version': version,
       'buildNumber': buildNumber,
       if (installerStore != null) 'installerStore': installerStore,
-      if (installTime != null) 'installTime': installTime!.toUtc().toIso8601String(),
-      if (updateTime != null) 'updateTime': updateTime!.toUtc().toIso8601String(),
+      if (installTime != null)
+        'installTime': installTime!.toUtc().toIso8601String(),
+      if (updateTime != null)
+        'updateTime': updateTime!.toUtc().toIso8601String(),
     };
   }
 }

@@ -238,6 +238,7 @@ class _SettingsTextButton extends StatelessWidget {
 
 class _SettingsSwitch extends StatelessWidget {
   const _SettingsSwitch({
+    super.key,
     required this.value,
     required this.onChanged,
     this.semanticsLabel,

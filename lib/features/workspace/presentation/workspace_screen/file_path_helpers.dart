@@ -11,6 +11,16 @@ String _fileName(String path) {
   return parts.last;
 }
 
+String? _droppedItemName(DropItem item, String localPath) {
+  final itemName = item.name.trim();
+  final candidate = itemName.isEmpty ? _fileName(localPath) : itemName;
+  final name = _fileName(candidate).trim();
+  if (name.isEmpty || name == '.' || name == '..') {
+    return null;
+  }
+  return name;
+}
+
 String _parentPath(String path) {
   final normalized = _joinRemotePath(path);
   if (normalized == '/') {
@@ -47,10 +57,6 @@ String _resolveMoveTarget(String target, String entryName) {
 
 bool _sameRemotePath(String left, String right) {
   return _joinRemotePath(left) == _joinRemotePath(right);
-}
-
-bool _isOctalPermissions(String value) {
-  return RegExp(r'^[0-7]{3,4}$').hasMatch(value);
 }
 
 String _joinRemotePath(String path) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
+import 'package:serlink/app/app_theme.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/security/application/security_modal_service.dart';
 import 'package:serlink/features/security/presentation/flutter_security_modal_service.dart';
@@ -14,7 +15,7 @@ void main() {
     tester,
   ) async {
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(_LocalizedTestApp(navigatorKey: navigatorKey));
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
     final service = FlutterSecurityModalService(key: navigatorKey);
     final decisionFuture = service.confirmHostKey(
@@ -40,7 +41,7 @@ void main() {
 
   testWidgets('host key changed dialog defaults to cancel', (tester) async {
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(_LocalizedTestApp(navigatorKey: navigatorKey));
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
     final service = FlutterSecurityModalService(key: navigatorKey);
     final decisionFuture = service.confirmHostKey(
@@ -68,7 +69,7 @@ void main() {
     tester,
   ) async {
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(_LocalizedTestApp(navigatorKey: navigatorKey));
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
     final service = FlutterSecurityModalService(key: navigatorKey);
     final decisionFuture = service.confirmMultilinePaste('ls\npwd');
@@ -91,7 +92,7 @@ void main() {
     tester,
   ) async {
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(_LocalizedTestApp(navigatorKey: navigatorKey));
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
     final service = FlutterSecurityModalService(key: navigatorKey);
     final decisionFuture = service.confirmWebDavCertificate(
@@ -125,7 +126,7 @@ void main() {
     tester,
   ) async {
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(_LocalizedTestApp(navigatorKey: navigatorKey));
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
     final service = FlutterSecurityModalService(key: navigatorKey);
     final decisionFuture = service.confirmExport(
@@ -147,8 +148,8 @@ void main() {
   });
 }
 
-class _LocalizedTestApp extends StatelessWidget {
-  const _LocalizedTestApp({required this.navigatorKey});
+class _TestApp extends StatelessWidget {
+  const _TestApp({required this.navigatorKey});
 
   final GlobalKey<NavigatorState> navigatorKey;
 
@@ -156,6 +157,7 @@ class _LocalizedTestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
+      theme: SerlinkTheme.dark(),
       localizationsDelegates: const [
         AppLocalizations.delegate,
         ...FLocalizations.localizationsDelegates,
@@ -164,7 +166,11 @@ class _LocalizedTestApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      home: const Scaffold(body: SizedBox.shrink()),
+      home: FTheme(
+        data: SerlinkTheme.foruiDark(),
+        platform: FPlatformVariant.macOS,
+        child: const Scaffold(body: SizedBox.shrink()),
+      ),
     );
   }
 }

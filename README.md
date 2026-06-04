@@ -1,8 +1,10 @@
 # Serlink
 
-Serlink is a Flutter-based desktop SSH terminal and SFTP workstation for macOS, Windows, and Linux.
+Serlink is a Flutter-based SSH terminal and SFTP workstation, with a desktop-first core for macOS, Windows, and Linux and an early iOS foundation.
 
-Current code status: the project already has a substantial desktop core, including an encrypted vault, host and identity management, mixed Terminal/SFTP/local-terminal tabs, transfer queueing, and automatic encrypted WebDAV sync. It is not yet release-complete: packaging, real integration fixtures, and cross-platform QA are still in progress.
+> Status: Work in progress. Serlink is open source, but it is not release-ready yet. Desktop packaging, real integration fixtures, cross-platform QA, and mobile/iOS validation are still in progress.
+
+Current code status: the project already has a substantial desktop core, including an encrypted vault, host and identity management, mixed Terminal/SFTP/local-terminal tabs, transfer queueing, and automatic encrypted WebDAV sync. iOS support has an initial project shell, touch workspace, document gateway, and mobile capability gating, but it is still WIP.
 
 ## Current Scope
 
@@ -11,8 +13,9 @@ Primary target in this repository:
 - macOS
 - Windows
 - Linux
+- iOS WIP foundation
 
-Desktop-first architecture is being kept compatible with future mobile expansion, but iOS/Android clients are not part of the current implementation round.
+Desktop remains the primary production target. The iOS code path is present for mobile validation and incremental hardening; Android is not part of the current implementation round.
 
 ## Implemented
 
@@ -102,6 +105,7 @@ These areas are still open before a production desktop release:
 - CI, dependency audit, SBOM, third-party notices
 - Real integration fixtures for SSH/SFTP/WebDAV/ProxyJump/OpenSSH certificates/forwarding
 - Cross-platform secure-storage and IME verification on real machines
+- iOS simulator/device validation and mobile file-transfer UX hardening
 - Final accessibility and polish pass
 - OpenSSH import validation against real `ssh -G` behavior
 
@@ -153,10 +157,10 @@ flutter analyze
 flutter test
 ```
 
-As of 2026-05-29:
+As of 2026-06-04:
 
 - `flutter analyze` passes
-- `flutter test` passes with 182 tests
+- Targeted iOS/mobile foundation tests pass
 
 ## Repository Layout
 
@@ -183,6 +187,19 @@ test/           unit, widget, and smoke tests
 
 - `flutter_pty` currently emits a macOS Swift Package Manager support warning during Flutter commands. It is non-blocking today, but it must be addressed before upgrading to a Flutter version that makes it fatal.
 - Current verification is mostly unit/widget/smoke level. Integration coverage against real SSH/SFTP/WebDAV stacks is still missing.
+
+## License
+
+Serlink source code is licensed under the GNU Affero General Public License
+version 3 or any later version. See [LICENSE](LICENSE).
+
+The Serlink name, logos, icons, app store assets, screenshots, and related
+branding materials are not licensed under the AGPL. See
+[TRADEMARKS.md](TRADEMARKS.md) for the brand and trademark policy.
+
+This repository also vendors a patched copy of `xterm.dart` 4.0.0 under
+`third_party/xterm`, which remains under the MIT License. See [NOTICE](NOTICE)
+and [third_party/xterm/LICENSE](third_party/xterm/LICENSE).
 
 ## Project Docs
 

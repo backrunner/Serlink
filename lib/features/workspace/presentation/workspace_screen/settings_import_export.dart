@@ -319,6 +319,47 @@ Future<List<HostId>?> _showHostSelectionDialog(
   );
 }
 
+Future<void> _exportRuntimeDebugLog(BuildContext context, WidgetRef ref) async {
+  final l10n = context.l10n;
+  final confirmed = await _confirmDialog(
+    context,
+    title: l10n.exportRuntimeDebugLogTitle,
+    body: l10n.exportRuntimeDebugLogBody,
+    confirmLabel: l10n.settingsExportAction,
+  );
+  if (!confirmed || !context.mounted) {
+    return;
+  }
+
+  try {
+    final logExport = await ref
+        .read(diagnosticBundleServiceProvider)
+        .buildRedactedRuntimeDebugLog();
+    final location = await getSaveLocation(
+      suggestedName: 'serlink-runtime-debug.log',
+      acceptedTypeGroups: const [
+        XTypeGroup(
+          label: 'Serlink Runtime Debug Log',
+          extensions: ['log', 'txt'],
+        ),
+      ],
+    );
+    if (location == null) {
+      return;
+    }
+    final file = File(location.path);
+    await file.writeAsBytes(logExport.bytes, flush: true);
+    await LocalFileSecurity.restrictExistingFile(file);
+    if (context.mounted) {
+      _showSnackBar(context, l10n.runtimeDebugLogExportedSnack);
+    }
+  } on Object {
+    if (context.mounted) {
+      _showSnackBar(context, l10n.runtimeDebugLogExportFailed);
+    }
+  }
+}
+
 Future<void> _exportDiagnosticBundle(
   BuildContext context,
   WidgetRef ref,

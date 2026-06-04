@@ -158,6 +158,15 @@ bool _showsWorkspaceSearch(WorkspaceArea area) {
   };
 }
 
+bool _showsMobileWorkspaceSearch(WorkspaceArea area) {
+  return switch (area) {
+    WorkspaceArea.hosts ||
+    WorkspaceArea.transfers ||
+    WorkspaceArea.snippets => true,
+    WorkspaceArea.sessions || WorkspaceArea.settings => false,
+  };
+}
+
 bool _showsLocalTerminalAction(WorkspaceArea area) {
   return switch (area) {
     WorkspaceArea.hosts || WorkspaceArea.snippets => true,

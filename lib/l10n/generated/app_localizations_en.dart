@@ -133,6 +133,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'SFTP uploads and downloads will appear here.';
 
   @override
+  String get transfersNoMatchesBody =>
+      'No transfer tasks match the current workspace search.';
+
+  @override
   String transfersItemCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

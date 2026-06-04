@@ -39,6 +39,7 @@
   "transfersPreparing": "正在准备传输队列。",
   "transfersEmptyTitle": "没有传输",
   "transfersEmptyBody": "SFTP 上传和下载会显示在这里。",
+  "transfersNoMatchesBody": "没有传输任务匹配当前工作区搜索。",
   "transfersItemCount": "{count} 项",
   "transfersActiveCount": "{count} 个活动",
   "transfersClearAction": "清除",

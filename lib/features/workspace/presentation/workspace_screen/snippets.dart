@@ -117,44 +117,16 @@ class _SnippetsHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    if (ref.watch(platformCapabilitiesProvider).prefersMobileWorkspaceShell) {
-      return _WorkspaceListHeader(
-        title: l10n.snippetsTitle,
-        count: count,
-        action: SerlinkTooltip(
-          message: l10n.snippetsAddTooltip,
-          child: SerlinkIconButton(
-            key: const ValueKey('add-snippet-button'),
-            onPressed: onAdd,
-            icon: const Icon(Icons.add),
-          ),
+    return _WorkspaceListHeader(
+      title: l10n.snippetsTitle,
+      count: count,
+      action: SerlinkTooltip(
+        message: l10n.snippetsAddTooltip,
+        child: SerlinkIconButton(
+          key: const ValueKey('add-snippet-button'),
+          onPressed: onAdd,
+          icon: const Icon(Icons.add),
         ),
-      );
-    }
-
-    final t = context.tokens;
-    return SurfaceToolbar(
-      child: Row(
-        children: [
-          Text(
-            l10n.snippetsTitle,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: t.textPrimary,
-            ),
-          ),
-          const SizedBox(width: 8),
-          _CountBadge(count: count),
-          const Spacer(),
-          SerlinkTooltip(
-            message: l10n.snippetsAddTooltip,
-            child: SerlinkIconButton(
-              key: const ValueKey('add-snippet-button'),
-              onPressed: onAdd,
-              icon: const Icon(Icons.add),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -179,15 +151,13 @@ class _WorkspaceListHeader extends StatelessWidget {
     return SurfaceToolbar(
       child: Row(
         children: [
-          Flexible(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: t.textPrimary,
-              ),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: t.textPrimary,
             ),
           ),
           const SizedBox(width: 8),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -13,6 +14,7 @@ import 'package:xterm/xterm.dart';
 
 import '../../../app/app_dependencies.dart';
 import '../../../core/ids/entity_id.dart';
+import '../../../core/security/local_file_security.dart';
 import '../../../design_system/design_system.dart';
 import '../../../features/settings/application/app_language_settings.dart';
 import '../../../l10n/l10n.dart';

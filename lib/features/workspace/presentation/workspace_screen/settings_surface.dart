@@ -119,6 +119,9 @@ class _SettingsSurface extends ConsumerWidget {
                       subtitle: _localUnlockLabel(l10n, vault),
                       action: vaultState == VaultState.unlocked
                           ? _SettingsSwitch(
+                              key: const ValueKey(
+                                'settings-local-unlock-switch',
+                              ),
                               semanticsLabel: l10n.settingsLocalUnlockSemantics,
                               value: vault?.localUnlockAvailable ?? false,
                               onChanged: (value) =>
@@ -200,13 +203,25 @@ class _SettingsSurface extends ConsumerWidget {
                 _SettingsSection(
                   title: l10n.settingsRuntimeSection,
                   children: [
-                    _SettingsInfoRow(
+                    _SettingsActionRow(
                       icon: Icons.bug_report_outlined,
                       title: l10n.settingsDebugLoggingTitle,
+                      action: _SettingsTextButton(
+                        key: const ValueKey('settings-debug-log-export-button'),
+                        onPressed: () => _exportRuntimeDebugLog(context, ref),
+                        child: Text(l10n.settingsExportAction),
+                      ),
                     ),
-                    _SettingsInfoRow(
-                      icon: Icons.health_and_safety_outlined,
-                      title: l10n.settingsCrashReportingTitle,
+                    _SettingsActionRow(
+                      icon: Icons.support_agent_outlined,
+                      title: l10n.settingsDiagnosticBundleTitle,
+                      action: _SettingsTextButton(
+                        key: const ValueKey(
+                          'settings-diagnostic-info-export-button',
+                        ),
+                        onPressed: () => _exportDiagnosticBundle(context, ref),
+                        child: Text(l10n.settingsExportAction),
+                      ),
                     ),
                   ],
                 ),

@@ -369,16 +369,45 @@ void main() {
     await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Create'));
     await tester.pumpAndSettle();
     expect(find.text('releases'), findsOneWidget);
+    final rootListCountAfterCreate = sshService.sftp.listCounts['/'] ?? 0;
 
     await tester.tap(find.text('releases'));
     await tester.pumpAndSettle();
     expect(find.text('Empty Folder'), findsOneWidget);
     expect(find.text('/releases'), findsOneWidget);
+    expect(sshService.sftp.listCounts['/releases'], 1);
 
     await tester.tap(find.byKey(const ValueKey('sftp-parent-button')));
     await tester.pumpAndSettle();
     expect(find.text('/'), findsOneWidget);
     expect(find.text('releases'), findsOneWidget);
+    expect(sshService.sftp.listCounts['/'], rootListCountAfterCreate);
+
+    await tester.tap(find.byKey(const ValueKey('sftp-path-display')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('sftp-path-field')),
+      '/releases',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.go);
+    await tester.pumpAndSettle();
+    expect(find.text('/releases'), findsOneWidget);
+    expect(find.text('Empty Folder'), findsOneWidget);
+    expect(sshService.sftp.listCounts['/releases'], 2);
+
+    await tester.tap(find.byKey(const ValueKey('sftp-path-display')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('sftp-path-field')), '/');
+    await tester.testTextInput.receiveAction(TextInputAction.go);
+    await tester.pumpAndSettle();
+    expect(find.text('/'), findsOneWidget);
+    expect(find.text('releases'), findsOneWidget);
+    final rootListCountAfterPathInput = sshService.sftp.listCounts['/'] ?? 0;
+    expect(rootListCountAfterPathInput, rootListCountAfterCreate + 1);
+
+    await tester.tap(_byTooltipLabel('Refresh'));
+    await tester.pumpAndSettle();
+    expect(sshService.sftp.listCounts['/'], rootListCountAfterPathInput + 1);
 
     await tester.tap(_byTooltipLabel('Rename').first);
     await tester.pumpAndSettle();
@@ -393,12 +422,12 @@ void main() {
     await tester.tap(_byTooltipLabel('Change permissions').first);
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.byKey(const ValueKey('text-input-Octal permissions')),
-      '0700',
+      find.byKey(const ValueKey('text-input-Permissions (octal or symbolic)')),
+      'rwx------',
     );
     await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Apply'));
     await tester.pumpAndSettle();
-    expect(find.text('0700'), findsOneWidget);
+    expect(find.text('rwx------'), findsOneWidget);
 
     await tester.tap(_byTooltipLabel('Move').first);
     await tester.pumpAndSettle();
@@ -639,6 +668,64 @@ void main() {
     expect(find.text('Reset Vault'), findsOneWidget);
     expect(find.text('Reset Vault Permanently'), findsOneWidget);
   });
+
+  testWidgets('settings can enable local unlock and use it after locking', (
+    tester,
+  ) async {
+    await _pumpLockedVaultApp(tester);
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('settings-local-unlock-switch')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Enable local unlock?'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Enable'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Local unlock enabled. Lock the vault to use device unlock.'),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(SerlinkTextButton, 'Lock'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('settings-local-unlock-button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(SerlinkTextButton, 'Lock'), findsOneWidget);
+  });
+
+  testWidgets(
+    'settings runtime exports logs and keeps diagnostic information',
+    (tester) async {
+      await _pumpLockedVaultApp(tester);
+      await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView), const Offset(0, -900));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Debug logging'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('settings-debug-log-export-button')),
+        findsOneWidget,
+      );
+      expect(find.text('Crash reporting'), findsNothing);
+      expect(find.text('Diagnostic information'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('settings-diagnostic-info-export-button')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'hosts show loading while encrypted records initialize after unlock',

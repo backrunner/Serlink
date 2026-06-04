@@ -1697,11 +1697,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sftpChangePermissionsTitle => 'Change permissions';
 
   @override
-  String get sftpOctalPermissionsLabel => 'Octal permissions';
+  String get sftpOctalPermissionsLabel => 'Permissions (octal or symbolic)';
 
   @override
   String get sftpPermissionsOctalError =>
-      'Permissions must be a 3 or 4 digit octal.';
+      'Permissions must be octal, like 0644, or symbolic, like rw-r--r--.';
 
   @override
   String get sftpPermissionsUpdatedSnack => 'Permissions updated.';

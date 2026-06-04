@@ -1612,10 +1612,11 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sftpChangePermissionsTitle => '権限を変更';
 
   @override
-  String get sftpOctalPermissionsLabel => '8 進権限';
+  String get sftpOctalPermissionsLabel => '権限（8 進数または記号）';
 
   @override
-  String get sftpPermissionsOctalError => '権限は 3 桁または 4 桁の 8 進数で入力してください。';
+  String get sftpPermissionsOctalError =>
+      '権限は 0644 のような 8 進数、または rw-r--r-- のような記号形式で入力してください。';
 
   @override
   String get sftpPermissionsUpdatedSnack => '権限を更新しました。';

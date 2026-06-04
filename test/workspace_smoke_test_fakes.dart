@@ -110,6 +110,7 @@ class _FakeShellSession implements SshShellSession {
 
 class _MutableFakeSftpConnection implements SftpConnection {
   final Set<String> deniedListPaths = {};
+  final Map<String, int> listCounts = {};
   final Map<String, SftpEntry> _entries = {
     '/app.env': SftpEntry(
       name: 'app.env',
@@ -205,6 +206,7 @@ class _MutableFakeSftpConnection implements SftpConnection {
 
   @override
   Future<List<SftpEntry>> list(String path) async {
+    listCounts[path] = (listCounts[path] ?? 0) + 1;
     if (deniedListPaths.contains(path)) {
       throw const SftpFailureException(
         SftpFailure(

@@ -214,13 +214,13 @@ class _SftpEntryRow extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       ),
       trailing: SizedBox(
-        width: 360,
+        width: 408,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             Flexible(child: Text(sizeLabel, overflow: TextOverflow.ellipsis)),
             const SizedBox(width: 16),
-            SizedBox(width: 44, child: Text(permissionsLabel)),
+            SizedBox(width: 88, child: Text(permissionsLabel)),
             SerlinkIconButton(
               visualDensity: VisualDensity.compact,
               tooltip: l10n.downloadAction,

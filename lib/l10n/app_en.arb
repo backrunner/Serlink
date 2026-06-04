@@ -758,8 +758,8 @@
   "sftpEntryRenamedSnack": "Entry renamed.",
   "sftpEntryMovedSnack": "Entry moved.",
   "sftpChangePermissionsTitle": "Change permissions",
-  "sftpOctalPermissionsLabel": "Octal permissions",
-  "sftpPermissionsOctalError": "Permissions must be a 3 or 4 digit octal.",
+  "sftpOctalPermissionsLabel": "Permissions (octal or symbolic)",
+  "sftpPermissionsOctalError": "Permissions must be octal, like 0644, or symbolic, like rw-r--r--.",
   "sftpPermissionsUpdatedSnack": "Permissions updated.",
   "sftpDeleteEntryTitle": "Delete {name}?",
   "@sftpDeleteEntryTitle": {

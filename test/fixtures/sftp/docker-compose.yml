@@ -1,0 +1,6 @@
+services:
+  sftp:
+    build:
+      context: .
+    ports:
+      - "2222:22"

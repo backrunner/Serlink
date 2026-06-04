@@ -24,6 +24,7 @@ void main() {
     expect(entry.path, '/var/www/.releases');
     expect(entry.type, SftpEntryType.directory);
     expect(entry.permissions!.octal, '0755');
+    expect(entry.permissions!.symbolic, 'rwxr-xr-x');
     expect(entry.owner, '501');
     expect(entry.group, '20');
     expect(entry.isHidden, isTrue);
@@ -49,5 +50,21 @@ void main() {
     expect(entry.path, '/app.log');
     expect(entry.type, SftpEntryType.file);
     expect(entry.permissions!.octal, '0640');
+  });
+
+  test('preserves special permission bits from remote mode', () {
+    final entry = DartSsh2SftpConnection.mapName(
+      path: '/bin',
+      name: ssh.SftpName(
+        filename: 'deploy',
+        longname: '',
+        attr: ssh.SftpFileAttrs(
+          mode: ssh.SftpFileMode.value(int.parse('104755', radix: 8)),
+        ),
+      ),
+    );
+
+    expect(entry.permissions!.octal, '4755');
+    expect(entry.permissions!.symbolic, 'rwsr-xr-x');
   });
 }

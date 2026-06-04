@@ -65,9 +65,7 @@ Future<void> main() async {
       0.1;
 
   if (dsn.isEmpty) {
-    runZonedGuarded(() => runApp(app), (error, stack) {
-      debugPrint('Unhandled error: ${Redactor.redact(error.toString())}');
-    });
+    runApp(app);
     return;
   }
 
@@ -80,9 +78,7 @@ Future<void> main() async {
         ..beforeSend = (event, hint) async => Redactor.redactSentryEvent(event);
     },
     appRunner: () {
-      runZonedGuarded(() => runApp(app), (error, stack) {
-        unawaited(Sentry.captureException(error, stackTrace: stack));
-      });
+      runApp(app);
     },
   );
 }

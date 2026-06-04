@@ -12,18 +12,6 @@ class _SettingsSection extends StatelessWidget {
   }
 }
 
-class _SettingsStatusPill extends StatelessWidget {
-  const _SettingsStatusPill({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return StatusPill(label: label, color: color);
-  }
-}
-
 class _SettingsInfoRow extends StatelessWidget {
   const _SettingsInfoRow({
     required this.icon,
@@ -46,6 +34,18 @@ class _SettingsInfoRow extends StatelessWidget {
   }
 }
 
+class _SettingsStatusPill extends StatelessWidget {
+  const _SettingsStatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return StatusPill(label: label, color: color);
+  }
+}
+
 class _SettingsActionRow extends StatelessWidget {
   const _SettingsActionRow({
     required this.icon,
@@ -53,6 +53,7 @@ class _SettingsActionRow extends StatelessWidget {
     required this.action,
     this.subtitle,
     this.subtitleWidget,
+    this.actionWidth,
   });
 
   final IconData icon;
@@ -60,6 +61,7 @@ class _SettingsActionRow extends StatelessWidget {
   final String? subtitle;
   final Widget? subtitleWidget;
   final Widget? action;
+  final double? actionWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -67,77 +69,197 @@ class _SettingsActionRow extends StatelessWidget {
     final subtitleStyle = Theme.of(
       context,
     ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
-    final tile = SerlinkListTile(
-      minLeadingWidth: 28,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      subtitleGap: 1,
-      leading: SizedBox.square(
-        dimension: 32,
-        child: Icon(icon, size: 19, color: t.textSecondary),
-      ),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: t.textPrimary,
-        ),
-      ),
-      subtitle:
-          subtitleWidget ??
-          (subtitle == null || subtitle!.trim().isEmpty
-              ? null
-              : Text(subtitle!, style: subtitleStyle)),
-      trailing: action == null
-          ? null
-          : Padding(padding: const EdgeInsets.only(left: 16), child: action),
-    );
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (action == null || constraints.maxWidth >= 560) {
+        final compact = constraints.maxWidth < 560;
+        final desktopSubtitle =
+            subtitleWidget ??
+            (subtitle == null || subtitle!.trim().isEmpty
+                ? null
+                : Text(subtitle!, style: subtitleStyle));
+        if (!compact) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: tile,
+            child: SerlinkListTile(
+              minLeadingWidth: 28,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 2,
+              ),
+              subtitleGap: 1,
+              leading: SizedBox.square(
+                dimension: 32,
+                child: Icon(icon, size: 19, color: t.textSecondary),
+              ),
+              title: Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: t.textPrimary,
+                ),
+              ),
+              subtitle: desktopSubtitle,
+              trailing: action == null
+                  ? null
+                  : Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: action,
+                    ),
+            ),
           );
         }
+
+        final effectiveSubtitle =
+            subtitleWidget ??
+            (subtitle == null || subtitle!.trim().isEmpty
+                ? null
+                : Text(
+                    subtitle!,
+                    maxLines: compact ? 2 : null,
+                    overflow: compact ? TextOverflow.ellipsis : null,
+                    style: subtitleStyle,
+                  ));
+        final slotWidth = math.min(
+          actionWidth ?? 104.0,
+          constraints.maxWidth * 0.48,
+        );
+
         return Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            crossAxisAlignment: effectiveSubtitle == null
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
             children: [
-              SerlinkListTile(
-                minLeadingWidth: 28,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 2,
-                ),
-                subtitleGap: 1,
-                leading: SizedBox.square(
-                  dimension: 32,
-                  child: Icon(icon, size: 19, color: t.textSecondary),
-                ),
-                title: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: t.textPrimary,
-                  ),
-                ),
-                subtitle:
-                    subtitleWidget ??
-                    (subtitle == null || subtitle!.trim().isEmpty
-                        ? null
-                        : Text(subtitle!, style: subtitleStyle)),
-              ),
               Padding(
-                padding: const EdgeInsets.only(left: 46, top: 8, right: 4),
-                child: Align(alignment: Alignment.centerLeft, child: action!),
+                padding: EdgeInsets.only(
+                  top: effectiveSubtitle == null ? 0 : 2,
+                ),
+                child: SizedBox.square(
+                  dimension: 30,
+                  child: Icon(icon, size: 18, color: t.textSecondary),
+                ),
               ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: t.textPrimary,
+                      ),
+                    ),
+                    if (effectiveSubtitle != null) ...[
+                      const SizedBox(height: 2),
+                      effectiveSubtitle,
+                    ],
+                  ],
+                ),
+              ),
+              if (action != null) ...[
+                const SizedBox(width: 10),
+                _SettingsActionSlot(width: slotWidth, child: action!),
+              ],
             ],
           ),
         );
       },
     );
   }
+}
+
+class _SettingsActionSlot extends StatelessWidget {
+  const _SettingsActionSlot({required this.width, required this.child});
+
+  final double width;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerRight,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsTextButton extends StatelessWidget {
+  const _SettingsTextButton({
+    super.key,
+    required this.onPressed,
+    required this.child,
+    this.compactSize = SerlinkButtonSize.sm,
+  }) : icon = null,
+       label = null;
+
+  const _SettingsTextButton.icon({
+    super.key,
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+  }) : child = null,
+       compactSize = SerlinkButtonSize.sm;
+
+  final VoidCallback? onPressed;
+  final Widget? child;
+  final Widget? icon;
+  final Widget? label;
+  final SerlinkButtonSize compactSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = _settingsUseCompactControls(context)
+        ? compactSize
+        : SerlinkButtonSize.lg;
+    if (icon case final icon?) {
+      return SerlinkTextButton.icon(
+        onPressed: onPressed,
+        icon: icon,
+        label: label!,
+        size: size,
+      );
+    }
+    return SerlinkTextButton(onPressed: onPressed, size: size, child: child!);
+  }
+}
+
+class _SettingsSwitch extends StatelessWidget {
+  const _SettingsSwitch({
+    required this.value,
+    required this.onChanged,
+    this.semanticsLabel,
+  });
+
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final String? semanticsLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return SerlinkSwitch(
+      value: value,
+      onChanged: onChanged,
+      semanticsLabel: semanticsLabel,
+      scale: _settingsUseCompactControls(context) ? 0.64 : 0.72,
+    );
+  }
+}
+
+bool _settingsUseCompactControls(BuildContext context) {
+  return MediaQuery.sizeOf(context).width < 700;
 }
 
 List<SerlinkSelectItem<AppLanguage>> _languageItems(AppLocalizations l10n) {

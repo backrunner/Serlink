@@ -59,37 +59,45 @@ class _MobileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FHeader(
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const _MobileBrandGlyph(),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              _mobileAreaTitle(context.l10n, area),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
+      title: _MobileHeaderTitle(title: _mobileAreaTitle(context.l10n, area)),
     );
   }
 }
 
-class _MobileBrandGlyph extends StatelessWidget {
-  const _MobileBrandGlyph();
+class _MobileHeaderTitle extends StatelessWidget {
+  const _MobileHeaderTitle({required this.title});
+
+  final String title;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: serlinkAccentGradient(t),
-        borderRadius: SerlinkRadii.control,
-      ),
-      child: SizedBox.square(
-        dimension: 30,
-        child: Icon(Icons.hub_outlined, size: 18, color: t.onAccent),
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: t.textPrimary,
+              fontWeight: FontWeight.w800,
+              height: 1.05,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 34,
+            height: 3,
+            decoration: BoxDecoration(
+              gradient: serlinkAccentGradient(t),
+              borderRadius: SerlinkRadii.pill,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -256,7 +264,7 @@ class _MobileBottomNavigation extends StatelessWidget {
     final l10n = context.l10n;
     return FBottomNavigationBar(
       index: index,
-      safeAreaBottom: true,
+      safeAreaBottom: false,
       onChange: onChange,
       children: [
         FBottomNavigationBarItem(

@@ -1311,7 +1311,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultUnlockTitle => 'ボールトを解除';
 
   @override
-  String get vaultCreateSubtitle => 'ホスト、鍵、シークレットを暗号化するための強力なパスフレーズを選んでください。';
+  String get vaultCreateSubtitle => '強力なパスフレーズでホストと鍵を保護します。';
 
   @override
   String get vaultUnlockSubtitle => 'ワークスペースを復号するにはパスフレーズを入力してください。';
@@ -1790,6 +1790,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get dataExchangeExportBackupSubtitle => '暗号化されたボールト記録とヘッダー。';
+
+  @override
+  String get dataExchangeExportDiagnosticBundleTitle => '診断バンドルをエクスポート';
+
+  @override
+  String get dataExchangeExportDiagnosticBundleSubtitle => '編集済みの実行情報と障害の手掛かり。';
 
   @override
   String get dataExchangeExportHostMetadataTitle => 'ホストメタデータをエクスポート';

@@ -108,15 +108,30 @@ class _SnippetsSurface extends ConsumerWidget {
   }
 }
 
-class _SnippetsHeader extends StatelessWidget {
+class _SnippetsHeader extends ConsumerWidget {
   const _SnippetsHeader({required this.count, required this.onAdd});
 
   final int count;
   final VoidCallback onAdd;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    if (ref.watch(platformCapabilitiesProvider).prefersMobileWorkspaceShell) {
+      return _WorkspaceListHeader(
+        title: l10n.snippetsTitle,
+        count: count,
+        action: SerlinkTooltip(
+          message: l10n.snippetsAddTooltip,
+          child: SerlinkIconButton(
+            key: const ValueKey('add-snippet-button'),
+            onPressed: onAdd,
+            icon: const Icon(Icons.add),
+          ),
+        ),
+      );
+    }
+
     final t = context.tokens;
     return SurfaceToolbar(
       child: Row(
@@ -139,6 +154,47 @@ class _SnippetsHeader extends StatelessWidget {
               icon: const Icon(Icons.add),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkspaceListHeader extends StatelessWidget {
+  const _WorkspaceListHeader({
+    required this.title,
+    required this.count,
+    this.status,
+    this.action,
+  });
+
+  final String title;
+  final int count;
+  final Widget? status;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return SurfaceToolbar(
+      child: Row(
+        children: [
+          Flexible(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: t.textPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _CountBadge(count: count),
+          if (status != null) ...[const SizedBox(width: 8), status!],
+          const Spacer(),
+          ?action,
         ],
       ),
     );
@@ -194,7 +250,7 @@ class _SnippetsEmptyState extends StatelessWidget {
   }
 }
 
-class _SnippetRow extends StatelessWidget {
+class _SnippetRow extends ConsumerWidget {
   const _SnippetRow({
     required this.snippet,
     required this.onInsert,
@@ -210,80 +266,173 @@ class _SnippetRow extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = context.tokens;
+    if (!ref.watch(platformCapabilitiesProvider).prefersMobileWorkspaceShell) {
+      return ListRow(
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    snippet.name,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: t.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _singleLineCommand(snippet.command),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                      color: t.textSecondary,
+                    ),
+                  ),
+                  if (snippet.tags.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final tag in snippet.tags) SerlinkTag(label: tag),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            _SnippetRowActions(
+              snippet: snippet,
+              onInsert: onInsert,
+              onRun: onRun,
+              onEdit: onEdit,
+              onDelete: onDelete,
+            ),
+          ],
+        ),
+      );
+    }
+
     return ListRow(
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            children: [
+              Icon(Icons.code_outlined, size: 18, color: t.textSecondary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
                   snippet.name,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: t.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  _singleLineCommand(snippet.command),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                    color: t.textSecondary,
-                  ),
-                ),
-                if (snippet.tags.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final tag in snippet.tags) SerlinkTag(label: tag),
-                    ],
-                  ),
+              ),
+              const SizedBox(width: 8),
+              _SnippetRowActions(
+                snippet: snippet,
+                onInsert: onInsert,
+                onRun: onRun,
+                onEdit: onEdit,
+                onDelete: onDelete,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(left: 28),
+            child: Text(
+              _singleLineCommand(snippet.command),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontFamily: 'monospace',
+                color: t.textSecondary,
+              ),
+            ),
+          ),
+          if (snippet.tags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 28),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final tag in snippet.tags) SerlinkTag(label: tag),
                 ],
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          SerlinkTooltip(
-            message: context.l10n.snippetInsertTooltip,
-            child: SerlinkIconButton(
-              key: ValueKey('snippet-insert-${snippet.id.value}'),
-              onPressed: onInsert,
-              icon: const Icon(Icons.input_outlined),
-            ),
-          ),
-          SerlinkTooltip(
-            message: context.l10n.snippetRunTooltip,
-            child: SerlinkIconButton(
-              key: ValueKey('snippet-run-${snippet.id.value}'),
-              onPressed: onRun,
-              icon: const Icon(Icons.play_arrow_outlined),
-            ),
-          ),
-          SerlinkTooltip(
-            message: context.l10n.snippetEditTooltip,
-            child: SerlinkIconButton(
-              key: ValueKey('snippet-edit-${snippet.id.value}'),
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_outlined),
-            ),
-          ),
-          SerlinkTooltip(
-            message: context.l10n.snippetDeleteTooltip,
-            child: SerlinkIconButton(
-              key: ValueKey('snippet-delete-${snippet.id.value}'),
-              onPressed: onDelete,
-              icon: const Icon(Icons.delete_outline),
-            ),
-          ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _SnippetRowActions extends StatelessWidget {
+  const _SnippetRowActions({
+    required this.snippet,
+    required this.onInsert,
+    required this.onRun,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final CommandSnippet snippet;
+  final VoidCallback onInsert;
+  final VoidCallback onRun;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SerlinkTooltip(
+          message: context.l10n.snippetInsertTooltip,
+          child: SerlinkIconButton(
+            key: ValueKey('snippet-insert-${snippet.id.value}'),
+            onPressed: onInsert,
+            icon: const Icon(Icons.input_outlined),
+          ),
+        ),
+        SerlinkTooltip(
+          message: context.l10n.snippetRunTooltip,
+          child: SerlinkIconButton(
+            key: ValueKey('snippet-run-${snippet.id.value}'),
+            onPressed: onRun,
+            icon: const Icon(Icons.play_arrow_outlined),
+          ),
+        ),
+        SerlinkTooltip(
+          message: context.l10n.snippetEditTooltip,
+          child: SerlinkIconButton(
+            key: ValueKey('snippet-edit-${snippet.id.value}'),
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined),
+          ),
+        ),
+        SerlinkTooltip(
+          message: context.l10n.snippetDeleteTooltip,
+          child: SerlinkIconButton(
+            key: ValueKey('snippet-delete-${snippet.id.value}'),
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ),
+      ],
     );
   }
 }

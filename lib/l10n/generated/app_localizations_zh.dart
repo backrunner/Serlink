@@ -1302,7 +1302,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultUnlockTitle => '解锁保险库';
 
   @override
-  String get vaultCreateSubtitle => '选择强密码短语来加密主机、密钥和机密。';
+  String get vaultCreateSubtitle => '用强密码短语加密主机和密钥。';
 
   @override
   String get vaultUnlockSubtitle => '输入密码短语以解密工作区。';
@@ -1775,6 +1775,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get dataExchangeExportBackupSubtitle => '加密保险库记录和头部。';
+
+  @override
+  String get dataExchangeExportDiagnosticBundleTitle => '导出诊断包';
+
+  @override
+  String get dataExchangeExportDiagnosticBundleSubtitle => '脱敏运行信息和故障线索。';
 
   @override
   String get dataExchangeExportHostMetadataTitle => '导出主机元数据';

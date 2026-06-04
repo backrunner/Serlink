@@ -2545,7 +2545,7 @@ abstract class AppLocalizations {
   /// No description provided for @vaultCreateSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Choose a strong passphrase to encrypt your hosts, keys, and secrets.'**
+  /// **'Use a strong passphrase for hosts and keys.'**
   String get vaultCreateSubtitle;
 
   /// No description provided for @vaultUnlockSubtitle.
@@ -3405,6 +3405,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Encrypted vault records and header.'**
   String get dataExchangeExportBackupSubtitle;
+
+  /// No description provided for @dataExchangeExportDiagnosticBundleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export diagnostic bundle'**
+  String get dataExchangeExportDiagnosticBundleTitle;
+
+  /// No description provided for @dataExchangeExportDiagnosticBundleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Redacted runtime details and failure clues.'**
+  String get dataExchangeExportDiagnosticBundleSubtitle;
 
   /// No description provided for @dataExchangeExportHostMetadataTitle.
   ///

@@ -1388,7 +1388,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultCreateSubtitle =>
-      'Choose a strong passphrase to encrypt your hosts, keys, and secrets.';
+      'Use a strong passphrase for hosts and keys.';
 
   @override
   String get vaultUnlockSubtitle =>
@@ -1880,6 +1880,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dataExchangeExportBackupSubtitle =>
       'Encrypted vault records and header.';
+
+  @override
+  String get dataExchangeExportDiagnosticBundleTitle =>
+      'Export diagnostic bundle';
+
+  @override
+  String get dataExchangeExportDiagnosticBundleSubtitle =>
+      'Redacted runtime details and failure clues.';
 
   @override
   String get dataExchangeExportHostMetadataTitle => 'Export host metadata';

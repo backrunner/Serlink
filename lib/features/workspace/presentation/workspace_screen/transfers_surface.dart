@@ -43,63 +43,88 @@ class _TransfersSurface extends ConsumerWidget {
   }
 }
 
-class _TransfersHeader extends StatelessWidget {
+class _TransfersHeader extends ConsumerWidget {
   const _TransfersHeader({required this.state, required this.onClear});
 
   final TransferQueueState? state;
   final VoidCallback? onClear;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final t = context.tokens;
     final tasks = state?.tasks ?? const <TransferTask>[];
     final activeCount = tasks.where(_transferIsActive).length;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-      child: Row(
-        children: [
-          Icon(Icons.swap_vert, size: 19, color: t.textSecondary),
-          const SizedBox(width: 10),
-          Text(
-            l10n.transfersTitle,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: t.textPrimary,
-              fontWeight: FontWeight.w700,
+    if (!ref.watch(platformCapabilitiesProvider).prefersMobileWorkspaceShell) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        child: Row(
+          children: [
+            Icon(Icons.swap_vert, size: 19, color: t.textSecondary),
+            const SizedBox(width: 10),
+            Text(
+              l10n.transfersTitle,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: t.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          SerlinkTag(label: l10n.transfersItemCount(tasks.length)),
-          if (activeCount > 0) ...[
-            const SizedBox(width: 6),
-            StatusPill(
-              label: l10n.transfersActiveCount(activeCount),
-              color: t.statusInfo,
+            const SizedBox(width: 10),
+            SerlinkTag(label: l10n.transfersItemCount(tasks.length)),
+            if (activeCount > 0) ...[
+              const SizedBox(width: 6),
+              StatusPill(
+                label: l10n.transfersActiveCount(activeCount),
+                color: t.statusInfo,
+              ),
+            ],
+            const Spacer(),
+            SerlinkTextButton.icon(
+              onPressed: onClear,
+              icon: const Icon(Icons.delete_sweep_outlined, size: 17),
+              label: Text(l10n.transfersClearAction),
             ),
           ],
-          const Spacer(),
-          SerlinkTextButton.icon(
-            onPressed: onClear,
-            icon: const Icon(Icons.delete_sweep_outlined, size: 17),
-            label: Text(l10n.transfersClearAction),
-          ),
-        ],
+        ),
+      );
+    }
+
+    return _WorkspaceListHeader(
+      title: l10n.transfersTitle,
+      count: tasks.length,
+      status: activeCount > 0
+          ? StatusPill(
+              label: l10n.transfersActiveCount(activeCount),
+              color: t.statusInfo,
+            )
+          : null,
+      action: SerlinkTextButton.icon(
+        onPressed: onClear,
+        icon: const Icon(Icons.delete_sweep_outlined, size: 17),
+        label: Text(l10n.transfersClearAction),
       ),
     );
   }
 }
 
-class _TransferTaskList extends StatelessWidget {
+class _TransferTaskList extends ConsumerWidget {
   const _TransferTaskList({required this.tasks});
 
   final List<TransferTask> tasks;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final compact = ref.watch(
+      platformCapabilitiesProvider.select(
+        (capabilities) => capabilities.prefersMobileWorkspaceShell,
+      ),
+    );
     return ListView.builder(
       key: const PageStorageKey('transfers-list'),
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: compact
+          ? const EdgeInsets.all(12)
+          : const EdgeInsets.fromLTRB(12, 0, 12, 12),
       scrollCacheExtent: const ScrollCacheExtent.pixels(960),
       itemCount: tasks.length,
       addAutomaticKeepAlives: false,
@@ -163,6 +188,9 @@ class _TransferTaskRow extends ConsumerWidget {
               ? () => unawaited(_openCompletedTransfer(context, ref, task))
               : null,
           child: ListRow(
+            padding: capabilities.prefersMobileWorkspaceShell
+                ? const EdgeInsets.fromLTRB(16, 14, 16, 14)
+                : const EdgeInsets.all(SerlinkSpacing.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

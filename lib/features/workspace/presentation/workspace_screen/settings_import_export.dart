@@ -324,16 +324,6 @@ Future<void> _exportDiagnosticBundle(
   WidgetRef ref,
 ) async {
   final l10n = context.l10n;
-  final confirmed = await _confirmDialog(
-    context,
-    title: l10n.exportDiagnosticBundleTitle,
-    body: l10n.exportDiagnosticBundleBody,
-    confirmLabel: l10n.settingsExportAction,
-  );
-  if (!confirmed || !context.mounted) {
-    return;
-  }
-
   try {
     final bundle = await ref
         .read(diagnosticBundleServiceProvider)

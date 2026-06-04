@@ -818,6 +818,77 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('iOS terminal accessory arranges navigation keys in two rows', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('host-display-name-field')),
+      'Mobile Terminal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'terminal.internal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'ops',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-password-field')),
+      'server-password',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Terminal').first);
+    await tester.pumpAndSettle();
+
+    final bar = tester.getRect(
+      find.byKey(const ValueKey('terminal-accessory-bar')),
+    );
+    expect(bar.height, lessThanOrEqualTo(72));
+
+    final ctrl = _rectForKey(tester, 'terminal-key-ctrl');
+    final tab = _rectForKey(tester, 'terminal-key-tab');
+    expect(ctrl.center.dy, lessThan(tab.center.dy));
+
+    final arrowUp = _rectForKey(tester, 'terminal-key-arrow-up');
+    final arrowLeft = _rectForKey(tester, 'terminal-key-arrow-left');
+    final arrowDown = _rectForKey(tester, 'terminal-key-arrow-down');
+    final arrowRight = _rectForKey(tester, 'terminal-key-arrow-right');
+
+    expect(arrowUp.center.dy, lessThan(arrowDown.center.dy));
+    expect(arrowUp.center.dx, closeTo(arrowDown.center.dx, 1));
+    expect(arrowLeft.center.dx, lessThan(arrowDown.center.dx));
+    expect(arrowDown.center.dx, lessThan(arrowRight.center.dx));
+    expect(arrowLeft.center.dy, closeTo(arrowDown.center.dy, 1));
+    expect(arrowRight.center.dy, closeTo(arrowDown.center.dy, 1));
+
+    final pageUp = _rectForKey(tester, 'terminal-key-page-up');
+    final pageDown = _rectForKey(tester, 'terminal-key-page-down');
+    expect(pageUp.center.dy, closeTo(pageDown.center.dy, 1));
+    expect(pageUp.center.dx, lessThan(pageDown.center.dx));
+    expect(pageDown.right, lessThanOrEqualTo(390));
+
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'hosts show loading while encrypted records initialize after unlock',
     (tester) async {
@@ -1000,6 +1071,10 @@ Future<void> _openHostContextMenu(WidgetTester tester, String hostName) async {
 }
 
 Finder _byTooltipLabel(String label) => find.bySemanticsLabel(label);
+
+Rect _rectForKey(WidgetTester tester, String key) {
+  return tester.getRect(find.byKey(ValueKey<String>(key)));
+}
 
 class _DelayedHostRepository implements HostRepository {
   _DelayedHostRepository(this._hosts);

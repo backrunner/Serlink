@@ -119,14 +119,12 @@ void main() {
       findsNothing,
     );
     expect(find.text('Recover / Reset'), findsNothing);
-    expect(find.widgetWithText(SerlinkTextButton, 'Lock'), findsOneWidget);
+    expect(find.text('Lock'), findsOneWidget);
     await tester.drag(find.byType(ListView), const Offset(0, -260));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.widgetWithText(SerlinkTextButton, 'Configure'),
-    );
+    await tester.ensureVisible(find.text('Configure'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(SerlinkTextButton, 'Configure'));
+    await tester.tap(find.text('Configure'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('webdav-endpoint-field')),
@@ -693,14 +691,14 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SerlinkTextButton, 'Lock'));
+    await tester.tap(find.text('Lock'));
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('settings-local-unlock-button')),
     );
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(SerlinkTextButton, 'Lock'), findsOneWidget);
+    expect(find.text('Lock'), findsOneWidget);
   });
 
   testWidgets('settings runtime exports diagnostic logs', (tester) async {

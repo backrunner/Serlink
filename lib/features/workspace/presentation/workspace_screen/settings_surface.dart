@@ -14,12 +14,13 @@ class _SettingsSurface extends ConsumerWidget {
     final showInPageTitle = !ref
         .watch(platformCapabilitiesProvider)
         .prefersMobileWorkspaceShell;
+    final mobile = !showInPageTitle;
     final t = context.tokens;
 
     return ListView(
       padding: showInPageTitle
           ? const EdgeInsets.fromLTRB(24, 22, 24, 36)
-          : const EdgeInsets.fromLTRB(24, 18, 24, 32),
+          : const EdgeInsets.fromLTRB(16, 12, 16, 16),
       children: [
         Center(
           child: ConstrainedBox(
@@ -67,9 +68,9 @@ class _SettingsSurface extends ConsumerWidget {
                     _SettingsActionRow(
                       icon: Icons.language_outlined,
                       title: l10n.settingsLanguageTitle,
-                      subtitle: l10n.settingsLanguageSubtitle,
+                      subtitle: _settingsLanguageSubtitle(l10n, mobile),
                       action: SizedBox(
-                        width: 220,
+                        width: mobile ? _settingsMobileActionWidth : 220,
                         child: SerlinkSelect<AppLanguage>(
                           value: language,
                           items: _languageItems(l10n),
@@ -79,7 +80,7 @@ class _SettingsSurface extends ConsumerWidget {
                               unawaited(_setAppLanguage(context, ref, value)),
                         ),
                       ),
-                      actionWidth: 220,
+                      actionWidth: mobile ? _settingsMobileActionWidth : 220,
                     ),
                   ],
                 ),
@@ -90,7 +91,7 @@ class _SettingsSurface extends ConsumerWidget {
                     _SettingsActionRow(
                       icon: Icons.lock_outline,
                       title: l10n.settingsVaultTitle,
-                      subtitle: _vaultStateLabel(l10n, vaultState),
+                      subtitle: _vaultStateLabel(l10n, vaultState, mobile),
                       subtitleWidget: vaultState == null
                           ? _DynamicStatusText(
                               label: l10n.settingsVaultPreparing,
@@ -116,7 +117,9 @@ class _SettingsSurface extends ConsumerWidget {
                     _SettingsActionRow(
                       icon: Icons.key_outlined,
                       title: l10n.settingsLocalUnlockTitle,
-                      subtitle: _localUnlockLabel(l10n, vault),
+                      subtitle: _localUnlockLabel(l10n, vault, mobile),
+                      mobileActionPlacement:
+                          _SettingsMobileActionPlacement.below,
                       action: vaultState == VaultState.unlocked
                           ? _SettingsSwitch(
                               key: const ValueKey(
@@ -154,7 +157,7 @@ class _SettingsSurface extends ConsumerWidget {
                       title: l10n.settingsCredentialsTitle,
                       subtitle: canImportHostData
                           ? null
-                          : l10n.settingsCredentialsLocked,
+                          : _settingsCredentialsLocked(l10n, mobile),
                       action: _SettingsTextButton(
                         onPressed: canImportHostData
                             ? () => _showIdentityManagerDialog(context, ref)
@@ -167,7 +170,7 @@ class _SettingsSurface extends ConsumerWidget {
                       title: l10n.settingsKnownHostsTitle,
                       subtitle: canImportHostData
                           ? null
-                          : l10n.settingsKnownHostsLocked,
+                          : _settingsKnownHostsLocked(l10n, mobile),
                       action: _SettingsTextButton(
                         onPressed: canImportHostData
                             ? () => _showKnownHostsDialog(context, ref)
@@ -186,7 +189,7 @@ class _SettingsSurface extends ConsumerWidget {
                     _SettingsActionRow(
                       icon: Icons.import_export_outlined,
                       title: l10n.settingsImportExportTitle,
-                      subtitle: l10n.settingsImportExportSubtitle,
+                      subtitle: _settingsImportExportSubtitle(l10n, mobile),
                       action: _SettingsTextButton(
                         key: const ValueKey('settings-data-exchange-button'),
                         onPressed: () => _showDataExchangeDialog(

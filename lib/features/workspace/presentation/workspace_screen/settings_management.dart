@@ -54,6 +54,7 @@ class _SettingsActionRow extends StatelessWidget {
     this.subtitle,
     this.subtitleWidget,
     this.actionWidth,
+    this.mobileActionPlacement = _SettingsMobileActionPlacement.trailing,
   });
 
   final IconData icon;
@@ -62,6 +63,7 @@ class _SettingsActionRow extends StatelessWidget {
   final Widget? subtitleWidget;
   final Widget? action;
   final double? actionWidth;
+  final _SettingsMobileActionPlacement mobileActionPlacement;
 
   @override
   Widget build(BuildContext context) {
@@ -115,19 +117,29 @@ class _SettingsActionRow extends StatelessWidget {
                 ? null
                 : Text(
                     subtitle!,
-                    maxLines: compact ? 2 : null,
+                    maxLines: 1,
                     overflow: compact ? TextOverflow.ellipsis : null,
                     style: subtitleStyle,
                   ));
         final slotWidth = math.min(
-          actionWidth ?? 104.0,
-          constraints.maxWidth * 0.48,
+          actionWidth ?? _settingsMobileActionWidth,
+          actionWidth == null ? constraints.maxWidth * 0.42 : actionWidth!,
         );
+        final actionSlot = action == null
+            ? null
+            : _SettingsActionSlot(
+                width: slotWidth,
+                height: actionWidth == null ? _settingsMobileActionHeight : 40,
+                child: _SettingsCompactControlsScope(child: action!),
+              );
+        final actionBelow =
+            actionSlot != null &&
+            mobileActionPlacement == _SettingsMobileActionPlacement.below;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           child: Row(
-            crossAxisAlignment: effectiveSubtitle == null
+            crossAxisAlignment: effectiveSubtitle == null && !actionBelow
                 ? CrossAxisAlignment.center
                 : CrossAxisAlignment.start,
             children: [
@@ -159,12 +171,16 @@ class _SettingsActionRow extends StatelessWidget {
                       const SizedBox(height: 2),
                       effectiveSubtitle,
                     ],
+                    if (actionBelow) ...[
+                      const SizedBox(height: 8),
+                      Align(alignment: Alignment.center, child: actionSlot),
+                    ],
                   ],
                 ),
               ),
-              if (action != null) ...[
+              if (actionSlot != null && !actionBelow) ...[
                 const SizedBox(width: 10),
-                _SettingsActionSlot(width: slotWidth, child: action!),
+                actionSlot,
               ],
             ],
           ),
@@ -175,33 +191,52 @@ class _SettingsActionRow extends StatelessWidget {
 }
 
 class _SettingsActionSlot extends StatelessWidget {
-  const _SettingsActionSlot({required this.width, required this.child});
+  const _SettingsActionSlot({
+    required this.width,
+    required this.height,
+    required this.child,
+  });
 
   final double width;
+  final double height;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: width,
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerRight,
-          child: child,
-        ),
-      ),
+      height: height,
+      child: Align(alignment: Alignment.centerRight, child: child),
     );
   }
 }
+
+class _SettingsCompactControlsScope extends InheritedWidget {
+  const _SettingsCompactControlsScope({required super.child});
+
+  static bool of(BuildContext context) {
+    return context
+            .dependOnInheritedWidgetOfExactType<
+              _SettingsCompactControlsScope
+            >() !=
+        null;
+  }
+
+  @override
+  bool updateShouldNotify(_SettingsCompactControlsScope oldWidget) => false;
+}
+
+enum _SettingsMobileActionPlacement { trailing, below }
+
+const double _settingsMobileActionWidth = 92;
+const double _settingsMobileActionHeight = 32;
 
 class _SettingsTextButton extends StatelessWidget {
   const _SettingsTextButton({
     super.key,
     required this.onPressed,
     required this.child,
-    this.compactSize = SerlinkButtonSize.sm,
+    this.compactSize = SerlinkButtonSize.xs,
   }) : icon = null,
        label = null;
 
@@ -211,7 +246,7 @@ class _SettingsTextButton extends StatelessWidget {
     required this.icon,
     required this.label,
   }) : child = null,
-       compactSize = SerlinkButtonSize.sm;
+       compactSize = SerlinkButtonSize.xs;
 
   final VoidCallback? onPressed;
   final Widget? child;
@@ -221,6 +256,14 @@ class _SettingsTextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_settingsUseCompactControls(context) ||
+        _SettingsCompactControlsScope.of(context)) {
+      return _SettingsMobileButton(
+        onPressed: onPressed,
+        icon: icon,
+        child: child ?? label!,
+      );
+    }
     final size = _settingsUseCompactControls(context)
         ? compactSize
         : SerlinkButtonSize.lg;
@@ -233,6 +276,74 @@ class _SettingsTextButton extends StatelessWidget {
       );
     }
     return SerlinkTextButton(onPressed: onPressed, size: size, child: child!);
+  }
+}
+
+class _SettingsMobileButton extends StatelessWidget {
+  const _SettingsMobileButton({
+    required this.onPressed,
+    required this.child,
+    this.icon,
+  });
+
+  final VoidCallback? onPressed;
+  final Widget child;
+  final Widget? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final enabled = onPressed != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.45,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: t.surfaceSunken,
+          borderRadius: SerlinkRadii.control,
+          border: Border.all(color: t.borderSubtle),
+        ),
+        child: SerlinkPressable(
+          onTap: onPressed,
+          borderRadius: SerlinkRadii.control,
+          hoverColor: t.accentPrimary.withValues(alpha: 0.08),
+          pressedColor: t.accentPrimary.withValues(alpha: 0.16),
+          child: SizedBox(
+            width: _settingsMobileActionWidth,
+            height: _settingsMobileActionHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (icon != null) ...[
+                        IconTheme.merge(
+                          data: IconThemeData(size: 14, color: t.textPrimary),
+                          child: icon!,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      DefaultTextStyle.merge(
+                        style: TextStyle(
+                          color: t.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                        maxLines: 1,
+                        child: child,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -314,7 +425,24 @@ String _vaultStatusPillLabel(AppLocalizations l10n, VaultState? state) {
   };
 }
 
-String _vaultStateLabel(AppLocalizations l10n, VaultState? state) {
+String _vaultStateLabel(AppLocalizations l10n, VaultState? state, bool mobile) {
+  if (!mobile) {
+    return _vaultStateLabelDesktop(l10n, state);
+  }
+  return switch (state) {
+    VaultState.uninitialized => l10n.settingsVaultNotCreated,
+    VaultState.locked => _mobileText(l10n, zh: '已锁定', en: 'Locked', ja: 'ロック中'),
+    VaultState.unlocked => _mobileText(
+      l10n,
+      zh: '已解锁',
+      en: 'Unlocked',
+      ja: '解除済み',
+    ),
+    null => l10n.settingsVaultPreparing,
+  };
+}
+
+String _vaultStateLabelDesktop(AppLocalizations l10n, VaultState? state) {
   return switch (state) {
     VaultState.uninitialized => l10n.settingsVaultNotCreated,
     VaultState.locked => l10n.settingsVaultLocked,
@@ -323,7 +451,35 @@ String _vaultStateLabel(AppLocalizations l10n, VaultState? state) {
   };
 }
 
-String _localUnlockLabel(AppLocalizations l10n, VaultSessionState? session) {
+String _localUnlockLabel(
+  AppLocalizations l10n,
+  VaultSessionState? session,
+  bool mobile,
+) {
+  if (mobile) {
+    if (session?.vaultState == VaultState.uninitialized) {
+      return _mobileText(
+        l10n,
+        zh: '需先创建保险库',
+        en: 'Create vault first',
+        ja: '先に作成',
+      );
+    }
+    if (session?.localUnlockAvailable == true) {
+      return _mobileText(
+        l10n,
+        zh: '可用设备解锁',
+        en: 'Device unlock ready',
+        ja: '端末解除可',
+      );
+    }
+    return _mobileText(
+      l10n,
+      zh: '需密码或恢复密钥',
+      en: 'Passphrase required',
+      ja: 'パスフレーズ必須',
+    );
+  }
   if (session?.vaultState == VaultState.uninitialized) {
     return l10n.settingsLocalUnlockNeedsVault;
   }
@@ -331,6 +487,52 @@ String _localUnlockLabel(AppLocalizations l10n, VaultSessionState? session) {
     return l10n.settingsLocalUnlockEnabled;
   }
   return l10n.settingsLocalUnlockDisabled;
+}
+
+String _settingsLanguageSubtitle(AppLocalizations l10n, bool mobile) {
+  if (!mobile) {
+    return l10n.settingsLanguageSubtitle;
+  }
+  return _mobileText(l10n, zh: '应用语言', en: 'App language', ja: '表示言語');
+}
+
+String _settingsCredentialsLocked(AppLocalizations l10n, bool mobile) {
+  if (!mobile) {
+    return l10n.settingsCredentialsLocked;
+  }
+  return _mobileText(l10n, zh: '需解锁保险库', en: 'Unlock vault first', ja: '解除が必要');
+}
+
+String _settingsKnownHostsLocked(AppLocalizations l10n, bool mobile) {
+  if (!mobile) {
+    return l10n.settingsKnownHostsLocked;
+  }
+  return _mobileText(l10n, zh: '需解锁保险库', en: 'Unlock vault first', ja: '解除が必要');
+}
+
+String _settingsImportExportSubtitle(AppLocalizations l10n, bool mobile) {
+  if (!mobile) {
+    return l10n.settingsImportExportSubtitle;
+  }
+  return _mobileText(
+    l10n,
+    zh: '备份与 SSH 数据',
+    en: 'Backups and SSH data',
+    ja: 'バックアップと SSH',
+  );
+}
+
+String _mobileText(
+  AppLocalizations l10n, {
+  required String zh,
+  required String en,
+  required String ja,
+}) {
+  return switch (l10n.localeName.split('_').first) {
+    'zh' => zh,
+    'ja' => ja,
+    _ => en,
+  };
 }
 
 Future<void> _setLocalVaultUnlock(

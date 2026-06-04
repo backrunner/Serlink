@@ -260,10 +260,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsRuntimeSection => '运行时';
 
   @override
-  String get settingsDebugLoggingTitle => '调试日志';
-
-  @override
-  String get settingsDiagnosticBundleTitle => '诊断信息';
+  String get settingsDiagnosticBundleTitle => '诊断日志';
 
   @override
   String get settingsExportAction => '导出';
@@ -1774,7 +1771,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dataExchangeExportBackupSubtitle => '加密保险库记录和头部。';
 
   @override
-  String get dataExchangeExportDiagnosticBundleTitle => '导出诊断包';
+  String get dataExchangeExportDiagnosticBundleTitle => '导出诊断日志';
 
   @override
   String get dataExchangeExportDiagnosticBundleSubtitle => '脱敏运行信息和故障线索。';
@@ -1863,32 +1860,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get identityMetadataExportedSnack => '身份元数据已导出。';
 
   @override
-  String get exportRuntimeDebugLogTitle => '导出运行时调试日志？';
-
-  @override
-  String get exportRuntimeDebugLogBody => '日志导出会被脱敏，只包含运行时调试日志尾部。';
-
-  @override
-  String get runtimeDebugLogExportedSnack => '运行时调试日志已导出。';
-
-  @override
-  String get runtimeDebugLogExportFailed => '无法导出运行时调试日志。';
-
-  @override
-  String get exportDiagnosticBundleTitle => '导出诊断信息？';
+  String get exportDiagnosticBundleTitle => '导出诊断日志？';
 
   @override
   String get exportDiagnosticBundleBody =>
-      '诊断信息会被脱敏，并排除终端输出、命令、主机、用户名、路径、凭据和私钥。';
+      '诊断日志会被脱敏，并排除终端输出、命令、主机、用户名、路径、凭据和私钥。';
 
   @override
-  String get diagnosticBundleExportedSnack => '诊断信息已导出。';
+  String get diagnosticBundleExportedSnack => '诊断日志已导出。';
 
   @override
   String get backupOperationFailed => '备份操作失败。';
 
   @override
-  String get diagnosticExportFailed => '无法导出诊断信息。';
+  String get diagnosticExportFailed => '无法导出诊断日志。';
 
   @override
   String get openSshConfigExportFailed => '无法导出 OpenSSH 配置。';

@@ -261,10 +261,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsRuntimeSection => '実行時';
 
   @override
-  String get settingsDebugLoggingTitle => 'デバッグログ';
-
-  @override
-  String get settingsDiagnosticBundleTitle => '診断情報';
+  String get settingsDiagnosticBundleTitle => '診断ログ';
 
   @override
   String get settingsExportAction => 'エクスポート';
@@ -1790,7 +1787,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get dataExchangeExportBackupSubtitle => '暗号化されたボールト記録とヘッダー。';
 
   @override
-  String get dataExchangeExportDiagnosticBundleTitle => '診断バンドルをエクスポート';
+  String get dataExchangeExportDiagnosticBundleTitle => '診断ログをエクスポート';
 
   @override
   String get dataExchangeExportDiagnosticBundleSubtitle => '編集済みの実行情報と障害の手掛かり。';
@@ -1883,33 +1880,20 @@ class AppLocalizationsJa extends AppLocalizations {
   String get identityMetadataExportedSnack => 'ID メタデータをエクスポートしました。';
 
   @override
-  String get exportRuntimeDebugLogTitle => '実行時デバッグログをエクスポートしますか？';
-
-  @override
-  String get exportRuntimeDebugLogBody =>
-      'ログのエクスポートは編集済みで、実行時デバッグログの末尾のみを含みます。';
-
-  @override
-  String get runtimeDebugLogExportedSnack => '実行時デバッグログをエクスポートしました。';
-
-  @override
-  String get runtimeDebugLogExportFailed => '実行時デバッグログをエクスポートできませんでした。';
-
-  @override
-  String get exportDiagnosticBundleTitle => '診断情報をエクスポートしますか？';
+  String get exportDiagnosticBundleTitle => '診断ログをエクスポートしますか？';
 
   @override
   String get exportDiagnosticBundleBody =>
-      '診断情報は編集済みで、端末出力、コマンド、ホスト、ユーザー名、パス、認証情報、秘密鍵は含まれません。';
+      '診断ログは編集済みで、端末出力、コマンド、ホスト、ユーザー名、パス、認証情報、秘密鍵は含まれません。';
 
   @override
-  String get diagnosticBundleExportedSnack => '診断情報をエクスポートしました。';
+  String get diagnosticBundleExportedSnack => '診断ログをエクスポートしました。';
 
   @override
   String get backupOperationFailed => 'バックアップ操作に失敗しました。';
 
   @override
-  String get diagnosticExportFailed => '診断情報をエクスポートできませんでした。';
+  String get diagnosticExportFailed => '診断ログをエクスポートできませんでした。';
 
   @override
   String get openSshConfigExportFailed => 'OpenSSH 設定をエクスポートできませんでした。';

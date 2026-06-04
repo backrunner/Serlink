@@ -12,7 +12,7 @@ class CloudKitSyncChannel {
   private static let recordType = "SerlinkSyncObject"
   private static let pathField = "path"
   private static let dataField = "data"
-  private static let containerIdentifier = "iCloud.top.backrunner.serlink"
+  private static let containerIdentifier = "iCloud.com.alkinum.serlink"
 
   private lazy var database = CKContainer(identifier: Self.containerIdentifier).privateCloudDatabase
   private var channel: FlutterMethodChannel?

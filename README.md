@@ -184,6 +184,14 @@ test/           unit, widget, and smoke tests
 - `flutter_pty` currently emits a macOS Swift Package Manager support warning during Flutter commands. It is non-blocking today, but it must be addressed before upgrading to a Flutter version that makes it fatal.
 - Current verification is mostly unit/widget/smoke level. Integration coverage against real SSH/SFTP/WebDAV stacks is still missing.
 
+## License
+
+Serlink is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+
+This repository also vendors a patched copy of `xterm.dart` 4.0.0 under
+`third_party/xterm`, which remains under the MIT License. See [NOTICE](NOTICE)
+and [third_party/xterm/LICENSE](third_party/xterm/LICENSE).
+
 ## Project Docs
 
 Detailed planning and implementation docs live under `.agents/`:

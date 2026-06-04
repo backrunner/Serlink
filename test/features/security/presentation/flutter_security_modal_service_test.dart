@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:forui/forui.dart';
+import 'package:serlink/app/app_theme.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/security/application/security_modal_service.dart';
 import 'package:serlink/features/security/presentation/flutter_security_modal_service.dart';
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/sync/domain/webdav_tls_certificate_details.dart';
+import 'package:serlink/l10n/l10n.dart';
 
 void main() {
   testWidgets('host key confirmation blocks until user chooses a decision', (
     tester,
   ) async {
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(
-      MaterialApp(
-        navigatorKey: navigatorKey,
-        home: const Scaffold(body: SizedBox.shrink()),
-      ),
-    );
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
     final service = FlutterSecurityModalService(key: navigatorKey);
     final decisionFuture = service.confirmHostKey(
@@ -42,12 +41,7 @@ void main() {
 
   testWidgets('host key changed dialog defaults to cancel', (tester) async {
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(
-      MaterialApp(
-        navigatorKey: navigatorKey,
-        home: const Scaffold(body: SizedBox.shrink()),
-      ),
-    );
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
     final service = FlutterSecurityModalService(key: navigatorKey);
     final decisionFuture = service.confirmHostKey(
@@ -75,12 +69,7 @@ void main() {
     tester,
   ) async {
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(
-      MaterialApp(
-        navigatorKey: navigatorKey,
-        home: const Scaffold(body: SizedBox.shrink()),
-      ),
-    );
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
     final service = FlutterSecurityModalService(key: navigatorKey);
     final decisionFuture = service.confirmMultilinePaste('ls\npwd');
@@ -103,12 +92,7 @@ void main() {
     tester,
   ) async {
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(
-      MaterialApp(
-        navigatorKey: navigatorKey,
-        home: const Scaffold(body: SizedBox.shrink()),
-      ),
-    );
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
     final service = FlutterSecurityModalService(key: navigatorKey);
     final decisionFuture = service.confirmWebDavCertificate(
@@ -142,12 +126,7 @@ void main() {
     tester,
   ) async {
     final navigatorKey = GlobalKey<NavigatorState>();
-    await tester.pumpWidget(
-      MaterialApp(
-        navigatorKey: navigatorKey,
-        home: const Scaffold(body: SizedBox.shrink()),
-      ),
-    );
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
     final service = FlutterSecurityModalService(key: navigatorKey);
     final decisionFuture = service.confirmExport(
@@ -167,4 +146,31 @@ void main() {
 
     await expectLater(decisionFuture, completion(ExportDecision.confirm));
   });
+}
+
+class _TestApp extends StatelessWidget {
+  const _TestApp({required this.navigatorKey});
+
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      theme: SerlinkTheme.dark(),
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        ...FLocalizations.localizationsDelegates,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: FTheme(
+        data: SerlinkTheme.foruiDark(),
+        platform: FPlatformVariant.macOS,
+        child: const Scaffold(body: SizedBox.shrink()),
+      ),
+    );
+  }
 }

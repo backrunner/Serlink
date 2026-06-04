@@ -14,21 +14,22 @@ Future<void> _exportVaultBackup(BuildContext context, WidgetRef ref) async {
 
   try {
     final bundle = await ref.read(vaultBackupServiceProvider).exportBackup();
-    final location = await getSaveLocation(
-      suggestedName: 'serlink-vault-backup.srlkvault',
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Serlink Vault Backup', extensions: ['srlkvault']),
-      ],
-    );
-    if (location == null) {
+    final exported = await ref
+        .read(documentGatewayProvider)
+        .exportBytes(
+          bytes: Uint8List.fromList(bundle.toBytes()),
+          suggestedName: 'serlink-vault-backup.srlkvault',
+          acceptedTypeGroups: const [
+            XTypeGroup(
+              label: 'Serlink Vault Backup',
+              extensions: ['srlkvault'],
+            ),
+          ],
+          mimeType: 'application/json',
+        );
+    if (!exported) {
       return;
     }
-    final file = XFile.fromData(
-      Uint8List.fromList(bundle.toBytes()),
-      mimeType: 'application/json',
-      name: 'serlink-vault-backup.srlkvault',
-    );
-    await file.saveTo(location.path);
     if (context.mounted) {
       _showSnackBar(context, l10n.backupExportedSnack);
     }
@@ -72,18 +73,19 @@ Future<void> _exportHostMetadata(BuildContext context, WidgetRef ref) async {
     if (!context.mounted) {
       return;
     }
-    final location = await getSaveLocation(
-      suggestedName: 'serlink-host-metadata.json',
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Serlink Host Metadata', extensions: ['json']),
-      ],
-    );
-    if (location == null) {
+    final exported = await ref
+        .read(documentGatewayProvider)
+        .exportBytes(
+          bytes: Uint8List.fromList(bundle.toBytes()),
+          suggestedName: 'serlink-host-metadata.json',
+          acceptedTypeGroups: const [
+            XTypeGroup(label: 'Serlink Host Metadata', extensions: ['json']),
+          ],
+          mimeType: 'application/json',
+        );
+    if (!exported) {
       return;
     }
-    final file = File(location.path);
-    await file.writeAsBytes(bundle.toBytes(), flush: true);
-    await LocalFileSecurity.restrictExistingFile(file);
     if (context.mounted) {
       _showSnackBar(context, l10n.hostMetadataExportedSnack);
     }
@@ -142,21 +144,22 @@ Future<void> _exportOpenSshConfig(BuildContext context, WidgetRef ref) async {
     final bundle = await ref
         .read(openSshConfigExportServiceProvider)
         .export(selectedHostIds: selectedHostIds);
-    final location = await getSaveLocation(
-      suggestedName: 'serlink-openssh-config.sshconfig',
-      acceptedTypeGroups: const [
-        XTypeGroup(
-          label: 'OpenSSH Config',
-          extensions: ['sshconfig', 'config', 'txt'],
-        ),
-      ],
-    );
-    if (location == null) {
+    final exported = await ref
+        .read(documentGatewayProvider)
+        .exportString(
+          contents: bundle.contents,
+          suggestedName: 'serlink-openssh-config.sshconfig',
+          acceptedTypeGroups: const [
+            XTypeGroup(
+              label: 'OpenSSH Config',
+              extensions: ['sshconfig', 'config', 'txt'],
+            ),
+          ],
+          mimeType: 'text/plain',
+        );
+    if (!exported) {
       return;
     }
-    final file = File(location.path);
-    await file.writeAsString(bundle.contents, flush: true);
-    await LocalFileSecurity.restrictExistingFile(file);
     if (context.mounted) {
       _showSnackBar(context, l10n.openSshConfigExportedSnack);
     }
@@ -194,18 +197,22 @@ Future<void> _exportIdentityMetadata(
     final bundle = await ref
         .read(identityMetadataExportServiceProvider)
         .export();
-    final location = await getSaveLocation(
-      suggestedName: 'serlink-identity-metadata.json',
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Serlink Identity Metadata', extensions: ['json']),
-      ],
-    );
-    if (location == null) {
+    final exported = await ref
+        .read(documentGatewayProvider)
+        .exportBytes(
+          bytes: Uint8List.fromList(bundle.toBytes()),
+          suggestedName: 'serlink-identity-metadata.json',
+          acceptedTypeGroups: const [
+            XTypeGroup(
+              label: 'Serlink Identity Metadata',
+              extensions: ['json'],
+            ),
+          ],
+          mimeType: 'application/json',
+        );
+    if (!exported) {
       return;
     }
-    final file = File(location.path);
-    await file.writeAsBytes(bundle.toBytes(), flush: true);
-    await LocalFileSecurity.restrictExistingFile(file);
     if (context.mounted) {
       _showSnackBar(context, l10n.identityMetadataExportedSnack);
     }
@@ -372,18 +379,19 @@ Future<void> _exportDiagnosticBundle(
     final bundle = await ref
         .read(diagnosticBundleServiceProvider)
         .buildRedactedBundle();
-    final location = await getSaveLocation(
-      suggestedName: 'serlink-diagnostics.json',
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'Serlink Diagnostics', extensions: ['json']),
-      ],
-    );
-    if (location == null) {
+    final exported = await ref
+        .read(documentGatewayProvider)
+        .exportBytes(
+          bytes: Uint8List.fromList(bundle.bytes),
+          suggestedName: 'serlink-diagnostics.json',
+          acceptedTypeGroups: const [
+            XTypeGroup(label: 'Serlink Diagnostics', extensions: ['json']),
+          ],
+          mimeType: 'application/json',
+        );
+    if (!exported) {
       return;
     }
-    final file = File(location.path);
-    await file.writeAsBytes(bundle.bytes, flush: true);
-    await LocalFileSecurity.restrictExistingFile(file);
     if (context.mounted) {
       _showSnackBar(context, l10n.diagnosticBundleExportedSnack);
     }
@@ -395,11 +403,13 @@ Future<void> _exportDiagnosticBundle(
 }
 
 Future<void> _importVaultBackup(BuildContext context, WidgetRef ref) async {
-  final file = await openFile(
-    acceptedTypeGroups: const [
-      XTypeGroup(label: 'Serlink Vault Backup', extensions: ['srlkvault']),
-    ],
-  );
+  final file = await ref
+      .read(documentGatewayProvider)
+      .pickUploadFile(
+        acceptedTypeGroups: const [
+          XTypeGroup(label: 'Serlink Vault Backup', extensions: ['srlkvault']),
+        ],
+      );
   if (file == null || !context.mounted) {
     return;
   }
@@ -416,7 +426,9 @@ Future<void> _importVaultBackup(BuildContext context, WidgetRef ref) async {
   }
 
   try {
-    final bundle = VaultBackupBundle.fromBytes(await file.readAsBytes());
+    final bundle = VaultBackupBundle.fromBytes(
+      await File(file.path).readAsBytes(),
+    );
     await ref.read(vaultBackupServiceProvider).importBackup(bundle);
     ref.invalidate(vaultSessionControllerProvider);
     ref.invalidate(hostSummariesProvider);
@@ -431,16 +443,20 @@ Future<void> _importVaultBackup(BuildContext context, WidgetRef ref) async {
 }
 
 Future<void> _importOpenSshConfig(BuildContext context, WidgetRef ref) async {
-  final file = await openFile();
+  final file = await ref.read(documentGatewayProvider).pickUploadFile();
   if (file == null || !context.mounted) {
     return;
   }
 
   try {
     final service = ref.read(openSshConfigImportServiceProvider);
+    final configSourcePath =
+        ref.read(platformCapabilitiesProvider).stableLocalFilePaths
+        ? file.path
+        : null;
     final preview = service.preview(
-      await file.readAsString(),
-      configSourcePath: file.path,
+      await File(file.path).readAsString(),
+      configSourcePath: configSourcePath,
     );
     if (!context.mounted) {
       return;
@@ -458,7 +474,7 @@ Future<void> _importOpenSshConfig(BuildContext context, WidgetRef ref) async {
     final result = await service.applyPreview(
       preview,
       defaultUsername: _defaultImportUsername(),
-      configSourcePath: file.path,
+      configSourcePath: configSourcePath,
     );
     ref.invalidate(hostSummariesProvider);
     if (context.mounted) {
@@ -481,7 +497,7 @@ Future<void> _importOpenSshConfig(BuildContext context, WidgetRef ref) async {
 }
 
 Future<void> _importKnownHosts(BuildContext context, WidgetRef ref) async {
-  final file = await openFile();
+  final file = await ref.read(documentGatewayProvider).pickUploadFile();
   if (file == null || !context.mounted) {
     return;
   }
@@ -499,7 +515,7 @@ Future<void> _importKnownHosts(BuildContext context, WidgetRef ref) async {
   try {
     final result = await ref
         .read(knownHostsImportServiceProvider)
-        .importText(await file.readAsString());
+        .importText(await File(file.path).readAsString());
     if (context.mounted) {
       final l10n = context.l10n;
       _showSnackBar(
@@ -523,11 +539,29 @@ Future<void> _importOpenSshCertificate(
   BuildContext context,
   WidgetRef ref,
 ) async {
-  final privateKeyFile = await openFile();
+  final privateKeyFile = await ref
+      .read(documentGatewayProvider)
+      .pickUploadFile(
+        acceptedTypeGroups: const [
+          XTypeGroup(
+            label: 'SSH Private Key',
+            extensions: ['pem', 'key', 'txt'],
+          ),
+        ],
+      );
   if (privateKeyFile == null || !context.mounted) {
     return;
   }
-  final certificateFile = await openFile();
+  final certificateFile = await ref
+      .read(documentGatewayProvider)
+      .pickUploadFile(
+        acceptedTypeGroups: const [
+          XTypeGroup(
+            label: 'OpenSSH Certificate',
+            extensions: ['pub', 'cert', 'txt'],
+          ),
+        ],
+      );
   if (certificateFile == null || !context.mounted) {
     return;
   }
@@ -535,8 +569,8 @@ Future<void> _importOpenSshCertificate(
   try {
     final service = ref.read(openSshCertificateImportServiceProvider);
     final draft = OpenSshCertificateImportDraft(
-      privateKeyPem: await privateKeyFile.readAsString(),
-      certificateText: await certificateFile.readAsString(),
+      privateKeyPem: await File(privateKeyFile.path).readAsString(),
+      certificateText: await File(certificateFile.path).readAsString(),
     );
     final preview = service.preview(draft);
     if (!context.mounted) {

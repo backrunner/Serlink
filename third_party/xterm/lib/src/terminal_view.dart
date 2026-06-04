@@ -21,6 +21,8 @@ import 'package:xterm/src/ui/terminal_text_style.dart';
 import 'package:xterm/src/ui/terminal_theme.dart';
 import 'package:xterm/src/ui/themes.dart';
 
+typedef TerminalInsertTextInterceptor = String? Function(String text);
+
 class TerminalView extends StatefulWidget {
   const TerminalView(
     this.terminal, {
@@ -46,6 +48,7 @@ class TerminalView extends StatefulWidget {
     this.deleteDetection = false,
     this.shortcuts,
     this.onKeyEvent,
+    this.onInsertText,
     this.readOnly = false,
     this.hardwareKeyboardOnly = false,
     this.simulateScroll = true,
@@ -127,6 +130,10 @@ class TerminalView extends StatefulWidget {
   /// Keyboard event handler of the terminal. This has higher priority than
   /// [shortcuts] and input handler of the terminal.
   final FocusOnKeyEventCallback? onKeyEvent;
+
+  /// Intercepts text inserted by software keyboards or IMEs before it reaches
+  /// the terminal input handler. Return `null` to consume the insertion.
+  final TerminalInsertTextInterceptor? onInsertText;
 
   /// True if no input should send to the terminal.
   final bool readOnly;
@@ -372,6 +379,16 @@ class TerminalViewState extends State<TerminalView> {
   }
 
   void _onInsert(String text) {
+    final onInsertText = widget.onInsertText;
+    if (onInsertText != null) {
+      final interceptedText = onInsertText(text);
+      if (interceptedText == null) {
+        _scrollToBottom();
+        return;
+      }
+      text = interceptedText;
+    }
+
     final key = charToTerminalKey(text.trim());
 
     // On mobile platforms there is no guarantee that virtual keyboard will

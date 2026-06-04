@@ -22,7 +22,7 @@ class LocalFileSecurity {
   }
 
   static Future<void> _chmod(String path, String mode) async {
-    if (Platform.isWindows) {
+    if (Platform.isWindows || Platform.isIOS) {
       return;
     }
     try {

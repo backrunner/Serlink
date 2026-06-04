@@ -6,12 +6,14 @@ class _SingleTerminalViewport extends StatelessWidget {
     required this.controller,
     required this.settings,
     this.onKeyEvent,
+    this.onInsertText,
   });
 
   final Terminal terminal;
   final TerminalController controller;
   final TerminalDisplaySettings settings;
   final FocusOnKeyEventCallback? onKeyEvent;
+  final TerminalInsertTextInterceptor? onInsertText;
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +25,7 @@ class _SingleTerminalViewport extends StatelessWidget {
       theme: settings.terminalTheme,
       textStyle: settings.textStyle,
       onKeyEvent: onKeyEvent,
+      onInsertText: onInsertText,
     );
   }
 }
@@ -38,6 +41,7 @@ class _SplitTerminalViewport extends StatelessWidget {
     required this.local,
     required this.onActivatePane,
     this.onKeyEvent,
+    this.onInsertText,
   });
 
   final List<TerminalPaneState> panes;
@@ -49,6 +53,7 @@ class _SplitTerminalViewport extends StatelessWidget {
   final bool local;
   final ValueChanged<int> onActivatePane;
   final FocusOnKeyEventCallback? onKeyEvent;
+  final TerminalInsertTextInterceptor? onInsertText;
 
   @override
   Widget build(BuildContext context) {
@@ -89,6 +94,7 @@ class _SplitTerminalViewport extends StatelessWidget {
       lifecycle: pane.lifecycle,
       local: local,
       onKeyEvent: onKeyEvent,
+      onInsertText: onInsertText,
       onTap: () => onActivatePane(index),
     );
   }
@@ -110,6 +116,7 @@ class _TerminalViewportPane extends StatelessWidget {
     required this.lifecycle,
     required this.local,
     this.onKeyEvent,
+    this.onInsertText,
     required this.onTap,
   });
 
@@ -121,6 +128,7 @@ class _TerminalViewportPane extends StatelessWidget {
   final SessionLifecycleState lifecycle;
   final bool local;
   final FocusOnKeyEventCallback? onKeyEvent;
+  final TerminalInsertTextInterceptor? onInsertText;
   final VoidCallback onTap;
 
   @override
@@ -163,6 +171,7 @@ class _TerminalViewportPane extends StatelessWidget {
                 theme: settings.terminalTheme,
                 textStyle: settings.textStyle,
                 onKeyEvent: onKeyEvent,
+                onInsertText: onInsertText,
               ),
             ),
           ],

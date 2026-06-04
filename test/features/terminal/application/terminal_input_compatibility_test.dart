@@ -11,9 +11,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          body: TerminalView(terminal, autofocus: true),
-        ),
+        home: Scaffold(body: TerminalView(terminal, autofocus: true)),
       ),
     );
 
@@ -33,9 +31,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          body: TerminalView(terminal, autofocus: true),
-        ),
+        home: Scaffold(body: TerminalView(terminal, autofocus: true)),
       ),
     );
 
@@ -49,28 +45,51 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   });
 
-  testWidgets(
-    'accepts combining character text input through TerminalView',
-    (tester) async {
-      final output = <String>[];
-      final terminal = Terminal(onOutput: output.add);
+  testWidgets('accepts combining character text input through TerminalView', (
+    tester,
+  ) async {
+    final output = <String>[];
+    final terminal = Terminal(onOutput: output.add);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: TerminalView(terminal, autofocus: true),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: TerminalView(terminal, autofocus: true)),
+      ),
+    );
+
+    await tester.tap(find.byType(TerminalView));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    binding.testTextInput.enterText('e\u0301');
+    await binding.idle();
+
+    expect(output.join(), 'e\u0301');
+    await tester.pump(const Duration(milliseconds: 400));
+  });
+
+  testWidgets('allows software keyboard insert interception', (tester) async {
+    final output = <String>[];
+    final terminal = Terminal(onOutput: output.add);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            terminal,
+            autofocus: true,
+            onInsertText: (text) => text == 'a' ? 'A' : text,
           ),
         ),
-      );
+      ),
+    );
 
-      await tester.tap(find.byType(TerminalView));
-      await tester.pump(const Duration(milliseconds: 200));
+    await tester.tap(find.byType(TerminalView));
+    await tester.pump(const Duration(milliseconds: 200));
 
-      binding.testTextInput.enterText('e\u0301');
-      await binding.idle();
+    binding.testTextInput.enterText('a');
+    await binding.idle();
 
-      expect(output.join(), 'e\u0301');
-      await tester.pump(const Duration(milliseconds: 400));
-    },
-  );
+    expect(output.join(), 'A');
+    await tester.pump(const Duration(milliseconds: 400));
+  });
 }

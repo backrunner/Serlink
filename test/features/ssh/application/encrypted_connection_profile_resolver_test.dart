@@ -234,6 +234,40 @@ void main() {
     );
   });
 
+  test('rejects SSH agent auth when platform does not support it', () async {
+    final mobileResolver = EncryptedConnectionProfileResolver(
+      hosts: hosts,
+      identities: identities,
+      records: records,
+      vault: vault,
+      sshAgentAuthAvailable: false,
+    );
+    await identities.save(
+      IdentityConfig(
+        id: IdentityId('agent'),
+        displayName: 'Agent',
+        kind: IdentityKind.sshAgent,
+        createdAt: DateTime.utc(2026, 5, 27),
+        updatedAt: DateTime.utc(2026, 5, 27),
+      ),
+    );
+    await hosts.save(_host(identityIds: [IdentityId('agent')]));
+
+    await expectLater(
+      mobileResolver.resolve(
+        hostId: HostId('production'),
+        sessionId: SessionId('session-1'),
+      ),
+      throwsA(
+        isA<ConnectionProfileResolutionException>().having(
+          (error) => error.code,
+          'code',
+          'connection_profile.ssh_agent_unsupported',
+        ),
+      ),
+    );
+  });
+
   test('locked vault prevents profile resolution', () async {
     await _saveSecret(
       vault: vault,

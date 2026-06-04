@@ -26,8 +26,13 @@ class WorkspaceScreen extends ConsumerWidget {
     final l10n = context.l10n;
     final state = ref.watch(workspaceTabControllerProvider);
     final controller = ref.read(workspaceTabControllerProvider.notifier);
+    final capabilities = ref.watch(platformCapabilitiesProvider);
+    if (capabilities.prefersMobileWorkspaceShell) {
+      return const MobileWorkspaceScreen();
+    }
     final showSearch = _showsWorkspaceSearch(state.area);
-    final showLocalTerminal = _showsLocalTerminalAction(state.area);
+    final showLocalTerminal =
+        capabilities.localTerminal && _showsLocalTerminalAction(state.area);
     final showTopBar =
         showSearch || showLocalTerminal || AppWindow.usesTrailingWindowControls;
 

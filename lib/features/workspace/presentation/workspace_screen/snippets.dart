@@ -299,6 +299,154 @@ Future<void> _showSnippetDialog(
   );
 }
 
+Future<void> _showTerminalSnippetPicker(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final session = ref.read(vaultSessionControllerProvider).value;
+  final unlockGeneration = session?.vaultState == VaultState.unlocked
+      ? session!.unlockGeneration
+      : null;
+  await showSerlinkDialog<void>(
+    context: context,
+    builder: (context) =>
+        _TerminalSnippetPickerDialog(unlockGeneration: unlockGeneration),
+  );
+}
+
+class _TerminalSnippetPickerDialog extends ConsumerWidget {
+  const _TerminalSnippetPickerDialog({required this.unlockGeneration});
+
+  final int? unlockGeneration;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final generation = unlockGeneration;
+    final snippets = generation == null
+        ? null
+        : ref.watch(snippetsProvider(generation));
+    return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
+      title: Text(l10n.snippetsTitle),
+      content: SizedBox(
+        width: 560,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 420),
+          child: generation == null
+              ? Text(l10n.snippetsLockedBody)
+              : snippets!.when(
+                  skipLoadingOnReload: false,
+                  skipLoadingOnRefresh: false,
+                  loading: () =>
+                      _DynamicStatusText(label: l10n.snippetsLoading),
+                  error: (error, stackTrace) => Text(error.toString()),
+                  data: (items) {
+                    if (items.isEmpty) {
+                      return Center(
+                        child: SerlinkFilledButton.icon(
+                          onPressed: () => _showSnippetDialog(context),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: Text(l10n.snippetsAddAction),
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: items.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final snippet = items[index];
+                        return _TerminalSnippetPickerRow(snippet: snippet);
+                      },
+                    );
+                  },
+                ),
+        ),
+      ),
+      actions: [
+        SerlinkTextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancelAction),
+        ),
+      ],
+    );
+  }
+}
+
+class _TerminalSnippetPickerRow extends ConsumerWidget {
+  const _TerminalSnippetPickerRow({required this.snippet});
+
+  final CommandSnippet snippet;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = context.tokens;
+    return ListRow(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  snippet.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: t.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  _singleLineCommand(snippet.command),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    color: t.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          SerlinkTooltip(
+            message: context.l10n.snippetInsertTooltip,
+            child: SerlinkIconButton(
+              key: ValueKey('terminal-snippet-insert-${snippet.id.value}'),
+              onPressed: () => _insert(context, ref, submit: false),
+              icon: const Icon(Icons.input_outlined),
+            ),
+          ),
+          SerlinkTooltip(
+            message: context.l10n.snippetRunTooltip,
+            child: SerlinkIconButton(
+              key: ValueKey('terminal-snippet-run-${snippet.id.value}'),
+              onPressed: () => _insert(context, ref, submit: true),
+              icon: const Icon(Icons.play_arrow_outlined),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _insert(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool submit,
+  }) async {
+    await _insertSnippet(context, ref, snippet, submit: submit);
+    if (context.mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+}
+
 class _SnippetDialog extends ConsumerStatefulWidget {
   const _SnippetDialog({this.snippet});
 

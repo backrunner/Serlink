@@ -16,6 +16,7 @@ import 'package:serlink/features/terminal/application/local_terminal_service.dar
 import 'package:serlink/features/terminal/application/terminal_display_settings.dart';
 import 'package:serlink/features/workspace/application/workspace_tab_controller.dart';
 import 'package:serlink/features/workspace/domain/workspace_tab.dart';
+import 'package:serlink/platform/platform_capabilities.dart';
 
 part 'workspace_tab_controller_test_fakes.dart';
 
@@ -61,6 +62,68 @@ void main() {
       expect(service.openShellCount, 2);
     },
   );
+
+  test(
+    'suspends remote terminal sessions when iOS enters background',
+    () async {
+      final service = _FakeSshSessionService();
+      final container = _container(
+        service: service,
+        capabilities: const PlatformCapabilities(
+          operatingSystem: 'ios',
+          targetPlatform: TargetPlatform.iOS,
+        ),
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openTerminal(_host);
+      await _drainMicrotasks();
+
+      final tab = container.read(workspaceTabControllerProvider).activeTab!;
+      expect(tab.lifecycle, SessionLifecycleState.connected);
+      expect(service.openShellCount, 1);
+
+      controller.suspendForBackground();
+      await _drainMicrotasks();
+
+      final suspended = container
+          .read(workspaceTabControllerProvider)
+          .activeTab!;
+      final content = suspended.content as TerminalTabContent;
+      expect(suspended.id, tab.id);
+      expect(suspended.lifecycle, SessionLifecycleState.disconnected);
+      expect(suspended.failure?.code, 'session.backgrounded');
+      expect(content.primaryPane.failure?.code, 'session.backgrounded');
+      expect(service.shells.single._done.isCompleted, isTrue);
+      expect(service.openShellCount, 1);
+    },
+  );
+
+  test('background suspend leaves desktop sessions alone', () async {
+    final service = _FakeSshSessionService();
+    final container = _container(
+      service: service,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'macos',
+        targetPlatform: TargetPlatform.macOS,
+      ),
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    controller.openTerminal(_host);
+    await _drainMicrotasks();
+
+    controller.suspendForBackground();
+    await _drainMicrotasks();
+
+    final tab = container.read(workspaceTabControllerProvider).activeTab!;
+    expect(tab.lifecycle, SessionLifecycleState.connected);
+    expect(service.shells.single._done.isCompleted, isFalse);
+  });
 
   test(
     'auto reconnect retries terminal sessions up to the configured limit',
@@ -729,9 +792,12 @@ ProviderContainer _container({
   LocalTerminalService? localTerminal,
   _FakeTerminalHostDisplaySettingsRepository? terminalProfiles,
   StaticConnectionProfile? profile,
+  PlatformCapabilities? capabilities,
 }) {
   return ProviderContainer(
     overrides: [
+      if (capabilities != null)
+        platformCapabilitiesProvider.overrideWithValue(capabilities),
       sshSessionServiceProvider.overrideWithValue(service),
       if (localTerminal != null)
         localTerminalServiceProvider.overrideWithValue(localTerminal),

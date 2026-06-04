@@ -67,32 +67,75 @@ class _SettingsActionRow extends StatelessWidget {
     final subtitleStyle = Theme.of(
       context,
     ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: SerlinkListTile(
-        minLeadingWidth: 28,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        subtitleGap: 1,
-        leading: SizedBox.square(
-          dimension: 32,
-          child: Icon(icon, size: 19, color: t.textSecondary),
-        ),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: t.textPrimary,
-          ),
-        ),
-        subtitle:
-            subtitleWidget ??
-            (subtitle == null || subtitle!.trim().isEmpty
-                ? null
-                : Text(subtitle!, style: subtitleStyle)),
-        trailing: action == null
-            ? null
-            : Padding(padding: const EdgeInsets.only(left: 16), child: action),
+    final tile = SerlinkListTile(
+      minLeadingWidth: 28,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      subtitleGap: 1,
+      leading: SizedBox.square(
+        dimension: 32,
+        child: Icon(icon, size: 19, color: t.textSecondary),
       ),
+      title: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: t.textPrimary,
+        ),
+      ),
+      subtitle:
+          subtitleWidget ??
+          (subtitle == null || subtitle!.trim().isEmpty
+              ? null
+              : Text(subtitle!, style: subtitleStyle)),
+      trailing: action == null
+          ? null
+          : Padding(padding: const EdgeInsets.only(left: 16), child: action),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (action == null || constraints.maxWidth >= 560) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: tile,
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SerlinkListTile(
+                minLeadingWidth: 28,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 2,
+                ),
+                subtitleGap: 1,
+                leading: SizedBox.square(
+                  dimension: 32,
+                  child: Icon(icon, size: 19, color: t.textSecondary),
+                ),
+                title: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: t.textPrimary,
+                  ),
+                ),
+                subtitle:
+                    subtitleWidget ??
+                    (subtitle == null || subtitle!.trim().isEmpty
+                        ? null
+                        : Text(subtitle!, style: subtitleStyle)),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 46, top: 8, right: 4),
+                child: Align(alignment: Alignment.centerLeft, child: action!),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -243,10 +286,15 @@ class _IdentityManagerDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    final capabilities = ref.watch(platformCapabilitiesProvider);
     return FutureBuilder<List<IdentityConfig>>(
       future: ref.read(identityRepositoryProvider).list(),
       builder: (context, snapshot) {
-        final identities = snapshot.data ?? const <IdentityConfig>[];
+        final identities = [
+          for (final identity in snapshot.data ?? const <IdentityConfig>[])
+            if (_identitySupportedByCapabilities(identity, capabilities))
+              identity,
+        ];
         return SerlinkDialog(
           maxWidth: _adaptiveDialogWidth(context, _dialogWidthManagement),
           title: Text(l10n.credentialsDialogTitle),
@@ -448,9 +496,7 @@ Future<void> _deleteKnownHost(
   final confirmed = await _confirmDialog(
     context,
     title: context.l10n.knownHostDeleteTitle,
-    body: context.l10n.knownHostDeleteBody(
-      '${record.hostname}:${record.port}',
-    ),
+    body: context.l10n.knownHostDeleteBody('${record.hostname}:${record.port}'),
     confirmLabel: context.l10n.deleteAction,
     destructive: true,
   );

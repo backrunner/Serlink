@@ -56,7 +56,8 @@ class SerlinkDialog extends StatelessWidget {
     return FDialog.raw(
       clipBehavior: Clip.antiAlias,
       constraints:
-          constraints ?? BoxConstraints(minWidth: 360, maxWidth: maxWidth),
+          constraints ??
+          BoxConstraints(minWidth: math.min(360, maxWidth), maxWidth: maxWidth),
       builder: (context, style) {
         final contentStyle = style.contentStyle.horizontal;
         final titleStyle = contentStyle.titleTextStyle.copyWith(

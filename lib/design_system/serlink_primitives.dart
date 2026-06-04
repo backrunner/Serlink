@@ -414,12 +414,14 @@ class SerlinkSegmentedControl<T> extends StatelessWidget {
     required this.segments,
     required this.onChanged,
     this.enabled = true,
+    this.compact = false,
   });
 
   final T value;
   final List<SerlinkSegment<T>> segments;
   final ValueChanged<T>? onChanged;
   final bool enabled;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -442,6 +444,7 @@ class SerlinkSegmentedControl<T> extends StatelessWidget {
                 selected: segments[index].value == value,
                 enabled: interactive,
                 onSelected: onChanged,
+                compact: compact,
               ),
               if (index < segments.length - 1)
                 Container(width: 1, height: 26, color: t.borderSubtle),
@@ -459,12 +462,14 @@ class _SerlinkSegmentButton<T> extends StatelessWidget {
     required this.selected,
     required this.enabled,
     required this.onSelected,
+    required this.compact,
   });
 
   final SerlinkSegment<T> segment;
   final bool selected;
   final bool enabled;
   final ValueChanged<T>? onSelected;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -482,22 +487,28 @@ class _SerlinkSegmentButton<T> extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOut,
-        height: 34,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        height: compact ? 32 : 34,
+        padding: EdgeInsets.symmetric(horizontal: compact ? 9 : 12),
         color: selected
             ? t.accentPrimary.withValues(alpha: 0.12)
             : Colors.transparent,
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(segment.icon, size: 16, color: foreground),
-            const SizedBox(width: 7),
+            Icon(segment.icon, size: compact ? 15 : 16, color: foreground),
+            SizedBox(width: compact ? 5 : 7),
             Text(
               segment.label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: foreground,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-              ),
+              style:
+                  (compact
+                          ? Theme.of(context).textTheme.labelSmall
+                          : Theme.of(context).textTheme.labelMedium)
+                      ?.copyWith(
+                        color: foreground,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w600,
+                      ),
             ),
           ],
         ),

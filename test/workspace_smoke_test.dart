@@ -29,6 +29,7 @@ import 'package:serlink/features/vault/application/vault_service.dart';
 import 'package:serlink/features/vault/data/drift_vault_repository.dart';
 import 'package:serlink/features/workspace/application/workspace_tab_controller.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
+import 'package:serlink/platform/platform_capabilities.dart';
 
 part 'workspace_smoke_test_fakes.dart';
 
@@ -720,6 +721,37 @@ void main() {
     expect(find.text('Crash reporting'), findsNothing);
   });
 
+  testWidgets('iOS add host form uses compact wide dialog', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
+    await tester.pumpAndSettle();
+
+    final formFrame = find.byKey(const ValueKey('host-form-scroll-frame'));
+    expect(formFrame, findsOneWidget);
+    final frameRect = tester.getRect(formFrame);
+    expect(frameRect.left, lessThan(24));
+    expect(frameRect.width, greaterThanOrEqualTo(348));
+    expect(frameRect.height, greaterThan(440));
+    expect(frameRect.height, lessThanOrEqualTo(600));
+    expect(
+      tester.getRect(find.byKey(const ValueKey('host-save-button'))).bottom,
+      lessThanOrEqualTo(844),
+    );
+  });
+
   testWidgets(
     'hosts show loading while encrypted records initialize after unlock',
     (tester) async {
@@ -825,7 +857,10 @@ void main() {
   });
 }
 
-Future<_LockedVaultHarness> _pumpLockedVaultApp(WidgetTester tester) async {
+Future<_LockedVaultHarness> _pumpLockedVaultApp(
+  WidgetTester tester, {
+  PlatformCapabilities? capabilities,
+}) async {
   final database = SerlinkDatabase(NativeDatabase.memory());
   final transferQueue = TransferQueueController();
   final secretStore = InMemorySecretStore();
@@ -850,6 +885,8 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(WidgetTester tester) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        if (capabilities != null)
+          platformCapabilitiesProvider.overrideWithValue(capabilities),
         serlinkDatabaseProvider.overrideWithValue(database),
         vaultCryptoConfigProvider.overrideWithValue(
           const VaultCryptoConfig.testing(),

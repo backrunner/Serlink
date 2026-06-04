@@ -702,30 +702,23 @@ void main() {
     expect(find.widgetWithText(SerlinkTextButton, 'Lock'), findsOneWidget);
   });
 
-  testWidgets(
-    'settings runtime exports logs and keeps diagnostic information',
-    (tester) async {
-      await _pumpLockedVaultApp(tester);
-      await _submitVaultPassphrase(tester, 'correct horse battery staple');
+  testWidgets('settings runtime exports diagnostic logs', (tester) async {
+    await _pumpLockedVaultApp(tester);
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
 
-      await tester.tap(find.text('Settings'));
-      await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, -900));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Debug logging'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('settings-debug-log-export-button')),
-        findsOneWidget,
-      );
-      expect(find.text('Crash reporting'), findsNothing);
-      expect(find.text('Diagnostic information'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('settings-diagnostic-info-export-button')),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(find.text('Diagnostic logs'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-diagnostic-log-export-button')),
+      findsOneWidget,
+    );
+    expect(find.text('Debug logging'), findsNothing);
+    expect(find.text('Crash reporting'), findsNothing);
+  });
 
   testWidgets(
     'hosts show loading while encrypted records initialize after unlock',

@@ -287,10 +287,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsRuntimeSection => 'Runtime';
 
   @override
-  String get settingsDebugLoggingTitle => 'Debug logging';
-
-  @override
-  String get settingsDiagnosticBundleTitle => 'Diagnostic information';
+  String get settingsDiagnosticBundleTitle => 'Diagnostic logs';
 
   @override
   String get settingsExportAction => 'Export';
@@ -1880,7 +1877,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dataExchangeExportDiagnosticBundleTitle =>
-      'Export diagnostic bundle';
+      'Export diagnostic logs';
 
   @override
   String get dataExchangeExportDiagnosticBundleSubtitle =>
@@ -1981,36 +1978,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get identityMetadataExportedSnack => 'Identity metadata exported.';
 
   @override
-  String get exportRuntimeDebugLogTitle => 'Export runtime debug log?';
-
-  @override
-  String get exportRuntimeDebugLogBody =>
-      'The log export is redacted and includes the runtime debug log tail only.';
-
-  @override
-  String get runtimeDebugLogExportedSnack => 'Runtime debug log exported.';
-
-  @override
-  String get runtimeDebugLogExportFailed =>
-      'Runtime debug log could not be exported.';
-
-  @override
-  String get exportDiagnosticBundleTitle => 'Export diagnostic information?';
+  String get exportDiagnosticBundleTitle => 'Export diagnostic logs?';
 
   @override
   String get exportDiagnosticBundleBody =>
-      'The diagnostic information is redacted and excludes terminal output, commands, hosts, usernames, paths, credentials, and private keys.';
+      'Diagnostic logs are redacted and exclude terminal output, commands, hosts, usernames, paths, credentials, and private keys.';
 
   @override
-  String get diagnosticBundleExportedSnack =>
-      'Diagnostic information exported.';
+  String get diagnosticBundleExportedSnack => 'Diagnostic logs exported.';
 
   @override
   String get backupOperationFailed => 'Backup operation failed.';
 
   @override
-  String get diagnosticExportFailed =>
-      'Diagnostic information could not be exported.';
+  String get diagnosticExportFailed => 'Diagnostic logs could not be exported.';
 
   @override
   String get openSshConfigExportFailed =>

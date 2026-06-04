@@ -204,11 +204,13 @@ class _SettingsSurface extends ConsumerWidget {
                   title: l10n.settingsRuntimeSection,
                   children: [
                     _SettingsActionRow(
-                      icon: Icons.bug_report_outlined,
-                      title: l10n.settingsDebugLoggingTitle,
+                      icon: Icons.article_outlined,
+                      title: l10n.settingsDiagnosticBundleTitle,
                       action: _SettingsTextButton(
-                        key: const ValueKey('settings-debug-log-export-button'),
-                        onPressed: () => _exportRuntimeDebugLog(context, ref),
+                        key: const ValueKey(
+                          'settings-diagnostic-log-export-button',
+                        ),
+                        onPressed: () => _exportDiagnosticBundle(context, ref),
                         child: Text(l10n.settingsExportAction),
                       ),
                     ),

@@ -39,6 +39,7 @@ class SerlinkDialog extends StatelessWidget {
     this.actionsPadding,
     this.constraints,
     this.maxWidth = 920,
+    this.style = const FDialogStyleDelta.context(),
   });
 
   final Widget? title;
@@ -49,11 +50,13 @@ class SerlinkDialog extends StatelessWidget {
   final EdgeInsetsGeometry? actionsPadding;
   final BoxConstraints? constraints;
   final double maxWidth;
+  final FDialogStyleDelta style;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     return FDialog.raw(
+      style: style,
       clipBehavior: Clip.antiAlias,
       constraints:
           constraints ??

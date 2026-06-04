@@ -127,8 +127,11 @@ class _SyncSettingsSection extends ConsumerWidget {
               icon: Icons.devices_outlined,
               title: l10n.syncDevicesTitle,
               subtitle: _syncDevicesSubtitle(l10n, devices),
-              action: Row(
-                mainAxisSize: MainAxisSize.min,
+              actionWidth: 188,
+              action: Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                alignment: WrapAlignment.end,
                 children: [
                   _SettingsTextButton(
                     onPressed: () =>
@@ -326,8 +329,11 @@ class _SyncConflictRow extends ConsumerWidget {
       icon: Icons.report_problem_outlined,
       title: l10n.syncConflictsTitle,
       subtitle: l10n.syncConflictsSubtitle(conflicts.length),
-      action: Row(
-        mainAxisSize: MainAxisSize.min,
+      actionWidth: 286,
+      action: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        alignment: WrapAlignment.end,
         children: [
           _SettingsTextButton(
             onPressed: () => _reviewWebDavConflicts(context, ref, conflicts),

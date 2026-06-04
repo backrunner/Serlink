@@ -205,56 +205,233 @@ class _SftpEntryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return SerlinkListTile(
-      dense: true,
-      leading: Icon(icon),
-      title: Text(name, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        metadataLabel.isEmpty ? typeLabel : '$typeLabel · $metadataLabel',
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: SizedBox(
-        width: 408,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Flexible(child: Text(sizeLabel, overflow: TextOverflow.ellipsis)),
-            const SizedBox(width: 16),
-            SizedBox(width: 88, child: Text(permissionsLabel)),
-            SerlinkIconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: l10n.downloadAction,
-              onPressed: onDownload,
-              icon: const Icon(Icons.download_outlined, size: 16),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 560;
+        if (compact) {
+          return _CompactSftpEntryRow(
+            name: name,
+            typeLabel: typeLabel,
+            icon: icon,
+            sizeLabel: sizeLabel,
+            permissionsLabel: permissionsLabel,
+            metadataLabel: metadataLabel,
+            onTap: onTap,
+            onRename: onRename,
+            onMove: onMove,
+            onChmod: onChmod,
+            onDelete: onDelete,
+            onDownload: onDownload,
+          );
+        }
+        return SerlinkListTile(
+          dense: true,
+          leading: Icon(icon),
+          title: Text(name, overflow: TextOverflow.ellipsis),
+          subtitle: Text(
+            metadataLabel.isEmpty ? typeLabel : '$typeLabel · $metadataLabel',
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: SizedBox(
+            width: 408,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(sizeLabel, overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 16),
+                SizedBox(width: 88, child: Text(permissionsLabel)),
+                _SftpEntryActionButton(
+                  tooltip: l10n.downloadAction,
+                  onPressed: onDownload,
+                  icon: const Icon(Icons.download_outlined, size: 16),
+                ),
+                _SftpEntryActionButton(
+                  tooltip: l10n.renameAction,
+                  onPressed: onRename,
+                  icon: const Icon(Icons.drive_file_rename_outline, size: 16),
+                ),
+                _SftpEntryActionButton(
+                  tooltip: l10n.moveAction,
+                  onPressed: onMove,
+                  icon: const Icon(Icons.drive_file_move_outline, size: 16),
+                ),
+                _SftpEntryActionButton(
+                  tooltip: l10n.sftpChangePermissionsTitle,
+                  onPressed: onChmod,
+                  icon: const Icon(
+                    Icons.admin_panel_settings_outlined,
+                    size: 16,
+                  ),
+                ),
+                _SftpEntryActionButton(
+                  tooltip: l10n.deleteAction,
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                ),
+              ],
             ),
-            SerlinkIconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: l10n.renameAction,
-              onPressed: onRename,
-              icon: const Icon(Icons.drive_file_rename_outline, size: 16),
-            ),
-            SerlinkIconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: l10n.moveAction,
-              onPressed: onMove,
-              icon: const Icon(Icons.drive_file_move_outline, size: 16),
-            ),
-            SerlinkIconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: l10n.sftpChangePermissionsTitle,
-              onPressed: onChmod,
-              icon: const Icon(Icons.admin_panel_settings_outlined, size: 16),
-            ),
-            SerlinkIconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: l10n.deleteAction,
-              onPressed: onDelete,
-              icon: const Icon(Icons.delete_outline, size: 16),
-            ),
-          ],
-        ),
-      ),
+          ),
+          onTap: onTap,
+        );
+      },
+    );
+  }
+}
+
+class _CompactSftpEntryRow extends StatelessWidget {
+  const _CompactSftpEntryRow({
+    required this.name,
+    required this.typeLabel,
+    required this.icon,
+    required this.sizeLabel,
+    required this.permissionsLabel,
+    required this.metadataLabel,
+    required this.onTap,
+    required this.onRename,
+    required this.onMove,
+    required this.onChmod,
+    required this.onDelete,
+    required this.onDownload,
+  });
+
+  final String name;
+  final String typeLabel;
+  final IconData icon;
+  final String sizeLabel;
+  final String permissionsLabel;
+  final String metadataLabel;
+  final VoidCallback? onTap;
+  final VoidCallback? onRename;
+  final VoidCallback? onMove;
+  final VoidCallback? onChmod;
+  final VoidCallback? onDelete;
+  final VoidCallback? onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final t = context.tokens;
+    final metadataParts = [
+      if (sizeLabel.isNotEmpty) sizeLabel,
+      if (metadataLabel.isNotEmpty) metadataLabel,
+    ];
+
+    return SerlinkPressable(
       onTap: onTap,
+      borderRadius: BorderRadius.zero,
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: t.textSecondary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: t.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      typeLabel,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                    ),
+                    if (permissionsLabel.isNotEmpty)
+                      Text(
+                        permissionsLabel,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: t.textSecondary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    for (final part in metadataParts)
+                      Text(
+                        part,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Wrap(
+            spacing: 2,
+            runSpacing: 2,
+            alignment: WrapAlignment.end,
+            children: [
+              _SftpEntryActionButton(
+                tooltip: l10n.downloadAction,
+                onPressed: onDownload,
+                icon: const Icon(Icons.download_outlined, size: 16),
+              ),
+              _SftpEntryActionButton(
+                tooltip: l10n.renameAction,
+                onPressed: onRename,
+                icon: const Icon(Icons.drive_file_rename_outline, size: 16),
+              ),
+              _SftpEntryActionButton(
+                tooltip: l10n.moveAction,
+                onPressed: onMove,
+                icon: const Icon(Icons.drive_file_move_outline, size: 16),
+              ),
+              _SftpEntryActionButton(
+                tooltip: l10n.sftpChangePermissionsTitle,
+                onPressed: onChmod,
+                icon: const Icon(Icons.admin_panel_settings_outlined, size: 16),
+              ),
+              _SftpEntryActionButton(
+                tooltip: l10n.deleteAction,
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline, size: 16),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SftpEntryActionButton extends StatelessWidget {
+  const _SftpEntryActionButton({
+    required this.tooltip,
+    required this.onPressed,
+    required this.icon,
+  });
+
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final Widget icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SerlinkIconButton(
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: icon,
     );
   }
 }

@@ -752,6 +752,72 @@ void main() {
     );
   });
 
+  testWidgets('iOS SFTP pane keeps controls within the viewport', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('host-display-name-field')),
+      'Mobile SFTP',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'mobile.internal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'ops',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-password-field')),
+      'server-password',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SFTP'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('sftp-path-display')), findsOneWidget);
+    expect(find.byKey(const ValueKey('sftp-search-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('sftp-hidden-toggle')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('sftp-new-folder-button')),
+      findsOneWidget,
+    );
+    expect(find.text('app.env'), findsOneWidget);
+    expect(find.text('rw-r-----'), findsOneWidget);
+
+    for (final finder in [
+      find.byKey(const ValueKey('sftp-path-display')),
+      find.byKey(const ValueKey('sftp-search-field')),
+      find.byKey(const ValueKey('sftp-hidden-toggle')),
+      find.byKey(const ValueKey('sftp-new-folder-button')),
+      find.text('app.env'),
+    ]) {
+      final rect = tester.getRect(finder);
+      expect(rect.left, greaterThanOrEqualTo(0));
+      expect(rect.right, lessThanOrEqualTo(390));
+    }
+
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'hosts show loading while encrypted records initialize after unlock',
     (tester) async {

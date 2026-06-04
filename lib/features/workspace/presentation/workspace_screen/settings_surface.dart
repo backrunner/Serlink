@@ -212,17 +212,6 @@ class _SettingsSurface extends ConsumerWidget {
                         child: Text(l10n.settingsExportAction),
                       ),
                     ),
-                    _SettingsActionRow(
-                      icon: Icons.support_agent_outlined,
-                      title: l10n.settingsDiagnosticBundleTitle,
-                      action: _SettingsTextButton(
-                        key: const ValueKey(
-                          'settings-diagnostic-info-export-button',
-                        ),
-                        onPressed: () => _exportDiagnosticBundle(context, ref),
-                        child: Text(l10n.settingsExportAction),
-                      ),
-                    ),
                   ],
                 ),
               ],

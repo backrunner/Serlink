@@ -20,19 +20,32 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
     required IdentityRepository identities,
     required VaultRecordRepository records,
     required VaultService vault,
-  }) : this._(hosts, identities, records, vault);
+    bool sshAgentAuthAvailable = true,
+    bool hardwareKeyAuthAvailable = false,
+  }) : this._(
+         hosts,
+         identities,
+         records,
+         vault,
+         sshAgentAuthAvailable,
+         hardwareKeyAuthAvailable,
+       );
 
   EncryptedConnectionProfileResolver._(
     this._hosts,
     this._identities,
     this._records,
     this._vault,
+    this._sshAgentAuthAvailable,
+    this._hardwareKeyAuthAvailable,
   );
 
   final HostRepository _hosts;
   final IdentityRepository _identities;
   final VaultRecordRepository _records;
   final VaultService _vault;
+  final bool _sshAgentAuthAvailable;
+  final bool _hardwareKeyAuthAvailable;
 
   @override
   Future<ConnectionProfileSnapshot> resolve({
@@ -164,9 +177,29 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
         ],
       ),
       IdentityKind.openSshCertificate => _certificateAuth(identity),
-      IdentityKind.sshAgent => const SshAgentAuth(),
-      IdentityKind.hardwareKey => const SshHardwareKeyAuth(),
+      IdentityKind.sshAgent => _sshAgentAuth(),
+      IdentityKind.hardwareKey => _hardwareKeyAuth(),
     };
+  }
+
+  SshAgentAuth _sshAgentAuth() {
+    if (!_sshAgentAuthAvailable) {
+      throw ConnectionProfileResolutionException(
+        'connection_profile.ssh_agent_unsupported',
+        'SSH agent authentication is not available on this platform.',
+      );
+    }
+    return const SshAgentAuth();
+  }
+
+  SshHardwareKeyAuth _hardwareKeyAuth() {
+    if (!_hardwareKeyAuthAvailable) {
+      throw ConnectionProfileResolutionException(
+        'connection_profile.hardware_key_unsupported',
+        'Hardware key authentication is not available on this platform.',
+      );
+    }
+    return const SshHardwareKeyAuth();
   }
 
   Future<SshPrivateKeyAuth> _privateKeyAuth(IdentityConfig identity) async {

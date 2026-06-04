@@ -41,7 +41,9 @@ import '../features/vault/application/in_memory_vault_service.dart';
 import '../features/vault/application/vault_record_repository.dart';
 import '../features/vault/application/vault_service.dart';
 import '../features/vault/data/drift_vault_repository.dart';
+import '../platform/document_gateway.dart';
 import '../platform/flutter_secure_storage_secret_store.dart';
+import '../platform/platform_capabilities.dart';
 import '../platform/secret_store.dart';
 import 'app_navigator.dart';
 
@@ -84,6 +86,14 @@ final vaultRecordRepositoryProvider = Provider<VaultRecordRepository>((ref) {
 
 final secretStoreProvider = Provider<SecretStore>((ref) {
   return const FlutterSecureStorageSecretStore();
+});
+
+final platformCapabilitiesProvider = Provider<PlatformCapabilities>((ref) {
+  return PlatformCapabilities.current();
+});
+
+final documentGatewayProvider = Provider<DocumentGateway>((ref) {
+  return DocumentGateway(capabilities: ref.watch(platformCapabilitiesProvider));
 });
 
 final appLanguageSettingsRepositoryProvider =
@@ -236,6 +246,7 @@ final syncSettingsServiceProvider = Provider<SyncSettingsService>((ref) {
   return SyncSettingsService(
     settings: ref.watch(syncSettingsRepositoryProvider),
     secrets: ref.watch(secretStoreProvider),
+    cloudKitAvailable: ref.watch(platformCapabilitiesProvider).cloudKitSync,
   );
 });
 
@@ -248,12 +259,18 @@ final webDavSyncSettingsProvider = FutureProvider<WebDavSyncSettings?>((ref) {
 });
 
 final iCloudAvailableProvider = FutureProvider<bool>((ref) {
+  if (!ref.watch(platformCapabilitiesProvider).cloudKitSync) {
+    return false;
+  }
   return CloudKitSyncProvider.isAvailable();
 });
 
 final cloudKitSyncSettingsProvider = FutureProvider<CloudKitSyncSettings?>((
   ref,
 ) {
+  if (!ref.watch(platformCapabilitiesProvider).cloudKitSync) {
+    return null;
+  }
   final vaultSession = ref.watch(vaultSessionControllerProvider).value;
   if (vaultSession?.vaultState != VaultState.unlocked) {
     return null;
@@ -954,10 +971,13 @@ String _vaultFailureMessage(Object error) {
 
 final encryptedConnectionProfileResolverProvider =
     Provider<ConnectionProfileResolver>((ref) {
+      final capabilities = ref.watch(platformCapabilitiesProvider);
       return EncryptedConnectionProfileResolver(
         hosts: ref.watch(hostRepositoryProvider),
         identities: ref.watch(identityRepositoryProvider),
         records: ref.watch(vaultRecordRepositoryProvider),
         vault: ref.watch(vaultServiceProvider),
+        sshAgentAuthAvailable: capabilities.sshAgentAuth,
+        hardwareKeyAuthAvailable: capabilities.hardwareKeyAuth,
       );
     });

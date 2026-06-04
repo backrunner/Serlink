@@ -97,11 +97,12 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final capabilities = ref.watch(platformCapabilitiesProvider);
     final mediaSize = MediaQuery.sizeOf(context);
-    final dialogWidth = math.min(680.0, math.max(360.0, mediaSize.width - 96));
+    final dialogWidth = _adaptiveDialogWidth(context, 680);
     final dialogHeight = math.min(
       720.0,
-      math.max(420.0, mediaSize.height - 140),
+      math.max(360.0, mediaSize.height - (mediaSize.width < 600 ? 80 : 140)),
     );
 
     return SerlinkDialog(
@@ -185,6 +186,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                       passwordVisible: _passwordVisible,
                       privateKeyController: _privateKeyController,
                       keyPassphraseController: _keyPassphraseController,
+                      showSshAgent: capabilities.sshAgentAuth,
                       identityOptions: _identityOptions,
                       selectedIdentityIds: _selectedIdentityIds,
                       onAuthModeChanged: (authMode) {
@@ -361,7 +363,8 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             connectionSettings: connectionSettings,
           ),
         );
-      } else if (_authMode == _HostAuthInputMode.sshAgent) {
+      } else if (_authMode == _HostAuthInputMode.sshAgent &&
+          ref.read(platformCapabilitiesProvider).sshAgentAuth) {
         await service.createSshAgentHost(
           SshAgentHostDraft(
             displayName: _displayNameController.text,
@@ -413,19 +416,25 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   }
 
   Future<void> _importPrivateKey() async {
-    final file = await openFile(
-      acceptedTypeGroups: const [
-        XTypeGroup(label: 'SSH Private Key', extensions: ['pem', 'key', 'txt']),
-      ],
-    );
+    final file = await ref
+        .read(documentGatewayProvider)
+        .pickUploadFile(
+          acceptedTypeGroups: const [
+            XTypeGroup(
+              label: 'SSH Private Key',
+              extensions: ['pem', 'key', 'txt'],
+            ),
+          ],
+        );
     if (file == null) {
       return;
     }
-    _privateKeyController.text = await file.readAsString();
+    _privateKeyController.text = await File(file.path).readAsString();
   }
 
   Future<void> _loadOptions() async {
     try {
+      final capabilities = ref.read(platformCapabilitiesProvider);
       final identities = await ref.read(identityRepositoryProvider).list();
       final hostConfigs = await ref.read(hostRepositoryProvider).list();
       final editingHostId = widget.host?.id;
@@ -450,7 +459,12 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
           if (host.id != editingHostId) host,
       ];
       setState(() {
-        _identityOptions = List<IdentityConfig>.unmodifiable(identities);
+        _identityOptions = List<IdentityConfig>.unmodifiable(
+          identities.where(
+            (identity) =>
+                _identitySupportedByCapabilities(identity, capabilities),
+          ),
+        );
         _jumpHostOptions = List<HostSummary>.unmodifiable(jumpHosts);
         if (hostConfig != null) {
           _selectedIdentityIds = {...hostConfig.identityIds};
@@ -519,6 +533,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     if (updated != true || !mounted) {
       return;
     }
+    final capabilities = ref.read(platformCapabilitiesProvider);
     final identities = await ref.read(identityRepositoryProvider).list();
     identities.sort(
       (left, right) => left.displayName.toLowerCase().compareTo(
@@ -529,7 +544,12 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       return;
     }
     setState(() {
-      _identityOptions = List<IdentityConfig>.unmodifiable(identities);
+      _identityOptions = List<IdentityConfig>.unmodifiable(
+        identities.where(
+          (identity) =>
+              _identitySupportedByCapabilities(identity, capabilities),
+        ),
+      );
     });
   }
 
@@ -582,5 +602,16 @@ String _identityKindLabel(AppLocalizations l10n, IdentityKind kind) {
     IdentityKind.openSshCertificate => l10n.identityKindCertificate,
     IdentityKind.sshAgent => l10n.identityKindSshAgent,
     IdentityKind.hardwareKey => l10n.identityKindHardwareKey,
+  };
+}
+
+bool _identitySupportedByCapabilities(
+  IdentityConfig identity,
+  PlatformCapabilities capabilities,
+) {
+  return switch (identity.kind) {
+    IdentityKind.sshAgent => capabilities.sshAgentAuth,
+    IdentityKind.hardwareKey => capabilities.hardwareKeyAuth,
+    _ => true,
   };
 }

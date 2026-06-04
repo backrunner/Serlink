@@ -18,12 +18,28 @@ class SerlinkTheme {
     tokens: SerlinkTokens.dark,
     baseColors: FThemes.neutral.dark.desktop.colors,
     debugLabel: 'Serlink Dark Desktop',
+    touch: false,
   );
 
   static FThemeData foruiLight() => _buildForui(
     tokens: SerlinkTokens.light,
     baseColors: FThemes.neutral.light.desktop.colors,
     debugLabel: 'Serlink Light Desktop',
+    touch: false,
+  );
+
+  static FThemeData foruiDarkTouch() => _buildForui(
+    tokens: SerlinkTokens.dark,
+    baseColors: FThemes.neutral.dark.touch.colors,
+    debugLabel: 'Serlink Dark Touch',
+    touch: true,
+  );
+
+  static FThemeData foruiLightTouch() => _buildForui(
+    tokens: SerlinkTokens.light,
+    baseColors: FThemes.neutral.light.touch.colors,
+    debugLabel: 'Serlink Light Touch',
+    touch: true,
   );
 }
 
@@ -31,6 +47,7 @@ FThemeData _buildForui({
   required SerlinkTokens tokens,
   required FColors baseColors,
   required String debugLabel,
+  required bool touch,
 }) {
   final colors = baseColors.copyWith(
     barrier: tokens.shadowColor.withValues(alpha: 0.52),
@@ -49,12 +66,12 @@ FThemeData _buildForui({
     card: tokens.surfaceRaised,
     border: tokens.borderSubtle,
   );
-  final typography = FTypography.inherit(colors: colors, touch: false);
+  final typography = FTypography.inherit(colors: colors, touch: touch);
   final style =
       FStyle.inherit(
         colors: colors,
         typography: typography,
-        touch: false,
+        touch: touch,
       ).copyWith(
         borderRadius: const FBorderRadius(
           xs2: BorderRadius.all(Radius.circular(4)),
@@ -70,13 +87,13 @@ FThemeData _buildForui({
         shadow: serlinkShadow(tokens, elevation: 18),
       );
   return FThemeData(
-    touch: false,
+    touch: touch,
     debugLabel: debugLabel,
     colors: colors,
     typography: typography,
     style: style,
-    cardStyle: _foruiCardStyle(tokens, colors, typography, style),
-    dialogStyle: _foruiDialogStyle(tokens, colors, typography, style),
+    cardStyle: _foruiCardStyle(tokens, colors, typography, style, touch),
+    dialogStyle: _foruiDialogStyle(tokens, colors, typography, style, touch),
   );
 }
 
@@ -85,12 +102,13 @@ FCardStyle _foruiCardStyle(
   FColors colors,
   FTypography typography,
   FStyle style,
+  bool touch,
 ) {
   return FCardStyle.inherit(
     colors: colors,
     typography: typography,
     style: style,
-    touch: false,
+    touch: touch,
   ).copyWith(
     decoration: DecorationDelta.value(
       ShapeDecoration(
@@ -109,13 +127,14 @@ FDialogStyle _foruiDialogStyle(
   FColors colors,
   FTypography typography,
   FStyle style,
+  bool touch,
 ) {
   return FDialogStyle.inherit(
     colors: colors,
     typography: typography,
     style: style,
     hapticFeedback: const FHapticFeedback(),
-    touch: false,
+    touch: touch,
   ).copyWith(
     decoration: DecorationDelta.value(
       ShapeDecoration(

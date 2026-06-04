@@ -135,6 +135,7 @@ class _TransferTaskRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final t = context.tokens;
+    final capabilities = ref.watch(platformCapabilitiesProvider);
     final queue = ref.read(transferQueueControllerProvider);
     final progress = task.totalBytes == null || task.totalBytes == 0
         ? null
@@ -142,7 +143,9 @@ class _TransferTaskRow extends ConsumerWidget {
     final isActive =
         task.state == TransferState.running ||
         task.state == TransferState.paused;
-    final canOpen = task.state == TransferState.completed;
+    final canOpen =
+        task.state == TransferState.completed &&
+        (capabilities.openLocalFile || capabilities.documentExport);
 
     return SerlinkContextMenu(
       actions: [
@@ -157,7 +160,7 @@ class _TransferTaskRow extends ConsumerWidget {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onDoubleTap: canOpen
-              ? () => unawaited(_openCompletedTransfer(context, task))
+              ? () => unawaited(_openCompletedTransfer(context, ref, task))
               : null,
           child: ListRow(
             child: Column(
@@ -369,6 +372,7 @@ Future<void> _deleteTransfer(
 
 Future<void> _openCompletedTransfer(
   BuildContext context,
+  WidgetRef ref,
   TransferTask task,
 ) async {
   if (task.state != TransferState.completed) {
@@ -383,7 +387,24 @@ Future<void> _openCompletedTransfer(
     return;
   }
   try {
-    await _openLocalPath(task.localPath);
+    final capabilities = ref.read(platformCapabilitiesProvider);
+    if (capabilities.openLocalFile) {
+      await _openLocalPath(task.localPath);
+      return;
+    }
+    if (localType == FileSystemEntityType.file && capabilities.documentExport) {
+      final exported = await ref
+          .read(documentGatewayProvider)
+          .exportLocalFile(
+            task.localPath,
+            suggestedName: _fileName(task.localPath),
+          );
+      if (!exported && context.mounted) {
+        _showSnackBar(context, context.l10n.transferOpenFailedSnack);
+      }
+      return;
+    }
+    throw UnsupportedError('Opening files is not supported.');
   } on Object {
     if (context.mounted) {
       _showSnackBar(context, context.l10n.transferOpenFailedSnack);

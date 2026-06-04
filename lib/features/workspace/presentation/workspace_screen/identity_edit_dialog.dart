@@ -256,11 +256,13 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
     required TextEditingController controller,
     required XTypeGroup typeGroup,
   }) async {
-    final file = await openFile(acceptedTypeGroups: [typeGroup]);
+    final file = await ref
+        .read(documentGatewayProvider)
+        .pickUploadFile(acceptedTypeGroups: [typeGroup]);
     if (file == null) {
       return;
     }
-    controller.text = await file.readAsString();
+    controller.text = await File(file.path).readAsString();
   }
 }
 

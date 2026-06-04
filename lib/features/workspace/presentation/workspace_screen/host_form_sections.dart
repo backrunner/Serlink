@@ -24,7 +24,9 @@ class _PrivateKeyFields extends StatelessWidget {
                 controller: privateKeyController,
                 minLines: 5,
                 maxLines: 8,
-                decoration: InputDecoration(labelText: l10n.hostPrivateKeyLabel),
+                decoration: InputDecoration(
+                  labelText: l10n.hostPrivateKeyLabel,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -224,6 +226,7 @@ class _HostAuthenticationFields extends StatelessWidget {
     required this.passwordVisible,
     required this.privateKeyController,
     required this.keyPassphraseController,
+    required this.showSshAgent,
     required this.identityOptions,
     required this.selectedIdentityIds,
     required this.onAuthModeChanged,
@@ -241,6 +244,7 @@ class _HostAuthenticationFields extends StatelessWidget {
   final bool passwordVisible;
   final TextEditingController privateKeyController;
   final TextEditingController keyPassphraseController;
+  final bool showSshAgent;
   final List<IdentityConfig> identityOptions;
   final Set<IdentityId> selectedIdentityIds;
   final ValueChanged<_HostAuthInputMode> onAuthModeChanged;
@@ -280,11 +284,12 @@ class _HostAuthenticationFields extends StatelessWidget {
                 icon: Icons.key,
                 label: l10n.hostAuthKeySegment,
               ),
-              SerlinkSegment(
-                value: _HostAuthInputMode.sshAgent,
-                icon: Icons.vpn_key_outlined,
-                label: l10n.hostAuthAgentSegment,
-              ),
+              if (showSshAgent)
+                SerlinkSegment(
+                  value: _HostAuthInputMode.sshAgent,
+                  icon: Icons.vpn_key_outlined,
+                  label: l10n.hostAuthAgentSegment,
+                ),
               SerlinkSegment(
                 value: _HostAuthInputMode.savedOrNone,
                 icon: Icons.badge_outlined,

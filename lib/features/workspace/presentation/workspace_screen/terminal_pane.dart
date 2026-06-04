@@ -42,6 +42,9 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
   _RemoteForwardDraft? _activeRemoteForward;
   _DynamicForwardDraft? _activeDynamicForward;
   bool _forwardBusy = false;
+  bool _ctrlLatched = false;
+  bool _altLatched = false;
+  bool _shiftLatched = false;
 
   @override
   void initState() {
@@ -86,6 +89,15 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
       }
       _buildPaneControllers();
     }
+    if (_modifierLatch.isActive &&
+        widget
+                .panes[widget.activePane.clamp(0, widget.panes.length - 1)]
+                .lifecycle !=
+            SessionLifecycleState.connected) {
+      _ctrlLatched = false;
+      _altLatched = false;
+      _shiftLatched = false;
+    }
   }
 
   @override
@@ -96,6 +108,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     final activePaneState =
         widget.panes[widget.activePane.clamp(0, widget.panes.length - 1)];
     final settings = activePaneState.displaySettings ?? globalSettings;
+    final capabilities = ref.watch(platformCapabilitiesProvider);
     _scheduleToolbarSnapshot(activePaneState);
     return Column(
       children: [
@@ -120,14 +133,31 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
                   local: widget.local,
                   onActivatePane: _setActivePane,
                   onKeyEvent: _terminalViewKeyHandler,
+                  onInsertText: _handleTerminalTextInsert,
                 )
               : _SingleTerminalViewport(
                   terminal: _terminals().first,
                   controller: _terminalControllers.first,
                   settings: settings,
                   onKeyEvent: _terminalViewKeyHandler,
+                  onInsertText: _handleTerminalTextInsert,
                 ),
         ),
+        if (capabilities.mobileTerminalAccessory)
+          _TerminalAccessoryBar(
+            connected:
+                activePaneState.lifecycle == SessionLifecycleState.connected,
+            ctrlLatched: _ctrlLatched,
+            altLatched: _altLatched,
+            shiftLatched: _shiftLatched,
+            onToggleCtrl: _toggleCtrlLatch,
+            onToggleAlt: _toggleAltLatch,
+            onToggleShift: _toggleShiftLatch,
+            onControlKey: _sendActiveTerminalControlKey,
+            onPaste: _pasteClipboard,
+            onToggleSearch: _toggleSearch,
+            onOpenSnippets: () => _showTerminalSnippetPicker(context, ref),
+          ),
       ],
     );
   }
@@ -183,6 +213,79 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     ref
         .read(workspaceTabControllerProvider.notifier)
         .closeActiveTerminalPane(widget.tabId);
+  }
+
+  void _sendActiveTerminalInput(String text) {
+    _runtimeRegistry.sendTerminalInput(_activePaneState.sessionId, text);
+  }
+
+  void _sendActiveTerminalControlKey(TerminalControlInputKey key) {
+    if (_activePaneState.lifecycle != SessionLifecycleState.connected) {
+      return;
+    }
+    final sequence = terminalControlInputSequence(key, _modifierLatch);
+    _clearLatchedModifiers();
+    _sendActiveTerminalInput(sequence);
+  }
+
+  String? _handleTerminalTextInsert(String text) {
+    final latch = _modifierLatch;
+    if (!latch.isActive) {
+      return text;
+    }
+    final transformed = applyTerminalModifierLatchToText(text, latch);
+    _clearLatchedModifiers();
+    return transformed;
+  }
+
+  void _toggleCtrlLatch() {
+    _setModifierLatch(ctrl: !_ctrlLatched);
+  }
+
+  void _toggleAltLatch() {
+    _setModifierLatch(alt: !_altLatched);
+  }
+
+  void _toggleShiftLatch() {
+    _setModifierLatch(shift: !_shiftLatched);
+  }
+
+  void _setModifierLatch({bool? ctrl, bool? alt, bool? shift}) {
+    if (_activePaneState.lifecycle != SessionLifecycleState.connected) {
+      return;
+    }
+    setState(() {
+      _ctrlLatched = ctrl ?? _ctrlLatched;
+      _altLatched = alt ?? _altLatched;
+      _shiftLatched = shift ?? _shiftLatched;
+    });
+  }
+
+  void _clearLatchedModifiers() {
+    if (!_modifierLatch.isActive || !mounted) {
+      return;
+    }
+    setState(() {
+      _ctrlLatched = false;
+      _altLatched = false;
+      _shiftLatched = false;
+    });
+  }
+
+  Future<void> _pasteClipboard() async {
+    if (_activePaneState.lifecycle != SessionLifecycleState.connected) {
+      return;
+    }
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text;
+    if (!mounted ||
+        text == null ||
+        text.isEmpty ||
+        _activePaneState.lifecycle != SessionLifecycleState.connected) {
+      return;
+    }
+    _clearLatchedModifiers();
+    _activeTerminal.paste(text);
   }
 
   void _setActivePane(int index) {
@@ -464,6 +567,10 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
   }
 
   KeyEventResult _terminalViewKeyHandler(FocusNode node, KeyEvent event) {
+    final latchResult = _handleLatchedHardwareKey(event);
+    if (latchResult != KeyEventResult.ignored) {
+      return latchResult;
+    }
     if (!shouldHandleTerminalShortcutLocally(event)) {
       return KeyEventResult.ignored;
     }
@@ -476,8 +583,48 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     return KeyEventResult.ignored;
   }
 
+  KeyEventResult _handleLatchedHardwareKey(KeyEvent event) {
+    final latch = _modifierLatch;
+    if (!latch.isActive ||
+        (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
+      return KeyEventResult.ignored;
+    }
+
+    final character = event.character;
+    if (character != null && character.isNotEmpty) {
+      final transformed = applyTerminalModifierLatchToText(character, latch);
+      _clearLatchedModifiers();
+      if (transformed == character) {
+        return KeyEventResult.ignored;
+      }
+      _sendActiveTerminalInput(transformed);
+      return KeyEventResult.handled;
+    }
+
+    final controlKey = _terminalControlKeyForLogicalKey(event.logicalKey);
+    if (controlKey == null) {
+      return KeyEventResult.ignored;
+    }
+    _clearLatchedModifiers();
+    _sendActiveTerminalInput(terminalControlInputSequence(controlKey, latch));
+    return KeyEventResult.handled;
+  }
+
+  TerminalModifierLatch get _modifierLatch {
+    return TerminalModifierLatch(
+      ctrl: _ctrlLatched,
+      alt: _altLatched,
+      shift: _shiftLatched,
+    );
+  }
+
   TerminalPaneState get _activePaneState {
     return widget.panes[widget.activePane.clamp(0, widget.panes.length - 1)];
+  }
+
+  Terminal get _activeTerminal {
+    final terminals = _terminals();
+    return terminals[widget.activePane.clamp(0, terminals.length - 1)];
   }
 
   TerminalBufferSearchController get _activeSearchController {
@@ -531,5 +678,263 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
       }
     }
     return true;
+  }
+}
+
+TerminalControlInputKey? _terminalControlKeyForLogicalKey(
+  LogicalKeyboardKey key,
+) {
+  return switch (key) {
+    LogicalKeyboardKey.escape => TerminalControlInputKey.escape,
+    LogicalKeyboardKey.tab => TerminalControlInputKey.tab,
+    LogicalKeyboardKey.enter => TerminalControlInputKey.enter,
+    LogicalKeyboardKey.backspace => TerminalControlInputKey.backspace,
+    LogicalKeyboardKey.delete => TerminalControlInputKey.delete,
+    LogicalKeyboardKey.arrowUp => TerminalControlInputKey.arrowUp,
+    LogicalKeyboardKey.arrowDown => TerminalControlInputKey.arrowDown,
+    LogicalKeyboardKey.arrowLeft => TerminalControlInputKey.arrowLeft,
+    LogicalKeyboardKey.arrowRight => TerminalControlInputKey.arrowRight,
+    LogicalKeyboardKey.pageUp => TerminalControlInputKey.pageUp,
+    LogicalKeyboardKey.pageDown => TerminalControlInputKey.pageDown,
+    LogicalKeyboardKey.home => TerminalControlInputKey.home,
+    LogicalKeyboardKey.end => TerminalControlInputKey.end,
+    _ => null,
+  };
+}
+
+class _TerminalAccessoryBar extends StatelessWidget {
+  const _TerminalAccessoryBar({
+    required this.connected,
+    required this.ctrlLatched,
+    required this.altLatched,
+    required this.shiftLatched,
+    required this.onToggleCtrl,
+    required this.onToggleAlt,
+    required this.onToggleShift,
+    required this.onControlKey,
+    required this.onPaste,
+    required this.onToggleSearch,
+    required this.onOpenSnippets,
+  });
+
+  final bool connected;
+  final bool ctrlLatched;
+  final bool altLatched;
+  final bool shiftLatched;
+  final VoidCallback onToggleCtrl;
+  final VoidCallback onToggleAlt;
+  final VoidCallback onToggleShift;
+  final ValueChanged<TerminalControlInputKey> onControlKey;
+  final VoidCallback onPaste;
+  final VoidCallback onToggleSearch;
+  final VoidCallback onOpenSnippets;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.surfaceRaised,
+        border: Border(top: BorderSide(color: t.borderSubtle)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 50,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            children: [
+              _TerminalAccessoryKey(
+                label: 'Ctrl',
+                enabled: connected,
+                selected: ctrlLatched,
+                onPressed: onToggleCtrl,
+              ),
+              _TerminalAccessoryKey(
+                label: 'Shift',
+                enabled: connected,
+                selected: shiftLatched,
+                onPressed: onToggleShift,
+              ),
+              _TerminalAccessoryKey(
+                label: 'Alt',
+                enabled: connected,
+                selected: altLatched,
+                onPressed: onToggleAlt,
+              ),
+              _TerminalAccessoryKey(
+                label: 'Esc',
+                enabled: connected,
+                onPressed: () => onControlKey(TerminalControlInputKey.escape),
+              ),
+              _TerminalAccessoryKey(
+                label: 'Tab',
+                enabled: connected,
+                onPressed: () => onControlKey(TerminalControlInputKey.tab),
+              ),
+              _TerminalAccessoryIconKey(
+                icon: Icons.keyboard_arrow_up,
+                enabled: connected,
+                onPressed: () => onControlKey(TerminalControlInputKey.arrowUp),
+              ),
+              _TerminalAccessoryIconKey(
+                icon: Icons.keyboard_arrow_down,
+                enabled: connected,
+                onPressed: () =>
+                    onControlKey(TerminalControlInputKey.arrowDown),
+              ),
+              _TerminalAccessoryIconKey(
+                icon: Icons.keyboard_arrow_left,
+                enabled: connected,
+                onPressed: () =>
+                    onControlKey(TerminalControlInputKey.arrowLeft),
+              ),
+              _TerminalAccessoryIconKey(
+                icon: Icons.keyboard_arrow_right,
+                enabled: connected,
+                onPressed: () =>
+                    onControlKey(TerminalControlInputKey.arrowRight),
+              ),
+              _TerminalAccessoryKey(
+                label: 'Home',
+                enabled: connected,
+                onPressed: () => onControlKey(TerminalControlInputKey.home),
+              ),
+              _TerminalAccessoryKey(
+                label: 'End',
+                enabled: connected,
+                onPressed: () => onControlKey(TerminalControlInputKey.end),
+              ),
+              _TerminalAccessoryKey(
+                label: 'PgUp',
+                enabled: connected,
+                onPressed: () => onControlKey(TerminalControlInputKey.pageUp),
+              ),
+              _TerminalAccessoryKey(
+                label: 'PgDn',
+                enabled: connected,
+                onPressed: () => onControlKey(TerminalControlInputKey.pageDown),
+              ),
+              _TerminalAccessoryIconKey(
+                icon: Icons.content_paste,
+                enabled: connected,
+                onPressed: onPaste,
+              ),
+              _TerminalAccessoryIconKey(
+                icon: Icons.search,
+                enabled: true,
+                onPressed: onToggleSearch,
+              ),
+              _TerminalAccessoryIconKey(
+                icon: Icons.code_outlined,
+                enabled: true,
+                onPressed: onOpenSnippets,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TerminalAccessoryKey extends StatelessWidget {
+  const _TerminalAccessoryKey({
+    required this.label,
+    required this.enabled,
+    required this.onPressed,
+    this.selected = false,
+  });
+
+  final String label;
+  final bool enabled;
+  final VoidCallback? onPressed;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: SerlinkPressable(
+        onTap: enabled ? onPressed : null,
+        borderRadius: SerlinkRadii.control,
+        hoverColor: t.accentPrimary.withValues(alpha: 0.08),
+        pressedColor: t.accentPrimary.withValues(alpha: 0.14),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 120),
+          opacity: enabled ? 1 : 0.45,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: selected
+                  ? t.accentPrimary.withValues(alpha: 0.16)
+                  : t.surfaceSunken,
+              borderRadius: SerlinkRadii.control,
+              border: Border.all(
+                color: selected ? t.accentPrimary : t.borderSubtle,
+              ),
+            ),
+            child: SizedBox(
+              height: 36,
+              width: label.length > 4 ? 64 : 52,
+              child: Center(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? t.accentPrimary : t.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TerminalAccessoryIconKey extends StatelessWidget {
+  const _TerminalAccessoryIconKey({
+    required this.icon,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: SerlinkPressable(
+        onTap: enabled ? onPressed : null,
+        borderRadius: SerlinkRadii.control,
+        hoverColor: t.accentPrimary.withValues(alpha: 0.08),
+        pressedColor: t.accentPrimary.withValues(alpha: 0.14),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 120),
+          opacity: enabled ? 1 : 0.45,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: t.surfaceSunken,
+              borderRadius: SerlinkRadii.control,
+              border: Border.all(color: t.borderSubtle),
+            ),
+            child: SizedBox.square(
+              dimension: 36,
+              child: Icon(icon, size: 20, color: t.textPrimary),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

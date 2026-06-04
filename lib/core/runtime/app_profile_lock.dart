@@ -15,9 +15,13 @@ class AppProfileLock {
   AppProfileLock._(this.path, this._file);
 
   final String path;
-  final RandomAccessFile _file;
+  final RandomAccessFile? _file;
 
   static AppProfileLock acquire(File file) {
+    if (Platform.isIOS) {
+      file.createSync(recursive: true);
+      return AppProfileLock._(file.path, null);
+    }
     try {
       file.createSync(recursive: true);
       final handle = file.openSync(mode: FileMode.write);
@@ -41,6 +45,6 @@ class AppProfileLock {
   }
 
   Future<void> release() async {
-    await _file.close();
+    await _file?.close();
   }
 }

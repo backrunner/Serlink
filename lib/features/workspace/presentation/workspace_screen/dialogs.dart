@@ -10,7 +10,9 @@ const double _dialogWidthWide = 728;
 const double _dialogWidthReview = 868;
 
 double _adaptiveDialogWidth(BuildContext context, double preferredWidth) {
-  final availableWidth = math.max(360.0, MediaQuery.sizeOf(context).width - 96);
+  final width = MediaQuery.sizeOf(context).width;
+  final horizontalMargin = width < 600 ? 32.0 : 96.0;
+  final availableWidth = math.max(288.0, width - horizontalMargin);
   return math.min(preferredWidth, availableWidth);
 }
 

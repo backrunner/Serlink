@@ -207,14 +207,20 @@ class SyncSettingsService {
   const SyncSettingsService({
     required SyncSettingsRepository settings,
     required SecretStore secrets,
-  }) : this._(settings, secrets);
+    bool cloudKitAvailable = true,
+  }) : this._(settings, secrets, cloudKitAvailable: cloudKitAvailable);
 
-  const SyncSettingsService._(this._settings, this._secrets);
+  const SyncSettingsService._(
+    this._settings,
+    this._secrets, {
+    this.cloudKitAvailable = true,
+  });
 
   static const _webDavPasswordRef = SecretRef('sync:webdav:password');
 
   final SyncSettingsRepository _settings;
   final SecretStore _secrets;
+  final bool cloudKitAvailable;
 
   Future<WebDavSyncSettings?> readWebDav() {
     return _settings.readWebDav();
@@ -331,10 +337,19 @@ class SyncSettingsService {
   }
 
   Future<CloudKitSyncSettings?> readCloudKit() {
+    if (!cloudKitAvailable) {
+      return Future<CloudKitSyncSettings?>.value();
+    }
     return _settings.readCloudKit();
   }
 
   Future<CloudKitSyncSettings> saveCloudKit(bool enabled) async {
+    if (!cloudKitAvailable) {
+      throw const SyncSettingsException(
+        'sync.cloudkit.unavailable',
+        'iCloud sync is not available on this platform.',
+      );
+    }
     final settings = CloudKitSyncSettings(
       enabled: enabled,
       updatedAt: DateTime.now().toUtc(),
@@ -350,9 +365,11 @@ class SyncSettingsService {
   /// Resolves the sync provider to use for an auto-sync run. iCloud takes
   /// priority over WebDAV when both are enabled; returns null when neither is.
   Future<SyncProvider?> activeSyncProvider() async {
-    final cloudKit = await _settings.readCloudKit();
-    if (cloudKit?.enabled ?? false) {
-      return CloudKitSyncProvider();
+    if (cloudKitAvailable) {
+      final cloudKit = await _settings.readCloudKit();
+      if (cloudKit?.enabled ?? false) {
+        return CloudKitSyncProvider();
+      }
     }
     final webDav = await _settings.readWebDav();
     if (webDav?.enabled ?? false) {

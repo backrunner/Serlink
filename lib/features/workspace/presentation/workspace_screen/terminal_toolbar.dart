@@ -1,13 +1,16 @@
 part of '../workspace_screen.dart';
 
-class _TerminalToolbar extends StatelessWidget {
+class _TerminalToolbar extends ConsumerWidget {
   const _TerminalToolbar({required this.snapshot});
 
   final _TerminalToolbarSnapshot snapshot;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    final showSplitControls = ref
+        .watch(platformCapabilitiesProvider)
+        .terminalSplit;
     return SizedBox(
       height: 44,
       child: Padding(
@@ -48,19 +51,21 @@ class _TerminalToolbar extends StatelessWidget {
                 icon: Icons.folder_open_outlined,
                 onPressed: snapshot.onOpenSftp,
               ),
-            _ToolbarSerlinkIconButton(
-              key: const ValueKey('terminal-split-right-button'),
-              tooltip: l10n.terminalSplitRightTooltip,
-              icon: Icons.view_column_outlined,
-              onPressed: snapshot.onSplitRight,
-            ),
-            _ToolbarSerlinkIconButton(
-              key: const ValueKey('terminal-split-down-button'),
-              tooltip: l10n.terminalSplitDownTooltip,
-              icon: Icons.view_agenda_outlined,
-              onPressed: snapshot.onSplitDown,
-            ),
-            if (snapshot.showSplit)
+            if (showSplitControls) ...[
+              _ToolbarSerlinkIconButton(
+                key: const ValueKey('terminal-split-right-button'),
+                tooltip: l10n.terminalSplitRightTooltip,
+                icon: Icons.view_column_outlined,
+                onPressed: snapshot.onSplitRight,
+              ),
+              _ToolbarSerlinkIconButton(
+                key: const ValueKey('terminal-split-down-button'),
+                tooltip: l10n.terminalSplitDownTooltip,
+                icon: Icons.view_agenda_outlined,
+                onPressed: snapshot.onSplitDown,
+              ),
+            ],
+            if (showSplitControls && snapshot.showSplit)
               _ToolbarSerlinkIconButton(
                 key: const ValueKey('terminal-close-pane-button'),
                 tooltip: l10n.terminalClosePaneTooltip,

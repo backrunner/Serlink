@@ -59,6 +59,13 @@ class _MobileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FHeader(
+      key: const ValueKey('mobile-workspace-header'),
+      style: const FHeaderStyleDelta.delta(
+        constraints: BoxConstraints(minHeight: 44),
+        padding: EdgeInsetsGeometryDelta.value(
+          EdgeInsets.fromLTRB(16, 5, 16, 7),
+        ),
+      ),
       title: _MobileHeaderTitle(title: _mobileAreaTitle(context.l10n, area)),
     );
   }
@@ -72,26 +79,27 @@ class _MobileHeaderTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
+    return SizedBox(
+      height: 32,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: t.textPrimary,
-              fontWeight: FontWeight.w800,
-              height: 1.05,
+              fontWeight: FontWeight.w700,
+              height: 1,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Container(
-            width: 34,
-            height: 3,
+            width: 24,
+            height: 2,
             decoration: BoxDecoration(
               gradient: serlinkAccentGradient(t),
               borderRadius: SerlinkRadii.pill,

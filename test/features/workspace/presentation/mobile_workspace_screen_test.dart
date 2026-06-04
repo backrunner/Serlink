@@ -54,6 +54,12 @@ void main() {
       find.byWidgetPredicate((widget) => widget is FHeader),
       findsOneWidget,
     );
+    expect(
+      tester
+          .getRect(find.byKey(const ValueKey('mobile-workspace-header')))
+          .height,
+      lessThanOrEqualTo(90),
+    );
     expect(find.byType(FBottomNavigationBar), findsOneWidget);
     expect(find.text('Hosts'), findsWidgets);
     expect(find.text('Sessions'), findsOneWidget);

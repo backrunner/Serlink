@@ -126,6 +126,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get transfersEmptyBody => 'SFTP のアップロードとダウンロードはここに表示されます。';
 
   @override
+  String get transfersNoMatchesBody => '現在のワークスペース検索に一致する転送タスクはありません。';
+
+  @override
   String transfersItemCount(num count) {
     return '$count 件';
   }

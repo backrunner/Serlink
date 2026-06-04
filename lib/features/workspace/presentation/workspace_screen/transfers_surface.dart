@@ -8,11 +8,23 @@ class _TransfersSurface extends ConsumerWidget {
     final l10n = context.l10n;
     final queue = ref.watch(transferQueueStateProvider);
     final state = queue.value;
+    final canSearch = ref.watch(
+      platformCapabilitiesProvider.select(
+        (capabilities) => capabilities.prefersMobileWorkspaceShell,
+      ),
+    );
+    final searchQuery = canSearch
+        ? ref.watch(_workspaceSearchQueryProvider)
+        : '';
+    final filteredTasks = state == null
+        ? const <TransferTask>[]
+        : filterTransferTasks(state.tasks, searchQuery);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _TransfersHeader(
           state: state,
+          displayedCount: filteredTasks.length,
           onClear: state == null || state.tasks.isEmpty
               ? null
               : () => unawaited(_clearTransfers(context, ref, state)),
@@ -34,7 +46,17 @@ class _TransfersSurface extends ConsumerWidget {
                   body: l10n.transfersEmptyBody,
                 );
               }
-              return _TransferTaskList(tasks: state.tasks);
+              final filteredTasks = filterTransferTasks(
+                state.tasks,
+                searchQuery,
+              );
+              if (filteredTasks.isEmpty) {
+                return _PlaceholderSurface(
+                  title: l10n.hostsNoMatchesTitle,
+                  body: l10n.transfersNoMatchesBody,
+                );
+              }
+              return _TransferTaskList(tasks: filteredTasks);
             },
           ),
         ),
@@ -44,9 +66,14 @@ class _TransfersSurface extends ConsumerWidget {
 }
 
 class _TransfersHeader extends ConsumerWidget {
-  const _TransfersHeader({required this.state, required this.onClear});
+  const _TransfersHeader({
+    required this.state,
+    required this.displayedCount,
+    required this.onClear,
+  });
 
   final TransferQueueState? state;
+  final int displayedCount;
   final VoidCallback? onClear;
 
   @override
@@ -56,53 +83,22 @@ class _TransfersHeader extends ConsumerWidget {
     final tasks = state?.tasks ?? const <TransferTask>[];
     final activeCount = tasks.where(_transferIsActive).length;
 
-    if (!ref.watch(platformCapabilitiesProvider).prefersMobileWorkspaceShell) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-        child: Row(
-          children: [
-            Icon(Icons.swap_vert, size: 19, color: t.textSecondary),
-            const SizedBox(width: 10),
-            Text(
-              l10n.transfersTitle,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: t.textPrimary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(width: 10),
-            SerlinkTag(label: l10n.transfersItemCount(tasks.length)),
-            if (activeCount > 0) ...[
-              const SizedBox(width: 6),
-              StatusPill(
-                label: l10n.transfersActiveCount(activeCount),
-                color: t.statusInfo,
-              ),
-            ],
-            const Spacer(),
-            SerlinkTextButton.icon(
-              onPressed: onClear,
-              icon: const Icon(Icons.delete_sweep_outlined, size: 17),
-              label: Text(l10n.transfersClearAction),
-            ),
-          ],
-        ),
-      );
-    }
-
     return _WorkspaceListHeader(
       title: l10n.transfersTitle,
-      count: tasks.length,
+      count: displayedCount,
       status: activeCount > 0
           ? StatusPill(
               label: l10n.transfersActiveCount(activeCount),
               color: t.statusInfo,
             )
           : null,
-      action: SerlinkTextButton.icon(
-        onPressed: onClear,
-        icon: const Icon(Icons.delete_sweep_outlined, size: 17),
-        label: Text(l10n.transfersClearAction),
+      action: SerlinkTooltip(
+        message: l10n.transfersClearAction,
+        child: SerlinkIconButton(
+          key: const ValueKey('clear-transfers-button'),
+          onPressed: onClear,
+          icon: const Icon(Icons.delete_sweep_outlined),
+        ),
       ),
     );
   }

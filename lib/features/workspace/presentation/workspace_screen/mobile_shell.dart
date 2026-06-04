@@ -117,7 +117,7 @@ class _MobileMainSurface extends StatelessWidget {
       ),
       child: Column(
         children: [
-          if (_showsWorkspaceSearch(state.area))
+          if (_showsMobileWorkspaceSearch(state.area))
             _MobileWorkspaceSearchBar(
               placeholder: _workspaceSearchPlaceholder(
                 context.l10n,

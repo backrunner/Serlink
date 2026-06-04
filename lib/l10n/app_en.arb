@@ -42,6 +42,7 @@
   "transfersPreparing": "Preparing transfer queue.",
   "transfersEmptyTitle": "No Transfers",
   "transfersEmptyBody": "SFTP uploads and downloads will appear here.",
+  "transfersNoMatchesBody": "No transfer tasks match the current workspace search.",
   "transfersItemCount": "{count, plural, =1{1 item} other{{count} items}}",
   "@transfersItemCount": {
     "placeholders": {

@@ -39,6 +39,7 @@
   "transfersPreparing": "転送キューを準備しています。",
   "transfersEmptyTitle": "転送はありません",
   "transfersEmptyBody": "SFTP のアップロードとダウンロードはここに表示されます。",
+  "transfersNoMatchesBody": "現在のワークスペース検索に一致する転送タスクはありません。",
   "transfersItemCount": "{count} 件",
   "transfersActiveCount": "{count} 件が実行中",
   "transfersClearAction": "クリア",

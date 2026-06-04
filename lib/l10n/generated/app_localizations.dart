@@ -334,6 +334,12 @@ abstract class AppLocalizations {
   /// **'SFTP uploads and downloads will appear here.'**
   String get transfersEmptyBody;
 
+  /// No description provided for @transfersNoMatchesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'No transfer tasks match the current workspace search.'**
+  String get transfersNoMatchesBody;
+
   /// No description provided for @transfersItemCount.
   ///
   /// In en, this message translates to:

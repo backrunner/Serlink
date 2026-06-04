@@ -126,6 +126,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get transfersEmptyBody => 'SFTP 上传和下载会显示在这里。';
 
   @override
+  String get transfersNoMatchesBody => '没有传输任务匹配当前工作区搜索。';
+
+  @override
   String transfersItemCount(num count) {
     return '$count 项';
   }

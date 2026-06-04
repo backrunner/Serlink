@@ -75,7 +75,7 @@ class DartSsh2SftpConnection implements SftpConnection {
   @override
   Future<void> chmod(String path, SftpPermissions permissions) async {
     await _withMappedSftpErrors(() async {
-      final mode = int.parse(permissions.octal, radix: 8);
+      final mode = int.parse(permissions.normalizedOctal, radix: 8);
       await _sftp.setStat(
         path,
         ssh.SftpFileAttrs(mode: ssh.SftpFileMode.value(mode)),
@@ -374,6 +374,17 @@ class DartSsh2SftpConnection implements SftpConnection {
       );
       transferredBytes += await file.length();
     }
+    for (final directory in directories.reversed) {
+      await transfer.waitIfPaused();
+      final relativePath = p.relative(directory.path, from: root.path);
+      final remoteDirectory = relativePath == '.'
+          ? remotePath
+          : p.posix.join(remotePath, p.split(relativePath).join('/'));
+      await _trySetRemoteModifiedTime(
+        remoteDirectory,
+        (await directory.stat()).modified,
+      );
+    }
     transfer.markCompleted();
     _emitTransferProgress(
       controller,
@@ -397,9 +408,12 @@ class DartSsh2SftpConnection implements SftpConnection {
     required StreamController<TransferProgress> controller,
   }) async {
     ssh.SftpFile? remoteFile;
+    var completed = false;
+    late final DateTime localModifiedAt;
     try {
       await transfer.waitIfPaused();
       final localFile = File(localPath);
+      localModifiedAt = (await localFile.stat()).modified;
       remoteFile = await _sftp.open(
         remotePath,
         mode:
@@ -425,8 +439,12 @@ class DartSsh2SftpConnection implements SftpConnection {
       transfer.bindWriter(writer);
       await writer.done;
       transfer.throwIfCanceled();
+      completed = true;
     } finally {
       await remoteFile?.close();
+    }
+    if (completed) {
+      await _trySetRemoteModifiedTime(remotePath, localModifiedAt);
     }
   }
 
@@ -457,6 +475,7 @@ class DartSsh2SftpConnection implements SftpConnection {
       baseTransferredBytes: 0,
       fileBytes: totalBytes,
       aggregateTotalBytes: totalBytes,
+      remoteModifiedAt: _modifiedAtFromSftpSeconds(stat.modifyTime),
       transfer: transfer,
       controller: controller,
     );
@@ -530,6 +549,7 @@ class DartSsh2SftpConnection implements SftpConnection {
         baseTransferredBytes: transferredBytes,
         fileBytes: file.size,
         aggregateTotalBytes: aggregateTotalBytes,
+        remoteModifiedAt: file.modifiedAt,
         transfer: transfer,
         controller: controller,
       );
@@ -555,6 +575,7 @@ class DartSsh2SftpConnection implements SftpConnection {
     required int baseTransferredBytes,
     required int? fileBytes,
     required int? aggregateTotalBytes,
+    DateTime? remoteModifiedAt,
     required _SftpTransferControl transfer,
     required StreamController<TransferProgress> controller,
   }) async {
@@ -566,6 +587,7 @@ class DartSsh2SftpConnection implements SftpConnection {
     StreamSubscription<Uint8List>? subscription;
     final done = Completer<void>();
     var transferredBytes = 0;
+    var completed = false;
 
     Future<void> fail(Object error, StackTrace stackTrace) async {
       if (!done.isCompleted) {
@@ -630,19 +652,26 @@ class DartSsh2SftpConnection implements SftpConnection {
       );
       await done.future;
       transfer.throwIfCanceled();
+      completed = true;
     } finally {
       await subscription?.cancel();
       await sink?.close();
       await remoteFile?.close();
     }
+    if (completed) {
+      await _trySetLocalModifiedTime(localFile, remoteModifiedAt);
+    }
   }
 
   Future<_RemoteTree> _collectRemoteTree(String rootPath) async {
+    final rootAttrs = await _sftp.stat(rootPath);
     final directories = <SftpEntry>[
       SftpEntry(
         name: p.posix.basename(rootPath),
         path: rootPath,
         type: SftpEntryType.directory,
+        modifiedAt: _modifiedAtFromSftpSeconds(rootAttrs.modifyTime),
+        permissions: _permissionsFromSftpMode(rootAttrs.mode),
       ),
     ];
     final files = <SftpEntry>[];
@@ -684,6 +713,22 @@ class DartSsh2SftpConnection implements SftpConnection {
     }
   }
 
+  Future<void> _trySetRemoteModifiedTime(
+    String path,
+    DateTime modifiedAt,
+  ) async {
+    try {
+      final seconds = _sftpSecondsFromDateTime(modifiedAt);
+      await _sftp.setStat(
+        path,
+        ssh.SftpFileAttrs(accessTime: seconds, modifyTime: seconds),
+      );
+    } on Object {
+      // Timestamp preservation is best-effort because many SFTP servers reject
+      // SETSTAT even when the file transfer itself succeeded.
+    }
+  }
+
   static SftpEntry mapName({required String path, required ssh.SftpName name}) {
     final attrs = name.attr;
     final entryPath = _joinRemotePath(path, name.filename);
@@ -692,21 +737,50 @@ class DartSsh2SftpConnection implements SftpConnection {
       path: entryPath,
       type: _mapType(attrs.type),
       size: attrs.size,
-      modifiedAt: attrs.modifyTime == null
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(
-              attrs.modifyTime! * 1000,
-              isUtc: true,
-            ),
-      permissions: attrs.mode == null
-          ? null
-          : SftpPermissions(
-              (attrs.mode!.value & 0x1ff).toRadixString(8).padLeft(4, '0'),
-            ),
+      modifiedAt: _modifiedAtFromSftpSeconds(attrs.modifyTime),
+      permissions: _permissionsFromSftpMode(attrs.mode),
       owner: attrs.userID?.toString(),
       group: attrs.groupID?.toString(),
       isHidden: name.filename.startsWith('.'),
     );
+  }
+}
+
+DateTime? _modifiedAtFromSftpSeconds(int? seconds) {
+  return seconds == null
+      ? null
+      : DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true);
+}
+
+SftpPermissions? _permissionsFromSftpMode(ssh.SftpFileMode? mode) {
+  return mode == null
+      ? null
+      : SftpPermissions.fromOctal(
+          (mode.value & 0xfff).toRadixString(8).padLeft(4, '0'),
+        );
+}
+
+int _sftpSecondsFromDateTime(DateTime value) {
+  return value.toUtc().millisecondsSinceEpoch ~/ 1000;
+}
+
+Future<void> _trySetLocalModifiedTime(
+  FileSystemEntity entity,
+  DateTime? modifiedAt,
+) async {
+  if (modifiedAt == null) {
+    return;
+  }
+  try {
+    switch (entity) {
+      case File file:
+        await file.setLastModified(modifiedAt);
+      default:
+        return;
+    }
+  } on Object {
+    // Some platforms or target locations reject metadata writes; downloaded
+    // contents should remain successful when timestamp restoration fails.
   }
 }
 

@@ -60,6 +60,7 @@ dependencies:
   flutter_pty: ^0.4.2
   ffi: ^2.2.0
   forui: ^0.22.3
+  desktop_drop: ^0.7.1
 
 dependency_overrides:
   xterm:

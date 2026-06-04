@@ -1599,10 +1599,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sftpChangePermissionsTitle => '更改权限';
 
   @override
-  String get sftpOctalPermissionsLabel => '八进制权限';
+  String get sftpOctalPermissionsLabel => '权限（八进制或符号）';
 
   @override
-  String get sftpPermissionsOctalError => '权限必须是 3 或 4 位八进制数。';
+  String get sftpPermissionsOctalError => '权限必须是八进制（如 0644）或符号格式（如 rw-r--r--）。';
 
   @override
   String get sftpPermissionsUpdatedSnack => '权限已更新。';

@@ -3109,13 +3109,13 @@ abstract class AppLocalizations {
   /// No description provided for @sftpOctalPermissionsLabel.
   ///
   /// In en, this message translates to:
-  /// **'Octal permissions'**
+  /// **'Permissions (octal or symbolic)'**
   String get sftpOctalPermissionsLabel;
 
   /// No description provided for @sftpPermissionsOctalError.
   ///
   /// In en, this message translates to:
-  /// **'Permissions must be a 3 or 4 digit octal.'**
+  /// **'Permissions must be octal, like 0644, or symbolic, like rw-r--r--.'**
   String get sftpPermissionsOctalError;
 
   /// No description provided for @sftpPermissionsUpdatedSnack.

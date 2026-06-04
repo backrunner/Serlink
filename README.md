@@ -190,7 +190,12 @@ test/           unit, widget, and smoke tests
 
 ## License
 
-Serlink is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+Serlink source code is licensed under the GNU Affero General Public License
+version 3 or any later version. See [LICENSE](LICENSE).
+
+The Serlink name, logos, icons, app store assets, screenshots, and related
+branding materials are not licensed under the AGPL. See
+[TRADEMARKS.md](TRADEMARKS.md) for the brand and trademark policy.
 
 This repository also vendors a patched copy of `xterm.dart` 4.0.0 under
 `third_party/xterm`, which remains under the MIT License. See [NOTICE](NOTICE)

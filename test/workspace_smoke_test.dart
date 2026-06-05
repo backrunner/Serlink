@@ -843,7 +843,15 @@ void main() {
 
     expect(find.text('About'), findsOneWidget);
     expect(find.text('Serlink'), findsOneWidget);
+    final versionLabel = find.byKey(
+      const ValueKey('settings-about-version-label'),
+    );
+    expect(versionLabel, findsOneWidget);
     expect(find.text('Version 1.2.3 (45)'), findsOneWidget);
+    final appTitleRect = tester.getRect(find.text('Serlink'));
+    final versionRect = tester.getRect(versionLabel);
+    expect(versionRect.left, greaterThan(appTitleRect.right));
+    expect(versionRect.center.dy, closeTo(appTitleRect.center.dy, 4));
   });
 
   testWidgets('iOS add host form uses compact wide dialog', (tester) async {

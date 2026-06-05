@@ -238,12 +238,16 @@ class _SettingsSurface extends ConsumerWidget {
                 _SettingsSection(
                   title: l10n.settingsAboutSection,
                   children: [
-                    _SettingsInfoRow(
+                    _SettingsActionRow(
                       icon: Icons.info_outline,
                       title: l10n.appTitle,
-                      subtitle: _settingsAppVersionSubtitle(
-                        l10n,
-                        appPackageInfo,
+                      actionWidth: mobile ? 146 : 220,
+                      action: SizedBox(
+                        width: mobile ? 146 : 220,
+                        child: _SettingsInlineValue(
+                          key: const ValueKey('settings-about-version-label'),
+                          text: _settingsAppVersionLabel(l10n, appPackageInfo),
+                        ),
                       ),
                     ),
                   ],
@@ -257,7 +261,7 @@ class _SettingsSurface extends ConsumerWidget {
   }
 }
 
-String _settingsAppVersionSubtitle(
+String _settingsAppVersionLabel(
   AppLocalizations l10n,
   AsyncValue<PackageInfo> packageInfo,
 ) {
@@ -273,4 +277,27 @@ String _settingsAppVersionSubtitle(
     loading: () => l10n.settingsAppVersionLoading,
     error: (_, _) => l10n.settingsAppVersionUnavailable,
   );
+}
+
+class _SettingsInlineValue extends StatelessWidget {
+  const _SettingsInlineValue({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.right,
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+      ),
+    );
+  }
 }

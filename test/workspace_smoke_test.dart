@@ -23,6 +23,7 @@ import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
 import 'package:serlink/features/ssh/application/known_host_repository.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
+import 'package:serlink/features/terminal/application/terminal_modifier_latch.dart';
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_service.dart';
@@ -816,6 +817,88 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('iOS terminal accessory sends control sequences to shell', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final sshService = _FakeSshSessionService();
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+      sshService: sshService,
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('host-display-name-field')),
+      'Mobile Terminal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'terminal.internal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'ops',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-password-field')),
+      'server-password',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Terminal').first);
+    await tester.pumpAndSettle();
+    sshService.shell.writes.clear();
+
+    await tester.tap(find.byKey(const ValueKey('terminal-key-tab')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-arrow-up')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-arrow-left')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-page-up')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-page-down')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-ctrl')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-arrow-right')));
+    await tester.pump();
+
+    expect(sshService.shell.writes, [
+      terminalControlInputSequence(
+        TerminalControlInputKey.tab,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.arrowUp,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.arrowLeft,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.pageUp,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.pageDown,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.arrowRight,
+        const TerminalModifierLatch(ctrl: true),
+      ),
+    ]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('iOS terminal accessory arranges navigation keys in two rows', (
     tester,
   ) async {
@@ -995,10 +1078,12 @@ void main() {
 Future<_LockedVaultHarness> _pumpLockedVaultApp(
   WidgetTester tester, {
   PlatformCapabilities? capabilities,
+  _FakeSshSessionService? sshService,
 }) async {
   final database = SerlinkDatabase(NativeDatabase.memory());
   final transferQueue = TransferQueueController();
   final secretStore = InMemorySecretStore();
+  final resolvedSshService = sshService ?? _FakeSshSessionService();
   final bootstrapVault = InMemoryVaultService(
     config: const VaultCryptoConfig.testing(),
   );
@@ -1026,7 +1111,7 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
         vaultCryptoConfigProvider.overrideWithValue(
           const VaultCryptoConfig.testing(),
         ),
-        sshSessionServiceProvider.overrideWithValue(_FakeSshSessionService()),
+        sshSessionServiceProvider.overrideWithValue(resolvedSshService),
         transferQueueControllerProvider.overrideWithValue(transferQueue),
         secretStoreProvider.overrideWithValue(secretStore),
         autoSyncEnabledProvider.overrideWithValue(false),

@@ -9,6 +9,7 @@ class _SettingsSurface extends ConsumerWidget {
     final vaultSession = ref.watch(vaultSessionControllerProvider);
     final vault = vaultSession.value;
     final vaultState = vault?.vaultState;
+    final vaultBusy = vault?.isBusy == true || vaultSession.isLoading;
     final canImportHostData = vaultState == VaultState.unlocked;
     final language = ref.watch(appLanguageProvider).value ?? AppLanguage.system;
     final appPackageInfo = ref.watch(appPackageInfoProvider);
@@ -149,7 +150,7 @@ class _SettingsSurface extends ConsumerWidget {
                               key: const ValueKey(
                                 'settings-local-unlock-button',
                               ),
-                              onPressed: vaultSession.isLoading
+                              onPressed: vaultBusy
                                   ? null
                                   : () => ref
                                         .read(

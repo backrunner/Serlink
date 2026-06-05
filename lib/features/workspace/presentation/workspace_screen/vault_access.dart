@@ -47,6 +47,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     final t = context.tokens;
     final asyncState = ref.watch(vaultSessionControllerProvider);
     final session = asyncState.value ?? widget.session;
+    final busy = session?.isBusy ?? asyncState.isLoading;
     final isInitializing = session?.vaultState == VaultState.uninitialized;
     final recoveryKey = session?.recoveryKey;
     final showRecoveryCodeAccess =
@@ -89,7 +90,9 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                     _VaultLockBadge(initializing: isInitializing),
                     const SizedBox(height: 22),
                     Text(
-                      isInitializing ? l10n.vaultCreateTitle : l10n.vaultUnlockTitle,
+                      isInitializing
+                          ? l10n.vaultCreateTitle
+                          : l10n.vaultUnlockTitle,
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(
@@ -128,17 +131,15 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                       label: isInitializing
                           ? l10n.vaultCreateAction
                           : l10n.vaultUnlockAction,
-                      loading: asyncState.isLoading,
-                      onPressed: asyncState.isLoading
-                          ? null
-                          : () => _submit(isInitializing),
+                      loading: busy,
+                      onPressed: busy ? null : () => _submit(isInitializing),
                     ),
                     if (!isInitializing &&
                         session?.localUnlockAvailable == true) ...[
                       const SizedBox(height: 10),
                       SerlinkOutlinedButton.icon(
                         key: const ValueKey('vault-local-unlock-button'),
-                        onPressed: asyncState.isLoading
+                        onPressed: busy
                             ? null
                             : () => ref
                                   .read(vaultSessionControllerProvider.notifier)
@@ -151,9 +152,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                       const SizedBox(height: 10),
                       SerlinkTextButton.icon(
                         key: const ValueKey('vault-recovery-code-button'),
-                        onPressed: asyncState.isLoading
-                            ? null
-                            : _showRecoveryCodeDialog,
+                        onPressed: busy ? null : _showRecoveryCodeDialog,
                         icon: const Icon(Icons.key_outlined, size: 19),
                         label: Text(l10n.vaultUseRecoveryCodeAction),
                       ),

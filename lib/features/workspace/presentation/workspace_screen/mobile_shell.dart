@@ -252,6 +252,16 @@ class _MobileHeaderActionGroup extends StatelessWidget {
 const double _mobileHeaderActionSide = 38;
 const double _mobileHeaderActionIconSize = 19;
 const double _mobileHeaderControlGap = 10;
+const double _mobileSurfaceHorizontalPadding = 12;
+const double _mobileSurfaceTopGap = 8;
+const double _mobileSurfaceBottomPadding = 12;
+const EdgeInsets _mobileSurfaceListPadding = EdgeInsets.fromLTRB(
+  _mobileSurfaceHorizontalPadding,
+  _mobileSurfaceTopGap,
+  _mobileSurfaceHorizontalPadding,
+  _mobileSurfaceBottomPadding,
+);
+const EdgeInsets _mobileSearchBarPadding = EdgeInsets.fromLTRB(16, 10, 16, 8);
 
 class _MobileHeaderIconButton extends StatelessWidget {
   const _MobileHeaderIconButton({
@@ -344,7 +354,8 @@ class _MobileWorkspaceSearchBarState
       );
     }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      key: const ValueKey('mobile-workspace-search-bar'),
+      padding: _mobileSearchBarPadding,
       child: _WorkspaceSearchPill(
         fieldKey: const ValueKey('mobile-workspace-search-field'),
         controller: _controller,

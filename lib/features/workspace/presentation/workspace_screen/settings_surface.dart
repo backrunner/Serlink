@@ -21,7 +21,7 @@ class _SettingsSurface extends ConsumerWidget {
     return ListView(
       padding: showInPageTitle
           ? const EdgeInsets.fromLTRB(24, 22, 24, 36)
-          : const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          : const EdgeInsets.fromLTRB(16, _mobileSurfaceTopGap, 16, 16),
       children: [
         Center(
           child: ConstrainedBox(

@@ -70,7 +70,9 @@ class _HostsSurface extends ConsumerWidget {
                                 body: l10n.hostsNoMatchesBody,
                               )
                             : ListView.separated(
-                                padding: const EdgeInsets.all(16),
+                                padding: mobile
+                                    ? _mobileSurfaceListPadding
+                                    : const EdgeInsets.all(16),
                                 itemCount: filteredHosts.length,
                                 separatorBuilder: (context, index) =>
                                     const SizedBox(height: 8),

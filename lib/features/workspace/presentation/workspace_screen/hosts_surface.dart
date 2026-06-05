@@ -31,80 +31,71 @@ class _HostsSurface extends ConsumerWidget {
         final hostsAsync = ref.watch(
           hostSummariesProvider(session.unlockGeneration),
         );
-        final content = hostsAsync.isLoading
-            ? _PlaceholderSurface(
-                title: l10n.hostsTitle,
-                body: l10n.hostsLoading,
-                loading: true,
-              )
-            : hostsAsync.when(
-                skipLoadingOnReload: false,
-                skipLoadingOnRefresh: false,
-                loading: () => _PlaceholderSurface(
-                  title: l10n.hostsTitle,
-                  body: l10n.hostsLoading,
-                  loading: true,
-                ),
-                error: (error, stackTrace) => _PlaceholderSurface(
-                  title: l10n.hostsTitle,
-                  body: error.toString(),
-                ),
-                data: (hosts) {
-                  final filteredHosts = filterHostSummaries(hosts, searchQuery);
-                  if (hosts.isEmpty) {
-                    return _HostsEmptyState(
-                      onAddHost: () => _showAddHostDialog(context),
-                    );
-                  }
-                  return Column(
-                    children: [
-                      if (!mobile)
-                        _HostsHeader(
-                          count: filteredHosts.length,
-                          onAddHost: () => _showAddHostDialog(context),
-                        ),
-                      Expanded(
-                        child: filteredHosts.isEmpty
-                            ? _PlaceholderSurface(
-                                title: l10n.hostsNoMatchesTitle,
-                                body: l10n.hostsNoMatchesBody,
-                              )
-                            : ListView.separated(
-                                padding: mobile
-                                    ? _mobileSurfaceListPadding
-                                    : const EdgeInsets.all(16),
-                                itemCount: filteredHosts.length,
-                                separatorBuilder: (context, index) =>
-                                    const SizedBox(height: 8),
-                                itemBuilder: (context, index) {
-                                  final host = filteredHosts[index];
-                                  return EntranceFade(
-                                    key: ValueKey('host-row-${host.id.value}'),
-                                    delay: Duration(
-                                      milliseconds: 40 * (index.clamp(0, 8)),
-                                    ),
-                                    child: _HostRow(
-                                      mobile: mobile,
-                                      host: host,
-                                      onTerminal: () =>
-                                          controller.openTerminal(host),
-                                      onSftp: () => controller.openSftp(host),
-                                      onEdit: () =>
-                                          _showEditHostDialog(context, host),
-                                      onDelete: () => _confirmDeleteHost(
-                                        context,
-                                        ref,
-                                        host,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  );
-                },
+        final content = hostsAsync.when(
+          skipLoadingOnReload: true,
+          skipLoadingOnRefresh: true,
+          loading: () => _PlaceholderSurface(
+            title: l10n.hostsTitle,
+            body: l10n.hostsLoading,
+            loading: true,
+          ),
+          error: (error, stackTrace) => _PlaceholderSurface(
+            title: l10n.hostsTitle,
+            body: error.toString(),
+          ),
+          data: (hosts) {
+            final filteredHosts = filterHostSummaries(hosts, searchQuery);
+            if (hosts.isEmpty) {
+              return _HostsEmptyState(
+                onAddHost: () => _showAddHostDialog(context),
               );
+            }
+            return Column(
+              children: [
+                if (!mobile)
+                  _HostsHeader(
+                    count: filteredHosts.length,
+                    onAddHost: () => _showAddHostDialog(context),
+                  ),
+                Expanded(
+                  child: filteredHosts.isEmpty
+                      ? _PlaceholderSurface(
+                          title: l10n.hostsNoMatchesTitle,
+                          body: l10n.hostsNoMatchesBody,
+                        )
+                      : ListView.separated(
+                          key: const PageStorageKey('hosts-list'),
+                          padding: mobile
+                              ? _mobileSurfaceListPadding
+                              : const EdgeInsets.all(16),
+                          itemCount: filteredHosts.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final host = filteredHosts[index];
+                            return EntranceFade(
+                              key: ValueKey('host-row-${host.id.value}'),
+                              delay: Duration(
+                                milliseconds: 40 * (index.clamp(0, 8)),
+                              ),
+                              child: _HostRow(
+                                mobile: mobile,
+                                host: host,
+                                onTerminal: () => controller.openTerminal(host),
+                                onSftp: () => controller.openSftp(host),
+                                onEdit: () =>
+                                    _showEditHostDialog(context, host),
+                                onDelete: () =>
+                                    _confirmDeleteHost(context, ref, host),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        );
         final recoveryKey = session.recoveryKey;
         if (recoveryKey == null) {
           return content;

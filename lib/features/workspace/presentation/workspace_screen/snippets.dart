@@ -34,83 +34,73 @@ class _SnippetsSurface extends ConsumerWidget {
           );
         }
         final snippets = ref.watch(snippetsProvider(session.unlockGeneration));
-        return snippets.isLoading
-            ? _PlaceholderSurface(
-                title: l10n.snippetsTitle,
-                body: l10n.snippetsLoading,
-                loading: true,
-              )
-            : snippets.when(
-                skipLoadingOnReload: false,
-                skipLoadingOnRefresh: false,
-                loading: () => _PlaceholderSurface(
-                  title: l10n.snippetsTitle,
-                  body: l10n.snippetsLoading,
-                  loading: true,
-                ),
-                error: (error, stackTrace) => _PlaceholderSurface(
-                  title: l10n.snippetsTitle,
-                  body: error.toString(),
-                ),
-                data: (items) {
-                  final filteredItems = filterCommandSnippets(
-                    items,
-                    searchQuery,
-                  );
-                  return Column(
-                    children: [
-                      if (!mobile)
-                        _SnippetsHeader(
-                          count: filteredItems.length,
+        return snippets.when(
+          skipLoadingOnReload: true,
+          skipLoadingOnRefresh: true,
+          loading: () => _PlaceholderSurface(
+            title: l10n.snippetsTitle,
+            body: l10n.snippetsLoading,
+            loading: true,
+          ),
+          error: (error, stackTrace) => _PlaceholderSurface(
+            title: l10n.snippetsTitle,
+            body: error.toString(),
+          ),
+          data: (items) {
+            final filteredItems = filterCommandSnippets(items, searchQuery);
+            return Column(
+              children: [
+                if (!mobile)
+                  _SnippetsHeader(
+                    count: filteredItems.length,
+                    onAdd: () => _showSnippetDialog(context),
+                  ),
+                Expanded(
+                  child: items.isEmpty
+                      ? _SnippetsEmptyState(
                           onAdd: () => _showSnippetDialog(context),
-                        ),
-                      Expanded(
-                        child: items.isEmpty
-                            ? _SnippetsEmptyState(
-                                onAdd: () => _showSnippetDialog(context),
-                              )
-                            : filteredItems.isEmpty
-                            ? _PlaceholderSurface(
-                                title: l10n.hostsNoMatchesTitle,
-                                body: l10n.snippetsNoMatchesBody,
-                              )
-                            : ListView.separated(
-                                padding: mobile
-                                    ? _mobileSurfaceListPadding
-                                    : const EdgeInsets.all(12),
-                                itemCount: filteredItems.length,
-                                separatorBuilder: (context, index) =>
-                                    const SizedBox(height: 8),
-                                itemBuilder: (context, index) {
-                                  final snippet = filteredItems[index];
-                                  return _SnippetRow(
-                                    snippet: snippet,
-                                    onInsert: () => _insertSnippet(
-                                      context,
-                                      ref,
-                                      snippet,
-                                      submit: false,
-                                    ),
-                                    onRun: () => _insertSnippet(
-                                      context,
-                                      ref,
-                                      snippet,
-                                      submit: true,
-                                    ),
-                                    onEdit: () => _showSnippetDialog(
-                                      context,
-                                      snippet: snippet,
-                                    ),
-                                    onDelete: () =>
-                                        _deleteSnippet(context, ref, snippet),
-                                  );
-                                },
+                        )
+                      : filteredItems.isEmpty
+                      ? _PlaceholderSurface(
+                          title: l10n.hostsNoMatchesTitle,
+                          body: l10n.snippetsNoMatchesBody,
+                        )
+                      : ListView.separated(
+                          key: const PageStorageKey('snippets-list'),
+                          padding: mobile
+                              ? _mobileSurfaceListPadding
+                              : const EdgeInsets.all(12),
+                          itemCount: filteredItems.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final snippet = filteredItems[index];
+                            return _SnippetRow(
+                              snippet: snippet,
+                              onInsert: () => _insertSnippet(
+                                context,
+                                ref,
+                                snippet,
+                                submit: false,
                               ),
-                      ),
-                    ],
-                  );
-                },
-              );
+                              onRun: () => _insertSnippet(
+                                context,
+                                ref,
+                                snippet,
+                                submit: true,
+                              ),
+                              onEdit: () =>
+                                  _showSnippetDialog(context, snippet: snippet),
+                              onDelete: () =>
+                                  _deleteSnippet(context, ref, snippet),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        );
       },
     );
   }

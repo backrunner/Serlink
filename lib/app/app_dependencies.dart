@@ -237,7 +237,9 @@ final snippetsProvider = FutureProvider.autoDispose
         return Completer<List<CommandSnippet>>().future;
       }
       ref.watch(vaultRecordChangesProvider);
-      return ref.watch(snippetRepositoryProvider).list();
+      final snippets = await ref.watch(snippetRepositoryProvider).list();
+      ref.keepAlive();
+      return snippets;
     });
 
 final syncSettingsRepositoryProvider = Provider<SyncSettingsRepository>((ref) {
@@ -689,6 +691,7 @@ class VaultSessionState {
     this.failureMessage,
     this.unlockFailureCount = 0,
     this.unlockGeneration = 0,
+    this.isBusy = false,
   });
 
   final VaultState vaultState;
@@ -697,6 +700,7 @@ class VaultSessionState {
   final String? failureMessage;
   final int unlockFailureCount;
   final int unlockGeneration;
+  final bool isBusy;
 
   VaultSessionState copyWith({
     VaultState? vaultState,
@@ -708,6 +712,7 @@ class VaultSessionState {
     int? unlockFailureCount,
     bool clearUnlockFailures = false,
     int? unlockGeneration,
+    bool? isBusy,
   }) {
     return VaultSessionState(
       vaultState: vaultState ?? this.vaultState,
@@ -720,6 +725,7 @@ class VaultSessionState {
           ? 0
           : unlockFailureCount ?? this.unlockFailureCount,
       unlockGeneration: unlockGeneration ?? this.unlockGeneration,
+      isBusy: isBusy ?? this.isBusy,
     );
   }
 }
@@ -756,7 +762,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     final previous =
         state.value ??
         const VaultSessionState(vaultState: VaultState.uninitialized);
-    state = const AsyncLoading<VaultSessionState>();
+    state = AsyncData(
+      previous.copyWith(
+        isBusy: true,
+        clearFailure: true,
+        clearRecoveryKey: true,
+      ),
+    );
     try {
       final result = await service.initialize(passphrase: passphrase);
       await ref.read(vaultHeaderStoreProvider).save(result.header);
@@ -775,6 +787,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         previous.copyWith(
           failureMessage: _vaultFailureMessage(error),
           clearRecoveryKey: true,
+          isBusy: false,
         ),
       );
     }
@@ -783,7 +796,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   Future<void> unlock({required String passphrase}) async {
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
-    state = const AsyncLoading<VaultSessionState>();
+    state = AsyncData(
+      previous.copyWith(
+        isBusy: true,
+        clearFailure: true,
+        clearRecoveryKey: true,
+      ),
+    );
     try {
       await service.unlock(passphrase: passphrase);
       state = AsyncData(
@@ -803,6 +822,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           failureMessage: _vaultFailureMessage(error),
           clearRecoveryKey: true,
           unlockFailureCount: previous.unlockFailureCount + 1,
+          isBusy: false,
         ),
       );
     }
@@ -811,7 +831,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   Future<String?> unlockWithRecoveryCode({required String recoveryCode}) async {
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
-    state = const AsyncLoading<VaultSessionState>();
+    state = AsyncData(
+      previous.copyWith(
+        isBusy: true,
+        clearFailure: true,
+        clearRecoveryKey: true,
+      ),
+    );
     try {
       await service.unlockWithRecoveryKey(VaultRecoveryKey(recoveryCode));
       state = AsyncData(
@@ -829,7 +855,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     } on Object catch (error) {
       final message = _vaultFailureMessage(error);
       state = AsyncData(
-        previous.copyWith(failureMessage: message, clearRecoveryKey: true),
+        previous.copyWith(
+          failureMessage: message,
+          clearRecoveryKey: true,
+          isBusy: false,
+        ),
       );
       return message;
     }
@@ -838,7 +868,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   Future<void> unlockWithLocalKey() async {
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
-    state = const AsyncLoading<VaultSessionState>();
+    state = AsyncData(
+      previous.copyWith(
+        isBusy: true,
+        clearFailure: true,
+        clearRecoveryKey: true,
+      ),
+    );
     try {
       await service.unlockWithLocalKey(secrets: ref.read(secretStoreProvider));
       state = AsyncData(
@@ -857,6 +893,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         previous.copyWith(
           failureMessage: _vaultFailureMessage(error),
           clearRecoveryKey: true,
+          isBusy: false,
         ),
       );
     }
@@ -878,7 +915,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   Future<String?> resetVault() async {
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
-    state = const AsyncLoading<VaultSessionState>();
+    state = AsyncData(
+      previous.copyWith(
+        isBusy: true,
+        clearFailure: true,
+        clearRecoveryKey: true,
+      ),
+    );
     try {
       await _clearLocalUnlockSecrets();
       await ref.read(vaultRecordRepositoryProvider).clear();
@@ -892,7 +935,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     } on Object catch (error) {
       final message = _vaultFailureMessage(error);
       state = AsyncData(
-        previous.copyWith(failureMessage: message, clearRecoveryKey: true),
+        previous.copyWith(
+          failureMessage: message,
+          clearRecoveryKey: true,
+          isBusy: false,
+        ),
       );
       return message;
     }

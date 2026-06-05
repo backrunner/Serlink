@@ -608,6 +608,29 @@ void main() {
     expect(find.text('No Hosts'), findsOneWidget);
   });
 
+  testWidgets('vault unlock keeps locked state while submitting', (
+    tester,
+  ) async {
+    await _pumpLockedVaultApp(tester);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SerlinkApp)),
+    );
+    final unlockFuture = container
+        .read(vaultSessionControllerProvider.notifier)
+        .unlock(passphrase: 'correct horse battery staple');
+    final pendingState = container.read(vaultSessionControllerProvider);
+
+    expect(pendingState.hasValue, isTrue);
+    expect(pendingState.isLoading, isFalse);
+    expect(pendingState.requireValue.vaultState, VaultState.locked);
+    expect(pendingState.requireValue.isBusy, isTrue);
+
+    await unlockFuture;
+    await tester.pumpAndSettle();
+    expect(find.text('No Hosts'), findsOneWidget);
+  });
+
   testWidgets('vault reset requires typed confirmation from recovery dialog', (
     tester,
   ) async {
@@ -941,6 +964,16 @@ void main() {
             .getRect(find.byKey(const ValueKey('mobile-workspace-search-bar')))
             .bottom;
     expect(hostTopGap, inInclusiveRange(6, 10));
+
+    await tester.tap(find.text('Sessions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hosts'));
+    await tester.pump();
+
+    expect(find.text('Loading encrypted host records'), findsNothing);
+    expect(find.text('Swipe Delete Host'), findsOneWidget);
+    await tester.pumpAndSettle();
+
     for (final keyPrefix in ['terminal', 'sftp']) {
       final buttonRect = tester.getRect(
         find.byKey(ValueKey('mobile-host-$keyPrefix-button')),

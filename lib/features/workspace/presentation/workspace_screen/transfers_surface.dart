@@ -30,6 +30,8 @@ class _TransfersSurface extends ConsumerWidget {
           ),
         Expanded(
           child: queue.when(
+            skipLoadingOnReload: true,
+            skipLoadingOnRefresh: true,
             loading: () => _PlaceholderSurface(
               title: l10n.transfersTitle,
               body: l10n.transfersPreparing,

@@ -20,5 +20,6 @@ final hostSummariesProvider = FutureProvider.autoDispose
       hosts.sort(
         (left, right) => left.displayName.compareTo(right.displayName),
       );
+      ref.keepAlive();
       return [for (final host in hosts) host.toSummary()];
     });

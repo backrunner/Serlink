@@ -119,6 +119,20 @@ void main() {
         ),
         '\x1b[6~',
       );
+      expect(
+        terminalControlInputSequence(
+          TerminalControlInputKey.insert,
+          const TerminalModifierLatch(),
+        ),
+        '\x1b[2~',
+      );
+      expect(
+        terminalControlInputSequence(
+          TerminalControlInputKey.delete,
+          const TerminalModifierLatch(),
+        ),
+        '\x1b[3~',
+      );
     });
 
     test('adds xterm modifier codes for navigation keys', () {
@@ -135,6 +149,44 @@ void main() {
           const TerminalModifierLatch(ctrl: true, alt: true, shift: true),
         ),
         '\x1b[5;8~',
+      );
+      expect(
+        terminalControlInputSequence(
+          TerminalControlInputKey.insert,
+          const TerminalModifierLatch(ctrl: true),
+        ),
+        '\x1b[2;5~',
+      );
+    });
+
+    test('emits function key sequences', () {
+      expect(
+        terminalControlInputSequence(
+          TerminalControlInputKey.f1,
+          const TerminalModifierLatch(),
+        ),
+        '\x1bOP',
+      );
+      expect(
+        terminalControlInputSequence(
+          TerminalControlInputKey.f4,
+          const TerminalModifierLatch(alt: true),
+        ),
+        '\x1bO3S',
+      );
+      expect(
+        terminalControlInputSequence(
+          TerminalControlInputKey.f5,
+          const TerminalModifierLatch(),
+        ),
+        '\x1b[15~',
+      );
+      expect(
+        terminalControlInputSequence(
+          TerminalControlInputKey.f12,
+          const TerminalModifierLatch(shift: true, alt: true),
+        ),
+        '\x1b[24;4~',
       );
     });
   });

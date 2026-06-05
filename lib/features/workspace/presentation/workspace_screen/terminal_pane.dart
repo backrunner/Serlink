@@ -716,6 +716,7 @@ TerminalControlInputKey? _terminalControlKeyForLogicalKey(
     LogicalKeyboardKey.tab => TerminalControlInputKey.tab,
     LogicalKeyboardKey.enter => TerminalControlInputKey.enter,
     LogicalKeyboardKey.backspace => TerminalControlInputKey.backspace,
+    LogicalKeyboardKey.insert => TerminalControlInputKey.insert,
     LogicalKeyboardKey.delete => TerminalControlInputKey.delete,
     LogicalKeyboardKey.arrowUp => TerminalControlInputKey.arrowUp,
     LogicalKeyboardKey.arrowDown => TerminalControlInputKey.arrowDown,
@@ -725,6 +726,18 @@ TerminalControlInputKey? _terminalControlKeyForLogicalKey(
     LogicalKeyboardKey.pageDown => TerminalControlInputKey.pageDown,
     LogicalKeyboardKey.home => TerminalControlInputKey.home,
     LogicalKeyboardKey.end => TerminalControlInputKey.end,
+    LogicalKeyboardKey.f1 => TerminalControlInputKey.f1,
+    LogicalKeyboardKey.f2 => TerminalControlInputKey.f2,
+    LogicalKeyboardKey.f3 => TerminalControlInputKey.f3,
+    LogicalKeyboardKey.f4 => TerminalControlInputKey.f4,
+    LogicalKeyboardKey.f5 => TerminalControlInputKey.f5,
+    LogicalKeyboardKey.f6 => TerminalControlInputKey.f6,
+    LogicalKeyboardKey.f7 => TerminalControlInputKey.f7,
+    LogicalKeyboardKey.f8 => TerminalControlInputKey.f8,
+    LogicalKeyboardKey.f9 => TerminalControlInputKey.f9,
+    LogicalKeyboardKey.f10 => TerminalControlInputKey.f10,
+    LogicalKeyboardKey.f11 => TerminalControlInputKey.f11,
+    LogicalKeyboardKey.f12 => TerminalControlInputKey.f12,
     _ => null,
   };
 }
@@ -735,6 +748,7 @@ TerminalKey? _terminalKeyForControlInput(TerminalControlInputKey key) {
     TerminalControlInputKey.tab => TerminalKey.tab,
     TerminalControlInputKey.enter => TerminalKey.enter,
     TerminalControlInputKey.backspace => TerminalKey.backspace,
+    TerminalControlInputKey.insert => TerminalKey.insert,
     TerminalControlInputKey.delete => TerminalKey.delete,
     TerminalControlInputKey.arrowUp => TerminalKey.arrowUp,
     TerminalControlInputKey.arrowDown => TerminalKey.arrowDown,
@@ -744,10 +758,22 @@ TerminalKey? _terminalKeyForControlInput(TerminalControlInputKey key) {
     TerminalControlInputKey.pageDown => TerminalKey.pageDown,
     TerminalControlInputKey.home => TerminalKey.home,
     TerminalControlInputKey.end => TerminalKey.end,
+    TerminalControlInputKey.f1 => TerminalKey.f1,
+    TerminalControlInputKey.f2 => TerminalKey.f2,
+    TerminalControlInputKey.f3 => TerminalKey.f3,
+    TerminalControlInputKey.f4 => TerminalKey.f4,
+    TerminalControlInputKey.f5 => TerminalKey.f5,
+    TerminalControlInputKey.f6 => TerminalKey.f6,
+    TerminalControlInputKey.f7 => TerminalKey.f7,
+    TerminalControlInputKey.f8 => TerminalKey.f8,
+    TerminalControlInputKey.f9 => TerminalKey.f9,
+    TerminalControlInputKey.f10 => TerminalKey.f10,
+    TerminalControlInputKey.f11 => TerminalKey.f11,
+    TerminalControlInputKey.f12 => TerminalKey.f12,
   };
 }
 
-class _TerminalAccessoryBar extends StatelessWidget {
+class _TerminalAccessoryBar extends StatefulWidget {
   const _TerminalAccessoryBar({
     required this.connected,
     required this.ctrlLatched,
@@ -775,6 +801,13 @@ class _TerminalAccessoryBar extends StatelessWidget {
   final VoidCallback onOpenSnippets;
 
   @override
+  State<_TerminalAccessoryBar> createState() => _TerminalAccessoryBarState();
+}
+
+class _TerminalAccessoryBarState extends State<_TerminalAccessoryBar> {
+  var _functionKeysExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     return DecoratedBox(
@@ -797,66 +830,75 @@ class _TerminalAccessoryBar extends StatelessWidget {
                     _TerminalAccessoryKey(
                       keyValue: 'terminal-key-ctrl',
                       label: 'Ctrl',
-                      enabled: connected,
-                      selected: ctrlLatched,
-                      onPressed: onToggleCtrl,
+                      enabled: widget.connected,
+                      selected: widget.ctrlLatched,
+                      onPressed: widget.onToggleCtrl,
                     ),
                     _TerminalAccessoryKey(
                       keyValue: 'terminal-key-shift',
                       label: 'Shift',
-                      enabled: connected,
-                      selected: shiftLatched,
-                      onPressed: onToggleShift,
+                      enabled: widget.connected,
+                      selected: widget.shiftLatched,
+                      onPressed: widget.onToggleShift,
                     ),
                     _TerminalAccessoryKey(
                       keyValue: 'terminal-key-alt',
                       label: 'Alt',
-                      enabled: connected,
-                      selected: altLatched,
-                      onPressed: onToggleAlt,
+                      enabled: widget.connected,
+                      selected: widget.altLatched,
+                      onPressed: widget.onToggleAlt,
                     ),
                     _TerminalAccessoryKey(
                       keyValue: 'terminal-key-esc',
                       label: 'Esc',
-                      enabled: connected,
+                      enabled: widget.connected,
                       onPressed: () =>
-                          onControlKey(TerminalControlInputKey.escape),
+                          widget.onControlKey(TerminalControlInputKey.escape),
                     ),
                   ],
                   bottom: [
                     _TerminalAccessoryKey(
                       keyValue: 'terminal-key-tab',
                       label: 'Tab',
-                      enabled: connected,
+                      enabled: widget.connected,
                       onPressed: () =>
-                          onControlKey(TerminalControlInputKey.tab),
+                          widget.onControlKey(TerminalControlInputKey.tab),
                     ),
                     _TerminalAccessoryKey(
-                      keyValue: 'terminal-key-home',
-                      label: 'Home',
-                      enabled: connected,
-                      onPressed: () =>
-                          onControlKey(TerminalControlInputKey.home),
-                    ),
-                    _TerminalAccessoryKey(
-                      keyValue: 'terminal-key-end',
-                      label: 'End',
-                      enabled: connected,
-                      onPressed: () =>
-                          onControlKey(TerminalControlInputKey.end),
+                      keyValue: 'terminal-key-function-toggle',
+                      label: 'Fn',
+                      enabled: true,
+                      selected: _functionKeysExpanded,
+                      onPressed: () {
+                        setState(() {
+                          _functionKeysExpanded = !_functionKeysExpanded;
+                        });
+                      },
                     ),
                     _TerminalAccessoryIconKey(
                       keyValue: 'terminal-key-paste',
                       icon: Icons.content_paste,
-                      enabled: connected,
-                      onPressed: onPaste,
+                      enabled: widget.connected,
+                      onPressed: widget.onPaste,
                     ),
                   ],
                 ),
                 const SizedBox(width: _terminalAccessoryGroupGap),
+                if (_functionKeysExpanded) ...[
+                  _TerminalFunctionKeyCluster(
+                    connected: widget.connected,
+                    onControlKey: widget.onControlKey,
+                  ),
+                  const SizedBox(width: _terminalAccessoryGroupGap),
+                ],
+                _TerminalEditKeyCluster(
+                  connected: widget.connected,
+                  onControlKey: widget.onControlKey,
+                ),
+                const SizedBox(width: _terminalAccessoryGroupGap),
                 _TerminalArrowKeyCluster(
-                  connected: connected,
-                  onControlKey: onControlKey,
+                  connected: widget.connected,
+                  onControlKey: widget.onControlKey,
                 ),
                 const SizedBox(width: _terminalAccessoryGroupGap),
                 _TerminalAccessoryCluster(
@@ -865,13 +907,13 @@ class _TerminalAccessoryBar extends StatelessWidget {
                       keyValue: 'terminal-key-search',
                       icon: Icons.search,
                       enabled: true,
-                      onPressed: onToggleSearch,
+                      onPressed: widget.onToggleSearch,
                     ),
                     _TerminalAccessoryIconKey(
                       keyValue: 'terminal-key-snippets',
                       icon: Icons.code_outlined,
                       enabled: true,
-                      onPressed: onOpenSnippets,
+                      onPressed: widget.onOpenSnippets,
                     ),
                   ],
                   bottom: [
@@ -918,6 +960,91 @@ class _TerminalAccessoryCluster extends StatelessWidget {
         Row(children: top),
         const SizedBox(height: _terminalAccessoryGap),
         Row(children: bottom),
+      ],
+    );
+  }
+}
+
+class _TerminalFunctionKeyCluster extends StatelessWidget {
+  const _TerminalFunctionKeyCluster({
+    required this.connected,
+    required this.onControlKey,
+  });
+
+  final bool connected;
+  final ValueChanged<TerminalControlInputKey> onControlKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TerminalAccessoryCluster(
+      top: [
+        _functionKey('F1', TerminalControlInputKey.f1),
+        _functionKey('F2', TerminalControlInputKey.f2),
+        _functionKey('F3', TerminalControlInputKey.f3),
+        _functionKey('F4', TerminalControlInputKey.f4),
+        _functionKey('F5', TerminalControlInputKey.f5),
+        _functionKey('F6', TerminalControlInputKey.f6),
+      ],
+      bottom: [
+        _functionKey('F7', TerminalControlInputKey.f7),
+        _functionKey('F8', TerminalControlInputKey.f8),
+        _functionKey('F9', TerminalControlInputKey.f9),
+        _functionKey('F10', TerminalControlInputKey.f10),
+        _functionKey('F11', TerminalControlInputKey.f11),
+        _functionKey('F12', TerminalControlInputKey.f12),
+      ],
+    );
+  }
+
+  Widget _functionKey(String label, TerminalControlInputKey key) {
+    return _TerminalAccessoryKey(
+      keyValue: 'terminal-key-${label.toLowerCase()}',
+      label: label,
+      enabled: connected,
+      onPressed: () => onControlKey(key),
+    );
+  }
+}
+
+class _TerminalEditKeyCluster extends StatelessWidget {
+  const _TerminalEditKeyCluster({
+    required this.connected,
+    required this.onControlKey,
+  });
+
+  final bool connected;
+  final ValueChanged<TerminalControlInputKey> onControlKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return _TerminalAccessoryCluster(
+      top: [
+        _TerminalAccessoryKey(
+          keyValue: 'terminal-key-insert',
+          label: 'Ins',
+          enabled: connected,
+          onPressed: () => onControlKey(TerminalControlInputKey.insert),
+        ),
+        _TerminalAccessoryKey(
+          keyValue: 'terminal-key-delete',
+          label: 'Del',
+          enabled: connected,
+          onPressed: () => onControlKey(TerminalControlInputKey.delete),
+        ),
+      ],
+      bottom: [
+        _TerminalAccessoryKey(
+          keyValue: 'terminal-key-home',
+          label: 'Home',
+          enabled: connected,
+          onPressed: () => onControlKey(TerminalControlInputKey.home),
+        ),
+        _TerminalAccessoryKey(
+          keyValue: 'terminal-key-end',
+          label: 'End',
+          enabled: connected,
+          onPressed: () => onControlKey(TerminalControlInputKey.end),
+        ),
       ],
     );
   }

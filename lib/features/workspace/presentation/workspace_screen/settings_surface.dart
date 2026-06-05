@@ -70,17 +70,28 @@ class _SettingsSurface extends ConsumerWidget {
                       title: l10n.settingsLanguageTitle,
                       subtitle: _settingsLanguageSubtitle(l10n, mobile),
                       action: SizedBox(
-                        width: mobile ? _settingsMobileActionWidth : 220,
+                        width: mobile ? _settingsMobileSelectActionWidth : 220,
                         child: SerlinkSelect<AppLanguage>(
+                          key: const ValueKey('settings-language-select'),
                           value: language,
                           items: _languageItems(l10n),
                           hintText: l10n.selectAction,
                           searchHint: l10n.searchAction,
+                          size: mobile
+                              ? FTextFieldSizeVariant.sm
+                              : FTextFieldSizeVariant.lg,
+                          compact: mobile,
+                          menuMinWidth: mobile ? 184 : null,
                           onChanged: (value) =>
                               unawaited(_setAppLanguage(context, ref, value)),
                         ),
                       ),
-                      actionWidth: mobile ? _settingsMobileActionWidth : 220,
+                      actionWidth: mobile
+                          ? _settingsMobileSelectActionWidth
+                          : 220,
+                      actionHeight: mobile
+                          ? _settingsMobileSelectActionHeight
+                          : null,
                     ),
                   ],
                 ),

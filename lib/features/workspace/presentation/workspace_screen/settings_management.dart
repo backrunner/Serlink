@@ -54,6 +54,7 @@ class _SettingsActionRow extends StatelessWidget {
     this.subtitle,
     this.subtitleWidget,
     this.actionWidth,
+    this.actionHeight,
     this.mobileActionPlacement = _SettingsMobileActionPlacement.trailing,
   });
 
@@ -63,6 +64,7 @@ class _SettingsActionRow extends StatelessWidget {
   final Widget? subtitleWidget;
   final Widget? action;
   final double? actionWidth;
+  final double? actionHeight;
   final _SettingsMobileActionPlacement mobileActionPlacement;
 
   @override
@@ -125,16 +127,21 @@ class _SettingsActionRow extends StatelessWidget {
           actionWidth ?? _settingsMobileActionWidth,
           actionWidth == null ? constraints.maxWidth * 0.42 : actionWidth!,
         );
+        final actionBelow =
+            action != null &&
+            mobileActionPlacement == _SettingsMobileActionPlacement.below;
         final actionSlot = action == null
             ? null
             : _SettingsActionSlot(
                 width: slotWidth,
-                height: actionWidth == null ? _settingsMobileActionHeight : 40,
+                height:
+                    actionHeight ??
+                    (actionWidth == null ? _settingsMobileActionHeight : 40),
+                alignment: actionBelow
+                    ? Alignment.center
+                    : Alignment.centerRight,
                 child: _SettingsCompactControlsScope(child: action!),
               );
-        final actionBelow =
-            actionSlot != null &&
-            mobileActionPlacement == _SettingsMobileActionPlacement.below;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -194,11 +201,13 @@ class _SettingsActionSlot extends StatelessWidget {
   const _SettingsActionSlot({
     required this.width,
     required this.height,
+    required this.alignment,
     required this.child,
   });
 
   final double width;
   final double height;
+  final AlignmentGeometry alignment;
   final Widget child;
 
   @override
@@ -206,7 +215,7 @@ class _SettingsActionSlot extends StatelessWidget {
     return SizedBox(
       width: width,
       height: height,
-      child: Align(alignment: Alignment.centerRight, child: child),
+      child: Align(alignment: alignment, child: child),
     );
   }
 }
@@ -230,6 +239,8 @@ enum _SettingsMobileActionPlacement { trailing, below }
 
 const double _settingsMobileActionWidth = 92;
 const double _settingsMobileActionHeight = 32;
+const double _settingsMobileSelectActionWidth = 88;
+const double _settingsMobileSelectActionHeight = 36;
 
 class _SettingsTextButton extends StatelessWidget {
   const _SettingsTextButton({
@@ -365,7 +376,7 @@ class _SettingsSwitch extends StatelessWidget {
       value: value,
       onChanged: onChanged,
       semanticsLabel: semanticsLabel,
-      scale: _settingsUseCompactControls(context) ? 0.64 : 0.72,
+      scale: _settingsUseCompactControls(context) ? 0.6 : 0.72,
     );
   }
 }

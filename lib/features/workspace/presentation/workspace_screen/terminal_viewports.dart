@@ -1,6 +1,6 @@
 part of '../workspace_screen.dart';
 
-const EdgeInsets _terminalViewportPadding = EdgeInsets.fromLTRB(10, 2, 10, 8);
+const EdgeInsets _terminalViewportPadding = EdgeInsets.fromLTRB(10, 0, 10, 8);
 
 class _SingleTerminalViewport extends StatelessWidget {
   const _SingleTerminalViewport({

@@ -836,10 +836,26 @@ void main() {
     await _submitVaultPassphrase(tester, 'correct horse battery staple');
 
     expect(find.byKey(const ValueKey('add-host-button')), findsOneWidget);
+    final addHostRect = tester.getRect(
+      find.byKey(const ValueKey('add-host-button')),
+    );
+    expect(addHostRect.width, 38);
+    expect(addHostRect.height, 38);
     expect(
       find.byKey(const ValueKey('mobile-header-count-badge')),
       findsOneWidget,
     );
+
+    await tester.tap(find.text('Sessions'));
+    await tester.pumpAndSettle();
+
+    final newSessionButton = find.byKey(
+      const ValueKey('mobile-new-session-button'),
+    );
+    expect(newSessionButton, findsOneWidget);
+    final newSessionRect = tester.getRect(newSessionButton);
+    expect(newSessionRect.width, 38);
+    expect(newSessionRect.height, 38);
 
     await tester.tap(find.text('Snippets'));
     await tester.pumpAndSettle();

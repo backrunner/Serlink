@@ -702,6 +702,54 @@ void main() {
     expect(find.text('Lock'), findsOneWidget);
   });
 
+  testWidgets('iOS settings controls stay compact and readable', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    final languageSelect = find.byKey(
+      const ValueKey('settings-language-select'),
+    );
+    expect(languageSelect, findsOneWidget);
+    final selectRect = tester.getRect(languageSelect);
+    expect(selectRect.width, lessThanOrEqualTo(90));
+    expect(selectRect.height, lessThanOrEqualTo(38));
+
+    await tester.tap(languageSelect);
+    await tester.pumpAndSettle();
+    final chineseOption = find.text('Simplified Chinese');
+    expect(chineseOption, findsOneWidget);
+    expect(tester.getRect(chineseOption).width, greaterThan(96));
+    await tester.tapAt(const Offset(8, 8));
+    await tester.pumpAndSettle();
+
+    final localUnlockSwitch = find.byKey(
+      const ValueKey('settings-local-unlock-switch'),
+    );
+    await tester.ensureVisible(localUnlockSwitch);
+    await tester.pumpAndSettle();
+    expect(localUnlockSwitch, findsOneWidget);
+    final switchRect = tester.getRect(localUnlockSwitch);
+    expect(switchRect.width, lessThanOrEqualTo(38));
+    expect(switchRect.height, lessThanOrEqualTo(26));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('settings runtime exports diagnostic logs', (tester) async {
     await _pumpLockedVaultApp(tester);
     await _submitVaultPassphrase(tester, 'correct horse battery staple');

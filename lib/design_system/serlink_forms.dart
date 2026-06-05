@@ -88,6 +88,9 @@ class SerlinkSelect<T> extends StatelessWidget {
     this.searchable = false,
     this.searchHint = 'Search',
     this.menuMaxHeight = 320,
+    this.menuMinWidth,
+    this.size = FTextFieldSizeVariant.lg,
+    this.compact = false,
   });
 
   final T? value;
@@ -97,15 +100,26 @@ class SerlinkSelect<T> extends StatelessWidget {
   final bool searchable;
   final String searchHint;
   final double menuMaxHeight;
+  final double? menuMinWidth;
+  final FTextFieldSizeVariant size;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final compactStyle = compact ? _compactSelectStyle(context) : null;
+    final contentConstraints = menuMinWidth == null
+        ? FAutoWidthPortalConstraints(maxHeight: menuMaxHeight)
+        : FPortalConstraints(
+            minWidth: menuMinWidth!,
+            maxWidth: menuMinWidth!,
+            maxHeight: menuMaxHeight,
+          );
     final children = [
       for (final item in items)
         FSelectItem<T>(
           value: item.value,
           prefix: item.icon == null ? null : Icon(item.icon, size: 16),
-          title: Text(item.label),
+          title: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
     ];
 
@@ -119,12 +133,11 @@ class SerlinkSelect<T> extends StatelessWidget {
             }
           },
         ),
-        size: FTextFieldSizeVariant.lg,
+        size: size,
+        style: compactStyle ?? const FSelectStyleDelta.context(),
         hint: hintText,
         searchFieldProperties: FSelectSearchFieldProperties(hint: searchHint),
-        contentConstraints: FAutoWidthPortalConstraints(
-          maxHeight: menuMaxHeight,
-        ),
+        contentConstraints: contentConstraints,
         filter: (query) {
           final normalized = query.trim().toLowerCase();
           if (normalized.isEmpty) {
@@ -158,11 +171,42 @@ class SerlinkSelect<T> extends StatelessWidget {
           }
         },
       ),
-      size: FTextFieldSizeVariant.lg,
+      size: size,
+      style: compactStyle ?? const FSelectStyleDelta.context(),
       hint: hintText,
-      contentConstraints: FAutoWidthPortalConstraints(maxHeight: menuMaxHeight),
+      contentConstraints: contentConstraints,
       format: _format,
       children: children,
+    );
+  }
+
+  FSelectStyleDelta _compactSelectStyle(BuildContext context) {
+    final textStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      fontSize: 12.5,
+      fontWeight: FontWeight.w600,
+      height: 1.1,
+    );
+    return FSelectStyleDelta.delta(
+      fieldStyles: FVariantsDelta.delta([
+        FVariantOperation.all(
+          FTextFieldStyleDelta.delta(
+            constraints: const BoxConstraints(minHeight: 32),
+            contentPadding: const EdgeInsetsGeometryDelta.value(
+              EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            ),
+            contentTextStyle: textStyle == null
+                ? null
+                : FVariantsDelta.delta([
+                    FVariantOperation.all(TextStyleDelta.value(textStyle)),
+                  ]),
+            hintTextStyle: textStyle == null
+                ? null
+                : FVariantsDelta.delta([
+                    FVariantOperation.all(TextStyleDelta.value(textStyle)),
+                  ]),
+          ),
+        ),
+      ]),
     );
   }
 

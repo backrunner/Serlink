@@ -8,6 +8,11 @@ class _SnippetsSurface extends ConsumerWidget {
     final l10n = context.l10n;
     final vaultSession = ref.watch(vaultSessionControllerProvider);
     final searchQuery = ref.watch(_workspaceSearchQueryProvider);
+    final mobile = ref.watch(
+      platformCapabilitiesProvider.select(
+        (capabilities) => capabilities.prefersMobileWorkspaceShell,
+      ),
+    );
 
     return vaultSession.when(
       skipLoadingOnReload: false,
@@ -54,10 +59,11 @@ class _SnippetsSurface extends ConsumerWidget {
                   );
                   return Column(
                     children: [
-                      _SnippetsHeader(
-                        count: filteredItems.length,
-                        onAdd: () => _showSnippetDialog(context),
-                      ),
+                      if (!mobile)
+                        _SnippetsHeader(
+                          count: filteredItems.length,
+                          onAdd: () => _showSnippetDialog(context),
+                        ),
                       Expanded(
                         child: items.isEmpty
                             ? _SnippetsEmptyState(
@@ -173,7 +179,7 @@ class _WorkspaceListHeader extends StatelessWidget {
 
 /// Small pill that shows a count next to a section title.
 class _CountBadge extends StatelessWidget {
-  const _CountBadge({required this.count});
+  const _CountBadge({super.key, required this.count});
 
   final int count;
 

@@ -122,6 +122,14 @@ void main() {
       find.byKey(const ValueKey('mobile-workspace-search-field')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('mobile-header-count-badge')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('clear-transfers-button')),
+      findsOneWidget,
+    );
     expect(find.text('release.zip'), findsOneWidget);
     expect(find.text('access.log'), findsOneWidget);
 

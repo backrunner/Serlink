@@ -1151,17 +1151,33 @@ void main() {
     sshService.shell.writes.clear();
 
     await tester.tap(find.byKey(const ValueKey('terminal-key-tab')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-insert')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-delete')));
     await tester.tap(find.byKey(const ValueKey('terminal-key-arrow-up')));
     await tester.tap(find.byKey(const ValueKey('terminal-key-arrow-left')));
     await tester.tap(find.byKey(const ValueKey('terminal-key-page-up')));
     await tester.tap(find.byKey(const ValueKey('terminal-key-page-down')));
     await tester.tap(find.byKey(const ValueKey('terminal-key-ctrl')));
     await tester.tap(find.byKey(const ValueKey('terminal-key-arrow-right')));
+    await tester.tap(
+      find.byKey(const ValueKey('terminal-key-function-toggle')),
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('terminal-key-f1')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-f12')));
     await tester.pump();
 
     expect(sshService.shell.writes, [
       terminalControlInputSequence(
         TerminalControlInputKey.tab,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.insert,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.delete,
         const TerminalModifierLatch(),
       ),
       terminalControlInputSequence(
@@ -1183,6 +1199,14 @@ void main() {
       terminalControlInputSequence(
         TerminalControlInputKey.arrowRight,
         const TerminalModifierLatch(ctrl: true),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.f1,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.f12,
+        const TerminalModifierLatch(),
       ),
     ]);
     expect(tester.takeException(), isNull);
@@ -1238,6 +1262,16 @@ void main() {
     final tab = _rectForKey(tester, 'terminal-key-tab');
     expect(ctrl.center.dy, lessThan(tab.center.dy));
 
+    final insert = _rectForKey(tester, 'terminal-key-insert');
+    final delete = _rectForKey(tester, 'terminal-key-delete');
+    final home = _rectForKey(tester, 'terminal-key-home');
+    final end = _rectForKey(tester, 'terminal-key-end');
+    expect(insert.center.dy, closeTo(delete.center.dy, 1));
+    expect(home.center.dy, closeTo(end.center.dy, 1));
+    expect(insert.center.dy, lessThan(home.center.dy));
+    expect(insert.center.dx, closeTo(home.center.dx, 1));
+    expect(delete.center.dx, closeTo(end.center.dx, 1));
+
     final arrowUp = _rectForKey(tester, 'terminal-key-arrow-up');
     final arrowLeft = _rectForKey(tester, 'terminal-key-arrow-left');
     final arrowDown = _rectForKey(tester, 'terminal-key-arrow-down');
@@ -1255,6 +1289,21 @@ void main() {
     expect(pageUp.center.dy, closeTo(pageDown.center.dy, 1));
     expect(pageUp.center.dx, lessThan(pageDown.center.dx));
     expect(pageDown.right, lessThanOrEqualTo(390));
+
+    expect(find.byKey(const ValueKey('terminal-key-f1')), findsNothing);
+    await tester.tap(
+      find.byKey(const ValueKey('terminal-key-function-toggle')),
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('terminal-key-f1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('terminal-key-f12')), findsOneWidget);
+
+    final f1 = _rectForKey(tester, 'terminal-key-f1');
+    final f7 = _rectForKey(tester, 'terminal-key-f7');
+    final f12 = _rectForKey(tester, 'terminal-key-f12');
+    expect(f1.center.dy, lessThan(f7.center.dy));
+    expect(f1.center.dx, closeTo(f7.center.dx, 1));
+    expect(f12.right, lessThanOrEqualTo(390));
 
     expect(tester.takeException(), isNull);
   });

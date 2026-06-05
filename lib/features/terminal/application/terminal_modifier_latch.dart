@@ -17,6 +17,7 @@ enum TerminalControlInputKey {
   tab,
   enter,
   backspace,
+  insert,
   delete,
   arrowUp,
   arrowDown,
@@ -26,6 +27,18 @@ enum TerminalControlInputKey {
   pageDown,
   home,
   end,
+  f1,
+  f2,
+  f3,
+  f4,
+  f5,
+  f6,
+  f7,
+  f8,
+  f9,
+  f10,
+  f11,
+  f12,
 }
 
 String applyTerminalModifierLatchToText(
@@ -68,8 +81,8 @@ String terminalControlInputSequence(
     TerminalControlInputKey.tab => _tabSequence(modifiers, modifierCode),
     TerminalControlInputKey.enter => modifiers.alt ? '\x1b\r' : '\r',
     TerminalControlInputKey.backspace => _backspaceSequence(modifiers),
-    TerminalControlInputKey.delete =>
-      modifierCode == null ? '\x1b[3~' : '\x1b[3;$modifierCode~',
+    TerminalControlInputKey.insert => _csiTilde('2', modifierCode),
+    TerminalControlInputKey.delete => _csiTilde('3', modifierCode),
     TerminalControlInputKey.arrowUp => _csiArrow('A', modifierCode),
     TerminalControlInputKey.arrowDown => _csiArrow('B', modifierCode),
     TerminalControlInputKey.arrowRight => _csiArrow('C', modifierCode),
@@ -80,6 +93,18 @@ String terminalControlInputSequence(
       modifierCode == null ? '\x1b[H' : '\x1b[1;${modifierCode}H',
     TerminalControlInputKey.end =>
       modifierCode == null ? '\x1b[F' : '\x1b[1;${modifierCode}F',
+    TerminalControlInputKey.f1 ||
+    TerminalControlInputKey.f2 ||
+    TerminalControlInputKey.f3 ||
+    TerminalControlInputKey.f4 ||
+    TerminalControlInputKey.f5 ||
+    TerminalControlInputKey.f6 ||
+    TerminalControlInputKey.f7 ||
+    TerminalControlInputKey.f8 ||
+    TerminalControlInputKey.f9 ||
+    TerminalControlInputKey.f10 ||
+    TerminalControlInputKey.f11 ||
+    TerminalControlInputKey.f12 => _functionKeySequence(key, modifierCode),
   };
 }
 
@@ -126,6 +151,33 @@ String _csiArrow(String suffix, int? modifierCode) {
 
 String _csiTilde(String code, int? modifierCode) {
   return modifierCode == null ? '\x1b[$code~' : '\x1b[$code;$modifierCode~';
+}
+
+String _functionKeySequence(TerminalControlInputKey key, int? modifierCode) {
+  final ss3Suffix = switch (key) {
+    TerminalControlInputKey.f1 => 'P',
+    TerminalControlInputKey.f2 => 'Q',
+    TerminalControlInputKey.f3 => 'R',
+    TerminalControlInputKey.f4 => 'S',
+    _ => null,
+  };
+  if (ss3Suffix != null) {
+    return modifierCode == null
+        ? '\x1bO$ss3Suffix'
+        : '\x1bO$modifierCode$ss3Suffix';
+  }
+  final csiCode = switch (key) {
+    TerminalControlInputKey.f5 => '15',
+    TerminalControlInputKey.f6 => '17',
+    TerminalControlInputKey.f7 => '18',
+    TerminalControlInputKey.f8 => '19',
+    TerminalControlInputKey.f9 => '20',
+    TerminalControlInputKey.f10 => '21',
+    TerminalControlInputKey.f11 => '23',
+    TerminalControlInputKey.f12 => '24',
+    _ => throw ArgumentError.value(key, 'key', 'Expected a function key'),
+  };
+  return _csiTilde(csiCode, modifierCode);
 }
 
 String _tabSequence(TerminalModifierLatch modifiers, int? modifierCode) {

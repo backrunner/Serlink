@@ -729,11 +729,13 @@ void main() {
     final selectRect = tester.getRect(languageSelect);
     expect(selectRect.width, greaterThanOrEqualTo(108));
     expect(selectRect.width, lessThanOrEqualTo(116));
-    expect(selectRect.height, lessThanOrEqualTo(38));
-    final languageTitleRect = tester.getRect(find.text('Language'));
+    expect(selectRect.height, lessThanOrEqualTo(42));
+    final languageIconRect = tester.getRect(
+      find.byKey(const ValueKey('settings-language-icon')),
+    );
     expect(
-      (selectRect.center.dy - languageTitleRect.center.dy).abs(),
-      lessThanOrEqualTo(16),
+      (selectRect.center.dy - languageIconRect.center.dy).abs(),
+      lessThanOrEqualTo(4),
     );
 
     await tester.tap(languageSelect);

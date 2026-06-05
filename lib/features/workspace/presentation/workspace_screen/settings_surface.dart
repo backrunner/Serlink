@@ -67,6 +67,9 @@ class _SettingsSurface extends ConsumerWidget {
                   children: [
                     _SettingsActionRow(
                       icon: Icons.language_outlined,
+                      leadingKey: mobile
+                          ? const ValueKey('settings-language-icon')
+                          : null,
                       title: l10n.settingsLanguageTitle,
                       subtitle: _settingsLanguageSubtitle(l10n, mobile),
                       action: SizedBox(
@@ -92,6 +95,7 @@ class _SettingsSurface extends ConsumerWidget {
                       actionHeight: mobile
                           ? _settingsMobileSelectActionHeight
                           : null,
+                      actionVerticalOffset: mobile ? 3 : 0,
                     ),
                   ],
                 ),

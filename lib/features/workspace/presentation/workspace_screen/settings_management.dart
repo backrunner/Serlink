@@ -55,6 +55,8 @@ class _SettingsActionRow extends StatelessWidget {
     this.subtitleWidget,
     this.actionWidth,
     this.actionHeight,
+    this.actionVerticalOffset = 0,
+    this.leadingKey,
   });
 
   final IconData icon;
@@ -64,6 +66,8 @@ class _SettingsActionRow extends StatelessWidget {
   final Widget? action;
   final double? actionWidth;
   final double? actionHeight;
+  final double actionVerticalOffset;
+  final Key? leadingKey;
 
   @override
   Widget build(BuildContext context) {
@@ -132,6 +136,7 @@ class _SettingsActionRow extends StatelessWidget {
                 height:
                     actionHeight ??
                     (actionWidth == null ? _settingsMobileActionHeight : 40),
+                verticalOffset: actionVerticalOffset,
                 alignment: Alignment.centerRight,
                 child: _SettingsCompactControlsScope(child: action!),
               );
@@ -149,6 +154,7 @@ class _SettingsActionRow extends StatelessWidget {
                   top: effectiveSubtitle == null || actionSlot != null ? 0 : 2,
                 ),
                 child: SizedBox.square(
+                  key: leadingKey,
                   dimension: 30,
                   child: Icon(icon, size: 18, color: t.textSecondary),
                 ),
@@ -191,21 +197,29 @@ class _SettingsActionSlot extends StatelessWidget {
   const _SettingsActionSlot({
     required this.width,
     required this.height,
+    required this.verticalOffset,
     required this.alignment,
     required this.child,
   });
 
   final double width;
   final double height;
+  final double verticalOffset;
   final AlignmentGeometry alignment;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
+    final aligned = Align(alignment: alignment, child: child);
     return SizedBox(
       width: width,
       height: height,
-      child: Align(alignment: alignment, child: child),
+      child: verticalOffset == 0
+          ? aligned
+          : Transform.translate(
+              offset: Offset(0, verticalOffset),
+              child: aligned,
+            ),
     );
   }
 }
@@ -228,7 +242,7 @@ class _SettingsCompactControlsScope extends InheritedWidget {
 const double _settingsMobileActionWidth = 92;
 const double _settingsMobileActionHeight = 32;
 const double _settingsMobileSelectActionWidth = 112;
-const double _settingsMobileSelectActionHeight = 36;
+const double _settingsMobileSelectActionHeight = 40;
 
 class _SettingsTextButton extends StatelessWidget {
   const _SettingsTextButton({

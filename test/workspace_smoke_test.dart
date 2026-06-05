@@ -853,6 +853,55 @@ void main() {
     );
   });
 
+  testWidgets('iOS host rows reveal delete action after swiping left', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.byKey(const ValueKey('add-host-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('host-display-name-field')),
+      'Swipe Delete Host',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'swipe-delete.internal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'ops',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-password-field')),
+      'server-password',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Swipe Delete Host'), findsOneWidget);
+
+    await tester.drag(find.text('Swipe Delete Host'), const Offset(-130, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mobile-host-delete-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete host?'), findsOneWidget);
+    expect(find.text('Swipe Delete Host'), findsOneWidget);
+  });
+
   testWidgets('iOS SFTP pane keeps controls within the viewport', (
     tester,
   ) async {
@@ -891,7 +940,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('host-save-button')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('SFTP'));
+    await tester.tap(_byTooltipLabel('SFTP'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('sftp-path-display')), findsOneWidget);
@@ -959,7 +1008,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('host-save-button')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Terminal').first);
+    await tester.tap(_byTooltipLabel('Terminal'));
     await tester.pumpAndSettle();
     sshService.shell.writes.clear();
 
@@ -1039,7 +1088,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('host-save-button')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Terminal').first);
+    await tester.tap(_byTooltipLabel('Terminal'));
     await tester.pumpAndSettle();
 
     final bar = tester.getRect(

@@ -2,6 +2,7 @@ part of '../workspace_screen.dart';
 
 class _HostRow extends StatelessWidget {
   const _HostRow({
+    required this.mobile,
     required this.host,
     required this.onTerminal,
     required this.onSftp,
@@ -9,6 +10,7 @@ class _HostRow extends StatelessWidget {
     required this.onDelete,
   });
 
+  final bool mobile;
   final HostSummary host;
   final VoidCallback onTerminal;
   final VoidCallback onSftp;
@@ -21,6 +23,75 @@ class _HostRow extends StatelessWidget {
     final t = context.tokens;
     final subtitle = '${host.username}@${host.hostname}:${host.port}';
     final trustState = _visibleTrustState(host.trustState);
+    final row = ListRow(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Icon(Icons.dns_outlined, size: 18, color: t.textMuted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  flex: 2,
+                  child: Text(
+                    host.displayName,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: t.textPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Flexible(
+                  flex: 3,
+                  child: Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: t.textSecondary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (host.tags.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  for (final tag in host.tags.take(2)) ...[
+                    SerlinkTag(label: tag),
+                    const SizedBox(width: 6),
+                  ],
+                  if (host.tags.length > 2)
+                    SerlinkTag(label: '+${host.tags.length - 2}'),
+                ],
+              ],
+            ),
+          ),
+          if (trustState != null) ...[
+            const SizedBox(width: 12),
+            _TrustText(state: trustState),
+          ],
+          const SizedBox(width: 12),
+          _HostActionButton(
+            onPressed: onTerminal,
+            icon: Icons.terminal,
+            label: l10n.hostTerminalAction,
+            primary: true,
+            iconOnly: mobile,
+          ),
+          const SizedBox(width: 10),
+          _HostActionButton(
+            onPressed: onSftp,
+            icon: Icons.folder_open,
+            label: l10n.hostSftpAction,
+            iconOnly: mobile,
+          ),
+        ],
+      ),
+    );
+    final child = mobile
+        ? _SwipeDeleteHostRow(onDelete: onDelete, child: row)
+        : row;
 
     return SerlinkContextMenu(
       actions: [
@@ -35,68 +106,117 @@ class _HostRow extends StatelessWidget {
           onPressed: onDelete,
         ),
       ],
-      child: ListRow(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          children: [
-            Icon(Icons.dns_outlined, size: 18, color: t.textMuted),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Row(
-                children: [
-                  Flexible(
-                    flex: 2,
-                    child: Text(
-                      host.displayName,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: t.textPrimary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    flex: 3,
-                    child: Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: t.textSecondary,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (host.tags.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    for (final tag in host.tags.take(2)) ...[
-                      SerlinkTag(label: tag),
-                      const SizedBox(width: 6),
-                    ],
-                    if (host.tags.length > 2)
-                      SerlinkTag(label: '+${host.tags.length - 2}'),
-                  ],
-                ],
+      child: child,
+    );
+  }
+}
+
+class _SwipeDeleteHostRow extends StatefulWidget {
+  const _SwipeDeleteHostRow({required this.child, required this.onDelete});
+
+  static const double revealWidth = 76;
+
+  final Widget child;
+  final VoidCallback onDelete;
+
+  @override
+  State<_SwipeDeleteHostRow> createState() => _SwipeDeleteHostRowState();
+}
+
+class _SwipeDeleteHostRowState extends State<_SwipeDeleteHostRow> {
+  double _dragOffset = 0;
+
+  void _handleDragUpdate(DragUpdateDetails details) {
+    final next = (_dragOffset + details.delta.dx).clamp(
+      -_SwipeDeleteHostRow.revealWidth,
+      0.0,
+    );
+    if (next == _dragOffset) {
+      return;
+    }
+    setState(() => _dragOffset = next);
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    final velocity = details.velocity.pixelsPerSecond.dx;
+    final open =
+        velocity < -220 ||
+        (_dragOffset < -_SwipeDeleteHostRow.revealWidth * 0.45 &&
+            velocity < 220);
+    setState(() => _dragOffset = open ? -_SwipeDeleteHostRow.revealWidth : 0);
+  }
+
+  void _handleDelete() {
+    setState(() => _dragOffset = 0);
+    widget.onDelete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: SerlinkRadii.dialog,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: _SwipeDeleteHostRow.revealWidth,
+                  child: _SwipeDeleteHostAction(onPressed: _handleDelete),
+                ),
+              ],
+            ),
+          ),
+          Transform.translate(
+            offset: Offset(_dragOffset, 0),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragUpdate: _handleDragUpdate,
+              onHorizontalDragEnd: _handleDragEnd,
+              child: widget.child,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwipeDeleteHostAction extends StatelessWidget {
+  const _SwipeDeleteHostAction({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(color: t.statusDanger),
+      child: SerlinkPressable(
+        key: const ValueKey('mobile-host-delete-button'),
+        onTap: onPressed,
+        borderRadius: BorderRadius.zero,
+        hoverColor: Colors.white.withValues(alpha: 0.08),
+        pressedColor: Colors.black.withValues(alpha: 0.12),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.delete_outline, size: 18, color: t.onAccent),
+              const SizedBox(height: 2),
+              Text(
+                context.l10n.hostsDeleteAction,
+                style: TextStyle(
+                  color: t.onAccent,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            if (trustState != null) ...[
-              const SizedBox(width: 12),
-              _TrustText(state: trustState),
             ],
-            const SizedBox(width: 12),
-            _HostActionButton(
-              onPressed: onTerminal,
-              icon: Icons.terminal,
-              label: l10n.hostTerminalAction,
-              primary: true,
-            ),
-            const SizedBox(width: 10),
-            _HostActionButton(
-              onPressed: onSftp,
-              icon: Icons.folder_open,
-              label: l10n.hostSftpAction,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -116,6 +236,7 @@ class _HostActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     this.primary = false,
+    this.iconOnly = false,
   });
 
   static const double height = 34;
@@ -124,12 +245,13 @@ class _HostActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool primary;
+  final bool iconOnly;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final foreground = primary ? t.onAccent : t.textPrimary;
-    return DecoratedBox(
+    final button = DecoratedBox(
       decoration: BoxDecoration(
         gradient: primary ? serlinkAccentGradient(t) : null,
         color: primary ? null : t.surfaceRaised,
@@ -150,30 +272,37 @@ class _HostActionButton extends StatelessWidget {
             ? Colors.black.withValues(alpha: 0.1)
             : t.accentPrimary.withValues(alpha: 0.14),
         child: SizedBox(
+          width: iconOnly ? height : null,
           height: height,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            padding: EdgeInsets.symmetric(horizontal: iconOnly ? 0 : 14),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(icon, size: 16, color: foreground),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: foreground,
-                    fontWeight: FontWeight.w700,
+                if (!iconOnly) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
         ),
       ),
     );
+    if (!iconOnly) {
+      return button;
+    }
+    return SerlinkTooltip(message: label, child: button);
   }
 }
 

@@ -73,16 +73,22 @@ class _HostRow extends StatelessWidget {
           ],
           const SizedBox(width: 12),
           _HostActionButton(
+            key: mobile ? const ValueKey('mobile-host-terminal-button') : null,
             onPressed: onTerminal,
             icon: Icons.terminal,
+            iconKey: mobile
+                ? const ValueKey('mobile-host-terminal-icon')
+                : null,
             label: l10n.hostTerminalAction,
             primary: true,
             iconOnly: mobile,
           ),
           const SizedBox(width: 10),
           _HostActionButton(
+            key: mobile ? const ValueKey('mobile-host-sftp-button') : null,
             onPressed: onSftp,
             icon: Icons.folder_open,
+            iconKey: mobile ? const ValueKey('mobile-host-sftp-icon') : null,
             label: l10n.hostSftpAction,
             iconOnly: mobile,
           ),
@@ -232,9 +238,11 @@ HostTrustState? _visibleTrustState(HostTrustState state) {
 
 class _HostActionButton extends StatelessWidget {
   const _HostActionButton({
+    super.key,
     required this.onPressed,
     required this.icon,
     required this.label,
+    this.iconKey,
     this.primary = false,
     this.iconOnly = false,
   });
@@ -244,6 +252,7 @@ class _HostActionButton extends StatelessWidget {
   final VoidCallback onPressed;
   final IconData icon;
   final String label;
+  final Key? iconKey;
   final bool primary;
   final bool iconOnly;
 
@@ -251,6 +260,29 @@ class _HostActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final foreground = primary ? t.onAccent : t.textPrimary;
+    final iconWidget = Icon(icon, key: iconKey, size: 16, color: foreground);
+    final content = iconOnly
+        ? Center(child: iconWidget)
+        : Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                iconWidget,
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: foreground,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          );
     final button = DecoratedBox(
       decoration: BoxDecoration(
         gradient: primary ? serlinkAccentGradient(t) : null,
@@ -274,28 +306,7 @@ class _HostActionButton extends StatelessWidget {
         child: SizedBox(
           width: iconOnly ? height : null,
           height: height,
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: iconOnly ? 0 : 14),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 16, color: foreground),
-                if (!iconOnly) ...[
-                  const SizedBox(width: 6),
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: false,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: foreground,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+          child: content,
         ),
       ),
     );

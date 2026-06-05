@@ -894,6 +894,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Swipe Delete Host'), findsOneWidget);
+    for (final keyPrefix in ['terminal', 'sftp']) {
+      final buttonRect = tester.getRect(
+        find.byKey(ValueKey('mobile-host-$keyPrefix-button')),
+      );
+      final iconRect = tester.getRect(
+        find.byKey(ValueKey('mobile-host-$keyPrefix-icon')),
+      );
+      expect(buttonRect.width, 34);
+      expect(buttonRect.height, 34);
+      expect(
+        (buttonRect.center.dx - iconRect.center.dx).abs(),
+        lessThanOrEqualTo(0.5),
+      );
+      expect(
+        (buttonRect.center.dy - iconRect.center.dy).abs(),
+        lessThanOrEqualTo(0.5),
+      );
+    }
 
     await tester.drag(find.text('Swipe Delete Host'), const Offset(-130, 0));
     await tester.pumpAndSettle();

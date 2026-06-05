@@ -143,16 +143,18 @@ class _SettingsActionRow extends StatelessWidget {
                 child: _SettingsCompactControlsScope(child: action!),
               );
 
+        final alignTrailingAction = actionSlot != null && !actionBelow;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           child: Row(
-            crossAxisAlignment: effectiveSubtitle == null && !actionBelow
+            crossAxisAlignment:
+                (effectiveSubtitle == null || alignTrailingAction)
                 ? CrossAxisAlignment.center
                 : CrossAxisAlignment.start,
             children: [
               Padding(
                 padding: EdgeInsets.only(
-                  top: effectiveSubtitle == null ? 0 : 2,
+                  top: effectiveSubtitle == null || alignTrailingAction ? 0 : 2,
                 ),
                 child: SizedBox.square(
                   dimension: 30,
@@ -239,7 +241,7 @@ enum _SettingsMobileActionPlacement { trailing, below }
 
 const double _settingsMobileActionWidth = 92;
 const double _settingsMobileActionHeight = 32;
-const double _settingsMobileSelectActionWidth = 88;
+const double _settingsMobileSelectActionWidth = 112;
 const double _settingsMobileSelectActionHeight = 36;
 
 class _SettingsTextButton extends StatelessWidget {

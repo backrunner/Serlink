@@ -727,8 +727,14 @@ void main() {
     );
     expect(languageSelect, findsOneWidget);
     final selectRect = tester.getRect(languageSelect);
-    expect(selectRect.width, lessThanOrEqualTo(90));
+    expect(selectRect.width, greaterThanOrEqualTo(108));
+    expect(selectRect.width, lessThanOrEqualTo(116));
     expect(selectRect.height, lessThanOrEqualTo(38));
+    final languageTitleRect = tester.getRect(find.text('Language'));
+    expect(
+      (selectRect.center.dy - languageTitleRect.center.dy).abs(),
+      lessThanOrEqualTo(16),
+    );
 
     await tester.tap(languageSelect);
     await tester.pumpAndSettle();
@@ -747,6 +753,11 @@ void main() {
     final switchRect = tester.getRect(localUnlockSwitch);
     expect(switchRect.width, lessThanOrEqualTo(38));
     expect(switchRect.height, lessThanOrEqualTo(26));
+    final localUnlockTitleRect = tester.getRect(find.text('Local unlock'));
+    expect(
+      (switchRect.center.dy - localUnlockTitleRect.center.dy).abs(),
+      lessThanOrEqualTo(16),
+    );
     expect(tester.takeException(), isNull);
   });
 

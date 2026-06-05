@@ -81,7 +81,7 @@ class _SettingsSurface extends ConsumerWidget {
                               ? FTextFieldSizeVariant.sm
                               : FTextFieldSizeVariant.lg,
                           compact: mobile,
-                          menuMinWidth: mobile ? 184 : null,
+                          menuMinWidth: mobile ? 196 : null,
                           onChanged: (value) =>
                               unawaited(_setAppLanguage(context, ref, value)),
                         ),
@@ -129,8 +129,9 @@ class _SettingsSurface extends ConsumerWidget {
                       icon: Icons.key_outlined,
                       title: l10n.settingsLocalUnlockTitle,
                       subtitle: _localUnlockLabel(l10n, vault, mobile),
-                      mobileActionPlacement:
-                          _SettingsMobileActionPlacement.below,
+                      mobileActionPlacement: vaultState == VaultState.unlocked
+                          ? _SettingsMobileActionPlacement.trailing
+                          : _SettingsMobileActionPlacement.below,
                       action: vaultState == VaultState.unlocked
                           ? _SettingsSwitch(
                               key: const ValueKey(

@@ -51,13 +51,13 @@ class MobileWorkspaceScreen extends ConsumerWidget {
   }
 }
 
-class _MobileHeader extends StatelessWidget {
+class _MobileHeader extends ConsumerWidget {
   const _MobileHeader({required this.area});
 
   final WorkspaceArea area;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return FHeader(
       key: const ValueKey('mobile-workspace-header'),
       style: const FHeaderStyleDelta.delta(
@@ -67,6 +67,7 @@ class _MobileHeader extends StatelessWidget {
         ),
       ),
       title: _MobileHeaderTitle(title: _mobileAreaTitle(context.l10n, area)),
+      suffixes: [_MobileHeaderActions(area: area)],
     );
   }
 }
@@ -107,6 +108,164 @@ class _MobileHeaderTitle extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MobileHeaderActions extends ConsumerWidget {
+  const _MobileHeaderActions({required this.area});
+
+  final WorkspaceArea area;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return switch (area) {
+      WorkspaceArea.hosts => _buildHostsActions(context, ref),
+      WorkspaceArea.sessions => _buildSessionsActions(context, ref),
+      WorkspaceArea.transfers => _buildTransfersActions(context, ref),
+      WorkspaceArea.snippets => _buildSnippetsActions(context, ref),
+      WorkspaceArea.settings => const SizedBox.shrink(),
+    };
+  }
+
+  Widget _buildHostsActions(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(vaultSessionControllerProvider).value;
+    if (session?.vaultState != VaultState.unlocked) {
+      return const SizedBox.shrink();
+    }
+    final hosts = ref
+        .watch(hostSummariesProvider(session!.unlockGeneration))
+        .value;
+    final query = ref.watch(_workspaceSearchQueryProvider);
+    final count = hosts == null
+        ? null
+        : filterHostSummaries(hosts, query).length;
+    return _MobileHeaderActionGroup(
+      count: count,
+      action: _MobileHeaderIconButton(
+        key: const ValueKey('add-host-button'),
+        tooltip: context.l10n.hostsAddTooltip,
+        icon: Icons.add,
+        onPressed: () => _showAddHostDialog(context),
+      ),
+    );
+  }
+
+  Widget _buildSessionsActions(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(workspaceTabControllerProvider);
+    return _MobileHeaderActionGroup(
+      count: state.tabs.isEmpty ? null : state.tabs.length,
+      action: _MobileHeaderIconButton(
+        key: const ValueKey('mobile-new-session-button'),
+        tooltip: context.l10n.tabsNewConnectionTooltip,
+        icon: Icons.add,
+        onPressed: () {
+          ref.read(_workspaceSearchQueryProvider.notifier).clear();
+          ref
+              .read(workspaceTabControllerProvider.notifier)
+              .selectArea(WorkspaceArea.hosts);
+        },
+      ),
+    );
+  }
+
+  Widget _buildTransfersActions(BuildContext context, WidgetRef ref) {
+    final queue = ref.watch(transferQueueStateProvider).value;
+    if (queue == null) {
+      return const SizedBox.shrink();
+    }
+    final query = ref.watch(_workspaceSearchQueryProvider);
+    final filteredTasks = filterTransferTasks(queue.tasks, query);
+    final activeCount = queue.tasks.where(_transferIsActive).length;
+    return _MobileHeaderActionGroup(
+      count: filteredTasks.length,
+      status: activeCount > 0
+          ? StatusPill(
+              label: context.l10n.transfersActiveCount(activeCount),
+              color: context.tokens.statusInfo,
+            )
+          : null,
+      action: _MobileHeaderIconButton(
+        key: const ValueKey('clear-transfers-button'),
+        tooltip: context.l10n.transfersClearAction,
+        icon: Icons.delete_sweep_outlined,
+        onPressed: queue.tasks.isEmpty
+            ? null
+            : () => unawaited(_clearTransfers(context, ref, queue)),
+      ),
+    );
+  }
+
+  Widget _buildSnippetsActions(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(vaultSessionControllerProvider).value;
+    if (session?.vaultState != VaultState.unlocked) {
+      return const SizedBox.shrink();
+    }
+    final snippets = ref
+        .watch(snippetsProvider(session!.unlockGeneration))
+        .value;
+    final query = ref.watch(_workspaceSearchQueryProvider);
+    final count = snippets == null
+        ? null
+        : filterCommandSnippets(snippets, query).length;
+    return _MobileHeaderActionGroup(
+      count: count,
+      action: _MobileHeaderIconButton(
+        key: const ValueKey('add-snippet-button'),
+        tooltip: context.l10n.snippetsAddTooltip,
+        icon: Icons.add,
+        onPressed: () => _showSnippetDialog(context),
+      ),
+    );
+  }
+}
+
+class _MobileHeaderActionGroup extends StatelessWidget {
+  const _MobileHeaderActionGroup({this.count, this.status, this.action});
+
+  final int? count;
+  final Widget? status;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (count != null) ...[
+          _CountBadge(
+            key: const ValueKey('mobile-header-count-badge'),
+            count: count!,
+          ),
+          const SizedBox(width: 8),
+        ],
+        if (status != null) ...[status!, const SizedBox(width: 8)],
+        ?action,
+      ],
+    );
+  }
+}
+
+class _MobileHeaderIconButton extends StatelessWidget {
+  const _MobileHeaderIconButton({
+    super.key,
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SerlinkIconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon),
+      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+      iconSize: 18,
     );
   }
 }

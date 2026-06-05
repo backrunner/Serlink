@@ -19,6 +19,11 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final active = state.activeTab ?? state.tabs.firstOrNull;
     final toolbar = _toolbarFor(active);
+    final mobile = ref.watch(
+      platformCapabilitiesProvider.select(
+        (capabilities) => capabilities.prefersMobileWorkspaceShell,
+      ),
+    );
 
     void openNewConnection() {
       ref.read(_workspaceSearchQueryProvider.notifier).clear();
@@ -52,7 +57,7 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
                     vertical: 7,
                   ),
                   itemBuilder: (context, index) {
-                    if (index == state.tabs.length) {
+                    if (!mobile && index == state.tabs.length) {
                       return _NewTabButton(onPressed: openNewConnection);
                     }
                     final tab = state.tabs[index];
@@ -70,7 +75,7 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
                     );
                   },
                   separatorBuilder: (context, index) => const SizedBox.shrink(),
-                  itemCount: state.tabs.length + 1,
+                  itemCount: state.tabs.length + (mobile ? 0 : 1),
                 ),
               ),
               if (toolbar != null) ...[

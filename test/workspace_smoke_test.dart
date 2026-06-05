@@ -794,7 +794,13 @@ void main() {
     );
     await _submitVaultPassphrase(tester, 'correct horse battery staple');
 
-    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
+    final headerAddHostButton = find.byKey(const ValueKey('add-host-button'));
+    expect(headerAddHostButton, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('mobile-header-count-badge')),
+      findsOneWidget,
+    );
+    await tester.tap(headerAddHostButton);
     await tester.pumpAndSettle();
 
     final formFrame = find.byKey(const ValueKey('host-form-scroll-frame'));
@@ -807,6 +813,43 @@ void main() {
     expect(
       tester.getRect(find.byKey(const ValueKey('host-save-button'))).bottom,
       lessThanOrEqualTo(844),
+    );
+  });
+
+  testWidgets('iOS list header actions live in the mobile title bar', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    expect(find.byKey(const ValueKey('add-host-button')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('mobile-header-count-badge')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Snippets'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('add-snippet-button')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('mobile-header-count-badge')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('empty-add-snippet-button')),
+      findsOneWidget,
     );
   });
 

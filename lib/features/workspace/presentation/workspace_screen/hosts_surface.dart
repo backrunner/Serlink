@@ -9,6 +9,11 @@ class _HostsSurface extends ConsumerWidget {
     final vaultSession = ref.watch(vaultSessionControllerProvider);
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final searchQuery = ref.watch(_workspaceSearchQueryProvider);
+    final mobile = ref.watch(
+      platformCapabilitiesProvider.select(
+        (capabilities) => capabilities.prefersMobileWorkspaceShell,
+      ),
+    );
 
     return vaultSession.when(
       skipLoadingOnReload: false,
@@ -53,10 +58,11 @@ class _HostsSurface extends ConsumerWidget {
                   }
                   return Column(
                     children: [
-                      _HostsHeader(
-                        count: filteredHosts.length,
-                        onAddHost: () => _showAddHostDialog(context),
-                      ),
+                      if (!mobile)
+                        _HostsHeader(
+                          count: filteredHosts.length,
+                          onAddHost: () => _showAddHostDialog(context),
+                        ),
                       Expanded(
                         child: filteredHosts.isEmpty
                             ? _PlaceholderSurface(

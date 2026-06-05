@@ -8,27 +8,26 @@ class _TransfersSurface extends ConsumerWidget {
     final l10n = context.l10n;
     final queue = ref.watch(transferQueueStateProvider);
     final state = queue.value;
-    final canSearch = ref.watch(
+    final mobile = ref.watch(
       platformCapabilitiesProvider.select(
         (capabilities) => capabilities.prefersMobileWorkspaceShell,
       ),
     );
-    final searchQuery = canSearch
-        ? ref.watch(_workspaceSearchQueryProvider)
-        : '';
+    final searchQuery = mobile ? ref.watch(_workspaceSearchQueryProvider) : '';
     final filteredTasks = state == null
         ? const <TransferTask>[]
         : filterTransferTasks(state.tasks, searchQuery);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _TransfersHeader(
-          state: state,
-          displayedCount: filteredTasks.length,
-          onClear: state == null || state.tasks.isEmpty
-              ? null
-              : () => unawaited(_clearTransfers(context, ref, state)),
-        ),
+        if (!mobile)
+          _TransfersHeader(
+            state: state,
+            displayedCount: filteredTasks.length,
+            onClear: state == null || state.tasks.isEmpty
+                ? null
+                : () => unawaited(_clearTransfers(context, ref, state)),
+          ),
         Expanded(
           child: queue.when(
             loading: () => _PlaceholderSurface(

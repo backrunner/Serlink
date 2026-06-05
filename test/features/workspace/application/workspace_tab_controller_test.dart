@@ -37,13 +37,15 @@ void main() {
       var state = container.read(workspaceTabControllerProvider);
       final tab = state.activeTab!;
       final content = tab.content as TerminalTabContent;
+      final terminal = container
+          .read(workspaceRuntimeRegistryProvider)
+          .terminalFor(content.primaryPane.sessionId)!;
       expect(tab.lifecycle, SessionLifecycleState.connected);
       expect(service.openShellCount, 1);
+      expect(terminal.buffer.getText(), isNot(contains('Serlink')));
       expect(
-        container
-            .read(workspaceRuntimeRegistryProvider)
-            .terminalFor(content.primaryPane.sessionId),
-        isNotNull,
+        terminal.buffer.getText(),
+        isNot(contains('Connection runtime is preparing this tab.')),
       );
 
       service.shells.single.completeDone();

@@ -107,7 +107,6 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .read(workspaceRuntimeRegistryProvider)
         .createTerminal(
           sessionId: sessionId,
-          title: host.displayName,
           maxLines: effectiveSettings.scrollbackLines,
         );
     final tab = _open(
@@ -147,7 +146,6 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .read(workspaceRuntimeRegistryProvider)
         .createTerminal(
           sessionId: sessionId,
-          title: title,
           maxLines: effectiveSettings.scrollbackLines,
         );
     final tab = _open(
@@ -228,8 +226,6 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .read(workspaceRuntimeRegistryProvider)
         .createTerminal(
           sessionId: sessionId,
-          title: 'Local Shell',
-          preparingMessage: 'Local shell is starting.',
           maxLines: settings.scrollbackLines,
         );
     final tab = _open(
@@ -467,7 +463,6 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .read(workspaceRuntimeRegistryProvider)
         .createTerminal(
           sessionId: sessionId,
-          title: paneTitle,
           maxLines: effectiveSettings.scrollbackLines,
         );
     final local = content is LocalTerminalTabContent;

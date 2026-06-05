@@ -1,5 +1,7 @@
 part of '../workspace_screen.dart';
 
+const EdgeInsets _terminalViewportPadding = EdgeInsets.fromLTRB(10, 6, 10, 8);
+
 class _SingleTerminalViewport extends StatelessWidget {
   const _SingleTerminalViewport({
     required this.terminal,
@@ -21,7 +23,7 @@ class _SingleTerminalViewport extends StatelessWidget {
       terminal,
       controller: controller,
       autofocus: true,
-      padding: const EdgeInsets.all(12),
+      padding: _terminalViewportPadding,
       theme: settings.terminalTheme,
       textStyle: settings.textStyle,
       onKeyEvent: onKeyEvent,
@@ -167,7 +169,7 @@ class _TerminalViewportPane extends StatelessWidget {
                 terminal,
                 controller: controller,
                 autofocus: active,
-                padding: const EdgeInsets.all(12),
+                padding: _terminalViewportPadding,
                 theme: settings.terminalTheme,
                 textStyle: settings.textStyle,
                 onKeyEvent: onKeyEvent,

@@ -223,9 +223,33 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     if (_activePaneState.lifecycle != SessionLifecycleState.connected) {
       return;
     }
-    final sequence = terminalControlInputSequence(key, _modifierLatch);
+    final latch = _modifierLatch;
+    final sequence = _terminalControlInputSequence(key, latch);
     _clearLatchedModifiers();
     _sendActiveTerminalInput(sequence);
+  }
+
+  String _terminalControlInputSequence(
+    TerminalControlInputKey key,
+    TerminalModifierLatch latch,
+  ) {
+    final terminalKey = _terminalKeyForControlInput(key);
+    if (terminalKey == null) {
+      return terminalControlInputSequence(key, latch);
+    }
+    final terminal = _activeTerminal;
+    final sequence = terminal.inputHandler?.call(
+      TerminalKeyboardEvent(
+        key: terminalKey,
+        shift: latch.shift,
+        alt: latch.alt,
+        ctrl: latch.ctrl,
+        state: terminal,
+        altBuffer: terminal.isUsingAltBuffer,
+        platform: terminal.platform,
+      ),
+    );
+    return sequence ?? terminalControlInputSequence(key, latch);
   }
 
   String? _handleTerminalTextInsert(String text) {
@@ -702,6 +726,24 @@ TerminalControlInputKey? _terminalControlKeyForLogicalKey(
   };
 }
 
+TerminalKey? _terminalKeyForControlInput(TerminalControlInputKey key) {
+  return switch (key) {
+    TerminalControlInputKey.escape => TerminalKey.escape,
+    TerminalControlInputKey.tab => TerminalKey.tab,
+    TerminalControlInputKey.enter => TerminalKey.enter,
+    TerminalControlInputKey.backspace => TerminalKey.backspace,
+    TerminalControlInputKey.delete => TerminalKey.delete,
+    TerminalControlInputKey.arrowUp => TerminalKey.arrowUp,
+    TerminalControlInputKey.arrowDown => TerminalKey.arrowDown,
+    TerminalControlInputKey.arrowLeft => TerminalKey.arrowLeft,
+    TerminalControlInputKey.arrowRight => TerminalKey.arrowRight,
+    TerminalControlInputKey.pageUp => TerminalKey.pageUp,
+    TerminalControlInputKey.pageDown => TerminalKey.pageDown,
+    TerminalControlInputKey.home => TerminalKey.home,
+    TerminalControlInputKey.end => TerminalKey.end,
+  };
+}
+
 class _TerminalAccessoryBar extends StatelessWidget {
   const _TerminalAccessoryBar({
     required this.connected,
@@ -855,6 +897,9 @@ class _TerminalAccessoryBar extends StatelessWidget {
 const double _terminalAccessoryGap = 4;
 const double _terminalAccessoryGroupGap = 6;
 const double _terminalAccessorySquareSide = 28;
+const BorderRadius _terminalAccessoryBorderRadius = BorderRadius.all(
+  Radius.circular(5),
+);
 
 class _TerminalAccessoryCluster extends StatelessWidget {
   const _TerminalAccessoryCluster({required this.top, required this.bottom});
@@ -961,7 +1006,7 @@ class _TerminalAccessoryKey extends StatelessWidget {
       padding: const EdgeInsets.only(right: _terminalAccessoryGap),
       child: SerlinkPressable(
         onTap: enabled ? onPressed : null,
-        borderRadius: SerlinkRadii.control,
+        borderRadius: _terminalAccessoryBorderRadius,
         hoverColor: t.accentPrimary.withValues(alpha: 0.1),
         pressedColor: t.accentPrimary.withValues(alpha: 0.2),
         child: AnimatedOpacity(
@@ -972,7 +1017,7 @@ class _TerminalAccessoryKey extends StatelessWidget {
               color: selected
                   ? t.accentPrimary.withValues(alpha: 0.16)
                   : t.surfaceSunken,
-              borderRadius: SerlinkRadii.control,
+              borderRadius: _terminalAccessoryBorderRadius,
               border: Border.all(
                 color: selected ? t.accentPrimary : t.borderSubtle,
               ),
@@ -1026,7 +1071,7 @@ class _TerminalAccessoryIconKey extends StatelessWidget {
       padding: const EdgeInsets.only(right: _terminalAccessoryGap),
       child: SerlinkPressable(
         onTap: enabled ? onPressed : null,
-        borderRadius: SerlinkRadii.control,
+        borderRadius: _terminalAccessoryBorderRadius,
         hoverColor: t.accentPrimary.withValues(alpha: 0.1),
         pressedColor: t.accentPrimary.withValues(alpha: 0.2),
         child: AnimatedOpacity(
@@ -1035,7 +1080,7 @@ class _TerminalAccessoryIconKey extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: t.surfaceSunken,
-              borderRadius: SerlinkRadii.control,
+              borderRadius: _terminalAccessoryBorderRadius,
               border: Border.all(color: t.borderSubtle),
             ),
             child: SizedBox.square(

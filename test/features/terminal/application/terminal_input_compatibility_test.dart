@@ -92,4 +92,15 @@ void main() {
     expect(output.join(), 'A');
     await tester.pump(const Duration(milliseconds: 400));
   });
+
+  test('encodes arrow keys with terminal cursor key mode', () {
+    final output = <String>[];
+    final terminal = Terminal(onOutput: output.add);
+
+    terminal.keyInput(TerminalKey.arrowUp);
+    terminal.setCursorKeysMode(true);
+    terminal.keyInput(TerminalKey.arrowUp);
+
+    expect(output, ['\x1b[A', '\x1bOA']);
+  });
 }

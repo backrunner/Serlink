@@ -129,9 +129,6 @@ class _SettingsSurface extends ConsumerWidget {
                       icon: Icons.key_outlined,
                       title: l10n.settingsLocalUnlockTitle,
                       subtitle: _localUnlockLabel(l10n, vault, mobile),
-                      mobileActionPlacement: vaultState == VaultState.unlocked
-                          ? _SettingsMobileActionPlacement.trailing
-                          : _SettingsMobileActionPlacement.below,
                       action: vaultState == VaultState.unlocked
                           ? _SettingsSwitch(
                               key: const ValueKey(

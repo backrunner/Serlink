@@ -55,7 +55,6 @@ class _SettingsActionRow extends StatelessWidget {
     this.subtitleWidget,
     this.actionWidth,
     this.actionHeight,
-    this.mobileActionPlacement = _SettingsMobileActionPlacement.trailing,
   });
 
   final IconData icon;
@@ -65,7 +64,6 @@ class _SettingsActionRow extends StatelessWidget {
   final Widget? action;
   final double? actionWidth;
   final double? actionHeight;
-  final _SettingsMobileActionPlacement mobileActionPlacement;
 
   @override
   Widget build(BuildContext context) {
@@ -127,9 +125,6 @@ class _SettingsActionRow extends StatelessWidget {
           actionWidth ?? _settingsMobileActionWidth,
           actionWidth == null ? constraints.maxWidth * 0.42 : actionWidth!,
         );
-        final actionBelow =
-            action != null &&
-            mobileActionPlacement == _SettingsMobileActionPlacement.below;
         final actionSlot = action == null
             ? null
             : _SettingsActionSlot(
@@ -137,24 +132,21 @@ class _SettingsActionRow extends StatelessWidget {
                 height:
                     actionHeight ??
                     (actionWidth == null ? _settingsMobileActionHeight : 40),
-                alignment: actionBelow
-                    ? Alignment.center
-                    : Alignment.centerRight,
+                alignment: Alignment.centerRight,
                 child: _SettingsCompactControlsScope(child: action!),
               );
 
-        final alignTrailingAction = actionSlot != null && !actionBelow;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           child: Row(
             crossAxisAlignment:
-                (effectiveSubtitle == null || alignTrailingAction)
+                (effectiveSubtitle == null || actionSlot != null)
                 ? CrossAxisAlignment.center
                 : CrossAxisAlignment.start,
             children: [
               Padding(
                 padding: EdgeInsets.only(
-                  top: effectiveSubtitle == null || alignTrailingAction ? 0 : 2,
+                  top: effectiveSubtitle == null || actionSlot != null ? 0 : 2,
                 ),
                 child: SizedBox.square(
                   dimension: 30,
@@ -180,14 +172,10 @@ class _SettingsActionRow extends StatelessWidget {
                       const SizedBox(height: 2),
                       effectiveSubtitle,
                     ],
-                    if (actionBelow) ...[
-                      const SizedBox(height: 8),
-                      Align(alignment: Alignment.center, child: actionSlot),
-                    ],
                   ],
                 ),
               ),
-              if (actionSlot != null && !actionBelow) ...[
+              if (actionSlot != null) ...[
                 const SizedBox(width: 10),
                 actionSlot,
               ],
@@ -236,8 +224,6 @@ class _SettingsCompactControlsScope extends InheritedWidget {
   @override
   bool updateShouldNotify(_SettingsCompactControlsScope oldWidget) => false;
 }
-
-enum _SettingsMobileActionPlacement { trailing, below }
 
 const double _settingsMobileActionWidth = 92;
 const double _settingsMobileActionHeight = 32;

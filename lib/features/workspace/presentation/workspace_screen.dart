@@ -14,7 +14,6 @@ import 'package:xterm/xterm.dart';
 
 import '../../../app/app_dependencies.dart';
 import '../../../core/ids/entity_id.dart';
-import '../../../core/security/local_file_security.dart';
 import '../../../design_system/design_system.dart';
 import '../../../features/settings/application/app_language_settings.dart';
 import '../../../l10n/l10n.dart';

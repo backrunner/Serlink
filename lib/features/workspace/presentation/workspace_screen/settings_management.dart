@@ -12,18 +12,6 @@ class _SettingsSection extends StatelessWidget {
   }
 }
 
-class _SettingsStatusPill extends StatelessWidget {
-  const _SettingsStatusPill({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return StatusPill(label: label, color: color);
-  }
-}
-
 class _SettingsInfoRow extends StatelessWidget {
   const _SettingsInfoRow({
     required this.icon,
@@ -46,6 +34,18 @@ class _SettingsInfoRow extends StatelessWidget {
   }
 }
 
+class _SettingsStatusPill extends StatelessWidget {
+  const _SettingsStatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return StatusPill(label: label, color: color);
+  }
+}
+
 class _SettingsActionRow extends StatelessWidget {
   const _SettingsActionRow({
     required this.icon,
@@ -53,6 +53,8 @@ class _SettingsActionRow extends StatelessWidget {
     required this.action,
     this.subtitle,
     this.subtitleWidget,
+    this.actionWidth,
+    this.mobileActionPlacement = _SettingsMobileActionPlacement.trailing,
   });
 
   final IconData icon;
@@ -60,6 +62,8 @@ class _SettingsActionRow extends StatelessWidget {
   final String? subtitle;
   final Widget? subtitleWidget;
   final Widget? action;
+  final double? actionWidth;
+  final _SettingsMobileActionPlacement mobileActionPlacement;
 
   @override
   Widget build(BuildContext context) {
@@ -67,77 +71,307 @@ class _SettingsActionRow extends StatelessWidget {
     final subtitleStyle = Theme.of(
       context,
     ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
-    final tile = SerlinkListTile(
-      minLeadingWidth: 28,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      subtitleGap: 1,
-      leading: SizedBox.square(
-        dimension: 32,
-        child: Icon(icon, size: 19, color: t.textSecondary),
-      ),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: t.textPrimary,
-        ),
-      ),
-      subtitle:
-          subtitleWidget ??
-          (subtitle == null || subtitle!.trim().isEmpty
-              ? null
-              : Text(subtitle!, style: subtitleStyle)),
-      trailing: action == null
-          ? null
-          : Padding(padding: const EdgeInsets.only(left: 16), child: action),
-    );
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (action == null || constraints.maxWidth >= 560) {
+        final compact = constraints.maxWidth < 560;
+        final desktopSubtitle =
+            subtitleWidget ??
+            (subtitle == null || subtitle!.trim().isEmpty
+                ? null
+                : Text(subtitle!, style: subtitleStyle));
+        if (!compact) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: tile,
+            child: SerlinkListTile(
+              minLeadingWidth: 28,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 2,
+              ),
+              subtitleGap: 1,
+              leading: SizedBox.square(
+                dimension: 32,
+                child: Icon(icon, size: 19, color: t.textSecondary),
+              ),
+              title: Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: t.textPrimary,
+                ),
+              ),
+              subtitle: desktopSubtitle,
+              trailing: action == null
+                  ? null
+                  : Padding(
+                      padding: const EdgeInsets.only(left: 16),
+                      child: action,
+                    ),
+            ),
           );
         }
+
+        final effectiveSubtitle =
+            subtitleWidget ??
+            (subtitle == null || subtitle!.trim().isEmpty
+                ? null
+                : Text(
+                    subtitle!,
+                    maxLines: 1,
+                    overflow: compact ? TextOverflow.ellipsis : null,
+                    style: subtitleStyle,
+                  ));
+        final slotWidth = math.min(
+          actionWidth ?? _settingsMobileActionWidth,
+          actionWidth == null ? constraints.maxWidth * 0.42 : actionWidth!,
+        );
+        final actionSlot = action == null
+            ? null
+            : _SettingsActionSlot(
+                width: slotWidth,
+                height: actionWidth == null ? _settingsMobileActionHeight : 40,
+                child: _SettingsCompactControlsScope(child: action!),
+              );
+        final actionBelow =
+            actionSlot != null &&
+            mobileActionPlacement == _SettingsMobileActionPlacement.below;
+
         return Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          child: Row(
+            crossAxisAlignment: effectiveSubtitle == null && !actionBelow
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
             children: [
-              SerlinkListTile(
-                minLeadingWidth: 28,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 2,
-                ),
-                subtitleGap: 1,
-                leading: SizedBox.square(
-                  dimension: 32,
-                  child: Icon(icon, size: 19, color: t.textSecondary),
-                ),
-                title: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: t.textPrimary,
-                  ),
-                ),
-                subtitle:
-                    subtitleWidget ??
-                    (subtitle == null || subtitle!.trim().isEmpty
-                        ? null
-                        : Text(subtitle!, style: subtitleStyle)),
-              ),
               Padding(
-                padding: const EdgeInsets.only(left: 46, top: 8, right: 4),
-                child: Align(alignment: Alignment.centerLeft, child: action!),
+                padding: EdgeInsets.only(
+                  top: effectiveSubtitle == null ? 0 : 2,
+                ),
+                child: SizedBox.square(
+                  dimension: 30,
+                  child: Icon(icon, size: 18, color: t.textSecondary),
+                ),
               ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: t.textPrimary,
+                      ),
+                    ),
+                    if (effectiveSubtitle != null) ...[
+                      const SizedBox(height: 2),
+                      effectiveSubtitle,
+                    ],
+                    if (actionBelow) ...[
+                      const SizedBox(height: 8),
+                      Align(alignment: Alignment.center, child: actionSlot),
+                    ],
+                  ],
+                ),
+              ),
+              if (actionSlot != null && !actionBelow) ...[
+                const SizedBox(width: 10),
+                actionSlot,
+              ],
             ],
           ),
         );
       },
     );
   }
+}
+
+class _SettingsActionSlot extends StatelessWidget {
+  const _SettingsActionSlot({
+    required this.width,
+    required this.height,
+    required this.child,
+  });
+
+  final double width;
+  final double height;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Align(alignment: Alignment.centerRight, child: child),
+    );
+  }
+}
+
+class _SettingsCompactControlsScope extends InheritedWidget {
+  const _SettingsCompactControlsScope({required super.child});
+
+  static bool of(BuildContext context) {
+    return context
+            .dependOnInheritedWidgetOfExactType<
+              _SettingsCompactControlsScope
+            >() !=
+        null;
+  }
+
+  @override
+  bool updateShouldNotify(_SettingsCompactControlsScope oldWidget) => false;
+}
+
+enum _SettingsMobileActionPlacement { trailing, below }
+
+const double _settingsMobileActionWidth = 92;
+const double _settingsMobileActionHeight = 32;
+
+class _SettingsTextButton extends StatelessWidget {
+  const _SettingsTextButton({
+    super.key,
+    required this.onPressed,
+    required this.child,
+    this.compactSize = SerlinkButtonSize.xs,
+  }) : icon = null,
+       label = null;
+
+  const _SettingsTextButton.icon({
+    super.key,
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+  }) : child = null,
+       compactSize = SerlinkButtonSize.xs;
+
+  final VoidCallback? onPressed;
+  final Widget? child;
+  final Widget? icon;
+  final Widget? label;
+  final SerlinkButtonSize compactSize;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_settingsUseCompactControls(context) ||
+        _SettingsCompactControlsScope.of(context)) {
+      return _SettingsMobileButton(
+        onPressed: onPressed,
+        icon: icon,
+        child: child ?? label!,
+      );
+    }
+    final size = _settingsUseCompactControls(context)
+        ? compactSize
+        : SerlinkButtonSize.lg;
+    if (icon case final icon?) {
+      return SerlinkTextButton.icon(
+        onPressed: onPressed,
+        icon: icon,
+        label: label!,
+        size: size,
+      );
+    }
+    return SerlinkTextButton(onPressed: onPressed, size: size, child: child!);
+  }
+}
+
+class _SettingsMobileButton extends StatelessWidget {
+  const _SettingsMobileButton({
+    required this.onPressed,
+    required this.child,
+    this.icon,
+  });
+
+  final VoidCallback? onPressed;
+  final Widget child;
+  final Widget? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final enabled = onPressed != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.45,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: t.surfaceSunken,
+          borderRadius: SerlinkRadii.control,
+          border: Border.all(color: t.borderSubtle),
+        ),
+        child: SerlinkPressable(
+          onTap: onPressed,
+          borderRadius: SerlinkRadii.control,
+          hoverColor: t.accentPrimary.withValues(alpha: 0.08),
+          pressedColor: t.accentPrimary.withValues(alpha: 0.16),
+          child: SizedBox(
+            width: _settingsMobileActionWidth,
+            height: _settingsMobileActionHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (icon != null) ...[
+                        IconTheme.merge(
+                          data: IconThemeData(size: 14, color: t.textPrimary),
+                          child: icon!,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      DefaultTextStyle.merge(
+                        style: TextStyle(
+                          color: t.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                        maxLines: 1,
+                        child: child,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsSwitch extends StatelessWidget {
+  const _SettingsSwitch({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    this.semanticsLabel,
+  });
+
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final String? semanticsLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return SerlinkSwitch(
+      value: value,
+      onChanged: onChanged,
+      semanticsLabel: semanticsLabel,
+      scale: _settingsUseCompactControls(context) ? 0.64 : 0.72,
+    );
+  }
+}
+
+bool _settingsUseCompactControls(BuildContext context) {
+  return MediaQuery.sizeOf(context).width < 700;
 }
 
 List<SerlinkSelectItem<AppLanguage>> _languageItems(AppLocalizations l10n) {
@@ -191,7 +425,24 @@ String _vaultStatusPillLabel(AppLocalizations l10n, VaultState? state) {
   };
 }
 
-String _vaultStateLabel(AppLocalizations l10n, VaultState? state) {
+String _vaultStateLabel(AppLocalizations l10n, VaultState? state, bool mobile) {
+  if (!mobile) {
+    return _vaultStateLabelDesktop(l10n, state);
+  }
+  return switch (state) {
+    VaultState.uninitialized => l10n.settingsVaultNotCreated,
+    VaultState.locked => _mobileText(l10n, zh: '已锁定', en: 'Locked', ja: 'ロック中'),
+    VaultState.unlocked => _mobileText(
+      l10n,
+      zh: '已解锁',
+      en: 'Unlocked',
+      ja: '解除済み',
+    ),
+    null => l10n.settingsVaultPreparing,
+  };
+}
+
+String _vaultStateLabelDesktop(AppLocalizations l10n, VaultState? state) {
   return switch (state) {
     VaultState.uninitialized => l10n.settingsVaultNotCreated,
     VaultState.locked => l10n.settingsVaultLocked,
@@ -200,7 +451,35 @@ String _vaultStateLabel(AppLocalizations l10n, VaultState? state) {
   };
 }
 
-String _localUnlockLabel(AppLocalizations l10n, VaultSessionState? session) {
+String _localUnlockLabel(
+  AppLocalizations l10n,
+  VaultSessionState? session,
+  bool mobile,
+) {
+  if (mobile) {
+    if (session?.vaultState == VaultState.uninitialized) {
+      return _mobileText(
+        l10n,
+        zh: '需先创建保险库',
+        en: 'Create vault first',
+        ja: '先に作成',
+      );
+    }
+    if (session?.localUnlockAvailable == true) {
+      return _mobileText(
+        l10n,
+        zh: '可用设备解锁',
+        en: 'Device unlock ready',
+        ja: '端末解除可',
+      );
+    }
+    return _mobileText(
+      l10n,
+      zh: '需密码或恢复密钥',
+      en: 'Passphrase required',
+      ja: 'パスフレーズ必須',
+    );
+  }
   if (session?.vaultState == VaultState.uninitialized) {
     return l10n.settingsLocalUnlockNeedsVault;
   }
@@ -208,6 +487,52 @@ String _localUnlockLabel(AppLocalizations l10n, VaultSessionState? session) {
     return l10n.settingsLocalUnlockEnabled;
   }
   return l10n.settingsLocalUnlockDisabled;
+}
+
+String _settingsLanguageSubtitle(AppLocalizations l10n, bool mobile) {
+  if (!mobile) {
+    return l10n.settingsLanguageSubtitle;
+  }
+  return _mobileText(l10n, zh: '应用语言', en: 'App language', ja: '表示言語');
+}
+
+String _settingsCredentialsLocked(AppLocalizations l10n, bool mobile) {
+  if (!mobile) {
+    return l10n.settingsCredentialsLocked;
+  }
+  return _mobileText(l10n, zh: '需解锁保险库', en: 'Unlock vault first', ja: '解除が必要');
+}
+
+String _settingsKnownHostsLocked(AppLocalizations l10n, bool mobile) {
+  if (!mobile) {
+    return l10n.settingsKnownHostsLocked;
+  }
+  return _mobileText(l10n, zh: '需解锁保险库', en: 'Unlock vault first', ja: '解除が必要');
+}
+
+String _settingsImportExportSubtitle(AppLocalizations l10n, bool mobile) {
+  if (!mobile) {
+    return l10n.settingsImportExportSubtitle;
+  }
+  return _mobileText(
+    l10n,
+    zh: '备份与 SSH 数据',
+    en: 'Backups and SSH data',
+    ja: 'バックアップと SSH',
+  );
+}
+
+String _mobileText(
+  AppLocalizations l10n, {
+  required String zh,
+  required String en,
+  required String ja,
+}) {
+  return switch (l10n.localeName.split('_').first) {
+    'zh' => zh,
+    'ja' => ja,
+    _ => en,
+  };
 }
 
 Future<void> _setLocalVaultUnlock(

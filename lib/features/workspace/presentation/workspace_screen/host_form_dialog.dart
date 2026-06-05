@@ -98,18 +98,19 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final capabilities = ref.watch(platformCapabilitiesProvider);
-    final mediaSize = MediaQuery.sizeOf(context);
-    final dialogWidth = _adaptiveDialogWidth(context, 680);
-    final dialogHeight = math.min(
-      720.0,
-      math.max(360.0, mediaSize.height - (mediaSize.width < 600 ? 80 : 140)),
-    );
+    final layout = _HostFormDialogLayout.resolve(context, capabilities);
 
     return SerlinkDialog(
+      maxWidth: layout.dialogWidth,
+      style: layout.dialogStyle,
       title: Text(_isEditing ? l10n.hostEditTitle : l10n.hostAddTitle),
+      titlePadding: layout.titlePadding,
+      contentPadding: layout.contentPadding,
+      actionsPadding: layout.actionsPadding,
       content: SizedBox(
-        width: dialogWidth,
-        height: dialogHeight,
+        key: const ValueKey('host-form-scroll-frame'),
+        width: layout.contentWidth,
+        height: layout.contentHeight,
         child: Scrollbar(
           controller: _scrollController,
           child: ScrollConfiguration(
@@ -118,12 +119,13 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             ).copyWith(scrollbars: false),
             child: SingleChildScrollView(
               controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(2, 8, 10, 2),
+              padding: layout.scrollPadding,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _HostFormSection(
                     title: l10n.hostSectionConnection,
+                    padding: layout.sectionPadding,
                     child: Column(
                       children: [
                         Row(
@@ -139,7 +141,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                                 textInputAction: TextInputAction.next,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: layout.inlineGap),
                             Expanded(
                               child: SerlinkTextField(
                                 controller: _portController,
@@ -152,7 +154,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
+                        SizedBox(height: layout.fieldGap),
                         SerlinkTextField(
                           key: const ValueKey('host-display-name-field'),
                           controller: _displayNameController,
@@ -163,7 +165,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                           ),
                           textInputAction: TextInputAction.next,
                         ),
-                        const SizedBox(height: 14),
+                        SizedBox(height: layout.fieldGap),
                         SerlinkTextField(
                           key: const ValueKey('host-username-field'),
                           controller: _usernameController,
@@ -175,9 +177,10 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: layout.sectionGap),
                   _HostFormSection(
                     title: l10n.hostSectionAuthentication,
+                    padding: layout.sectionPadding,
                     child: _HostAuthenticationFields(
                       isEditing: _isEditing,
                       authMode: _authMode,
@@ -203,11 +206,13 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                       onToggleIdentity: _toggleIdentity,
                       onEditIdentity: _editIdentity,
                       onSubmit: _save,
+                      compact: layout.compact,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: layout.sectionGap),
                   _HostFormSection(
                     title: l10n.hostSectionStartup,
+                    padding: layout.sectionPadding,
                     child: Column(
                       children: [
                         SerlinkTextField(
@@ -219,7 +224,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                             labelText: l10n.hostStartupCommandsLabel,
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        SizedBox(height: layout.fieldGap),
                         SerlinkTextField(
                           controller: _tagsController,
                           decoration: InputDecoration(
@@ -232,9 +237,10 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                     ),
                   ),
                   if (_jumpHostOptions.isNotEmpty) ...[
-                    const SizedBox(height: 16),
+                    SizedBox(height: layout.sectionGap),
                     _HostFormSection(
                       title: l10n.hostSectionRouting,
+                      padding: layout.sectionPadding,
                       child: _JumpHostSelectionSection(
                         hosts: _jumpHostOptions,
                         selectedHostIds: _selectedJumpHostIds,
@@ -243,9 +249,10 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 16),
+                  SizedBox(height: layout.sectionGap),
                   _HostFormSection(
                     title: 'SFTP',
+                    padding: layout.sectionPadding,
                     child: SerlinkTextField(
                       key: const ValueKey('host-sftp-default-directory-field'),
                       controller: _sftpDefaultDirectoryController,
@@ -255,13 +262,14 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                       textInputAction: TextInputAction.next,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: layout.sectionGap),
                   _AdvancedConnectionSettingsSection(
                     expanded: _showAdvancedConnection,
                     connectTimeoutController: _connectTimeoutController,
                     keepAliveIntervalController: _keepAliveIntervalController,
                     reconnectAttemptsController: _reconnectAttemptsController,
                     reconnectBackoffController: _reconnectBackoffController,
+                    compact: layout.compact,
                     onToggle: () {
                       setState(() {
                         _showAdvancedConnection = !_showAdvancedConnection;
@@ -280,11 +288,13 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       ),
       actions: [
         SerlinkTextButton(
+          size: layout.buttonSize,
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
           child: Text(l10n.cancelAction),
         ),
         SerlinkFilledButton(
           key: const ValueKey('host-save-button'),
+          size: layout.buttonSize,
           onPressed: _saving || _loadingOptions ? null : _save,
           child: Text(_saving ? l10n.savingAction : l10n.saveAction),
         ),
@@ -576,6 +586,97 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       keepAliveIntervalSeconds: keepAlive,
       reconnectAttempts: reconnectAttempts,
       reconnectBackoffSeconds: reconnectBackoff,
+    );
+  }
+}
+
+class _HostFormDialogLayout {
+  const _HostFormDialogLayout({
+    required this.compact,
+    required this.dialogWidth,
+    required this.contentWidth,
+    required this.contentHeight,
+    required this.titlePadding,
+    required this.contentPadding,
+    required this.actionsPadding,
+    required this.dialogStyle,
+    required this.scrollPadding,
+    required this.sectionPadding,
+    required this.sectionGap,
+    required this.fieldGap,
+    required this.inlineGap,
+    required this.buttonSize,
+  });
+
+  final bool compact;
+  final double dialogWidth;
+  final double contentWidth;
+  final double contentHeight;
+  final EdgeInsets titlePadding;
+  final EdgeInsets contentPadding;
+  final EdgeInsets actionsPadding;
+  final FDialogStyleDelta dialogStyle;
+  final EdgeInsets scrollPadding;
+  final EdgeInsets sectionPadding;
+  final double sectionGap;
+  final double fieldGap;
+  final double inlineGap;
+  final SerlinkButtonSize buttonSize;
+
+  static _HostFormDialogLayout resolve(
+    BuildContext context,
+    PlatformCapabilities capabilities,
+  ) {
+    final mediaSize = MediaQuery.sizeOf(context);
+    final compact =
+        capabilities.prefersMobileWorkspaceShell || mediaSize.width < 600;
+    final titlePadding = compact
+        ? const EdgeInsets.fromLTRB(16, 14, 16, 0)
+        : const EdgeInsets.fromLTRB(24, 22, 24, 0);
+    final contentPadding = compact
+        ? const EdgeInsets.fromLTRB(12, 12, 12, 0)
+        : const EdgeInsets.fromLTRB(24, 18, 24, 0);
+    final actionsPadding = compact
+        ? const EdgeInsets.fromLTRB(16, 12, 16, 16)
+        : const EdgeInsets.fromLTRB(24, 18, 24, 24);
+    final dialogWidth = compact
+        ? math.min(760.0, math.max(300.0, mediaSize.width - 12.0))
+        : _adaptiveDialogWidth(context, 728);
+    final availableContentHeight = mediaSize.height - (compact ? 204.0 : 140.0);
+    final compactMinimumHeight = math.min(
+      320.0,
+      math.max(180.0, mediaSize.height - 150.0),
+    );
+    final contentHeight = compact
+        ? math.min(
+            600.0,
+            math.max(compactMinimumHeight, availableContentHeight),
+          )
+        : math.min(720.0, math.max(360.0, availableContentHeight));
+
+    return _HostFormDialogLayout(
+      compact: compact,
+      dialogWidth: dialogWidth,
+      contentWidth: math.max(280.0, dialogWidth - contentPadding.horizontal),
+      contentHeight: contentHeight,
+      titlePadding: titlePadding,
+      contentPadding: contentPadding,
+      actionsPadding: actionsPadding,
+      dialogStyle: compact
+          ? const FDialogStyleDelta.delta(
+              insetPadding: EdgeInsetsGeometryDelta.value(
+                EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+              ),
+            )
+          : const FDialogStyleDelta.context(),
+      scrollPadding: compact
+          ? const EdgeInsets.fromLTRB(0, 4, 4, 0)
+          : const EdgeInsets.fromLTRB(2, 8, 10, 2),
+      sectionPadding: EdgeInsets.all(compact ? 10 : 14),
+      sectionGap: compact ? 12 : 16,
+      fieldGap: compact ? 10 : 14,
+      inlineGap: compact ? 8 : 12,
+      buttonSize: compact ? SerlinkButtonSize.md : SerlinkButtonSize.lg,
     );
   }
 }

@@ -29,7 +29,7 @@ class _SyncSettingsSection extends ConsumerWidget {
             icon: Icons.cloud_queue,
             title: 'WebDAV',
             subtitle: _syncSettingsErrorMessage(l10n, error),
-            action: SerlinkTextButton(
+            action: _SettingsTextButton(
               onPressed: () => _showWebDavSyncDialog(context, ref, null),
               child: Text(l10n.syncConfigureAction),
             ),
@@ -38,7 +38,7 @@ class _SyncSettingsSection extends ConsumerWidget {
             icon: Icons.cloud_queue,
             title: 'WebDAV',
             subtitle: _webDavSettingsSubtitle(l10n, settings, autoSync),
-            action: SerlinkTextButton(
+            action: _SettingsTextButton(
               onPressed: () => _showWebDavSyncDialog(context, ref, settings),
               child: Text(
                 settings == null
@@ -89,7 +89,7 @@ class _SyncSettingsSection extends ConsumerWidget {
                   icon: Icons.cloud_outlined,
                   title: 'iCloud',
                   subtitle: _iCloudSettingsSubtitle(l10n, enabled, autoSync),
-                  action: SerlinkSwitch(
+                  action: _SettingsSwitch(
                     value: enabled,
                     onChanged: (value) => _setICloudSync(context, ref, value),
                   ),
@@ -127,20 +127,25 @@ class _SyncSettingsSection extends ConsumerWidget {
               icon: Icons.devices_outlined,
               title: l10n.syncDevicesTitle,
               subtitle: _syncDevicesSubtitle(l10n, devices),
+              actionWidth: 188,
               action: Wrap(
                 spacing: 4,
+                runSpacing: 4,
+                alignment: WrapAlignment.end,
                 children: [
-                  SerlinkTextButton(
+                  _SettingsTextButton(
                     onPressed: () =>
                         _showSyncDevicesDialog(context, ref, devices),
+                    compactSize: SerlinkButtonSize.xs,
                     child: Text(
                       devices.isEmpty
                           ? l10n.syncViewAction
                           : l10n.settingsManageAction,
                     ),
                   ),
-                  SerlinkTextButton(
+                  _SettingsTextButton(
                     onPressed: () => _rotateSyncDevice(context, ref),
+                    compactSize: SerlinkButtonSize.xs,
                     child: Text(l10n.syncResetAction),
                   ),
                 ],
@@ -164,7 +169,7 @@ class _SyncRepairRow extends ConsumerWidget {
       icon: Icons.build_outlined,
       title: l10n.syncRepairTitle,
       subtitle: plan.message,
-      action: SerlinkTextButton(
+      action: _SettingsTextButton(
         onPressed: () => _repairWebDavSync(context, ref, plan),
         child: Text(l10n.syncRepairAction),
       ),
@@ -324,27 +329,33 @@ class _SyncConflictRow extends ConsumerWidget {
       icon: Icons.report_problem_outlined,
       title: l10n.syncConflictsTitle,
       subtitle: l10n.syncConflictsSubtitle(conflicts.length),
-      action: Row(
-        mainAxisSize: MainAxisSize.min,
+      actionWidth: 286,
+      action: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        alignment: WrapAlignment.end,
         children: [
-          SerlinkTextButton(
+          _SettingsTextButton(
             onPressed: () => _reviewWebDavConflicts(context, ref, conflicts),
+            compactSize: SerlinkButtonSize.xs,
             child: Text(l10n.syncReviewAction),
           ),
-          SerlinkTextButton(
+          _SettingsTextButton(
             onPressed: () => _resolveWebDavConflicts(
               context,
               ref,
               SyncConflictResolution.useRemote,
             ),
+            compactSize: SerlinkButtonSize.xs,
             child: Text(l10n.syncUseRemoteAction),
           ),
-          SerlinkTextButton(
+          _SettingsTextButton(
             onPressed: () => _resolveWebDavConflicts(
               context,
               ref,
               SyncConflictResolution.keepLocal,
             ),
+            compactSize: SerlinkButtonSize.xs,
             child: Text(l10n.syncKeepLocalAction),
           ),
         ],

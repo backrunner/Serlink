@@ -17,6 +17,8 @@ Future<void> _showDataExchangeDialog(
         switch (action) {
           case _DataExchangeAction.exportVaultBackup:
             await _exportVaultBackup(context, ref);
+          case _DataExchangeAction.exportDiagnosticBundle:
+            await _exportDiagnosticBundle(context, ref);
           case _DataExchangeAction.exportHostMetadata:
             await _exportHostMetadata(context, ref);
           case _DataExchangeAction.exportOpenSshConfig:
@@ -44,6 +46,7 @@ Future<void> _showDataExchangeDialog(
 
 enum _DataExchangeAction {
   exportVaultBackup,
+  exportDiagnosticBundle,
   exportHostMetadata,
   exportOpenSshConfig,
   exportIdentityMetadata,
@@ -120,6 +123,14 @@ class _DataExchangeDialog extends StatelessWidget {
                       subtitle: l10n.dataExchangeExportBackupSubtitle,
                       onPressed: () => onActionSelected(
                         _DataExchangeAction.exportVaultBackup,
+                      ),
+                    ),
+                    _DataExchangeActionTile(
+                      icon: Icons.support_agent_outlined,
+                      title: l10n.dataExchangeExportDiagnosticBundleTitle,
+                      subtitle: l10n.dataExchangeExportDiagnosticBundleSubtitle,
+                      onPressed: () => onActionSelected(
+                        _DataExchangeAction.exportDiagnosticBundle,
                       ),
                     ),
                     _DataExchangeActionTile(

@@ -39,6 +39,7 @@ class SerlinkDialog extends StatelessWidget {
     this.actionsPadding,
     this.constraints,
     this.maxWidth = 920,
+    this.style = const FDialogStyleDelta.context(),
   });
 
   final Widget? title;
@@ -49,11 +50,13 @@ class SerlinkDialog extends StatelessWidget {
   final EdgeInsetsGeometry? actionsPadding;
   final BoxConstraints? constraints;
   final double maxWidth;
+  final FDialogStyleDelta style;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     return FDialog.raw(
+      style: style,
       clipBehavior: Clip.antiAlias,
       constraints:
           constraints ??
@@ -124,6 +127,7 @@ class SerlinkFilledButton extends StatelessWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.size = SerlinkButtonSize.lg,
   }) : icon = null,
        label = null,
        variant = SerlinkButtonVariant.primary;
@@ -133,6 +137,7 @@ class SerlinkFilledButton extends StatelessWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.size = SerlinkButtonSize.lg,
   }) : icon = null,
        label = null,
        variant = SerlinkButtonVariant.secondary;
@@ -142,6 +147,7 @@ class SerlinkFilledButton extends StatelessWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.size = SerlinkButtonSize.lg,
   }) : icon = null,
        label = null,
        variant = SerlinkButtonVariant.danger;
@@ -152,6 +158,7 @@ class SerlinkFilledButton extends StatelessWidget {
     required this.icon,
     required this.label,
     this.style,
+    this.size = SerlinkButtonSize.lg,
   }) : child = null,
        variant = SerlinkButtonVariant.primary;
 
@@ -161,13 +168,14 @@ class SerlinkFilledButton extends StatelessWidget {
   final Widget? label;
   final ButtonStyle? style;
   final SerlinkButtonVariant variant;
+  final SerlinkButtonSize size;
 
   @override
   Widget build(BuildContext context) {
     return _SerlinkButtonCore(
       onPressed: onPressed,
       variant: variant,
-      size: SerlinkButtonSize.lg,
+      size: size,
       prefix: icon,
       child: child ?? label!,
     );
@@ -180,6 +188,7 @@ class SerlinkOutlinedButton extends StatelessWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.size = SerlinkButtonSize.lg,
   }) : icon = null,
        label = null;
 
@@ -189,6 +198,7 @@ class SerlinkOutlinedButton extends StatelessWidget {
     required this.icon,
     required this.label,
     this.style,
+    this.size = SerlinkButtonSize.lg,
   }) : child = null;
 
   final VoidCallback? onPressed;
@@ -196,13 +206,14 @@ class SerlinkOutlinedButton extends StatelessWidget {
   final Widget? icon;
   final Widget? label;
   final ButtonStyle? style;
+  final SerlinkButtonSize size;
 
   @override
   Widget build(BuildContext context) {
     return _SerlinkButtonCore(
       onPressed: onPressed,
       variant: SerlinkButtonVariant.outline,
-      size: SerlinkButtonSize.lg,
+      size: size,
       prefix: icon,
       child: child ?? label!,
     );
@@ -215,6 +226,7 @@ class SerlinkTextButton extends StatelessWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.size = SerlinkButtonSize.lg,
   }) : icon = null,
        label = null,
        danger = false;
@@ -225,6 +237,7 @@ class SerlinkTextButton extends StatelessWidget {
     required this.icon,
     required this.label,
     this.style,
+    this.size = SerlinkButtonSize.lg,
   }) : child = null,
        danger = false;
 
@@ -233,6 +246,7 @@ class SerlinkTextButton extends StatelessWidget {
     required this.onPressed,
     required this.child,
     this.style,
+    this.size = SerlinkButtonSize.lg,
   }) : icon = null,
        label = null,
        danger = true;
@@ -243,6 +257,7 @@ class SerlinkTextButton extends StatelessWidget {
   final Widget? label;
   final ButtonStyle? style;
   final bool danger;
+  final SerlinkButtonSize size;
 
   @override
   Widget build(BuildContext context) {
@@ -251,7 +266,7 @@ class SerlinkTextButton extends StatelessWidget {
       variant: danger
           ? SerlinkButtonVariant.danger
           : SerlinkButtonVariant.ghost,
-      size: SerlinkButtonSize.lg,
+      size: size,
       prefix: icon,
       child: child ?? label!,
     );
@@ -1061,11 +1076,13 @@ class SerlinkSwitch extends StatelessWidget {
     required this.value,
     required this.onChanged,
     this.semanticsLabel,
+    this.scale = _serlinkSwitchDefaultScale,
   });
 
   final bool value;
   final ValueChanged<bool>? onChanged;
   final String? semanticsLabel;
+  final double scale;
 
   @override
   Widget build(BuildContext context) {
@@ -1073,44 +1090,47 @@ class SerlinkSwitch extends StatelessWidget {
       value: value,
       onChanged: onChanged,
       semanticsLabel: semanticsLabel,
+      scale: scale,
     );
   }
 }
 
-const double _serlinkSwitchScale = 0.72;
+const double _serlinkSwitchDefaultScale = 0.72;
 const double _serlinkSwitchBaseWidth = 59;
 const double _serlinkSwitchBaseHeight = 39;
 const Size _serlinkSwitchBaseSize = Size(
   _serlinkSwitchBaseWidth,
   _serlinkSwitchBaseHeight,
 );
-const Size _serlinkSwitchSize = Size(
-  _serlinkSwitchBaseWidth * _serlinkSwitchScale,
-  _serlinkSwitchBaseHeight * _serlinkSwitchScale,
-);
 
 class _SerlinkSwitchFrame extends StatelessWidget {
   const _SerlinkSwitchFrame({
     required this.value,
     required this.onChanged,
+    required this.scale,
     this.semanticsLabel,
   });
 
   final bool value;
   final ValueChanged<bool>? onChanged;
+  final double scale;
   final String? semanticsLabel;
 
   @override
   Widget build(BuildContext context) {
+    final resolvedScale = scale.clamp(0.5, 1.0).toDouble();
     return SizedBox.fromSize(
-      size: _serlinkSwitchSize,
+      size: Size(
+        _serlinkSwitchBaseWidth * resolvedScale,
+        _serlinkSwitchBaseHeight * resolvedScale,
+      ),
       child: OverflowBox(
         minWidth: _serlinkSwitchBaseSize.width,
         maxWidth: _serlinkSwitchBaseSize.width,
         minHeight: _serlinkSwitchBaseSize.height,
         maxHeight: _serlinkSwitchBaseSize.height,
         child: Transform.scale(
-          scale: _serlinkSwitchScale,
+          scale: resolvedScale,
           child: FSwitch(
             value: value,
             onChange: onChanged,

@@ -82,6 +82,7 @@ class _HostsSurface extends ConsumerWidget {
                                       milliseconds: 40 * (index.clamp(0, 8)),
                                     ),
                                     child: _HostRow(
+                                      mobile: mobile,
                                       host: host,
                                       onTerminal: () =>
                                           controller.openTerminal(host),

@@ -75,7 +75,9 @@ class _SnippetsSurface extends ConsumerWidget {
                                 body: l10n.snippetsNoMatchesBody,
                               )
                             : ListView.separated(
-                                padding: const EdgeInsets.all(12),
+                                padding: mobile
+                                    ? _mobileSurfaceListPadding
+                                    : const EdgeInsets.all(12),
                                 itemCount: filteredItems.length,
                                 separatorBuilder: (context, index) =>
                                     const SizedBox(height: 8),

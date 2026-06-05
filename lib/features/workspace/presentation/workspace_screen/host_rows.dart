@@ -120,7 +120,7 @@ class _HostRow extends StatelessWidget {
 class _SwipeDeleteHostRow extends StatefulWidget {
   const _SwipeDeleteHostRow({required this.child, required this.onDelete});
 
-  static const double revealWidth = 76;
+  static const double revealWidth = 60;
 
   final Widget child;
   final VoidCallback onDelete;
@@ -193,35 +193,43 @@ class _SwipeDeleteHostRowState extends State<_SwipeDeleteHostRow> {
 class _SwipeDeleteHostAction extends StatelessWidget {
   const _SwipeDeleteHostAction({required this.onPressed});
 
+  static const double _side = 44;
+
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(color: t.statusDanger),
-      child: SerlinkPressable(
-        key: const ValueKey('mobile-host-delete-button'),
-        onTap: onPressed,
-        borderRadius: BorderRadius.zero,
-        hoverColor: Colors.white.withValues(alpha: 0.08),
-        pressedColor: Colors.black.withValues(alpha: 0.12),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.delete_outline, size: 18, color: t.onAccent),
-              const SizedBox(height: 2),
-              Text(
-                context.l10n.hostsDeleteAction,
-                style: TextStyle(
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 2),
+        child: Semantics(
+          button: true,
+          label: context.l10n.hostsDeleteAction,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: t.statusDanger,
+              borderRadius: SerlinkRadii.control,
+              border: Border.all(color: t.statusDanger.withValues(alpha: 0.7)),
+              boxShadow: serlinkShadow(t, elevation: 6, opacity: 0.45),
+            ),
+            child: SerlinkPressable(
+              key: const ValueKey('mobile-host-delete-button'),
+              onTap: onPressed,
+              borderRadius: SerlinkRadii.control,
+              hoverColor: Colors.white.withValues(alpha: 0.08),
+              pressedColor: Colors.black.withValues(alpha: 0.14),
+              child: SizedBox.square(
+                dimension: _side,
+                child: Icon(
+                  Icons.delete_outline,
+                  key: const ValueKey('mobile-host-delete-icon'),
+                  size: 20,
                   color: t.onAccent,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

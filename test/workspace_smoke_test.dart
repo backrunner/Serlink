@@ -930,6 +930,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Swipe Delete Host'), findsOneWidget);
+    final hostRow = find.ancestor(
+      of: find.text('Swipe Delete Host'),
+      matching: find.byType(ListRow),
+    );
+    expect(hostRow, findsOneWidget);
+    final hostTopGap =
+        tester.getRect(hostRow).top -
+        tester
+            .getRect(find.byKey(const ValueKey('mobile-workspace-search-bar')))
+            .bottom;
+    expect(hostTopGap, inInclusiveRange(6, 10));
     for (final keyPrefix in ['terminal', 'sftp']) {
       final buttonRect = tester.getRect(
         find.byKey(ValueKey('mobile-host-$keyPrefix-button')),
@@ -951,7 +962,30 @@ void main() {
 
     await tester.drag(find.text('Swipe Delete Host'), const Offset(-130, 0));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('mobile-host-delete-button')));
+    final deleteButton = find.byKey(
+      const ValueKey('mobile-host-delete-button'),
+    );
+    final deleteIcon = find.byKey(const ValueKey('mobile-host-delete-icon'));
+    expect(deleteButton, findsOneWidget);
+    expect(deleteIcon, findsOneWidget);
+    expect(
+      find.descendant(of: deleteButton, matching: find.text('Delete')),
+      findsNothing,
+    );
+    final deleteButtonRect = tester.getRect(deleteButton);
+    final deleteIconRect = tester.getRect(deleteIcon);
+    expect(deleteButtonRect.width, 44);
+    expect(deleteButtonRect.height, 44);
+    expect(
+      (deleteButtonRect.center.dx - deleteIconRect.center.dx).abs(),
+      lessThanOrEqualTo(0.5),
+    );
+    expect(
+      (deleteButtonRect.center.dy - deleteIconRect.center.dy).abs(),
+      lessThanOrEqualTo(0.5),
+    );
+
+    await tester.tap(deleteButton);
     await tester.pumpAndSettle();
 
     expect(find.text('Delete host?'), findsOneWidget);

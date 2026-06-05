@@ -118,7 +118,7 @@ class _TransferTaskList extends ConsumerWidget {
     return ListView.builder(
       key: const PageStorageKey('transfers-list'),
       padding: compact
-          ? const EdgeInsets.all(12)
+          ? _mobileSurfaceListPadding
           : const EdgeInsets.fromLTRB(12, 0, 12, 12),
       scrollCacheExtent: const ScrollCacheExtent.pixels(960),
       itemCount: tasks.length,

@@ -107,6 +107,9 @@ class SerlinkSelect<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compactStyle = compact ? _compactSelectStyle(context) : null;
+    final itemStyle = compact
+        ? _compactSelectItemStyle(context)
+        : const FItemStyleDelta.context();
     final contentConstraints = menuMinWidth == null
         ? FAutoWidthPortalConstraints(maxHeight: menuMaxHeight)
         : FPortalConstraints(
@@ -118,6 +121,7 @@ class SerlinkSelect<T> extends StatelessWidget {
       for (final item in items)
         FSelectItem<T>(
           value: item.value,
+          style: itemStyle,
           prefix: item.icon == null ? null : Icon(item.icon, size: 16),
           title: Text(item.label, maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
@@ -177,6 +181,40 @@ class SerlinkSelect<T> extends StatelessWidget {
       contentConstraints: contentConstraints,
       format: _format,
       children: children,
+    );
+  }
+
+  FItemStyleDelta _compactSelectItemStyle(BuildContext context) {
+    final t = context.tokens;
+    final titleStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      color: t.textPrimary,
+      fontSize: 12.5,
+      fontWeight: FontWeight.w600,
+      height: 1.12,
+    );
+    return FItemStyleDelta.delta(
+      padding: const EdgeInsetsGeometryDelta.value(EdgeInsets.zero),
+      contentStyle: FItemContentStyleDelta.delta(
+        suffixedPadding: const EdgeInsetsGeometryDelta.value(
+          EdgeInsets.fromLTRB(9, 7, 5, 7),
+        ),
+        unsuffixedPadding: const EdgeInsetsGeometryDelta.value(
+          EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+        ),
+        prefixIconSpacing: 7,
+        prefixIconStyle: FVariantsDelta.delta([
+          FVariantOperation.all(
+            IconThemeDataDelta.value(
+              IconThemeData(color: t.textSecondary, size: 15),
+            ),
+          ),
+        ]),
+        titleTextStyle: titleStyle == null
+            ? null
+            : FVariantsDelta.delta([
+                FVariantOperation.all(TextStyleDelta.value(titleStyle)),
+              ]),
+      ),
     );
   }
 

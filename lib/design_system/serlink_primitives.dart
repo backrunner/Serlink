@@ -171,14 +171,22 @@ class _SerlinkPressableState extends State<SerlinkPressable> {
         onTapCancel: interactive
             ? () => setState(() => _pressed = false)
             : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-          decoration: BoxDecoration(
-            color: overlay,
-            borderRadius: widget.borderRadius,
+        child: ClipRRect(
+          borderRadius: widget.borderRadius,
+          child: Stack(
+            children: [
+              Padding(padding: widget.padding, child: widget.child),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    curve: Curves.easeOut,
+                    color: overlay,
+                  ),
+                ),
+              ),
+            ],
           ),
-          child: Padding(padding: widget.padding, child: widget.child),
         ),
       ),
     );

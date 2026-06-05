@@ -81,130 +81,237 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final capabilities = ref.watch(platformCapabilitiesProvider);
+    final compact = capabilities.prefersMobileWorkspaceShell;
     final canList = widget.lifecycle == SessionLifecycleState.connected;
     final canOpenParent = canList && _showParentEntry;
     final canTransferDirectories = capabilities.localDirectoryTransfer;
     final canDropUpload = canList && capabilities.isDesktop;
     final pathContent = _buildPathContent(context, enabled: canList);
-    final pathWidget = capabilities.prefersTouchUi
+    final pathWidget = compact
+        ? Expanded(child: pathContent)
+        : capabilities.prefersTouchUi
         ? SizedBox(width: _sftpToolbarPathWidth(context), child: pathContent)
         : Expanded(child: pathContent);
+    final searchWidth = compact ? 180.0 : 220.0;
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: EdgeInsets.fromLTRB(12, compact ? 8 : 8, 12, 8),
           child: _SftpToolbarContainer(
-            scrollable: capabilities.prefersTouchUi,
-            child: Row(
-              children: [
-                const Icon(Icons.folder_open, size: 18),
-                const SizedBox(width: 8),
-                SerlinkTooltip(
-                  message: l10n.sftpParentFolderTooltip,
-                  child: SerlinkIconButton(
-                    key: const ValueKey('sftp-parent-button'),
-                    onPressed: canOpenParent ? _openParentDirectory : null,
-                    icon: const Icon(Icons.arrow_upward, size: 18),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                pathWidget,
-                SizedBox(
-                  width: 220,
-                  child: _WorkspaceSearchPill(
-                    fieldKey: const ValueKey('sftp-search-field'),
-                    controller: _filterController,
-                    placeholder: l10n.sftpSearchPlaceholder,
-                    enabled: canList,
-                    hasQuery: _filterText.trim().isNotEmpty,
-                    onChanged: (value) {
-                      setState(() {
-                        _filterText = value;
-                      });
-                    },
-                    onClear: () {
-                      _filterController.clear();
-                      setState(() {
-                        _filterText = '';
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SerlinkTooltip(
-                  message: _showHidden
-                      ? l10n.sftpHideHiddenFilesTooltip
-                      : l10n.sftpShowHiddenFilesTooltip,
-                  child: SerlinkIconButton(
-                    key: const ValueKey('sftp-hidden-toggle'),
-                    onPressed: canList
-                        ? () {
-                            setState(() {
-                              _showHidden = !_showHidden;
-                            });
-                          }
-                        : null,
-                    icon: Icon(
-                      _showHidden
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      size: 18,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                SerlinkTooltip(
-                  message: l10n.sftpOpenTerminalTooltip,
-                  child: SerlinkIconButton(
-                    onPressed: widget.onOpenTerminal,
-                    icon: const Icon(Icons.terminal_outlined, size: 18),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                SerlinkMenuButton(
-                  key: const ValueKey('sftp-upload-button'),
-                  tooltip: l10n.uploadAction,
-                  enabled: canList,
-                  icon: const Icon(Icons.upload_file_outlined, size: 18),
-                  actions: [
-                    SerlinkMenuAction(
-                      label: l10n.sftpUploadFileAction,
-                      icon: Icons.insert_drive_file_outlined,
-                      onPressed: _enqueueUploadFile,
-                    ),
-                    if (canTransferDirectories)
-                      SerlinkMenuAction(
-                        label: l10n.sftpUploadFolderAction,
-                        icon: Icons.folder_outlined,
-                        onPressed: _enqueueUploadDirectory,
+            scrollable: capabilities.prefersTouchUi && !compact,
+            child: compact
+                ? Column(
+                    children: [
+                      Row(
+                        children: [
+                          _SftpToolbarIcon(
+                            message: l10n.sftpParentFolderTooltip,
+                            keyValue: 'sftp-parent-button',
+                            onPressed: canOpenParent
+                                ? _openParentDirectory
+                                : null,
+                            icon: const Icon(Icons.arrow_upward, size: 18),
+                          ),
+                          const SizedBox(width: 8),
+                          pathWidget,
+                          const SizedBox(width: 8),
+                          _SftpToolbarIcon(
+                            message: l10n.sftpRefreshTooltip,
+                            onPressed: canList
+                                ? () {
+                                    setState(() => _reload(bypassCache: true));
+                                  }
+                                : null,
+                            icon: const Icon(Icons.refresh, size: 18),
+                          ),
+                        ],
                       ),
-                  ],
-                ),
-                SerlinkTooltip(
-                  message: l10n.sftpNewFolderTooltip,
-                  child: SerlinkIconButton(
-                    key: const ValueKey('sftp-new-folder-button'),
-                    onPressed: canList ? _createDirectory : null,
-                    icon: const Icon(
-                      Icons.create_new_folder_outlined,
-                      size: 18,
-                    ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _WorkspaceSearchPill(
+                              fieldKey: const ValueKey('sftp-search-field'),
+                              controller: _filterController,
+                              placeholder: l10n.sftpSearchPlaceholder,
+                              enabled: canList,
+                              hasQuery: _filterText.trim().isNotEmpty,
+                              onChanged: (value) {
+                                setState(() {
+                                  _filterText = value;
+                                });
+                              },
+                              onClear: () {
+                                _filterController.clear();
+                                setState(() {
+                                  _filterText = '';
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _SftpToolbarIcon(
+                            message: _showHidden
+                                ? l10n.sftpHideHiddenFilesTooltip
+                                : l10n.sftpShowHiddenFilesTooltip,
+                            keyValue: 'sftp-hidden-toggle',
+                            onPressed: canList
+                                ? () {
+                                    setState(() {
+                                      _showHidden = !_showHidden;
+                                    });
+                                  }
+                                : null,
+                            icon: Icon(
+                              _showHidden
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          _SftpToolbarIcon(
+                            message: l10n.sftpOpenTerminalTooltip,
+                            onPressed: widget.onOpenTerminal,
+                            icon: const Icon(Icons.terminal_outlined, size: 18),
+                          ),
+                          const SizedBox(width: 4),
+                          SerlinkMenuButton(
+                            key: const ValueKey('sftp-upload-button'),
+                            tooltip: l10n.uploadAction,
+                            enabled: canList,
+                            icon: const Icon(
+                              Icons.upload_file_outlined,
+                              size: 18,
+                            ),
+                            actions: [
+                              SerlinkMenuAction(
+                                label: l10n.sftpUploadFileAction,
+                                icon: Icons.insert_drive_file_outlined,
+                                onPressed: _enqueueUploadFile,
+                              ),
+                              if (canTransferDirectories)
+                                SerlinkMenuAction(
+                                  label: l10n.sftpUploadFolderAction,
+                                  icon: Icons.folder_outlined,
+                                  onPressed: _enqueueUploadDirectory,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(width: 4),
+                          _SftpToolbarIcon(
+                            message: l10n.sftpNewFolderTooltip,
+                            keyValue: 'sftp-new-folder-button',
+                            onPressed: canList ? _createDirectory : null,
+                            icon: const Icon(
+                              Icons.create_new_folder_outlined,
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      const Icon(Icons.folder_open, size: 18),
+                      const SizedBox(width: 8),
+                      _SftpToolbarIcon(
+                        message: l10n.sftpParentFolderTooltip,
+                        keyValue: 'sftp-parent-button',
+                        onPressed: canOpenParent ? _openParentDirectory : null,
+                        icon: const Icon(Icons.arrow_upward, size: 18),
+                      ),
+                      const SizedBox(width: 4),
+                      pathWidget,
+                      SizedBox(
+                        width: searchWidth,
+                        child: _WorkspaceSearchPill(
+                          fieldKey: const ValueKey('sftp-search-field'),
+                          controller: _filterController,
+                          placeholder: l10n.sftpSearchPlaceholder,
+                          enabled: canList,
+                          hasQuery: _filterText.trim().isNotEmpty,
+                          onChanged: (value) {
+                            setState(() {
+                              _filterText = value;
+                            });
+                          },
+                          onClear: () {
+                            _filterController.clear();
+                            setState(() {
+                              _filterText = '';
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _SftpToolbarIcon(
+                        message: _showHidden
+                            ? l10n.sftpHideHiddenFilesTooltip
+                            : l10n.sftpShowHiddenFilesTooltip,
+                        keyValue: 'sftp-hidden-toggle',
+                        onPressed: canList
+                            ? () {
+                                setState(() {
+                                  _showHidden = !_showHidden;
+                                });
+                              }
+                            : null,
+                        icon: Icon(
+                          _showHidden
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      _SftpToolbarIcon(
+                        message: l10n.sftpOpenTerminalTooltip,
+                        onPressed: widget.onOpenTerminal,
+                        icon: const Icon(Icons.terminal_outlined, size: 18),
+                      ),
+                      const SizedBox(width: 4),
+                      SerlinkMenuButton(
+                        key: const ValueKey('sftp-upload-button'),
+                        tooltip: l10n.uploadAction,
+                        enabled: canList,
+                        icon: const Icon(Icons.upload_file_outlined, size: 18),
+                        actions: [
+                          SerlinkMenuAction(
+                            label: l10n.sftpUploadFileAction,
+                            icon: Icons.insert_drive_file_outlined,
+                            onPressed: _enqueueUploadFile,
+                          ),
+                          if (canTransferDirectories)
+                            SerlinkMenuAction(
+                              label: l10n.sftpUploadFolderAction,
+                              icon: Icons.folder_outlined,
+                              onPressed: _enqueueUploadDirectory,
+                            ),
+                        ],
+                      ),
+                      _SftpToolbarIcon(
+                        message: l10n.sftpNewFolderTooltip,
+                        keyValue: 'sftp-new-folder-button',
+                        onPressed: canList ? _createDirectory : null,
+                        icon: const Icon(
+                          Icons.create_new_folder_outlined,
+                          size: 18,
+                        ),
+                      ),
+                      _SftpToolbarIcon(
+                        message: l10n.sftpRefreshTooltip,
+                        onPressed: canList
+                            ? () {
+                                setState(() => _reload(bypassCache: true));
+                              }
+                            : null,
+                        icon: const Icon(Icons.refresh, size: 18),
+                      ),
+                    ],
                   ),
-                ),
-                SerlinkTooltip(
-                  message: l10n.sftpRefreshTooltip,
-                  child: SerlinkIconButton(
-                    onPressed: canList
-                        ? () {
-                            setState(() => _reload(bypassCache: true));
-                          }
-                        : null,
-                    icon: const Icon(Icons.refresh, size: 18),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
         const Divider(height: 1),
@@ -1112,6 +1219,33 @@ class _SftpListCacheEntry {
 
   final List<SftpEntry> entries;
   final DateTime cachedAt;
+}
+
+class _SftpToolbarIcon extends StatelessWidget {
+  const _SftpToolbarIcon({
+    this.keyValue,
+    required this.message,
+    required this.onPressed,
+    required this.icon,
+  });
+
+  final String? keyValue;
+  final String message;
+  final VoidCallback? onPressed;
+  final Widget icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SerlinkTooltip(
+      message: message,
+      child: SerlinkIconButton(
+        key: keyValue == null ? null : ValueKey<String>(keyValue!),
+        onPressed: onPressed,
+        constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+        icon: icon,
+      ),
+    );
+  }
 }
 
 class _SftpDropUploadSurface extends StatelessWidget {

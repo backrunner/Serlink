@@ -737,101 +737,114 @@ class _TerminalAccessoryBar extends StatelessWidget {
         color: t.surfaceRaised,
         border: Border(top: BorderSide(color: t.borderSubtle)),
       ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 50,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            children: [
-              _TerminalAccessoryKey(
-                label: 'Ctrl',
-                enabled: connected,
-                selected: ctrlLatched,
-                onPressed: onToggleCtrl,
-              ),
-              _TerminalAccessoryKey(
-                label: 'Shift',
-                enabled: connected,
-                selected: shiftLatched,
-                onPressed: onToggleShift,
-              ),
-              _TerminalAccessoryKey(
-                label: 'Alt',
-                enabled: connected,
-                selected: altLatched,
-                onPressed: onToggleAlt,
-              ),
-              _TerminalAccessoryKey(
-                label: 'Esc',
-                enabled: connected,
-                onPressed: () => onControlKey(TerminalControlInputKey.escape),
-              ),
-              _TerminalAccessoryKey(
-                label: 'Tab',
-                enabled: connected,
-                onPressed: () => onControlKey(TerminalControlInputKey.tab),
-              ),
-              _TerminalAccessoryIconKey(
-                icon: Icons.keyboard_arrow_up,
-                enabled: connected,
-                onPressed: () => onControlKey(TerminalControlInputKey.arrowUp),
-              ),
-              _TerminalAccessoryIconKey(
-                icon: Icons.keyboard_arrow_down,
-                enabled: connected,
-                onPressed: () =>
-                    onControlKey(TerminalControlInputKey.arrowDown),
-              ),
-              _TerminalAccessoryIconKey(
-                icon: Icons.keyboard_arrow_left,
-                enabled: connected,
-                onPressed: () =>
-                    onControlKey(TerminalControlInputKey.arrowLeft),
-              ),
-              _TerminalAccessoryIconKey(
-                icon: Icons.keyboard_arrow_right,
-                enabled: connected,
-                onPressed: () =>
-                    onControlKey(TerminalControlInputKey.arrowRight),
-              ),
-              _TerminalAccessoryKey(
-                label: 'Home',
-                enabled: connected,
-                onPressed: () => onControlKey(TerminalControlInputKey.home),
-              ),
-              _TerminalAccessoryKey(
-                label: 'End',
-                enabled: connected,
-                onPressed: () => onControlKey(TerminalControlInputKey.end),
-              ),
-              _TerminalAccessoryKey(
-                label: 'PgUp',
-                enabled: connected,
-                onPressed: () => onControlKey(TerminalControlInputKey.pageUp),
-              ),
-              _TerminalAccessoryKey(
-                label: 'PgDn',
-                enabled: connected,
-                onPressed: () => onControlKey(TerminalControlInputKey.pageDown),
-              ),
-              _TerminalAccessoryIconKey(
-                icon: Icons.content_paste,
-                enabled: connected,
-                onPressed: onPaste,
-              ),
-              _TerminalAccessoryIconKey(
-                icon: Icons.search,
-                enabled: true,
-                onPressed: onToggleSearch,
-              ),
-              _TerminalAccessoryIconKey(
-                icon: Icons.code_outlined,
-                enabled: true,
-                onPressed: onOpenSnippets,
-              ),
-            ],
+      child: SizedBox(
+        key: const ValueKey('terminal-accessory-bar'),
+        height: 70,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 5, 0, 5),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _TerminalAccessoryCluster(
+                  top: [
+                    _TerminalAccessoryKey(
+                      keyValue: 'terminal-key-ctrl',
+                      label: 'Ctrl',
+                      enabled: connected,
+                      selected: ctrlLatched,
+                      onPressed: onToggleCtrl,
+                    ),
+                    _TerminalAccessoryKey(
+                      keyValue: 'terminal-key-shift',
+                      label: 'Shift',
+                      enabled: connected,
+                      selected: shiftLatched,
+                      onPressed: onToggleShift,
+                    ),
+                    _TerminalAccessoryKey(
+                      keyValue: 'terminal-key-alt',
+                      label: 'Alt',
+                      enabled: connected,
+                      selected: altLatched,
+                      onPressed: onToggleAlt,
+                    ),
+                    _TerminalAccessoryKey(
+                      keyValue: 'terminal-key-esc',
+                      label: 'Esc',
+                      enabled: connected,
+                      onPressed: () =>
+                          onControlKey(TerminalControlInputKey.escape),
+                    ),
+                  ],
+                  bottom: [
+                    _TerminalAccessoryKey(
+                      keyValue: 'terminal-key-tab',
+                      label: 'Tab',
+                      enabled: connected,
+                      onPressed: () =>
+                          onControlKey(TerminalControlInputKey.tab),
+                    ),
+                    _TerminalAccessoryKey(
+                      keyValue: 'terminal-key-home',
+                      label: 'Home',
+                      enabled: connected,
+                      onPressed: () =>
+                          onControlKey(TerminalControlInputKey.home),
+                    ),
+                    _TerminalAccessoryKey(
+                      keyValue: 'terminal-key-end',
+                      label: 'End',
+                      enabled: connected,
+                      onPressed: () =>
+                          onControlKey(TerminalControlInputKey.end),
+                    ),
+                    _TerminalAccessoryIconKey(
+                      keyValue: 'terminal-key-paste',
+                      icon: Icons.content_paste,
+                      enabled: connected,
+                      onPressed: onPaste,
+                    ),
+                  ],
+                ),
+                const SizedBox(width: _terminalAccessoryGroupGap),
+                _TerminalArrowKeyCluster(
+                  connected: connected,
+                  onControlKey: onControlKey,
+                ),
+                const SizedBox(width: _terminalAccessoryGroupGap),
+                _TerminalAccessoryCluster(
+                  top: [
+                    _TerminalAccessoryIconKey(
+                      keyValue: 'terminal-key-search',
+                      icon: Icons.search,
+                      enabled: true,
+                      onPressed: onToggleSearch,
+                    ),
+                    _TerminalAccessoryIconKey(
+                      keyValue: 'terminal-key-snippets',
+                      icon: Icons.code_outlined,
+                      enabled: true,
+                      onPressed: onOpenSnippets,
+                    ),
+                  ],
+                  bottom: [
+                    const SizedBox.square(
+                      dimension: _terminalAccessorySquareSide,
+                    ),
+                    const SizedBox(width: _terminalAccessoryGap),
+                    _TerminalAccessoryIconKey(
+                      keyValue: 'terminal-key-keyboard',
+                      icon: Icons.keyboard_hide_outlined,
+                      enabled: true,
+                      onPressed: () => FocusManager.instance.primaryFocus
+                          ?.unfocus(disposition: UnfocusDisposition.scope),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -839,14 +852,102 @@ class _TerminalAccessoryBar extends StatelessWidget {
   }
 }
 
+const double _terminalAccessoryGap = 4;
+const double _terminalAccessoryGroupGap = 6;
+const double _terminalAccessorySquareSide = 28;
+
+class _TerminalAccessoryCluster extends StatelessWidget {
+  const _TerminalAccessoryCluster({required this.top, required this.bottom});
+
+  final List<Widget> top;
+  final List<Widget> bottom;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: top),
+        const SizedBox(height: _terminalAccessoryGap),
+        Row(children: bottom),
+      ],
+    );
+  }
+}
+
+class _TerminalArrowKeyCluster extends StatelessWidget {
+  const _TerminalArrowKeyCluster({
+    required this.connected,
+    required this.onControlKey,
+  });
+
+  final bool connected;
+  final ValueChanged<TerminalControlInputKey> onControlKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            _TerminalAccessoryKey(
+              keyValue: 'terminal-key-page-up',
+              label: 'PgUp',
+              enabled: connected,
+              onPressed: () => onControlKey(TerminalControlInputKey.pageUp),
+            ),
+            _TerminalAccessoryIconKey(
+              keyValue: 'terminal-key-arrow-up',
+              icon: Icons.keyboard_arrow_up,
+              enabled: connected,
+              onPressed: () => onControlKey(TerminalControlInputKey.arrowUp),
+            ),
+            _TerminalAccessoryKey(
+              keyValue: 'terminal-key-page-down',
+              label: 'PgDn',
+              enabled: connected,
+              onPressed: () => onControlKey(TerminalControlInputKey.pageDown),
+            ),
+          ],
+        ),
+        const SizedBox(height: _terminalAccessoryGap),
+        Row(
+          children: [
+            _TerminalAccessoryIconKey(
+              keyValue: 'terminal-key-arrow-left',
+              icon: Icons.keyboard_arrow_left,
+              enabled: connected,
+              onPressed: () => onControlKey(TerminalControlInputKey.arrowLeft),
+            ),
+            _TerminalAccessoryIconKey(
+              keyValue: 'terminal-key-arrow-down',
+              icon: Icons.keyboard_arrow_down,
+              enabled: connected,
+              onPressed: () => onControlKey(TerminalControlInputKey.arrowDown),
+            ),
+            _TerminalAccessoryIconKey(
+              keyValue: 'terminal-key-arrow-right',
+              icon: Icons.keyboard_arrow_right,
+              enabled: connected,
+              onPressed: () => onControlKey(TerminalControlInputKey.arrowRight),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _TerminalAccessoryKey extends StatelessWidget {
   const _TerminalAccessoryKey({
+    this.keyValue,
     required this.label,
     required this.enabled,
     required this.onPressed,
     this.selected = false,
   });
 
+  final String? keyValue;
   final String label;
   final bool enabled;
   final VoidCallback? onPressed;
@@ -856,12 +957,13 @@ class _TerminalAccessoryKey extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      key: keyValue == null ? null : ValueKey<String>(keyValue!),
+      padding: const EdgeInsets.only(right: _terminalAccessoryGap),
       child: SerlinkPressable(
         onTap: enabled ? onPressed : null,
         borderRadius: SerlinkRadii.control,
-        hoverColor: t.accentPrimary.withValues(alpha: 0.08),
-        pressedColor: t.accentPrimary.withValues(alpha: 0.14),
+        hoverColor: t.accentPrimary.withValues(alpha: 0.1),
+        pressedColor: t.accentPrimary.withValues(alpha: 0.2),
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 120),
           opacity: enabled ? 1 : 0.45,
@@ -876,17 +978,22 @@ class _TerminalAccessoryKey extends StatelessWidget {
               ),
             ),
             child: SizedBox(
-              height: 36,
-              width: label.length > 4 ? 64 : 52,
+              height: _terminalAccessorySquareSide,
+              width: _terminalAccessorySquareSide,
               child: Center(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: selected ? t.accentPrimary : t.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 1),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: selected ? t.accentPrimary : t.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -900,11 +1007,13 @@ class _TerminalAccessoryKey extends StatelessWidget {
 
 class _TerminalAccessoryIconKey extends StatelessWidget {
   const _TerminalAccessoryIconKey({
+    this.keyValue,
     required this.icon,
     required this.enabled,
     required this.onPressed,
   });
 
+  final String? keyValue;
   final IconData icon;
   final bool enabled;
   final VoidCallback? onPressed;
@@ -913,12 +1022,13 @@ class _TerminalAccessoryIconKey extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      key: keyValue == null ? null : ValueKey<String>(keyValue!),
+      padding: const EdgeInsets.only(right: _terminalAccessoryGap),
       child: SerlinkPressable(
         onTap: enabled ? onPressed : null,
         borderRadius: SerlinkRadii.control,
-        hoverColor: t.accentPrimary.withValues(alpha: 0.08),
-        pressedColor: t.accentPrimary.withValues(alpha: 0.14),
+        hoverColor: t.accentPrimary.withValues(alpha: 0.1),
+        pressedColor: t.accentPrimary.withValues(alpha: 0.2),
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 120),
           opacity: enabled ? 1 : 0.45,
@@ -929,8 +1039,8 @@ class _TerminalAccessoryIconKey extends StatelessWidget {
               border: Border.all(color: t.borderSubtle),
             ),
             child: SizedBox.square(
-              dimension: 36,
-              child: Icon(icon, size: 20, color: t.textPrimary),
+              dimension: _terminalAccessorySquareSide,
+              child: Icon(icon, size: 18, color: t.textPrimary),
             ),
           ),
         ),

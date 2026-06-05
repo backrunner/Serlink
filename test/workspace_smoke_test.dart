@@ -23,12 +23,14 @@ import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
 import 'package:serlink/features/ssh/application/known_host_repository.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
+import 'package:serlink/features/terminal/application/terminal_modifier_latch.dart';
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_service.dart';
 import 'package:serlink/features/vault/data/drift_vault_repository.dart';
 import 'package:serlink/features/workspace/application/workspace_tab_controller.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
+import 'package:serlink/platform/platform_capabilities.dart';
 
 part 'workspace_smoke_test_fakes.dart';
 
@@ -118,14 +120,12 @@ void main() {
       findsNothing,
     );
     expect(find.text('Recover / Reset'), findsNothing);
-    expect(find.widgetWithText(SerlinkTextButton, 'Lock'), findsOneWidget);
+    expect(find.text('Lock'), findsOneWidget);
     await tester.drag(find.byType(ListView), const Offset(0, -260));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.widgetWithText(SerlinkTextButton, 'Configure'),
-    );
+    await tester.ensureVisible(find.text('Configure'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(SerlinkTextButton, 'Configure'));
+    await tester.tap(find.text('Configure'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('webdav-endpoint-field')),
@@ -692,40 +692,283 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(SerlinkTextButton, 'Lock'));
+    await tester.tap(find.text('Lock'));
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey('settings-local-unlock-button')),
     );
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(SerlinkTextButton, 'Lock'), findsOneWidget);
+    expect(find.text('Lock'), findsOneWidget);
   });
 
-  testWidgets(
-    'settings runtime exports logs and keeps diagnostic information',
-    (tester) async {
-      await _pumpLockedVaultApp(tester);
-      await _submitVaultPassphrase(tester, 'correct horse battery staple');
+  testWidgets('settings runtime exports diagnostic logs', (tester) async {
+    await _pumpLockedVaultApp(tester);
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
 
-      await tester.tap(find.text('Settings'));
-      await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, -900));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Debug logging'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('settings-debug-log-export-button')),
-        findsOneWidget,
-      );
-      expect(find.text('Crash reporting'), findsNothing);
-      expect(find.text('Diagnostic information'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('settings-diagnostic-info-export-button')),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(find.text('Diagnostic logs'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-diagnostic-log-export-button')),
+      findsOneWidget,
+    );
+    expect(find.text('Debug logging'), findsNothing);
+    expect(find.text('Crash reporting'), findsNothing);
+  });
+
+  testWidgets('iOS add host form uses compact wide dialog', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
+    await tester.pumpAndSettle();
+
+    final formFrame = find.byKey(const ValueKey('host-form-scroll-frame'));
+    expect(formFrame, findsOneWidget);
+    final frameRect = tester.getRect(formFrame);
+    expect(frameRect.left, lessThan(24));
+    expect(frameRect.width, greaterThanOrEqualTo(348));
+    expect(frameRect.height, greaterThan(440));
+    expect(frameRect.height, lessThanOrEqualTo(600));
+    expect(
+      tester.getRect(find.byKey(const ValueKey('host-save-button'))).bottom,
+      lessThanOrEqualTo(844),
+    );
+  });
+
+  testWidgets('iOS SFTP pane keeps controls within the viewport', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('host-display-name-field')),
+      'Mobile SFTP',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'mobile.internal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'ops',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-password-field')),
+      'server-password',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('SFTP'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('sftp-path-display')), findsOneWidget);
+    expect(find.byKey(const ValueKey('sftp-search-field')), findsOneWidget);
+    expect(find.byKey(const ValueKey('sftp-hidden-toggle')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('sftp-new-folder-button')),
+      findsOneWidget,
+    );
+    expect(find.text('app.env'), findsOneWidget);
+    expect(find.text('rw-r-----'), findsOneWidget);
+
+    for (final finder in [
+      find.byKey(const ValueKey('sftp-path-display')),
+      find.byKey(const ValueKey('sftp-search-field')),
+      find.byKey(const ValueKey('sftp-hidden-toggle')),
+      find.byKey(const ValueKey('sftp-new-folder-button')),
+      find.text('app.env'),
+    ]) {
+      final rect = tester.getRect(finder);
+      expect(rect.left, greaterThanOrEqualTo(0));
+      expect(rect.right, lessThanOrEqualTo(390));
+    }
+
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('iOS terminal accessory sends control sequences to shell', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final sshService = _FakeSshSessionService();
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+      sshService: sshService,
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('host-display-name-field')),
+      'Mobile Terminal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'terminal.internal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'ops',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-password-field')),
+      'server-password',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Terminal').first);
+    await tester.pumpAndSettle();
+    sshService.shell.writes.clear();
+
+    await tester.tap(find.byKey(const ValueKey('terminal-key-tab')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-arrow-up')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-arrow-left')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-page-up')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-page-down')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-ctrl')));
+    await tester.tap(find.byKey(const ValueKey('terminal-key-arrow-right')));
+    await tester.pump();
+
+    expect(sshService.shell.writes, [
+      terminalControlInputSequence(
+        TerminalControlInputKey.tab,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.arrowUp,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.arrowLeft,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.pageUp,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.pageDown,
+        const TerminalModifierLatch(),
+      ),
+      terminalControlInputSequence(
+        TerminalControlInputKey.arrowRight,
+        const TerminalModifierLatch(ctrl: true),
+      ),
+    ]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('iOS terminal accessory arranges navigation keys in two rows', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('host-display-name-field')),
+      'Mobile Terminal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'terminal.internal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'ops',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-password-field')),
+      'server-password',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Terminal').first);
+    await tester.pumpAndSettle();
+
+    final bar = tester.getRect(
+      find.byKey(const ValueKey('terminal-accessory-bar')),
+    );
+    expect(bar.height, lessThanOrEqualTo(72));
+
+    final ctrl = _rectForKey(tester, 'terminal-key-ctrl');
+    final tab = _rectForKey(tester, 'terminal-key-tab');
+    expect(ctrl.center.dy, lessThan(tab.center.dy));
+
+    final arrowUp = _rectForKey(tester, 'terminal-key-arrow-up');
+    final arrowLeft = _rectForKey(tester, 'terminal-key-arrow-left');
+    final arrowDown = _rectForKey(tester, 'terminal-key-arrow-down');
+    final arrowRight = _rectForKey(tester, 'terminal-key-arrow-right');
+
+    expect(arrowUp.center.dy, lessThan(arrowDown.center.dy));
+    expect(arrowUp.center.dx, closeTo(arrowDown.center.dx, 1));
+    expect(arrowLeft.center.dx, lessThan(arrowDown.center.dx));
+    expect(arrowDown.center.dx, lessThan(arrowRight.center.dx));
+    expect(arrowLeft.center.dy, closeTo(arrowDown.center.dy, 1));
+    expect(arrowRight.center.dy, closeTo(arrowDown.center.dy, 1));
+
+    final pageUp = _rectForKey(tester, 'terminal-key-page-up');
+    final pageDown = _rectForKey(tester, 'terminal-key-page-down');
+    expect(pageUp.center.dy, closeTo(pageDown.center.dy, 1));
+    expect(pageUp.center.dx, lessThan(pageDown.center.dx));
+    expect(pageDown.right, lessThanOrEqualTo(390));
+
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'hosts show loading while encrypted records initialize after unlock',
@@ -832,10 +1075,15 @@ void main() {
   });
 }
 
-Future<_LockedVaultHarness> _pumpLockedVaultApp(WidgetTester tester) async {
+Future<_LockedVaultHarness> _pumpLockedVaultApp(
+  WidgetTester tester, {
+  PlatformCapabilities? capabilities,
+  _FakeSshSessionService? sshService,
+}) async {
   final database = SerlinkDatabase(NativeDatabase.memory());
   final transferQueue = TransferQueueController();
   final secretStore = InMemorySecretStore();
+  final resolvedSshService = sshService ?? _FakeSshSessionService();
   final bootstrapVault = InMemoryVaultService(
     config: const VaultCryptoConfig.testing(),
   );
@@ -857,11 +1105,13 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(WidgetTester tester) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        if (capabilities != null)
+          platformCapabilitiesProvider.overrideWithValue(capabilities),
         serlinkDatabaseProvider.overrideWithValue(database),
         vaultCryptoConfigProvider.overrideWithValue(
           const VaultCryptoConfig.testing(),
         ),
-        sshSessionServiceProvider.overrideWithValue(_FakeSshSessionService()),
+        sshSessionServiceProvider.overrideWithValue(resolvedSshService),
         transferQueueControllerProvider.overrideWithValue(transferQueue),
         secretStoreProvider.overrideWithValue(secretStore),
         autoSyncEnabledProvider.overrideWithValue(false),
@@ -904,6 +1154,10 @@ Future<void> _openHostContextMenu(WidgetTester tester, String hostName) async {
 }
 
 Finder _byTooltipLabel(String label) => find.bySemanticsLabel(label);
+
+Rect _rectForKey(WidgetTester tester, String key) {
+  return tester.getRect(find.byKey(ValueKey<String>(key)));
+}
 
 class _DelayedHostRepository implements HostRepository {
   _DelayedHostRepository(this._hosts);

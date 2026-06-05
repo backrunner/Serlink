@@ -59,6 +59,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
     required this.keepAliveIntervalController,
     required this.reconnectAttemptsController,
     required this.reconnectBackoffController,
+    required this.compact,
     required this.onToggle,
   });
 
@@ -67,12 +68,19 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
   final TextEditingController keepAliveIntervalController;
   final TextEditingController reconnectAttemptsController;
   final TextEditingController reconnectBackoffController;
+  final bool compact;
   final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final t = context.tokens;
+    final headerPadding = compact
+        ? const EdgeInsets.fromLTRB(12, 10, 10, 10)
+        : const EdgeInsets.fromLTRB(14, 12, 12, 12);
+    final contentPadding = EdgeInsets.all(compact ? 10 : 14);
+    final fieldGap = compact ? 10.0 : 14.0;
+    final inlineGap = compact ? 8.0 : 12.0;
     return SurfacePanel(
       padding: EdgeInsets.zero,
       child: Column(
@@ -82,7 +90,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
             onTap: onToggle,
             borderRadius: SerlinkRadii.control,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+              padding: headerPadding,
               child: Row(
                 children: [
                   Icon(Icons.tune_rounded, size: 18, color: t.textSecondary),
@@ -110,7 +118,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
           if (expanded) ...[
             Divider(height: 1, color: t.borderSubtle),
             Padding(
-              padding: const EdgeInsets.all(14),
+              padding: contentPadding,
               child: Column(
                 children: [
                   Row(
@@ -122,7 +130,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
                           label: l10n.hostTimeoutLabel,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: inlineGap),
                       Expanded(
                         child: _ConnectionNumberField(
                           key: const ValueKey('host-keepalive-interval-field'),
@@ -132,7 +140,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: fieldGap),
                   Row(
                     children: [
                       Expanded(
@@ -142,7 +150,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
                           label: l10n.hostAutoReconnectLabel,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: inlineGap),
                       Expanded(
                         child: _ConnectionNumberField(
                           key: const ValueKey('host-reconnect-backoff-field'),
@@ -184,10 +192,15 @@ class _ConnectionNumberField extends StatelessWidget {
 }
 
 class _HostFormSection extends StatelessWidget {
-  const _HostFormSection({required this.title, required this.child});
+  const _HostFormSection({
+    required this.title,
+    required this.child,
+    required this.padding,
+  });
 
   final String title;
   final Widget child;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +222,7 @@ class _HostFormSection extends StatelessWidget {
         ),
         SurfacePanel(
           borderRadius: SerlinkRadii.dialog,
-          padding: const EdgeInsets.all(14),
+          padding: padding,
           child: child,
         ),
       ],
@@ -235,6 +248,7 @@ class _HostAuthenticationFields extends StatelessWidget {
     required this.onToggleIdentity,
     required this.onEditIdentity,
     required this.onSubmit,
+    required this.compact,
   });
 
   final bool isEditing;
@@ -253,6 +267,7 @@ class _HostAuthenticationFields extends StatelessWidget {
   final ValueChanged<IdentityId> onToggleIdentity;
   final ValueChanged<IdentityConfig> onEditIdentity;
   final VoidCallback onSubmit;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -269,37 +284,41 @@ class _HostAuthenticationFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: SerlinkSegmentedControl<_HostAuthInputMode>(
-            value: authMode,
-            segments: [
-              SerlinkSegment(
-                value: _HostAuthInputMode.password,
-                icon: Icons.password,
-                label: l10n.hostAuthPasswordSegment,
-              ),
-              SerlinkSegment(
-                value: _HostAuthInputMode.privateKey,
-                icon: Icons.key,
-                label: l10n.hostAuthKeySegment,
-              ),
-              if (showSshAgent)
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: SerlinkSegmentedControl<_HostAuthInputMode>(
+              value: authMode,
+              segments: [
                 SerlinkSegment(
-                  value: _HostAuthInputMode.sshAgent,
-                  icon: Icons.vpn_key_outlined,
-                  label: l10n.hostAuthAgentSegment,
+                  value: _HostAuthInputMode.password,
+                  icon: Icons.password,
+                  label: l10n.hostAuthPasswordSegment,
                 ),
-              SerlinkSegment(
-                value: _HostAuthInputMode.savedOrNone,
-                icon: Icons.badge_outlined,
-                label: l10n.hostAuthSavedSegment,
-              ),
-            ],
-            onChanged: onAuthModeChanged,
+                SerlinkSegment(
+                  value: _HostAuthInputMode.privateKey,
+                  icon: Icons.key,
+                  label: l10n.hostAuthKeySegment,
+                ),
+                if (showSshAgent)
+                  SerlinkSegment(
+                    value: _HostAuthInputMode.sshAgent,
+                    icon: Icons.vpn_key_outlined,
+                    label: l10n.hostAuthAgentSegment,
+                  ),
+                SerlinkSegment(
+                  value: _HostAuthInputMode.savedOrNone,
+                  icon: Icons.badge_outlined,
+                  label: l10n.hostAuthSavedSegment,
+                ),
+              ],
+              onChanged: onAuthModeChanged,
+              compact: compact,
+            ),
           ),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: compact ? 10 : 14),
         switch (authMode) {
           _HostAuthInputMode.password => SerlinkTextField(
             key: const ValueKey('host-password-field'),

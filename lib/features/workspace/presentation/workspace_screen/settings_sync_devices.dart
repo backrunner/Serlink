@@ -21,8 +21,9 @@ String _syncDevicesSubtitle(
 Future<void> _showSyncDevicesDialog(
   BuildContext context,
   WidgetRef ref,
-  List<SyncDeviceMetadata> devices,
-) async {
+  List<SyncDeviceMetadata> devices, {
+  bool allowReset = false,
+}) async {
   final localDevice = await ref
       .read(syncDeviceServiceProvider)
       .readLocalDevice();
@@ -36,6 +37,16 @@ Future<void> _showSyncDevicesDialog(
       localDeviceId: localDevice?.id,
       onDelete: (device) =>
           _deleteSyncDevice(context, dialogContext, ref, device),
+      onReset: allowReset
+          ? () {
+              unawaited(() async {
+                final reset = await _rotateSyncDevice(dialogContext, ref);
+                if (reset && dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+              }());
+            }
+          : null,
     ),
   );
 }
@@ -78,7 +89,7 @@ Future<void> _deleteSyncDevice(
   }
 }
 
-Future<void> _rotateSyncDevice(BuildContext context, WidgetRef ref) async {
+Future<bool> _rotateSyncDevice(BuildContext context, WidgetRef ref) async {
   final l10n = context.l10n;
   final confirmed = await _confirmDialog(
     context,
@@ -88,7 +99,7 @@ Future<void> _rotateSyncDevice(BuildContext context, WidgetRef ref) async {
     destructive: true,
   );
   if (!confirmed || !context.mounted) {
-    return;
+    return false;
   }
   try {
     await ref.read(syncDeviceServiceProvider).rotateLocalDeviceRegistration();
@@ -100,6 +111,7 @@ Future<void> _rotateSyncDevice(BuildContext context, WidgetRef ref) async {
     if (context.mounted) {
       _showSnackBar(context, l10n.syncDeviceResetSnack);
     }
+    return true;
   } on SyncDeviceException catch (error) {
     if (context.mounted) {
       _showSnackBar(context, error.message);
@@ -109,6 +121,7 @@ Future<void> _rotateSyncDevice(BuildContext context, WidgetRef ref) async {
       _showSnackBar(context, l10n.syncDeviceResetFailedSnack);
     }
   }
+  return false;
 }
 
 class _SyncDevicesDialog extends StatelessWidget {
@@ -116,11 +129,13 @@ class _SyncDevicesDialog extends StatelessWidget {
     required this.devices,
     required this.localDeviceId,
     required this.onDelete,
+    this.onReset,
   });
 
   final List<SyncDeviceMetadata> devices;
   final String? localDeviceId;
   final Future<void> Function(SyncDeviceMetadata device) onDelete;
+  final VoidCallback? onReset;
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +171,12 @@ class _SyncDevicesDialog extends StatelessWidget {
         ),
       ),
       actions: [
+        if (onReset != null)
+          SerlinkTextButton(
+            key: const ValueKey('sync-devices-dialog-reset-button'),
+            onPressed: onReset,
+            child: Text(l10n.syncResetAction),
+          ),
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l10n.closeAction),

@@ -12,6 +12,11 @@ class _SyncSettingsSection extends ConsumerWidget {
     final webDav = canEdit ? ref.watch(webDavSyncSettingsProvider) : null;
     final iCloudAvailable = ref.watch(iCloudAvailableProvider);
     final knownDevices = canEdit ? ref.watch(syncKnownDevicesProvider) : null;
+    final mobile = ref.watch(
+      platformCapabilitiesProvider.select(
+        (capabilities) => capabilities.prefersMobileWorkspaceShell,
+      ),
+    );
     final conflicts = ref.watch(syncConflictControllerProvider);
     final autoSync = ref.watch(autoSyncControllerProvider);
     final lastFailure = autoSync.lastFailure;
@@ -123,34 +128,49 @@ class _SyncSettingsSection extends ConsumerWidget {
               title: l10n.syncDevicesTitle,
               subtitle: _syncSettingsErrorMessage(l10n, error),
             ),
-            data: (devices) => _SettingsActionRow(
-              icon: Icons.devices_outlined,
-              title: l10n.syncDevicesTitle,
-              subtitle: _syncDevicesSubtitle(l10n, devices),
-              actionWidth: 188,
-              action: Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                alignment: WrapAlignment.end,
-                children: [
-                  _SettingsTextButton(
-                    onPressed: () =>
-                        _showSyncDevicesDialog(context, ref, devices),
-                    compactSize: SerlinkButtonSize.xs,
-                    child: Text(
-                      devices.isEmpty
-                          ? l10n.syncViewAction
-                          : l10n.settingsManageAction,
-                    ),
-                  ),
-                  _SettingsTextButton(
-                    onPressed: () => _rotateSyncDevice(context, ref),
-                    compactSize: SerlinkButtonSize.xs,
-                    child: Text(l10n.syncResetAction),
-                  ),
-                ],
-              ),
-            ),
+            data: (devices) {
+              final viewButton = _SettingsTextButton(
+                key: const ValueKey('settings-sync-devices-view-button'),
+                onPressed: () => _showSyncDevicesDialog(
+                  context,
+                  ref,
+                  devices,
+                  allowReset: mobile,
+                ),
+                compactSize: SerlinkButtonSize.xs,
+                child: Text(
+                  mobile
+                      ? l10n.syncViewAction
+                      : devices.isEmpty
+                      ? l10n.syncViewAction
+                      : l10n.settingsManageAction,
+                ),
+              );
+              return _SettingsActionRow(
+                icon: Icons.devices_outlined,
+                title: l10n.syncDevicesTitle,
+                subtitle: _syncDevicesSubtitle(l10n, devices),
+                actionWidth: mobile ? null : 188,
+                action: mobile
+                    ? viewButton
+                    : Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          viewButton,
+                          _SettingsTextButton(
+                            key: const ValueKey(
+                              'settings-sync-devices-reset-button',
+                            ),
+                            onPressed: () => _rotateSyncDevice(context, ref),
+                            compactSize: SerlinkButtonSize.xs,
+                            child: Text(l10n.syncResetAction),
+                          ),
+                        ],
+                      ),
+              );
+            },
           ),
       ],
     );

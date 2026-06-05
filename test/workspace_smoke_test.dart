@@ -790,6 +790,28 @@ void main() {
       (switchRect.center.dy - localUnlockTitleRect.center.dy).abs(),
       lessThanOrEqualTo(16),
     );
+
+    final syncDevicesViewButton = find.byKey(
+      const ValueKey('settings-sync-devices-view-button'),
+    );
+    await tester.ensureVisible(syncDevicesViewButton);
+    await tester.pumpAndSettle();
+    expect(syncDevicesViewButton, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-sync-devices-reset-button')),
+      findsNothing,
+    );
+    final devicesViewRect = tester.getRect(syncDevicesViewButton);
+    expect(devicesViewRect.width, lessThanOrEqualTo(92));
+    expect(devicesViewRect.height, lessThanOrEqualTo(32));
+
+    await tester.tap(syncDevicesViewButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Sync Devices'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('sync-devices-dialog-reset-button')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

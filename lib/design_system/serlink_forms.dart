@@ -194,6 +194,37 @@ class SerlinkSelect<T> extends StatelessWidget {
     );
     return FItemStyleDelta.delta(
       padding: const EdgeInsetsGeometryDelta.value(EdgeInsets.zero),
+      contentDecoration: FVariantsDelta.delta([
+        FVariantOperation.all(
+          const DecorationDelta.shapeDelta(color: Colors.transparent),
+        ),
+        FVariantOperation.exact(<FTappableVariantConstraint>{
+          FTappableVariant.hovered,
+        }, DecorationDelta.shapeDelta(color: t.surfaceOverlay)),
+        FVariantOperation.exact(<FTappableVariantConstraint>{
+          FTappableVariant.focused,
+        }, DecorationDelta.shapeDelta(color: t.surfaceOverlay)),
+        FVariantOperation.exact(
+          <FTappableVariantConstraint>{FTappableVariant.pressed},
+          DecorationDelta.shapeDelta(
+            color: t.accentPrimary.withValues(alpha: 0.12),
+          ),
+        ),
+        FVariantOperation.exact(
+          <FTappableVariantConstraint>{FTappableVariant.selected},
+          DecorationDelta.shapeDelta(
+            color: t.accentPrimary.withValues(alpha: 0.1),
+          ),
+        ),
+        FVariantOperation.exact(
+          <FTappableVariantConstraint>{
+            FTappableVariant.selected.and(FTappableVariant.pressed),
+          },
+          DecorationDelta.shapeDelta(
+            color: t.accentPrimary.withValues(alpha: 0.16),
+          ),
+        ),
+      ]),
       contentStyle: FItemContentStyleDelta.delta(
         suffixedPadding: const EdgeInsetsGeometryDelta.value(
           EdgeInsets.fromLTRB(9, 7, 5, 7),

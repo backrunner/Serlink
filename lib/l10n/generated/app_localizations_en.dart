@@ -297,6 +297,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsExportAction => 'Export';
 
   @override
+  String get settingsAboutSection => 'About';
+
+  @override
+  String settingsAppVersionOnly(String version) {
+    return 'Version $version';
+  }
+
+  @override
+  String settingsAppVersionLabel(String version, String buildNumber) {
+    return 'Version $version ($buildNumber)';
+  }
+
+  @override
+  String get settingsAppVersionLoading => 'Loading version';
+
+  @override
+  String get settingsAppVersionUnavailable => 'Version unavailable';
+
+  @override
   String get settingsEnableLocalUnlockTitle => 'Enable local unlock?';
 
   @override

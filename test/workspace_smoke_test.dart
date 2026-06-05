@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/app/serlink_app.dart';
 import 'package:serlink/core/ids/entity_id.dart';
@@ -71,6 +72,9 @@ void main() {
           transferQueueControllerProvider.overrideWithValue(transferQueue),
           secretStoreProvider.overrideWithValue(secretStore),
           autoSyncEnabledProvider.overrideWithValue(false),
+          appPackageInfoProvider.overrideWith((ref) async {
+            return _testPackageInfo();
+          }),
         ],
         child: const SerlinkApp(),
       ),
@@ -537,6 +541,9 @@ void main() {
           transferQueueControllerProvider.overrideWithValue(transferQueue),
           secretStoreProvider.overrideWithValue(secretStore),
           autoSyncEnabledProvider.overrideWithValue(false),
+          appPackageInfoProvider.overrideWith((ref) async {
+            return _testPackageInfo();
+          }),
         ],
         child: const SerlinkApp(),
       ),
@@ -779,6 +786,19 @@ void main() {
     );
     expect(find.text('Debug logging'), findsNothing);
     expect(find.text('Crash reporting'), findsNothing);
+  });
+
+  testWidgets('settings shows app version in about section', (tester) async {
+    await _pumpLockedVaultApp(tester);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('About'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('About'), findsOneWidget);
+    expect(find.text('Serlink'), findsOneWidget);
+    expect(find.text('Version 1.2.3 (45)'), findsOneWidget);
   });
 
   testWidgets('iOS add host form uses compact wide dialog', (tester) async {
@@ -1210,6 +1230,9 @@ void main() {
             transferQueueControllerProvider.overrideWithValue(transferQueue),
             secretStoreProvider.overrideWithValue(secretStore),
             autoSyncEnabledProvider.overrideWithValue(false),
+            appPackageInfoProvider.overrideWith((ref) async {
+              return _testPackageInfo();
+            }),
           ],
           child: const SerlinkApp(),
         ),
@@ -1306,6 +1329,9 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
         transferQueueControllerProvider.overrideWithValue(transferQueue),
         secretStoreProvider.overrideWithValue(secretStore),
         autoSyncEnabledProvider.overrideWithValue(false),
+        appPackageInfoProvider.overrideWith((ref) async {
+          return _testPackageInfo();
+        }),
       ],
       child: const SerlinkApp(),
     ),
@@ -1315,6 +1341,15 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   return _LockedVaultHarness(
     database: database,
     recoveryKey: initialized.recoveryKey,
+  );
+}
+
+PackageInfo _testPackageInfo() {
+  return PackageInfo(
+    appName: 'Serlink',
+    packageName: 'top.backrunner.serlink',
+    version: '1.2.3',
+    buildNumber: '45',
   );
 }
 

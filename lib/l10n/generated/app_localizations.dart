@@ -610,6 +610,36 @@ abstract class AppLocalizations {
   /// **'Export'**
   String get settingsExportAction;
 
+  /// No description provided for @settingsAboutSection.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsAboutSection;
+
+  /// No description provided for @settingsAppVersionOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String settingsAppVersionOnly(String version);
+
+  /// No description provided for @settingsAppVersionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} ({buildNumber})'**
+  String settingsAppVersionLabel(String version, String buildNumber);
+
+  /// No description provided for @settingsAppVersionLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading version'**
+  String get settingsAppVersionLoading;
+
+  /// No description provided for @settingsAppVersionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Version unavailable'**
+  String get settingsAppVersionUnavailable;
+
   /// No description provided for @settingsEnableLocalUnlockTitle.
   ///
   /// In en, this message translates to:

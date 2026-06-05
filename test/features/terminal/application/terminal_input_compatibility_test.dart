@@ -93,6 +93,39 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   });
 
+  testWidgets('does not apply safe area padding inside TerminalView', (
+    tester,
+  ) async {
+    final terminal = Terminal();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(390, 844),
+              padding: EdgeInsets.only(top: 59, bottom: 34),
+            ),
+            child: SizedBox(
+              width: 390,
+              height: 300,
+              child: TerminalView(terminal, padding: EdgeInsets.zero),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final terminalViewState =
+        tester.state(find.byType(TerminalView)) as dynamic;
+    final firstCellOffset =
+        terminalViewState.renderTerminal.getOffset(const CellOffset(0, 0))
+            as Offset;
+
+    expect(firstCellOffset.dy, 0);
+  });
+
   test('encodes arrow keys with terminal cursor key mode', () {
     final output = <String>[];
     final terminal = Terminal(onOutput: output.add);

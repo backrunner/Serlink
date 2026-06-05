@@ -269,6 +269,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsExportAction => '导出';
 
   @override
+  String get settingsAboutSection => '关于';
+
+  @override
+  String settingsAppVersionOnly(String version) {
+    return '版本 $version';
+  }
+
+  @override
+  String settingsAppVersionLabel(String version, String buildNumber) {
+    return '版本 $version（$buildNumber）';
+  }
+
+  @override
+  String get settingsAppVersionLoading => '正在加载版本信息';
+
+  @override
+  String get settingsAppVersionUnavailable => '版本信息不可用';
+
+  @override
   String get settingsEnableLocalUnlockTitle => '启用本地解锁？';
 
   @override

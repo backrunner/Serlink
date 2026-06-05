@@ -11,6 +11,7 @@ class _SettingsSurface extends ConsumerWidget {
     final vaultState = vault?.vaultState;
     final canImportHostData = vaultState == VaultState.unlocked;
     final language = ref.watch(appLanguageProvider).value ?? AppLanguage.system;
+    final appPackageInfo = ref.watch(appPackageInfoProvider);
     final showInPageTitle = !ref
         .watch(platformCapabilitiesProvider)
         .prefersMobileWorkspaceShell;
@@ -232,6 +233,20 @@ class _SettingsSurface extends ConsumerWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 26),
+                _SettingsSection(
+                  title: l10n.settingsAboutSection,
+                  children: [
+                    _SettingsInfoRow(
+                      icon: Icons.info_outline,
+                      title: l10n.appTitle,
+                      subtitle: _settingsAppVersionSubtitle(
+                        l10n,
+                        appPackageInfo,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -239,4 +254,22 @@ class _SettingsSurface extends ConsumerWidget {
       ],
     );
   }
+}
+
+String _settingsAppVersionSubtitle(
+  AppLocalizations l10n,
+  AsyncValue<PackageInfo> packageInfo,
+) {
+  return packageInfo.when(
+    data: (info) {
+      final version = info.version.trim().isEmpty ? '-' : info.version.trim();
+      final buildNumber = info.buildNumber.trim();
+      if (buildNumber.isEmpty) {
+        return l10n.settingsAppVersionOnly(version);
+      }
+      return l10n.settingsAppVersionLabel(version, buildNumber);
+    },
+    loading: () => l10n.settingsAppVersionLoading,
+    error: (_, _) => l10n.settingsAppVersionUnavailable,
+  );
 }

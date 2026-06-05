@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../database/serlink_database.dart';
 import '../core/logging/redactor.dart';
@@ -90,6 +91,10 @@ final secretStoreProvider = Provider<SecretStore>((ref) {
 
 final platformCapabilitiesProvider = Provider<PlatformCapabilities>((ref) {
   return PlatformCapabilities.current();
+});
+
+final appPackageInfoProvider = FutureProvider<PackageInfo>((ref) {
+  return PackageInfo.fromPlatform();
 });
 
 final documentGatewayProvider = Provider<DocumentGateway>((ref) {

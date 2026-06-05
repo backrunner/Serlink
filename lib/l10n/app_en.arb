@@ -102,6 +102,28 @@
   "settingsRuntimeSection": "Runtime",
   "settingsDiagnosticBundleTitle": "Diagnostic logs",
   "settingsExportAction": "Export",
+  "settingsAboutSection": "About",
+  "settingsAppVersionOnly": "Version {version}",
+  "@settingsAppVersionOnly": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppVersionLabel": "Version {version} ({buildNumber})",
+  "@settingsAppVersionLabel": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "buildNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppVersionLoading": "Loading version",
+  "settingsAppVersionUnavailable": "Version unavailable",
   "settingsEnableLocalUnlockTitle": "Enable local unlock?",
   "settingsDisableLocalUnlockTitle": "Disable local unlock?",
   "settingsEnableLocalUnlockBody": "Serlink will store a random device key in OS secure storage. Your vault passphrase is not stored.",

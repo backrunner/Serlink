@@ -270,6 +270,25 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsExportAction => 'エクスポート';
 
   @override
+  String get settingsAboutSection => '情報';
+
+  @override
+  String settingsAppVersionOnly(String version) {
+    return 'バージョン $version';
+  }
+
+  @override
+  String settingsAppVersionLabel(String version, String buildNumber) {
+    return 'バージョン $version（$buildNumber）';
+  }
+
+  @override
+  String get settingsAppVersionLoading => 'バージョンを読み込み中';
+
+  @override
+  String get settingsAppVersionUnavailable => 'バージョン情報を取得できません';
+
+  @override
   String get settingsEnableLocalUnlockTitle => 'ローカル解除を有効にしますか？';
 
   @override

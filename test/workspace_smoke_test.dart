@@ -884,10 +884,21 @@ void main() {
     );
     expect(addHostRect.width, 38);
     expect(addHostRect.height, 38);
-    expect(
-      find.byKey(const ValueKey('mobile-header-count-badge')),
-      findsOneWidget,
+    final headerCountBadge = find.byKey(
+      const ValueKey('mobile-header-count-badge'),
     );
+    expect(headerCountBadge, findsOneWidget);
+    final headerTitleRow = find.byKey(
+      const ValueKey('mobile-header-title-row'),
+    );
+    final headerTitle = find.descendant(
+      of: headerTitleRow,
+      matching: find.text('Hosts'),
+    );
+    expect(headerTitle, findsOneWidget);
+    final countRect = tester.getRect(headerCountBadge);
+    expect(countRect.left, greaterThan(tester.getRect(headerTitle).right));
+    expect(countRect.right, lessThan(addHostRect.left));
 
     await tester.tap(find.text('Sessions'));
     await tester.pumpAndSettle();

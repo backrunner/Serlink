@@ -58,6 +58,7 @@ class _MobileHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final count = _mobileHeaderCount(ref, area);
     return FHeader(
       key: const ValueKey('mobile-workspace-header'),
       style: const FHeaderStyleDelta.delta(
@@ -66,16 +67,58 @@ class _MobileHeader extends ConsumerWidget {
           EdgeInsets.fromLTRB(16, 9, 16, 9),
         ),
       ),
-      title: _MobileHeaderTitle(title: _mobileAreaTitle(context.l10n, area)),
+      title: _MobileHeaderTitle(
+        title: _mobileAreaTitle(context.l10n, area),
+        count: count,
+      ),
       suffixes: [_MobileHeaderActions(area: area)],
     );
   }
 }
 
+int? _mobileHeaderCount(WidgetRef ref, WorkspaceArea area) {
+  switch (area) {
+    case WorkspaceArea.hosts:
+      final session = ref.watch(vaultSessionControllerProvider).value;
+      if (session?.vaultState != VaultState.unlocked) {
+        return null;
+      }
+      final hosts = ref
+          .watch(hostSummariesProvider(session!.unlockGeneration))
+          .value;
+      final query = ref.watch(_workspaceSearchQueryProvider);
+      return hosts == null ? null : filterHostSummaries(hosts, query).length;
+    case WorkspaceArea.sessions:
+      final state = ref.watch(workspaceTabControllerProvider);
+      return state.tabs.isEmpty ? null : state.tabs.length;
+    case WorkspaceArea.transfers:
+      final queue = ref.watch(transferQueueStateProvider).value;
+      final query = ref.watch(_workspaceSearchQueryProvider);
+      return queue == null
+          ? null
+          : filterTransferTasks(queue.tasks, query).length;
+    case WorkspaceArea.snippets:
+      final session = ref.watch(vaultSessionControllerProvider).value;
+      if (session?.vaultState != VaultState.unlocked) {
+        return null;
+      }
+      final snippets = ref
+          .watch(snippetsProvider(session!.unlockGeneration))
+          .value;
+      final query = ref.watch(_workspaceSearchQueryProvider);
+      return snippets == null
+          ? null
+          : filterCommandSnippets(snippets, query).length;
+    case WorkspaceArea.settings:
+      return null;
+  }
+}
+
 class _MobileHeaderTitle extends StatelessWidget {
-  const _MobileHeaderTitle({required this.title});
+  const _MobileHeaderTitle({required this.title, this.count});
 
   final String title;
+  final int? count;
 
   @override
   Widget build(BuildContext context) {
@@ -86,16 +129,31 @@ class _MobileHeaderTitle extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: t.textPrimary,
-              fontSize: 18.5,
-              fontWeight: FontWeight.w700,
-              height: 1.08,
-            ),
+          Row(
+            key: const ValueKey('mobile-header-title-row'),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: t.textPrimary,
+                    fontSize: 18.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1.08,
+                  ),
+                ),
+              ),
+              if (count != null) ...[
+                const SizedBox(width: 8),
+                _CountBadge(
+                  key: const ValueKey('mobile-header-count-badge'),
+                  count: count!,
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 4),
           Container(
@@ -133,15 +191,7 @@ class _MobileHeaderActions extends ConsumerWidget {
     if (session?.vaultState != VaultState.unlocked) {
       return const SizedBox.shrink();
     }
-    final hosts = ref
-        .watch(hostSummariesProvider(session!.unlockGeneration))
-        .value;
-    final query = ref.watch(_workspaceSearchQueryProvider);
-    final count = hosts == null
-        ? null
-        : filterHostSummaries(hosts, query).length;
     return _MobileHeaderActionGroup(
-      count: count,
       action: _MobileHeaderIconButton(
         key: const ValueKey('add-host-button'),
         tooltip: context.l10n.hostsAddTooltip,
@@ -152,9 +202,7 @@ class _MobileHeaderActions extends ConsumerWidget {
   }
 
   Widget _buildSessionsActions(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(workspaceTabControllerProvider);
     return _MobileHeaderActionGroup(
-      count: state.tabs.isEmpty ? null : state.tabs.length,
       action: _MobileHeaderIconButton(
         key: const ValueKey('mobile-new-session-button'),
         tooltip: context.l10n.tabsNewConnectionTooltip,
@@ -174,11 +222,8 @@ class _MobileHeaderActions extends ConsumerWidget {
     if (queue == null) {
       return const SizedBox.shrink();
     }
-    final query = ref.watch(_workspaceSearchQueryProvider);
-    final filteredTasks = filterTransferTasks(queue.tasks, query);
     final activeCount = queue.tasks.where(_transferIsActive).length;
     return _MobileHeaderActionGroup(
-      count: filteredTasks.length,
       status: activeCount > 0
           ? StatusPill(
               label: context.l10n.transfersActiveCount(activeCount),
@@ -201,15 +246,7 @@ class _MobileHeaderActions extends ConsumerWidget {
     if (session?.vaultState != VaultState.unlocked) {
       return const SizedBox.shrink();
     }
-    final snippets = ref
-        .watch(snippetsProvider(session!.unlockGeneration))
-        .value;
-    final query = ref.watch(_workspaceSearchQueryProvider);
-    final count = snippets == null
-        ? null
-        : filterCommandSnippets(snippets, query).length;
     return _MobileHeaderActionGroup(
-      count: count,
       action: _MobileHeaderIconButton(
         key: const ValueKey('add-snippet-button'),
         tooltip: context.l10n.snippetsAddTooltip,
@@ -221,9 +258,8 @@ class _MobileHeaderActions extends ConsumerWidget {
 }
 
 class _MobileHeaderActionGroup extends StatelessWidget {
-  const _MobileHeaderActionGroup({this.count, this.status, this.action});
+  const _MobileHeaderActionGroup({this.status, this.action});
 
-  final int? count;
   final Widget? status;
   final Widget? action;
 
@@ -232,13 +268,6 @@ class _MobileHeaderActionGroup extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (count != null) ...[
-          _CountBadge(
-            key: const ValueKey('mobile-header-count-badge'),
-            count: count!,
-          ),
-          const SizedBox(width: _mobileHeaderControlGap),
-        ],
         if (status != null) ...[
           status!,
           const SizedBox(width: _mobileHeaderControlGap),

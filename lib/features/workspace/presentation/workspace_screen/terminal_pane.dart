@@ -122,26 +122,29 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
             onClose: _closeSearch,
           ),
         Expanded(
-          child: widget.showSplit
-              ? _SplitTerminalViewport(
-                  panes: widget.panes,
-                  terminals: _terminals(),
-                  controllers: _terminalControllers,
-                  globalSettings: globalSettings,
-                  layout: widget.layout,
-                  activePane: widget.activePane,
-                  local: widget.local,
-                  onActivatePane: _setActivePane,
-                  onKeyEvent: _terminalViewKeyHandler,
-                  onInsertText: _handleTerminalTextInsert,
-                )
-              : _SingleTerminalViewport(
-                  terminal: _terminals().first,
-                  controller: _terminalControllers.first,
-                  settings: settings,
-                  onKeyEvent: _terminalViewKeyHandler,
-                  onInsertText: _handleTerminalTextInsert,
-                ),
+          child: ClipRect(
+            key: const ValueKey('terminal-viewport-clip'),
+            child: widget.showSplit
+                ? _SplitTerminalViewport(
+                    panes: widget.panes,
+                    terminals: _terminals(),
+                    controllers: _terminalControllers,
+                    globalSettings: globalSettings,
+                    layout: widget.layout,
+                    activePane: widget.activePane,
+                    local: widget.local,
+                    onActivatePane: _setActivePane,
+                    onKeyEvent: _terminalViewKeyHandler,
+                    onInsertText: _handleTerminalTextInsert,
+                  )
+                : _SingleTerminalViewport(
+                    terminal: _terminals().first,
+                    controller: _terminalControllers.first,
+                    settings: settings,
+                    onKeyEvent: _terminalViewKeyHandler,
+                    onInsertText: _handleTerminalTextInsert,
+                  ),
+          ),
         ),
         if (capabilities.mobileTerminalAccessory)
           _TerminalAccessoryBar(

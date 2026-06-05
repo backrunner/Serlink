@@ -1046,6 +1046,10 @@ void main() {
 
     await tester.tap(_byTooltipLabel('Terminal'));
     await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('terminal-viewport-clip')),
+      findsOneWidget,
+    );
     sshService.shell.writes.clear();
 
     await tester.tap(find.byKey(const ValueKey('terminal-key-tab')));

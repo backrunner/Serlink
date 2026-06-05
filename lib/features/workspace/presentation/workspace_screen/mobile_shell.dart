@@ -237,14 +237,21 @@ class _MobileHeaderActionGroup extends StatelessWidget {
             key: const ValueKey('mobile-header-count-badge'),
             count: count!,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: _mobileHeaderControlGap),
         ],
-        if (status != null) ...[status!, const SizedBox(width: 8)],
+        if (status != null) ...[
+          status!,
+          const SizedBox(width: _mobileHeaderControlGap),
+        ],
         ?action,
       ],
     );
   }
 }
+
+const double _mobileHeaderActionSide = 38;
+const double _mobileHeaderActionIconSize = 19;
+const double _mobileHeaderControlGap = 10;
 
 class _MobileHeaderIconButton extends StatelessWidget {
   const _MobileHeaderIconButton({
@@ -264,8 +271,11 @@ class _MobileHeaderIconButton extends StatelessWidget {
       tooltip: tooltip,
       onPressed: onPressed,
       icon: Icon(icon),
-      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-      iconSize: 18,
+      constraints: const BoxConstraints.tightFor(
+        width: _mobileHeaderActionSide,
+        height: _mobileHeaderActionSide,
+      ),
+      iconSize: _mobileHeaderActionIconSize,
     );
   }
 }

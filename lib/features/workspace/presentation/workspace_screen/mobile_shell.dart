@@ -61,9 +61,9 @@ class _MobileHeader extends StatelessWidget {
     return FHeader(
       key: const ValueKey('mobile-workspace-header'),
       style: const FHeaderStyleDelta.delta(
-        constraints: BoxConstraints(minHeight: 40),
+        constraints: BoxConstraints(minHeight: 48),
         padding: EdgeInsetsGeometryDelta.value(
-          EdgeInsets.fromLTRB(16, 4, 16, 5),
+          EdgeInsets.fromLTRB(16, 7, 16, 8),
         ),
       ),
       title: _MobileHeaderTitle(title: _mobileAreaTitle(context.l10n, area)),
@@ -92,12 +92,12 @@ class _MobileHeaderTitle extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: t.textPrimary,
               fontWeight: FontWeight.w700,
-              height: 1.05,
+              height: 1.1,
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Container(
-            width: 22,
+            width: 24,
             height: 2,
             decoration: BoxDecoration(
               gradient: serlinkAccentGradient(t),

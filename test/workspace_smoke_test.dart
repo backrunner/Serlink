@@ -1504,7 +1504,7 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
 PackageInfo _testPackageInfo() {
   return PackageInfo(
     appName: 'Serlink',
-    packageName: 'top.backrunner.serlink',
+    packageName: 'com.alkinum.serlink',
     version: '1.2.3',
     buildNumber: '45',
   );

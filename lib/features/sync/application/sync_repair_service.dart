@@ -54,7 +54,8 @@ class SyncRepairService {
         }
         return switch (error.code) {
           'sync.provider.partial_upload' ||
-          'sync.provider.not_found' => const SyncRepairPlan(
+          'sync.provider.not_found' ||
+          'sync.provider.manifest_invalid' => const SyncRepairPlan(
             action: SyncRepairAction.rebuildRemoteFromLocal,
             title: 'Repair remote sync?',
             message:

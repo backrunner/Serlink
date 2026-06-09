@@ -8,6 +8,9 @@ import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/database/database_recovery.dart';
 import 'package:serlink/database/serlink_database.dart';
 import 'package:serlink/features/import_export/application/automatic_vault_backup_service.dart';
+import 'package:serlink/features/sync/application/sync_run_service.dart';
+import 'package:serlink/features/sync/data/local_sync_provider.dart';
+import 'package:serlink/features/sync/domain/sync_provider.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_record_health_service.dart';
 import 'package:serlink/features/vault/application/vault_record_repository.dart';
@@ -149,6 +152,81 @@ void main() {
       final restored = await records.read(original.id);
       expect(restored, isNotNull);
       expect(utf8.decode(await vault.decryptRecord(restored!)), 'from backup');
+    },
+  );
+
+  test('restores corrupt records from remote before quarantine', () async {
+    final remote = LocalDirectorySyncProvider(
+      Directory(p.join(tempDir.path, 'remote')),
+    );
+    final quarantine = _InMemoryVaultRecordQuarantineRepository();
+    final original = await vault.encryptRecord(
+      id: VaultRecordId('host:remote-recoverable'),
+      type: 'host',
+      plaintext: utf8.encode('from remote'),
+    );
+    final remoteRecords = InMemoryVaultRecordRepository();
+    await remoteRecords.upsert(original);
+    await SyncRunService(
+      vault: vault,
+      records: remoteRecords,
+    ).pushEncryptedSnapshot(remote);
+    await records.upsert(_withTamperedCiphertext(original));
+
+    final report = await VaultRecordHealthService(
+      vault: vault,
+      records: records,
+      quarantine: quarantine,
+      remote: remote,
+    ).quarantineCorruptRecords();
+
+    expect(report.isHealthy, isTrue);
+    expect(await quarantine.list(), isEmpty);
+    final restored = await records.read(original.id);
+    expect(restored, isNotNull);
+    expect(utf8.decode(await vault.decryptRecord(restored!)), 'from remote');
+  });
+
+  test(
+    'does not restore corrupt records from unsupported remote protocol',
+    () async {
+      final remote = LocalDirectorySyncProvider(
+        Directory(p.join(tempDir.path, 'remote')),
+      );
+      final quarantine = _InMemoryVaultRecordQuarantineRepository();
+      final original = await vault.encryptRecord(
+        id: VaultRecordId('host:remote-future-protocol'),
+        type: 'host',
+        plaintext: utf8.encode('from remote'),
+      );
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await remoteRecords.upsert(original);
+      await SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      ).pushEncryptedSnapshot(remote);
+      final manifest = await remote.readManifest();
+      await remote.writeManifest(
+        RemoteManifest(
+          vaultId: manifest!.vaultId,
+          protocolVersion: 2,
+          encryptedPayload: manifest.encryptedPayload,
+        ),
+      );
+      await records.upsert(_withTamperedCiphertext(original));
+
+      final report = await VaultRecordHealthService(
+        vault: vault,
+        records: records,
+        quarantine: quarantine,
+        remote: remote,
+      ).quarantineCorruptRecords();
+
+      expect(report.isHealthy, isTrue);
+      expect(await records.read(original.id), isNull);
+      final quarantined = await quarantine.list();
+      expect(quarantined, hasLength(1));
+      expect(quarantined.single.envelope.id, original.id);
     },
   );
 }

@@ -100,6 +100,18 @@ void main() {
       expect(plan?.action, SyncRepairAction.restoreLocalFromRemote);
       expect(plan?.destructive, isTrue);
     });
+
+    test('offers remote repair for malformed provider manifest', () {
+      final plan = service.planFor(
+        const SyncProviderException(
+          'sync.provider.manifest_invalid',
+          'Remote sync manifest is invalid.',
+        ),
+      );
+
+      expect(plan?.action, SyncRepairAction.rebuildRemoteFromLocal);
+      expect(plan?.destructive, isTrue);
+    });
   });
 }
 

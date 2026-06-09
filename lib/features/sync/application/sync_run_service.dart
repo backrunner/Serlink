@@ -62,7 +62,9 @@ class SyncPullResult {
 
 enum SyncConflictResolution { keepLocal, useRemote }
 
-enum _SyncConflictPolicy { report, useRemote }
+enum _SyncConflictPolicy { report, useRemote, useLatest }
+
+enum _RecordSource { local, remote }
 
 class SyncRunException implements Exception {
   const SyncRunException(this.code, this.message);
@@ -105,9 +107,6 @@ class SyncRunService {
 
   Future<SyncRunResult> syncEncryptedSnapshot(SyncProvider provider) async {
     final pull = await pullEncryptedSnapshot(provider, missingManifestOk: true);
-    if (pull.hasConflicts) {
-      throw SyncRunConflictException(pull.conflicts);
-    }
     final push = await pushEncryptedSnapshot(provider);
     return SyncRunResult(
       recordsUploaded: push.recordsUploaded,
@@ -123,10 +122,14 @@ class SyncRunService {
   Future<SyncPullResult> pullEncryptedSnapshot(
     SyncProvider provider, {
     bool missingManifestOk = false,
+    bool reportConflicts = false,
   }) {
     return _pullEncryptedSnapshot(
       provider,
       missingManifestOk: missingManifestOk,
+      conflictPolicy: reportConflicts
+          ? _SyncConflictPolicy.report
+          : _SyncConflictPolicy.useLatest,
     );
   }
 
@@ -154,30 +157,27 @@ class SyncRunService {
 
     final manifestData = await _decryptManifest(manifest);
     final recordEntries = _manifestRecords(manifestData);
+    final recordEntriesById = {
+      for (final entry in recordEntries) entry.id: entry,
+    };
     final remoteDevice = _manifestWriterDevice(manifestData);
     final localTombstones = await _localTombstones();
+    final tombstonesToDelete = <VaultRecordId>{};
     final conflicts = <SyncRecordConflict>[];
     final remoteTombstones = <SyncDeleteTombstone>[];
     var downloaded = 0;
     var unchanged = 0;
 
     for (final entry in recordEntries) {
-      final remoteEnvelope = VaultRecordEnvelope.fromJson(
-        jsonDecode(utf8.decode(await provider.readObject(entry.ref)))
-            as Map<String, Object?>,
-      );
-      if (remoteEnvelope.id != entry.id ||
-          remoteEnvelope.type != entry.type ||
-          remoteEnvelope.revision != entry.revision) {
-        throw const SyncRunException(
-          'sync.remote_manifest_mismatch',
-          'Remote sync manifest does not match its record objects.',
-        );
-      }
+      final remoteEnvelope = await _readRemoteEnvelope(provider, entry.ref);
+      _validateRemoteEnvelopeEntry(remoteEnvelope, entry);
 
       if (remoteEnvelope.type ==
           EncryptedSyncDeleteTombstoneRepository.recordType) {
-        final tombstone = await _decodeTombstone(remoteEnvelope);
+        final tombstone = await _decodeTombstone(
+          remoteEnvelope,
+          source: _RecordSource.remote,
+        );
         remoteTombstones.add(tombstone);
         final localEnvelope = await _records.read(remoteEnvelope.id);
         if (localEnvelope == null ||
@@ -190,8 +190,22 @@ class SyncRunService {
         continue;
       }
 
-      if (localTombstones.containsKey(remoteEnvelope.id)) {
-        unchanged += 1;
+      final localTombstone = localTombstones[remoteEnvelope.id];
+      if (localTombstone != null) {
+        final remoteModifiedAt = await _recordModifiedAt(
+          remoteEnvelope,
+          source: _RecordSource.remote,
+          provider: provider,
+          manifestEntriesById: recordEntriesById,
+        );
+        if (remoteModifiedAt != null &&
+            remoteModifiedAt.isAfter(localTombstone.deletedAt)) {
+          tombstonesToDelete.add(tombstoneRecordId(remoteEnvelope.id));
+          await _records.upsert(remoteEnvelope);
+          downloaded += 1;
+        } else {
+          unchanged += 1;
+        }
         continue;
       }
 
@@ -208,6 +222,20 @@ class SyncRunService {
       if (conflictPolicy == _SyncConflictPolicy.useRemote) {
         await _records.upsert(remoteEnvelope);
         downloaded += 1;
+        continue;
+      }
+      if (conflictPolicy == _SyncConflictPolicy.useLatest) {
+        if (await _remoteRecordWins(
+          localEnvelope: localEnvelope,
+          remoteEnvelope: remoteEnvelope,
+          provider: provider,
+          manifestEntriesById: recordEntriesById,
+        )) {
+          await _records.upsert(remoteEnvelope);
+          downloaded += 1;
+        } else {
+          unchanged += 1;
+        }
         continue;
       }
       conflicts.add(
@@ -227,7 +255,23 @@ class SyncRunService {
     }
 
     for (final tombstone in remoteTombstones) {
-      await _records.delete(tombstone.targetRecordId);
+      final localEnvelope = await _records.read(tombstone.targetRecordId);
+      if (localEnvelope == null) {
+        continue;
+      }
+      final localModifiedAt = await _recordModifiedAt(
+        localEnvelope,
+        source: _RecordSource.local,
+      );
+      if (localModifiedAt == null ||
+          !localModifiedAt.isAfter(tombstone.deletedAt)) {
+        await _records.delete(tombstone.targetRecordId);
+      } else {
+        tombstonesToDelete.add(tombstoneRecordId(tombstone.targetRecordId));
+      }
+    }
+    for (final tombstoneRecordId in tombstonesToDelete) {
+      await _records.delete(tombstoneRecordId);
     }
 
     return SyncPullResult(
@@ -441,10 +485,19 @@ class SyncRunService {
         'Remote sync manifest is invalid.',
       );
     }
-    return [
-      for (final rawRecord in rawRecords)
-        _ManifestRecordEntry.fromJson(rawRecord as Map<String, Object?>),
-    ];
+    try {
+      return [
+        for (final rawRecord in rawRecords)
+          _ManifestRecordEntry.fromJson(
+            Map<String, Object?>.from(rawRecord as Map<Object?, Object?>),
+          ),
+      ];
+    } on Object {
+      throw const SyncRunException(
+        'sync.remote_manifest_invalid',
+        'Remote sync manifest is invalid.',
+      );
+    }
   }
 
   SyncDeviceMetadata? _manifestWriterDevice(Map<String, Object?> manifest) {
@@ -458,7 +511,14 @@ class SyncRunService {
         'Remote sync manifest is invalid.',
       );
     }
-    return SyncDeviceMetadata.fromJson(Map<String, Object?>.from(rawDevice));
+    try {
+      return SyncDeviceMetadata.fromJson(Map<String, Object?>.from(rawDevice));
+    } on Object {
+      throw const SyncRunException(
+        'sync.remote_manifest_invalid',
+        'Remote sync manifest is invalid.',
+      );
+    }
   }
 
   void _ensureUnlocked() {
@@ -487,19 +547,210 @@ class SyncRunService {
     );
     final tombstones = <VaultRecordId, SyncDeleteTombstone>{};
     for (final envelope in envelopes) {
-      final tombstone = await _decodeTombstone(envelope);
+      final tombstone = await _decodeTombstone(
+        envelope,
+        source: _RecordSource.local,
+      );
       tombstones[tombstone.targetRecordId] = tombstone;
     }
     return tombstones;
   }
 
-  Future<SyncDeleteTombstone> _decodeTombstone(
-    VaultRecordEnvelope envelope,
+  Future<VaultRecordEnvelope> _readRemoteEnvelope(
+    SyncProvider provider,
+    RemoteObjectRef ref,
   ) async {
-    final plaintext = await _vault.decryptRecord(envelope);
-    return SyncDeleteTombstone.fromJson(
-      jsonDecode(utf8.decode(plaintext)) as Map<String, Object?>,
+    try {
+      return VaultRecordEnvelope.fromJson(
+        jsonDecode(utf8.decode(await provider.readObject(ref)))
+            as Map<String, Object?>,
+      );
+    } on SyncRunException {
+      rethrow;
+    } on Object {
+      throw const SyncRunException(
+        'sync.remote_manifest_invalid',
+        'Remote sync record is invalid or corrupted.',
+      );
+    }
+  }
+
+  void _validateRemoteEnvelopeEntry(
+    VaultRecordEnvelope envelope,
+    _ManifestRecordEntry entry,
+  ) {
+    if (envelope.id != entry.id ||
+        envelope.type != entry.type ||
+        envelope.revision != entry.revision) {
+      throw const SyncRunException(
+        'sync.remote_manifest_mismatch',
+        'Remote sync manifest does not match its record objects.',
+      );
+    }
+  }
+
+  Future<SyncDeleteTombstone> _decodeTombstone(
+    VaultRecordEnvelope envelope, {
+    required _RecordSource source,
+  }) async {
+    try {
+      final plaintext = await _vault.decryptRecord(envelope);
+      return SyncDeleteTombstone.fromJson(
+        jsonDecode(utf8.decode(plaintext)) as Map<String, Object?>,
+      );
+    } on VaultException {
+      throw SyncRunException(
+        source == _RecordSource.remote
+            ? 'sync.remote_manifest_invalid'
+            : 'sync.local_unhealthy',
+        source == _RecordSource.remote
+            ? 'Remote sync tombstone is invalid or corrupted.'
+            : 'Local vault data needs recovery before syncing.',
+      );
+    } on FormatException {
+      throw SyncRunException(
+        source == _RecordSource.remote
+            ? 'sync.remote_manifest_invalid'
+            : 'sync.local_unhealthy',
+        source == _RecordSource.remote
+            ? 'Remote sync tombstone is invalid.'
+            : 'Local tombstone data needs recovery before syncing.',
+      );
+    } on TypeError {
+      throw SyncRunException(
+        source == _RecordSource.remote
+            ? 'sync.remote_manifest_invalid'
+            : 'sync.local_unhealthy',
+        source == _RecordSource.remote
+            ? 'Remote sync tombstone is invalid.'
+            : 'Local tombstone data needs recovery before syncing.',
+      );
+    }
+  }
+
+  Future<bool> _remoteRecordWins({
+    required VaultRecordEnvelope localEnvelope,
+    required VaultRecordEnvelope remoteEnvelope,
+    required SyncProvider provider,
+    required Map<VaultRecordId, _ManifestRecordEntry> manifestEntriesById,
+  }) async {
+    final localModifiedAt = await _recordModifiedAt(
+      localEnvelope,
+      source: _RecordSource.local,
     );
+    final remoteModifiedAt = await _recordModifiedAt(
+      remoteEnvelope,
+      source: _RecordSource.remote,
+      provider: provider,
+      manifestEntriesById: manifestEntriesById,
+    );
+    if (remoteModifiedAt != null && localModifiedAt != null) {
+      return remoteModifiedAt.isAfter(localModifiedAt);
+    }
+    if (remoteModifiedAt != null) {
+      return true;
+    }
+    if (localModifiedAt != null) {
+      return false;
+    }
+    return true;
+  }
+
+  Future<DateTime?> _recordModifiedAt(
+    VaultRecordEnvelope envelope, {
+    required _RecordSource source,
+    SyncProvider? provider,
+    Map<VaultRecordId, _ManifestRecordEntry>? manifestEntriesById,
+  }) async {
+    try {
+      final plaintext = await _vault.decryptRecord(envelope);
+      final decoded = jsonDecode(utf8.decode(plaintext));
+      if (decoded is! Map<String, Object?>) {
+        return _relatedRecordModifiedAt(
+          envelope,
+          source: source,
+          provider: provider,
+          manifestEntriesById: manifestEntriesById,
+        );
+      }
+      return _timestampFromRecordJson(decoded) ??
+          await _relatedRecordModifiedAt(
+            envelope,
+            source: source,
+            provider: provider,
+            manifestEntriesById: manifestEntriesById,
+          );
+    } on VaultException {
+      throw SyncRunException(
+        source == _RecordSource.remote
+            ? 'sync.remote_manifest_invalid'
+            : 'sync.local_unhealthy',
+        source == _RecordSource.remote
+            ? 'Remote sync record is invalid or corrupted.'
+            : 'Local vault data needs recovery before syncing.',
+      );
+    } on FormatException {
+      return _relatedRecordModifiedAt(
+        envelope,
+        source: source,
+        provider: provider,
+        manifestEntriesById: manifestEntriesById,
+      );
+    } on TypeError {
+      return _relatedRecordModifiedAt(
+        envelope,
+        source: source,
+        provider: provider,
+        manifestEntriesById: manifestEntriesById,
+      );
+    }
+  }
+
+  Future<DateTime?> _relatedRecordModifiedAt(
+    VaultRecordEnvelope envelope, {
+    required _RecordSource source,
+    SyncProvider? provider,
+    Map<VaultRecordId, _ManifestRecordEntry>? manifestEntriesById,
+  }) async {
+    final relatedId = _relatedTimestampRecordId(envelope);
+    if (relatedId == null) {
+      return null;
+    }
+
+    final relatedEnvelope = switch (source) {
+      _RecordSource.local => await _records.read(relatedId),
+      _RecordSource.remote => await _readRemoteRelatedEnvelope(
+        provider: provider,
+        manifestEntriesById: manifestEntriesById,
+        id: relatedId,
+      ),
+    };
+    if (relatedEnvelope == null) {
+      return null;
+    }
+    return _recordModifiedAt(
+      relatedEnvelope,
+      source: source,
+      provider: provider,
+      manifestEntriesById: manifestEntriesById,
+    );
+  }
+
+  Future<VaultRecordEnvelope?> _readRemoteRelatedEnvelope({
+    required SyncProvider? provider,
+    required Map<VaultRecordId, _ManifestRecordEntry>? manifestEntriesById,
+    required VaultRecordId id,
+  }) async {
+    if (provider == null || manifestEntriesById == null) {
+      return null;
+    }
+    final entry = manifestEntriesById[id];
+    if (entry == null) {
+      return null;
+    }
+    final envelope = await _readRemoteEnvelope(provider, entry.ref);
+    _validateRemoteEnvelopeEntry(envelope, entry);
+    return envelope;
   }
 
   Future<SyncConflictFieldSet?> _buildFieldSet({
@@ -525,6 +776,40 @@ class SyncRunService {
       return null;
     }
   }
+}
+
+DateTime? _timestampFromRecordJson(Map<String, Object?> json) {
+  for (final key in const [
+    'updatedAt',
+    'deletedAt',
+    'lastSeenAt',
+    'createdAt',
+  ]) {
+    final value = json[key];
+    if (value is! String) {
+      continue;
+    }
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) {
+      return parsed.toUtc();
+    }
+  }
+  return null;
+}
+
+VaultRecordId? _relatedTimestampRecordId(VaultRecordEnvelope envelope) {
+  if (envelope.type != 'identity_secret') {
+    return null;
+  }
+  const secretPrefix = 'secret:';
+  if (!envelope.id.value.startsWith(secretPrefix)) {
+    return null;
+  }
+  final identityId = envelope.id.value.substring(secretPrefix.length);
+  if (identityId.isEmpty) {
+    return null;
+  }
+  return VaultRecordId('identity:$identityId');
 }
 
 class SyncRunConflictException extends SyncRunException {

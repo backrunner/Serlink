@@ -194,13 +194,13 @@ Exit criteria:
 
 ## Phase 7: iCloud Sync
 
-Current decision, 2026-05-28: CloudKit and iCloud Drive are out of scope for the first desktop release. WebDAV is the first-release encrypted sync provider. Keep Phase 7 as post-v1 work behind the existing `SyncProvider` abstraction.
+Current decision, 2026-06-09: CloudKit provider wiring exists for iOS and macOS, but release enablement still needs signed-device validation, CloudKit production schema deployment, and provider hardening. iCloud Drive remains out of scope for the first desktop release. WebDAV is the first-release encrypted sync provider.
 
 Duration: 4-8 weeks depending on chosen strategy.
 
 Deliverables:
 
-- Native macOS iCloud provider.
+- Native iOS/macOS CloudKit provider hardening.
 - Entitlement/config documentation.
 - iCloud account status detection.
 - Encrypted record upload/download.
@@ -209,7 +209,7 @@ Deliverables:
 
 Exit criteria:
 
-- macOS users can sync encrypted vault data through iCloud.
+- iOS/macOS users can sync encrypted vault data through iCloud.
 - Provider receives no plaintext.
 - Failure states for iCloud disabled, quota, network, account unavailable are clear.
 

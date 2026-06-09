@@ -4,7 +4,7 @@ Serlink is a Flutter-based SSH terminal and SFTP workstation, with a desktop-fir
 
 > Status: Work in progress. Serlink is open source, but it is not release-ready yet. Desktop packaging, real integration fixtures, cross-platform QA, and mobile/iOS validation are still in progress.
 
-Current code status: the project already has a substantial desktop core, including an encrypted vault, host and identity management, mixed Terminal/SFTP/local-terminal tabs, transfer queueing, and automatic encrypted WebDAV sync. iOS support has an initial project shell, touch workspace, document gateway, and mobile capability gating, but it is still WIP.
+Current code status: the project already has a substantial desktop core, including an encrypted vault, host and identity management, mixed Terminal/SFTP/local-terminal tabs, transfer queueing, and automatic encrypted WebDAV sync. iOS support has an initial project shell, touch workspace, document gateway, mobile capability gating, and CloudKit sync wiring, but it is still WIP.
 
 ## Current Scope
 
@@ -90,6 +90,7 @@ Desktop remains the primary production target. The iOS code path is present for 
 - Remote repair handling for missing/corrupt/wrong-vault manifests
 - TLS certificate diagnostics and endpoint pinning
 - Sync object-path validation to reject traversal/unsafe refs
+- CloudKit sync bridge and entitlements for iOS and macOS
 
 ### Diagnostics
 
@@ -106,12 +107,12 @@ These areas are still open before a production desktop release:
 - Real integration fixtures for SSH/SFTP/WebDAV/ProxyJump/OpenSSH certificates/forwarding
 - Cross-platform secure-storage and IME verification on real machines
 - iOS simulator/device validation and mobile file-transfer UX hardening
+- CloudKit signed-device validation, production schema deployment, and provider hardening
 - Final accessibility and polish pass
 - OpenSSH import validation against real `ssh -G` behavior
 
 ## Intentionally Deferred From First Desktop Release
 
-- CloudKit sync
 - iCloud Drive sync
 - SSH Agent auth
 - FIDO2 / hardware security key SSH auth

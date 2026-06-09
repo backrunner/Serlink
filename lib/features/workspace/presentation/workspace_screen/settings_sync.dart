@@ -224,7 +224,18 @@ Future<void> _repairWebDavSync(
   try {
     final provider = await ref
         .read(syncSettingsServiceProvider)
-        .buildWebDavProvider();
+        .activeSyncProvider();
+    if (provider == null) {
+      throw const SyncRunException(
+        'sync.provider_missing',
+        'No sync provider is enabled.',
+      );
+    }
+    if (plan.action == SyncRepairAction.restoreLocalFromRemote) {
+      await (await ref.read(
+        automaticVaultBackupServiceProvider.future,
+      )).createSnapshot(reason: 'before-remote-restore');
+    }
     final result = await ref
         .read(syncRunServiceProvider)
         .runRepair(provider, plan.action);

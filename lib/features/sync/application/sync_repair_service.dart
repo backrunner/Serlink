@@ -5,6 +5,7 @@ import 'sync_run_service.dart';
 enum SyncRepairAction {
   initializeEmptyRemote,
   rebuildRemoteFromLocal,
+  restoreLocalFromRemote,
   trustWebDavCertificate,
   reviewLocalClock,
 }
@@ -88,6 +89,13 @@ class SyncRepairService {
             'The remote manifest or record objects are incomplete or corrupted. Serlink can rebuild them from local encrypted records.',
         destructive: true,
       ),
+      'sync.local_unhealthy' => const SyncRepairPlan(
+        action: SyncRepairAction.restoreLocalFromRemote,
+        title: 'Restore local sync data?',
+        message:
+            'Local vault data needs recovery before remote sync can be rebuilt. Serlink can restore local encrypted records from the current remote sync set.',
+        destructive: true,
+      ),
       _ => null,
     };
   }
@@ -103,6 +111,8 @@ extension SyncRepairRun on SyncRunService {
       SyncRepairAction.rebuildRemoteFromLocal => pushEncryptedSnapshotForRepair(
         provider,
       ),
+      SyncRepairAction.restoreLocalFromRemote =>
+        restoreLocalFromRemoteForRepair(provider),
       SyncRepairAction.trustWebDavCertificate ||
       SyncRepairAction.reviewLocalClock => throw UnsupportedError(
         'Sync repair action ${action.name} must be handled by Settings.',

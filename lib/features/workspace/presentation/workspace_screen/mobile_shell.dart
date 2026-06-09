@@ -10,6 +10,15 @@ class MobileWorkspaceScreen extends ConsumerWidget {
     final state = ref.watch(workspaceTabControllerProvider);
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final selectedIndex = _mobileAreaIndex(state.area);
+    final session = ref.watch(vaultSessionControllerProvider).value;
+    if (session != null && !session.localDataHealthy) {
+      return Scaffold(
+        body: DecoratedBox(
+          decoration: BoxDecoration(color: context.tokens.surfaceBase),
+          child: _VaultAccessSurface(session: session),
+        ),
+      );
+    }
 
     return Scaffold(
       body: DecoratedBox(

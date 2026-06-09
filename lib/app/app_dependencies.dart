@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../database/serlink_database.dart';
+import '../database/database_recovery.dart';
 import '../core/logging/redactor.dart';
 import '../core/runtime/app_profile_lock.dart';
 import '../features/diagnostics/application/diagnostic_bundle_service.dart';
@@ -15,7 +17,9 @@ import '../features/import_export/application/open_ssh_config_export_service.dar
 import '../features/import_export/application/known_hosts_import_service.dart';
 import '../features/import_export/application/open_ssh_certificate_import_service.dart';
 import '../features/import_export/application/open_ssh_config_import_service.dart';
+import '../features/import_export/application/automatic_vault_backup_service.dart';
 import '../features/import_export/application/vault_backup_service.dart';
+import '../features/import_export/application/vault_backup_restore_service.dart';
 import '../features/security/application/security_modal_service.dart';
 import '../features/security/presentation/flutter_security_modal_service.dart';
 import '../features/settings/application/app_language_settings.dart';
@@ -40,6 +44,7 @@ import '../features/terminal/application/terminal_font_discovery.dart';
 import '../features/transfers/application/transfer_queue_controller.dart';
 import '../features/vault/application/in_memory_vault_service.dart';
 import '../features/vault/application/vault_record_repository.dart';
+import '../features/vault/application/vault_record_health_service.dart';
 import '../features/vault/application/vault_service.dart';
 import '../features/vault/data/drift_vault_repository.dart';
 import '../platform/document_gateway.dart';
@@ -155,6 +160,50 @@ final vaultBackupServiceProvider = Provider<VaultBackupService>((ref) {
   return VaultBackupService(
     headers: ref.watch(vaultHeaderStoreProvider),
     records: ref.watch(vaultRecordRepositoryProvider),
+  );
+});
+
+final databaseRecoveryServiceProvider = FutureProvider<DatabaseRecoveryService>(
+  (ref) async {
+    final paths = await resolveSerlinkDatabasePaths();
+    return DatabaseRecoveryService(
+      databaseFile: paths.databaseFile,
+      automaticBackupDirectory: paths.automaticBackupDirectory,
+      quarantineDirectory: paths.quarantineDirectory,
+    );
+  },
+);
+
+final automaticVaultBackupServiceProvider =
+    FutureProvider<AutomaticVaultBackupService>((ref) async {
+      return AutomaticVaultBackupService(
+        recovery: await ref.watch(databaseRecoveryServiceProvider.future),
+      );
+    });
+
+final vaultBackupRestoreServiceProvider =
+    FutureProvider<VaultBackupRestoreService>((ref) async {
+      final paths = await resolveSerlinkDatabasePaths();
+      return VaultBackupRestoreService(
+        recovery: await ref.watch(databaseRecoveryServiceProvider.future),
+        temporaryDirectory: Directory('${paths.directory.path}/restore'),
+      );
+    });
+
+final vaultRecordQuarantineRepositoryProvider =
+    Provider<VaultRecordQuarantineRepository>((ref) {
+      return DriftVaultRecordQuarantineRepository(
+        ref.watch(serlinkDatabaseProvider),
+      );
+    });
+
+final vaultRecordHealthServiceProvider = Provider<VaultRecordHealthService>((
+  ref,
+) {
+  return VaultRecordHealthService(
+    vault: ref.watch(vaultServiceProvider),
+    records: ref.watch(vaultRecordRepositoryProvider),
+    quarantine: ref.watch(vaultRecordQuarantineRepositoryProvider),
   );
 });
 
@@ -311,6 +360,10 @@ final syncRunServiceProvider = Provider<SyncRunService>((ref) {
     vault: ref.watch(vaultServiceProvider),
     records: ref.watch(vaultRecordRepositoryProvider),
     devices: ref.watch(syncDeviceServiceProvider),
+    localDataHealthy: () async {
+      final session = ref.read(vaultSessionControllerProvider).value;
+      return session?.localDataHealthy ?? false;
+    },
   );
 });
 
@@ -680,6 +733,7 @@ final vaultSessionControllerProvider =
     );
 
 final vaultServiceProvider = Provider<VaultService>((ref) {
+  ref.watch(vaultSessionControllerProvider);
   return ref.watch(vaultSessionControllerProvider.notifier).service;
 });
 
@@ -687,6 +741,8 @@ class VaultSessionState {
   const VaultSessionState({
     required this.vaultState,
     this.localUnlockAvailable = false,
+    this.recoveryStatus = VaultRecoveryStatus.healthy,
+    this.recordHealthReport,
     this.recoveryKey,
     this.failureMessage,
     this.unlockFailureCount = 0,
@@ -696,17 +752,26 @@ class VaultSessionState {
 
   final VaultState vaultState;
   final bool localUnlockAvailable;
+  final VaultRecoveryStatus recoveryStatus;
+  final VaultRecordHealthReport? recordHealthReport;
   final VaultRecoveryKey? recoveryKey;
   final String? failureMessage;
   final int unlockFailureCount;
   final int unlockGeneration;
   final bool isBusy;
 
+  bool get localDataHealthy =>
+      recoveryStatus == VaultRecoveryStatus.healthy &&
+      !(recordHealthReport?.hasCorruptRecords ?? false);
+
   VaultSessionState copyWith({
     VaultState? vaultState,
     bool? localUnlockAvailable,
     VaultRecoveryKey? recoveryKey,
     bool clearRecoveryKey = false,
+    VaultRecoveryStatus? recoveryStatus,
+    VaultRecordHealthReport? recordHealthReport,
+    bool clearRecordHealthReport = false,
     String? failureMessage,
     bool clearFailure = false,
     int? unlockFailureCount,
@@ -717,6 +782,10 @@ class VaultSessionState {
     return VaultSessionState(
       vaultState: vaultState ?? this.vaultState,
       localUnlockAvailable: localUnlockAvailable ?? this.localUnlockAvailable,
+      recoveryStatus: recoveryStatus ?? this.recoveryStatus,
+      recordHealthReport: clearRecordHealthReport
+          ? null
+          : recordHealthReport ?? this.recordHealthReport,
       recoveryKey: clearRecoveryKey ? null : recoveryKey ?? this.recoveryKey,
       failureMessage: clearFailure
           ? null
@@ -738,8 +807,27 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   @override
-  Future<VaultSessionState> build() async {
-    final header = await ref.watch(vaultHeaderStoreProvider).read();
+  Future<VaultSessionState> build() {
+    return _loadInitialState();
+  }
+
+  Future<VaultSessionState> _loadInitialState() async {
+    final VaultHeader? header;
+    try {
+      header = await ref.watch(vaultHeaderStoreProvider).read();
+    } on DatabaseIntegrityException catch (error) {
+      return VaultSessionState(
+        vaultState: VaultState.locked,
+        recoveryStatus: error.recoveryStatus,
+        failureMessage: error.message,
+      );
+    } on Object catch (error) {
+      return VaultSessionState(
+        vaultState: VaultState.locked,
+        recoveryStatus: VaultRecoveryStatus.vaultHeaderInvalid,
+        failureMessage: _vaultStructuralFailureMessage(error),
+      );
+    }
     _service = _createService(header: header);
     final localUnlockAvailable = await service.hasLocalUnlock(
       secrets: ref.read(secretStoreProvider),
@@ -805,14 +893,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlock(passphrase: passphrase);
-      state = AsyncData(
-        previous.copyWith(
-          vaultState: VaultState.unlocked,
-          clearFailure: true,
-          clearUnlockFailures: true,
-          unlockGeneration: previous.unlockGeneration + 1,
-        ),
-      );
+      state = AsyncData(await _unlockedState(previous));
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
       );
@@ -840,14 +921,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlockWithRecoveryKey(VaultRecoveryKey(recoveryCode));
-      state = AsyncData(
-        previous.copyWith(
-          vaultState: VaultState.unlocked,
-          clearFailure: true,
-          clearUnlockFailures: true,
-          unlockGeneration: previous.unlockGeneration + 1,
-        ),
-      );
+      state = AsyncData(await _unlockedState(previous));
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
       );
@@ -877,14 +951,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlockWithLocalKey(secrets: ref.read(secretStoreProvider));
-      state = AsyncData(
-        previous.copyWith(
-          vaultState: VaultState.unlocked,
-          clearFailure: true,
-          clearUnlockFailures: true,
-          unlockGeneration: previous.unlockGeneration + 1,
-        ),
-      );
+      state = AsyncData(await _unlockedState(previous));
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
       );
@@ -897,6 +964,26 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         ),
       );
     }
+  }
+
+  Future<VaultSessionState> _unlockedState(VaultSessionState previous) async {
+    final health = VaultRecordHealthService(
+      vault: service,
+      records: ref.read(vaultRecordRepositoryProvider),
+      quarantine: ref.read(vaultRecordQuarantineRepositoryProvider),
+    );
+    final report = await health.inspect();
+    return previous.copyWith(
+      vaultState: VaultState.unlocked,
+      recoveryStatus: report.hasCorruptRecords
+          ? VaultRecoveryStatus.recordsCorrupt
+          : VaultRecoveryStatus.healthy,
+      recordHealthReport: report,
+      clearFailure: true,
+      clearUnlockFailures: true,
+      unlockGeneration: previous.unlockGeneration + 1,
+      isBusy: false,
+    );
   }
 
   Future<void> lock() async {
@@ -923,6 +1010,16 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       ),
     );
     try {
+      if (previous.recoveryStatus == VaultRecoveryStatus.databaseCorrupt ||
+          previous.recoveryStatus == VaultRecoveryStatus.vaultHeaderInvalid) {
+        await _closeDatabaseIfOpen();
+        final recovery = await ref.read(databaseRecoveryServiceProvider.future);
+        await recovery.quarantineCurrentDatabase(reason: 'before-reset');
+        await recovery.deleteMainDatabaseFiles();
+        await _reloadAfterDatabaseReplacement();
+        return null;
+      }
+      await _tryQuarantineCurrentDatabase(reason: 'before-reset');
       await _clearLocalUnlockSecrets();
       await ref.read(vaultRecordRepositoryProvider).clear();
       await ref.read(vaultHeaderStoreProvider).clear();
@@ -940,6 +1037,87 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           clearRecoveryKey: true,
           isBusy: false,
         ),
+      );
+      return message;
+    }
+  }
+
+  Future<String?> restoreLatestAutomaticBackup() async {
+    final previous =
+        state.value ?? const VaultSessionState(vaultState: VaultState.locked);
+    state = AsyncData(previous.copyWith(isBusy: true, clearFailure: true));
+    try {
+      final recovery = await ref.read(databaseRecoveryServiceProvider.future);
+      final backup = await recovery.latestAutomaticBackup();
+      if (backup == null) {
+        throw const DatabaseIntegrityException(
+          'database.backup_missing',
+          'No automatic vault backup is available.',
+        );
+      }
+      await _closeDatabaseIfOpen();
+      await recovery.restoreFromBackup(backup);
+      await _reloadAfterDatabaseReplacement();
+      return null;
+    } on Object catch (error) {
+      final message = _recoveryFailureMessage(error);
+      state = AsyncData(
+        previous.copyWith(failureMessage: message, isBusy: false),
+      );
+      return message;
+    }
+  }
+
+  Future<String?> restoreFromBackupBytes(List<int> bytes) async {
+    final previous =
+        state.value ?? const VaultSessionState(vaultState: VaultState.locked);
+    state = AsyncData(previous.copyWith(isBusy: true, clearFailure: true));
+    try {
+      await _closeDatabaseIfOpen();
+      await (await ref.read(
+        vaultBackupRestoreServiceProvider.future,
+      )).restoreFromBackupBytes(bytes);
+      await _reloadAfterDatabaseReplacement();
+      return null;
+    } on Object catch (error) {
+      final message = _recoveryFailureMessage(error);
+      state = AsyncData(
+        previous.copyWith(failureMessage: message, isBusy: false),
+      );
+      return message;
+    }
+  }
+
+  Future<String?> quarantineCorruptRecords() async {
+    final previous =
+        state.value ?? const VaultSessionState(vaultState: VaultState.unlocked);
+    state = AsyncData(previous.copyWith(isBusy: true, clearFailure: true));
+    try {
+      final backups = await ref.read(
+        automaticVaultBackupServiceProvider.future,
+      );
+      final health = VaultRecordHealthService(
+        vault: service,
+        records: ref.read(vaultRecordRepositoryProvider),
+        quarantine: ref.read(vaultRecordQuarantineRepositoryProvider),
+        backups: backups,
+      );
+      final report = await health.quarantineCorruptRecords();
+      state = AsyncData(
+        previous.copyWith(
+          recoveryStatus: report.hasCorruptRecords
+              ? VaultRecoveryStatus.recordsCorrupt
+              : VaultRecoveryStatus.healthy,
+          recordHealthReport: report,
+          isBusy: false,
+          clearFailure: true,
+        ),
+      );
+      return null;
+    } on Object catch (error) {
+      final message = _recoveryFailureMessage(error);
+      state = AsyncData(
+        previous.copyWith(failureMessage: message, isBusy: false),
       );
       return message;
     }
@@ -1009,6 +1187,40 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       // secret cannot unlock anything once its matching header protector is gone.
     }
   }
+
+  Future<void> _closeDatabaseIfOpen() async {
+    try {
+      await ref.read(serlinkDatabaseProvider).close();
+    } on Object {
+      // The database may already be unavailable because recovery mode was
+      // entered during provider construction.
+    }
+  }
+
+  Future<void> _tryQuarantineCurrentDatabase({required String reason}) async {
+    try {
+      final recovery = await ref
+          .read(databaseRecoveryServiceProvider.future)
+          .timeout(const Duration(seconds: 2));
+      await recovery
+          .quarantineCurrentDatabase(reason: reason)
+          .timeout(const Duration(seconds: 2));
+    } on Object {
+      // Reset is an explicit destructive operation. File-level quarantine is
+      // best-effort here because tests and in-memory databases may not have a
+      // filesystem-backed profile to copy.
+    }
+  }
+
+  Future<void> _reloadAfterDatabaseReplacement() async {
+    ref.invalidate(serlinkDatabaseProvider);
+    ref.invalidate(vaultHeaderStoreProvider);
+    ref.invalidate(_driftVaultRecordRepositoryProvider);
+    ref.invalidate(vaultRecordRepositoryProvider);
+    ref.invalidate(vaultRecordHealthServiceProvider);
+    _service = null;
+    state = AsyncData(await _loadInitialState());
+  }
 }
 
 String _vaultFailureMessage(Object error) {
@@ -1019,6 +1231,23 @@ String _vaultFailureMessage(Object error) {
     return 'This Serlink profile is already open in another window.';
   }
   return 'Vault operation failed: ${Redactor.redact(error.toString())}';
+}
+
+String _vaultStructuralFailureMessage(Object error) {
+  if (error is DatabaseIntegrityException) {
+    return error.message;
+  }
+  return 'Vault metadata is invalid: ${Redactor.redact(error.toString())}';
+}
+
+String _recoveryFailureMessage(Object error) {
+  if (error is DatabaseIntegrityException) {
+    return error.message;
+  }
+  if (error is VaultException) {
+    return error.message;
+  }
+  return 'Vault recovery failed: ${Redactor.redact(error.toString())}';
 }
 
 final encryptedConnectionProfileResolverProvider =

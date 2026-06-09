@@ -400,6 +400,11 @@ class _MainSurface extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final vaultSession = ref.watch(vaultSessionControllerProvider);
+    final session = vaultSession.value;
+    if (session != null && !session.localDataHealthy) {
+      return _VaultAccessSurface(session: session);
+    }
     return switch (state.area) {
       WorkspaceArea.hosts => const _HostsSurface(),
       WorkspaceArea.sessions => _WorkspaceTabs(state: state),

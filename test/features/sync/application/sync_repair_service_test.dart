@@ -88,6 +88,18 @@ void main() {
 
       expect(plan, isNull);
     });
+
+    test('offers local restore when local data blocks remote rebuild', () {
+      final plan = service.planFor(
+        const SyncRunException(
+          'sync.local_unhealthy',
+          'Local vault data needs recovery before rebuilding remote sync.',
+        ),
+      );
+
+      expect(plan?.action, SyncRepairAction.restoreLocalFromRemote);
+      expect(plan?.destructive, isTrue);
+    });
   });
 }
 

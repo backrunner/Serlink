@@ -60,6 +60,13 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
         (asyncState.hasError ? asyncState.error.toString() : null) ??
         widget.error?.toString();
 
+    if (session != null && !session.localDataHealthy) {
+      return _VaultRecoverySurface(
+        session: session,
+        errorMessage: errorMessage,
+      );
+    }
+
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _triggerShake(errorMessage),
     );
@@ -203,6 +210,203 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
           .read(vaultSessionControllerProvider.notifier)
           .unlock(passphrase: passphrase);
     }
+  }
+}
+
+class _VaultRecoverySurface extends ConsumerStatefulWidget {
+  const _VaultRecoverySurface({
+    required this.session,
+    required this.errorMessage,
+  });
+
+  final VaultSessionState session;
+  final String? errorMessage;
+
+  @override
+  ConsumerState<_VaultRecoverySurface> createState() =>
+      _VaultRecoverySurfaceState();
+}
+
+class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
+  String? _localErrorMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final session = ref.watch(vaultSessionControllerProvider).value ??
+        widget.session;
+    final busy = session.isBusy;
+    final message =
+        _localErrorMessage ?? session.failureMessage ?? widget.errorMessage;
+    final recordReport = session.recordHealthReport;
+    final corruptCount = recordReport?.corruptRecords.length ?? 0;
+    final title = switch (session.recoveryStatus) {
+      VaultRecoveryStatus.databaseCorrupt => 'Database recovery',
+      VaultRecoveryStatus.vaultHeaderInvalid => 'Vault header recovery',
+      VaultRecoveryStatus.recordsCorrupt => 'Record recovery',
+      VaultRecoveryStatus.remoteCorrupt => 'Remote sync recovery',
+      VaultRecoveryStatus.healthy => 'Vault recovery',
+    };
+    final body = switch (session.recoveryStatus) {
+      VaultRecoveryStatus.databaseCorrupt =>
+        'Serlink could not open this local database safely.',
+      VaultRecoveryStatus.vaultHeaderInvalid =>
+        'The local vault header is invalid or incomplete.',
+      VaultRecoveryStatus.recordsCorrupt =>
+        '$corruptCount encrypted record${corruptCount == 1 ? '' : 's'} failed authentication.',
+      VaultRecoveryStatus.remoteCorrupt =>
+        'The remote sync set needs repair before it can be used.',
+      VaultRecoveryStatus.healthy => 'Vault recovery is available.',
+    };
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: GlassPanel(
+            elevation: 28,
+            padding: const EdgeInsets.fromLTRB(32, 36, 32, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Icon(
+                  Icons.health_and_safety_outlined,
+                  size: 42,
+                  color: t.accentPrimary,
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: t.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  body,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: t.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SerlinkFilledButton.icon(
+                  key: const ValueKey('vault-restore-latest-backup-button'),
+                  onPressed: busy ? null : _restoreLatestBackup,
+                  icon: const Icon(Icons.restore_outlined, size: 19),
+                  label: Text(
+                    busy ? context.l10n.savingAction : 'Restore latest backup',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SerlinkOutlinedButton.icon(
+                  key: const ValueKey('vault-import-recovery-backup-button'),
+                  onPressed: busy ? null : _importEncryptedBackup,
+                  icon: const Icon(Icons.upload_file_outlined, size: 19),
+                  label: Text(context.l10n.dataExchangeImportBackupTitle),
+                ),
+                if (session.recoveryStatus ==
+                        VaultRecoveryStatus.recordsCorrupt &&
+                    corruptCount > 0) ...[
+                  const SizedBox(height: 10),
+                  SerlinkOutlinedButton.icon(
+                    key: const ValueKey('vault-quarantine-records-button'),
+                    onPressed: busy ? null : _quarantineCorruptRecords,
+                    icon: const Icon(Icons.inventory_2_outlined, size: 19),
+                    label: const Text('Quarantine corrupt records'),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                SerlinkTextButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () => _exportDiagnosticBundle(context, ref),
+                  icon: const Icon(Icons.bug_report_outlined, size: 19),
+                  label: Text(context.l10n.dataExchangeExportDiagnosticBundleTitle),
+                ),
+                const SizedBox(height: 10),
+                SerlinkTextButton.danger(
+                  key: const ValueKey('vault-recovery-reset-entry-button'),
+                  onPressed: busy ? null : _showRecoveryCodeDialog,
+                  child: Text(context.l10n.vaultResetVaultAction),
+                ),
+                _VaultErrorText(message: message),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _restoreLatestBackup() async {
+    final error = await ref
+        .read(vaultSessionControllerProvider.notifier)
+        .restoreLatestAutomaticBackup();
+    if (!mounted) {
+      return;
+    }
+    if (error == null) {
+      _showSnackBar(context, context.l10n.backupImportedSnack);
+      return;
+    }
+    setState(() {
+      _localErrorMessage = error;
+    });
+  }
+
+  Future<void> _importEncryptedBackup() async {
+    final document = await ref
+        .read(documentGatewayProvider)
+        .pickUploadFile(
+          acceptedTypeGroups: const [
+            XTypeGroup(
+              label: 'Serlink Vault Backup',
+              extensions: ['srlkvault'],
+            ),
+          ],
+        );
+    if (document == null) {
+      return;
+    }
+    final error = await ref
+        .read(vaultSessionControllerProvider.notifier)
+        .restoreFromBackupBytes(await File(document.path).readAsBytes());
+    if (!mounted) {
+      return;
+    }
+    if (error == null) {
+      _showSnackBar(context, context.l10n.backupImportedSnack);
+      return;
+    }
+    setState(() {
+      _localErrorMessage = error;
+    });
+  }
+
+  Future<void> _quarantineCorruptRecords() async {
+    final error = await ref
+        .read(vaultSessionControllerProvider.notifier)
+        .quarantineCorruptRecords();
+    if (!mounted) {
+      return;
+    }
+    if (error == null) {
+      _showSnackBar(context, 'Corrupt records quarantined.');
+      return;
+    }
+    setState(() {
+      _localErrorMessage = error;
+    });
+  }
+
+  Future<void> _showRecoveryCodeDialog() {
+    return _showVaultRecoveryCodeDialog(context);
   }
 }
 

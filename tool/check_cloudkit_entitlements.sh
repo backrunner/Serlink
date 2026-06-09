@@ -1,24 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_PATH="${1:-build/macos/Build/Products/Debug/serlink.app}"
+TARGET_PATH="${1:-build/macos/Build/Products/Debug/serlink.app}"
 CONTAINER_ID="iCloud.com.alkinum.serlink"
 
-if [[ ! -d "$APP_PATH" ]]; then
-  echo "App bundle not found: $APP_PATH" >&2
-  echo "Build or run the macOS app first, for example: flutter run -d macos" >&2
+if [[ ! -e "$TARGET_PATH" ]]; then
+  echo "Target not found: $TARGET_PATH" >&2
+  echo "Pass an entitlements plist or a signed app bundle." >&2
   exit 1
 fi
 
 ENTITLEMENTS="$(mktemp)"
 trap 'rm -f "$ENTITLEMENTS"' EXIT
 
-codesign -d --entitlements :- "$APP_PATH" >"$ENTITLEMENTS" 2>/dev/null || {
-  echo "Unable to read signed entitlements from: $APP_PATH" >&2
-  exit 1
-}
+if [[ -f "$TARGET_PATH" ]]; then
+  cp "$TARGET_PATH" "$ENTITLEMENTS"
+else
+  codesign -d --entitlements :- "$TARGET_PATH" >"$ENTITLEMENTS" 2>/dev/null || {
+    echo "Unable to read signed entitlements from: $TARGET_PATH" >&2
+    echo "Simulator builds may be ad-hoc signed with empty entitlements." >&2
+    echo "For iOS simulator checks, pass ios/Runner/DebugProfile.entitlements instead." >&2
+    exit 1
+  }
+fi
 
-echo "Signed entitlements for $APP_PATH:"
+echo "CloudKit entitlements for $TARGET_PATH:"
 plutil -p "$ENTITLEMENTS"
 
 if ! /usr/libexec/PlistBuddy -c "Print :com.apple.developer.icloud-services" "$ENTITLEMENTS" 2>/dev/null | grep -q "CloudKit"; then
@@ -35,8 +41,8 @@ ENVIRONMENT="$(/usr/libexec/PlistBuddy -c "Print :com.apple.developer.icloud-con
 if [[ -n "$ENVIRONMENT" ]]; then
   echo "CloudKit environment: $ENVIRONMENT"
 else
-  echo "CloudKit environment entitlement is not present in the signed app" >&2
-  exit 1
+  echo "CloudKit environment entitlement is not present in the signed app."
+  echo "This is expected for release/distribution builds that use the production environment."
 fi
 
 echo "CloudKit entitlements look ready."

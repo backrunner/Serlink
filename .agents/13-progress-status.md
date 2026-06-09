@@ -1,6 +1,6 @@
 # Implementation Progress Status
 
-Last updated: 2026-05-29.
+Last updated: 2026-06-09.
 
 This file tracks the current codebase against the desktop complete-product plan. It is intentionally stricter than a public MVP checklist: items marked partial are not release-complete.
 
@@ -23,7 +23,7 @@ This file tracks the current codebase against the desktop complete-product plan.
 | Phase 4: WebDAV Encrypted Sync | Partial, strong core | Sync provider interfaces, local test provider, WebDAV security guard, Settings setup UI, encrypted WebDAV configuration, SecretStore-backed WebDAV password storage, automatic WebDAV sync scheduling, pull/import of missing remote records, same-record conflict detection, host/snippet/sync-settings field-level conflict merge, encrypted tombstone delete propagation, stale remote record cleanup, automatic retry/backoff after failures, blocking Settings conflict resolver, encrypted sync device metadata, Settings device cleanup, remote wrong-vault/corrupt-manifest detection, blocking repair actions, delete tombstones for device revocation, local-device revoked write blocking, WebDAV parent-directory creation, stable WebDAV provider error classification, TLS certificate diagnostic/pinning handling, and sync object path traversal protection exist. Identity/credential conflicts remain whole-record only by design. |
 | Phase 5: Desktop UX Completion | Partial | Professional compact shell exists with Hosts/Sessions/Transfers/Snippets/Settings. Settings is structured. The top workspace search now filters hosts and snippets with area-specific placeholders, while Sessions uses a tab strip with a new-connection plus button. Encrypted command snippets now support CRUD, tags, confirm-before-run, sync-safe delete tombstones, and insert/run into the active connected terminal tab. Command palette, shortcut map, accessibility pass, and final UI polish remain. |
 | Phase 6: Advanced SSH | Partial | Keyboard-interactive auth material exists. Local, remote, and SOCKS dynamic forwarding have service support, Terminal toolbar modal UI, stop control, and session cleanup. ProxyJump host links are resolved into ordered jump snapshots and dartssh2 connects through bastions with nested `forwardLocal` channels. OpenSSH certificate auth material is bound to private-key signing for dartssh2 public-key auth. Host startup commands resolve into connection profiles and execute after terminal attach. Bastion/certificate/forwarding integration fixtures are not complete. SSH Agent, FIDO2, and zmodem are out of first-release scope. |
-| Phase 7: iCloud Sync | Out of first-release scope | CloudKit and iCloud Drive providers are intentionally deferred. WebDAV remains the first-release encrypted sync provider. |
+| Phase 7: iCloud Sync | Partial, not release-complete | CloudKit provider wiring, native iOS/macOS method channels, entitlement files, and debugging docs exist. Release still needs signed-device validation, CloudKit production schema deployment, provider hardening, and integration coverage. iCloud Drive remains deferred. |
 | Phase 8: Beta Hardening | Early partial | Sentry redaction, runtime mode basics, and redacted diagnostic bundle export with build metadata exist. Packaging, signing/notarization, installers, dependency audit, SBOM, notices, and integration test servers are missing. |
 
 ## Completed Or Implemented In Code
@@ -91,6 +91,7 @@ This file tracks the current codebase against the desktop complete-product plan.
 - Sync registers a device-local sync device ID through `SecretStore`, stores device metadata as encrypted vault records, writes encrypted writer-device metadata into the sync manifest, exposes a Settings modal for removing non-local device records, supports resetting the current local sync device registration with an encrypted tombstone for the old identity, propagates encrypted device tombstones, and prevents a locally revoked device from silently re-registering during automatic sync.
 - WebDAV sync creates remote parent directories before encrypted object writes and maps provider failures into stable redacted errors for authentication, permission, missing/incomplete remote paths, provider locks, quota, TLS certificate failures, timeouts, network failures, and server errors. Certificate diagnostics now carry fingerprint/validity data into the repair flow and certificate trust is persisted as an endpoint pin.
 - Local and WebDAV sync providers reject unsafe object references such as absolute paths, parent-directory traversal, empty segments, and backslash-separated paths before reading/writing/deleting encrypted sync objects.
+- CloudKit sync wiring exists for iOS and macOS through the `serlink/cloudkit` method channel, private database encrypted-object storage, checked-in entitlement plists, and local entitlement diagnostics. It still requires signed-device validation and production CloudKit schema work before release.
 - The real desktop database path is protected by a profile lock and best-effort `0700` directory / `0600` database-file permissions on non-Windows platforms.
 - Diagnostic bundle export writes app build metadata, redacted runtime metadata, and redacted log tail only, explicitly excluding terminal output, commands, hostnames, usernames, paths, credentials, and private keys.
 - Diagnostic bundle export also includes the recent Sentry event id when one exists, but still excludes all sensitive session content.
@@ -112,7 +113,7 @@ This file tracks the current codebase against the desktop complete-product plan.
 7. Product polish still in release gate: command palette or final shortcut map decision, accessibility pass, concise empty/error states, README/user-facing docs, and support/package metadata.
 8. Sync production hardening: provider-specific quota and partial-upload guidance, migration/downgrade policy, and real WebDAV provider compatibility matrix.
 9. `flutter_pty` release risk: resolve or consciously pin/fork/replace before future Flutter versions make the macOS Swift Package Manager warning fatal.
-10. Explicitly deferred post-v1: iCloud providers, SSH Agent, FIDO2/hardware keys, zmodem/rz/sz, PuTTY PPK import, Explorer-style SFTP mode, and full vault cryptographic rekey.
+10. Explicitly deferred post-v1: iCloud Drive, SSH Agent, FIDO2/hardware keys, zmodem/rz/sz, PuTTY PPK import, Explorer-style SFTP mode, and full vault cryptographic rekey.
 
 ## Current Implementation Focus
 

@@ -1,6 +1,6 @@
 # Release Scope Decisions
 
-Last updated: 2026-05-29.
+Last updated: 2026-06-09.
 
 This file records capabilities intentionally moved out of the first desktop release. These are not permanent product rejections; they are excluded from the current release target because implementation cost, platform variance, or upstream limitations would reduce release quality.
 
@@ -18,18 +18,18 @@ This file records capabilities intentionally moved out of the first desktop rele
 
 ## Out Of Scope For First Desktop Release
 
-### iCloud Sync Providers
+### iCloud Drive Provider And CloudKit Release Hardening
 
-Decision: defer CloudKit and iCloud Drive providers.
+Decision: keep iCloud Drive deferred. CloudKit provider wiring may exist in code, but release enablement remains gated on signed-device validation, CloudKit schema deployment, and integration hardening.
 
 Reason:
 
-- macOS-only native plugin, entitlements, account state, quota behavior, and file coordination are all substantial.
+- Apple-native entitlements, account state, quota behavior, schema deployment, and file coordination remain substantial release risks.
 - WebDAV already proves the encrypted sync protocol without tying the first release to Apple-specific infrastructure.
 
 Follow-up condition:
 
-- Revisit after WebDAV sync has integration fixtures, repair flows, and stable encrypted manifest semantics.
+- Revisit CloudKit release status after signed iOS/macOS device validation, CloudKit production schema deployment, and WebDAV integration fixtures are stable.
 
 ### SSH Agent Authentication
 

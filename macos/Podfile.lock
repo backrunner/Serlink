@@ -47,15 +47,15 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/sentry_flutter/macos
 
 SPEC CHECKSUMS:
-  desktop_drop: 1eeeb9484299585770b6461e4f3d60950e99efa2
-  file_selector_macos: 3e56eaea051180007b900eacb006686fd54da150
-  flutter_pty: 41b6f848ade294be726a6b94cdd4a67c3bc52f59
-  flutter_secure_storage_darwin: 557817588b80e60213cbecb573c45c76b788018d
+  desktop_drop: 10a3e6a7fa9dbe350541f2574092fecfa345a07b
+  file_selector_macos: 9e9e068e90ebee155097d00e89ae91edb2374db7
+  flutter_pty: 1e360feaf8b1a213d2d50da3c076005b8eef1eee
+  flutter_secure_storage_darwin: acdb3f316ed05a3e68f856e0353b133eec373a23
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
-  package_info_plus: 12f1c5c2cfe8727ca46cbd0b26677728972d9a5b
+  package_info_plus: f0052d280d17aa382b932f399edf32507174e870
   Sentry: 108fdbb76299c4189af12246bf0308c09c278922
-  sentry_flutter: 980e0c8a15a07075f508f941653786ced138609b
+  sentry_flutter: 32e67cb4756ce3de42bbd56581fa935922ff328f
 
-PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
+PODFILE CHECKSUM: 2290ae1a70b079b9b27fadc21c843e6b73ac9c2b
 
 COCOAPODS: 1.16.2

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
 void main() {
-  test('iOS disables desktop-only capabilities', () {
+  test('iOS enables CloudKit and disables desktop-only capabilities', () {
     const capabilities = PlatformCapabilities(
       operatingSystem: 'ios',
       targetPlatform: TargetPlatform.iOS,
@@ -12,7 +12,7 @@ void main() {
     expect(capabilities.prefersMobileWorkspaceShell, isTrue);
     expect(capabilities.localTerminal, isFalse);
     expect(capabilities.customWindowChrome, isFalse);
-    expect(capabilities.cloudKitSync, isFalse);
+    expect(capabilities.cloudKitSync, isTrue);
     expect(capabilities.terminalSplit, isFalse);
     expect(capabilities.terminalZmodemTransfers, isFalse);
     expect(capabilities.localDirectoryTransfer, isFalse);

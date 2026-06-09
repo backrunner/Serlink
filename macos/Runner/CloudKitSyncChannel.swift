@@ -14,7 +14,8 @@ class CloudKitSyncChannel {
   private static let dataField = "data"
   private static let containerIdentifier = "iCloud.com.alkinum.serlink"
 
-  private lazy var database = CKContainer(identifier: Self.containerIdentifier).privateCloudDatabase
+  private lazy var container = CKContainer(identifier: Self.containerIdentifier)
+  private lazy var database = container.privateCloudDatabase
   private var channel: FlutterMethodChannel?
 
   func register(with messenger: FlutterBinaryMessenger) {
@@ -29,7 +30,7 @@ class CloudKitSyncChannel {
     let arguments = call.arguments as? [String: Any] ?? [:]
     switch call.method {
     case "isAvailable":
-      result(Self.hasCloudKitEntitlements)
+      isAvailable(result: result)
     case "readObject":
       guard let path = arguments["path"] as? String else {
         result(Self.argumentError("path"))
@@ -57,6 +58,20 @@ class CloudKitSyncChannel {
     }
   }
 
+  private func isAvailable(result: @escaping FlutterResult) {
+    guard Self.hasCloudKitEntitlements else {
+      result(false)
+      return
+    }
+    container.accountStatus { status, error in
+      if let error = error {
+        Self.complete(result, Self.flutterError(error))
+        return
+      }
+      Self.complete(result, status == .available)
+    }
+  }
+
   private func readObject(path: String, result: @escaping FlutterResult) {
     guard Self.hasCloudKitEntitlements else {
       result(Self.unavailableError())
@@ -64,21 +79,21 @@ class CloudKitSyncChannel {
     }
     database.fetch(withRecordID: recordID(for: path)) { record, error in
       if let error = error as? CKError, error.code == .unknownItem {
-        result(nil)
+        Self.complete(result, nil)
         return
       }
       if let error = error {
-        result(Self.flutterError(error))
+        Self.complete(result, Self.flutterError(error))
         return
       }
       guard let asset = record?[Self.dataField] as? CKAsset,
         let fileURL = asset.fileURL,
         let data = try? Data(contentsOf: fileURL)
       else {
-        result(nil)
+        Self.complete(result, nil)
         return
       }
-      result(FlutterStandardTypedData(bytes: data))
+      Self.complete(result, FlutterStandardTypedData(bytes: data))
     }
   }
 
@@ -91,7 +106,7 @@ class CloudKitSyncChannel {
     do {
       fileURL = try Self.temporaryFile(for: data)
     } catch {
-      result(Self.flutterError(error))
+      Self.complete(result, Self.flutterError(error))
       return
     }
     let recordID = recordID(for: path)
@@ -104,9 +119,9 @@ class CloudKitSyncChannel {
       try? FileManager.default.removeItem(at: fileURL)
       switch saveResult {
       case .success:
-        result(nil)
+        Self.complete(result, nil)
       case .failure(let error):
-        result(Self.flutterError(error))
+        Self.complete(result, Self.flutterError(error))
       }
     }
     database.add(operation)
@@ -119,14 +134,14 @@ class CloudKitSyncChannel {
     }
     database.delete(withRecordID: recordID(for: path)) { _, error in
       if let error = error as? CKError, error.code == .unknownItem {
-        result(nil)
+        Self.complete(result, nil)
         return
       }
       if let error = error {
-        result(Self.flutterError(error))
+        Self.complete(result, Self.flutterError(error))
         return
       }
-      result(nil)
+      Self.complete(result, nil)
     }
   }
 
@@ -137,25 +152,77 @@ class CloudKitSyncChannel {
     }
     let query = CKQuery(recordType: Self.recordType, predicate: NSPredicate(value: true))
     var paths: [String] = []
-    let operation = CKQueryOperation(query: query)
-    operation.desiredKeys = [Self.pathField]
-    operation.recordMatchedBlock = { _, recordResult in
-      if case .success(let record) = recordResult,
-        let path = record[Self.pathField] as? String,
-        prefix == nil || path.hasPrefix(prefix!)
-      {
-        paths.append(path)
-      }
+    var recordError: Error?
+    var completed = false
+    let lock = NSLock()
+
+    func appendPath(_ path: String) {
+      lock.lock()
+      paths.append(path)
+      lock.unlock()
     }
-    operation.queryResultBlock = { queryResult in
-      switch queryResult {
-      case .success:
-        result(paths)
-      case .failure(let error):
-        result(Self.flutterError(error))
+
+    func setRecordError(_ error: Error) {
+      lock.lock()
+      if recordError == nil {
+        recordError = error
       }
+      lock.unlock()
     }
-    database.add(operation)
+
+    func snapshot() -> (paths: [String], error: Error?) {
+      lock.lock()
+      defer { lock.unlock() }
+      return (paths, recordError)
+    }
+
+    func completeOnce(_ value: Any?) {
+      lock.lock()
+      if completed {
+        lock.unlock()
+        return
+      }
+      completed = true
+      lock.unlock()
+      Self.complete(result, value)
+    }
+
+    func addOperation(_ operation: CKQueryOperation) {
+      operation.desiredKeys = [Self.pathField]
+      operation.recordMatchedBlock = { _, recordResult in
+        switch recordResult {
+        case .success(let record):
+          guard let path = record[Self.pathField] as? String else {
+            return
+          }
+          if let prefix, !path.hasPrefix(prefix) {
+            return
+          }
+          appendPath(path)
+        case .failure(let error):
+          setRecordError(error)
+        }
+      }
+      operation.queryResultBlock = { queryResult in
+        switch queryResult {
+        case .success(let cursor):
+          if let error = snapshot().error {
+            completeOnce(Self.flutterError(error))
+            return
+          }
+          if let cursor = cursor {
+            addOperation(CKQueryOperation(cursor: cursor))
+          } else {
+            completeOnce(snapshot().paths)
+          }
+        case .failure(let error):
+          completeOnce(Self.flutterError(error))
+        }
+      }
+      database.add(operation)
+    }
+
+    addOperation(CKQueryOperation(query: query))
   }
 
   private func recordID(for path: String) -> CKRecord.ID {
@@ -211,13 +278,30 @@ class CloudKitSyncChannel {
     )
   }
 
+  private static func complete(_ result: @escaping FlutterResult, _ value: Any?) {
+    DispatchQueue.main.async {
+      result(value)
+    }
+  }
+
   private static func flutterError(_ error: Error) -> FlutterError {
-    if let ckError = error as? CKError, ckError.code == .notAuthenticated {
-      return FlutterError(
-        code: "sync.cloudkit.not_authenticated",
-        message: "Sign in to iCloud to enable sync.",
-        details: error.localizedDescription
-      )
+    if let ckError = error as? CKError {
+      switch ckError.code {
+      case .notAuthenticated:
+        return FlutterError(
+          code: "sync.cloudkit.not_authenticated",
+          message: "Sign in to iCloud to enable sync.",
+          details: error.localizedDescription
+        )
+      case .permissionFailure, .badContainer:
+        return FlutterError(
+          code: "sync.cloudkit.unavailable",
+          message: "iCloud sync requires a signed app with CloudKit entitlements.",
+          details: error.localizedDescription
+        )
+      default:
+        break
+      }
     }
     return FlutterError(
       code: "sync.cloudkit.failed",

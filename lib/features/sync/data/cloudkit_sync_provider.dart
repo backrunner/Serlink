@@ -19,7 +19,7 @@ class CloudKitSyncProvider implements SyncProvider {
   final MethodChannel _channel;
 
   static Future<bool> isAvailable({MethodChannel? channel}) async {
-    if (!Platform.isMacOS) {
+    if (!Platform.isMacOS && !Platform.isIOS) {
       return false;
     }
     try {
@@ -104,7 +104,7 @@ class CloudKitSyncProvider implements SyncProvider {
     } on MissingPluginException {
       throw const SyncProviderException(
         'sync.cloudkit.unavailable',
-        'iCloud sync is only available on macOS.',
+        'iCloud sync is only available on Apple platforms with CloudKit support.',
       );
     } on PlatformException catch (error) {
       throw SyncProviderException(

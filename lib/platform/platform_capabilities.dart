@@ -40,7 +40,7 @@ class PlatformCapabilities {
 
   bool get customWindowChrome => isDesktop;
 
-  bool get cloudKitSync => isMacOS;
+  bool get cloudKitSync => isMacOS || isIOS;
 
   bool get backgroundTransfers => false;
 

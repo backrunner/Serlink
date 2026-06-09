@@ -367,12 +367,12 @@ class _SyncConflictRow extends ConsumerWidget {
         alignment: WrapAlignment.end,
         children: [
           _SettingsTextButton(
-            onPressed: () => _reviewWebDavConflicts(context, ref, conflicts),
+            onPressed: () => _reviewSyncConflicts(context, ref, conflicts),
             compactSize: SerlinkButtonSize.xs,
             child: Text(l10n.syncReviewAction),
           ),
           _SettingsTextButton(
-            onPressed: () => _resolveWebDavConflicts(
+            onPressed: () => _resolveSyncConflicts(
               context,
               ref,
               SyncConflictResolution.useRemote,
@@ -381,7 +381,7 @@ class _SyncConflictRow extends ConsumerWidget {
             child: Text(l10n.syncUseRemoteAction),
           ),
           _SettingsTextButton(
-            onPressed: () => _resolveWebDavConflicts(
+            onPressed: () => _resolveSyncConflicts(
               context,
               ref,
               SyncConflictResolution.keepLocal,
@@ -395,7 +395,7 @@ class _SyncConflictRow extends ConsumerWidget {
   }
 }
 
-Future<void> _reviewWebDavConflicts(
+Future<void> _reviewSyncConflicts(
   BuildContext context,
   WidgetRef ref,
   List<SyncRecordConflict> conflicts,
@@ -407,7 +407,7 @@ Future<void> _reviewWebDavConflicts(
   );
 }
 
-Future<void> _resolveWebDavConflicts(
+Future<void> _resolveSyncConflicts(
   BuildContext context,
   WidgetRef ref,
   SyncConflictResolution resolution,
@@ -433,7 +433,13 @@ Future<void> _resolveWebDavConflicts(
   try {
     final provider = await ref
         .read(syncSettingsServiceProvider)
-        .buildWebDavProvider();
+        .activeSyncProvider();
+    if (provider == null) {
+      throw const SyncRunException(
+        'sync.provider_missing',
+        'No sync provider is enabled.',
+      );
+    }
     final result = await ref
         .read(syncRunServiceProvider)
         .resolveConflicts(provider, resolution);

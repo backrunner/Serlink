@@ -106,7 +106,7 @@ class _SyncConflictReviewDialogState
         return;
       }
       Navigator.of(context).pop();
-      await _resolveWebDavConflicts(
+      await _resolveSyncConflicts(
         context,
         ref,
         SyncConflictResolution.keepLocal,

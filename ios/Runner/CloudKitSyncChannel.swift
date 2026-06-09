@@ -1,11 +1,9 @@
 import CloudKit
-import FlutterMacOS
+import Flutter
 import Foundation
-import Security
 
 /// Bridges the `serlink/cloudkit` method channel to the user's private CloudKit
-/// database. Each remote object is a `SerlinkSyncObject` record whose
-/// `recordName` encodes the object path; payloads are opaque encrypted bytes.
+/// database. The Flutter sync layer writes opaque encrypted objects only.
 class CloudKitSyncChannel {
   static let channelName = "serlink/cloudkit"
 
@@ -59,10 +57,6 @@ class CloudKitSyncChannel {
   }
 
   private func isAvailable(result: @escaping FlutterResult) {
-    guard Self.hasCloudKitEntitlements else {
-      result(false)
-      return
-    }
     container.accountStatus { status, error in
       if let error = error {
         Self.complete(result, Self.flutterError(error))
@@ -73,10 +67,6 @@ class CloudKitSyncChannel {
   }
 
   private func readObject(path: String, result: @escaping FlutterResult) {
-    guard Self.hasCloudKitEntitlements else {
-      result(Self.unavailableError())
-      return
-    }
     database.fetch(withRecordID: recordID(for: path)) { record, error in
       if let error = error as? CKError, error.code == .unknownItem {
         Self.complete(result, nil)
@@ -98,10 +88,6 @@ class CloudKitSyncChannel {
   }
 
   private func writeObject(path: String, data: Data, result: @escaping FlutterResult) {
-    guard Self.hasCloudKitEntitlements else {
-      result(Self.unavailableError())
-      return
-    }
     let fileURL: URL
     do {
       fileURL = try Self.temporaryFile(for: data)
@@ -128,10 +114,6 @@ class CloudKitSyncChannel {
   }
 
   private func deleteObject(path: String, result: @escaping FlutterResult) {
-    guard Self.hasCloudKitEntitlements else {
-      result(Self.unavailableError())
-      return
-    }
     database.delete(withRecordID: recordID(for: path)) { _, error in
       if let error = error as? CKError, error.code == .unknownItem {
         Self.complete(result, nil)
@@ -146,10 +128,6 @@ class CloudKitSyncChannel {
   }
 
   private func listObjects(prefix: String?, result: @escaping FlutterResult) {
-    guard Self.hasCloudKitEntitlements else {
-      result(Self.unavailableError())
-      return
-    }
     let query = CKQuery(recordType: Self.recordType, predicate: NSPredicate(value: true))
     var paths: [String] = []
     var recordError: Error?
@@ -239,27 +217,6 @@ class CloudKitSyncChannel {
       .appendingPathComponent(UUID().uuidString)
     try data.write(to: url, options: .atomic)
     return url
-  }
-
-  private static var hasCloudKitEntitlements: Bool {
-    entitlementValues("com.apple.developer.icloud-services").contains("CloudKit")
-      && entitlementValues("com.apple.developer.icloud-container-identifiers")
-        .contains(containerIdentifier)
-  }
-
-  private static func entitlementValues(_ name: String) -> [String] {
-    guard let task = SecTaskCreateFromSelf(nil),
-      let value = SecTaskCopyValueForEntitlement(task, name as CFString, nil)
-    else {
-      return []
-    }
-    if let values = value as? [String] {
-      return values
-    }
-    if let value = value as? String {
-      return [value]
-    }
-    return []
   }
 
   private static func argumentError(_ name: String) -> FlutterError {

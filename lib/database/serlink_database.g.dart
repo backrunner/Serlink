@@ -833,6 +833,1160 @@ class EncryptedRecordsCompanion extends UpdateCompanion<EncryptedRecordRow> {
   }
 }
 
+class $VaultBackupEntriesTable extends VaultBackupEntries
+    with TableInfo<$VaultBackupEntriesTable, VaultBackupEntryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $VaultBackupEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _pathMeta = const VerificationMeta('path');
+  @override
+  late final GeneratedColumn<String> path = GeneratedColumn<String>(
+    'path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sizeBytesMeta = const VerificationMeta(
+    'sizeBytes',
+  );
+  @override
+  late final GeneratedColumn<int> sizeBytes = GeneratedColumn<int>(
+    'size_bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceSchemaVersionMeta =
+      const VerificationMeta('sourceSchemaVersion');
+  @override
+  late final GeneratedColumn<int> sourceSchemaVersion = GeneratedColumn<int>(
+    'source_schema_version',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _targetSchemaVersionMeta =
+      const VerificationMeta('targetSchemaVersion');
+  @override
+  late final GeneratedColumn<int> targetSchemaVersion = GeneratedColumn<int>(
+    'target_schema_version',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _automaticMeta = const VerificationMeta(
+    'automatic',
+  );
+  @override
+  late final GeneratedColumn<bool> automatic = GeneratedColumn<bool>(
+    'automatic',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("automatic" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    path,
+    reason,
+    createdAt,
+    sizeBytes,
+    sourceSchemaVersion,
+    targetSchemaVersion,
+    automatic,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'vault_backup_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<VaultBackupEntryRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('path')) {
+      context.handle(
+        _pathMeta,
+        path.isAcceptableOrUnknown(data['path']!, _pathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pathMeta);
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reasonMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('size_bytes')) {
+      context.handle(
+        _sizeBytesMeta,
+        sizeBytes.isAcceptableOrUnknown(data['size_bytes']!, _sizeBytesMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sizeBytesMeta);
+    }
+    if (data.containsKey('source_schema_version')) {
+      context.handle(
+        _sourceSchemaVersionMeta,
+        sourceSchemaVersion.isAcceptableOrUnknown(
+          data['source_schema_version']!,
+          _sourceSchemaVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('target_schema_version')) {
+      context.handle(
+        _targetSchemaVersionMeta,
+        targetSchemaVersion.isAcceptableOrUnknown(
+          data['target_schema_version']!,
+          _targetSchemaVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('automatic')) {
+      context.handle(
+        _automaticMeta,
+        automatic.isAcceptableOrUnknown(data['automatic']!, _automaticMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  VaultBackupEntryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return VaultBackupEntryRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      path: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}path'],
+      )!,
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      sizeBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}size_bytes'],
+      )!,
+      sourceSchemaVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}source_schema_version'],
+      ),
+      targetSchemaVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}target_schema_version'],
+      ),
+      automatic: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}automatic'],
+      )!,
+    );
+  }
+
+  @override
+  $VaultBackupEntriesTable createAlias(String alias) {
+    return $VaultBackupEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class VaultBackupEntryRow extends DataClass
+    implements Insertable<VaultBackupEntryRow> {
+  final String id;
+  final String path;
+  final String reason;
+  final DateTime createdAt;
+  final int sizeBytes;
+  final int? sourceSchemaVersion;
+  final int? targetSchemaVersion;
+  final bool automatic;
+  const VaultBackupEntryRow({
+    required this.id,
+    required this.path,
+    required this.reason,
+    required this.createdAt,
+    required this.sizeBytes,
+    this.sourceSchemaVersion,
+    this.targetSchemaVersion,
+    required this.automatic,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['path'] = Variable<String>(path);
+    map['reason'] = Variable<String>(reason);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['size_bytes'] = Variable<int>(sizeBytes);
+    if (!nullToAbsent || sourceSchemaVersion != null) {
+      map['source_schema_version'] = Variable<int>(sourceSchemaVersion);
+    }
+    if (!nullToAbsent || targetSchemaVersion != null) {
+      map['target_schema_version'] = Variable<int>(targetSchemaVersion);
+    }
+    map['automatic'] = Variable<bool>(automatic);
+    return map;
+  }
+
+  VaultBackupEntriesCompanion toCompanion(bool nullToAbsent) {
+    return VaultBackupEntriesCompanion(
+      id: Value(id),
+      path: Value(path),
+      reason: Value(reason),
+      createdAt: Value(createdAt),
+      sizeBytes: Value(sizeBytes),
+      sourceSchemaVersion: sourceSchemaVersion == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceSchemaVersion),
+      targetSchemaVersion: targetSchemaVersion == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetSchemaVersion),
+      automatic: Value(automatic),
+    );
+  }
+
+  factory VaultBackupEntryRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return VaultBackupEntryRow(
+      id: serializer.fromJson<String>(json['id']),
+      path: serializer.fromJson<String>(json['path']),
+      reason: serializer.fromJson<String>(json['reason']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      sizeBytes: serializer.fromJson<int>(json['sizeBytes']),
+      sourceSchemaVersion: serializer.fromJson<int?>(
+        json['sourceSchemaVersion'],
+      ),
+      targetSchemaVersion: serializer.fromJson<int?>(
+        json['targetSchemaVersion'],
+      ),
+      automatic: serializer.fromJson<bool>(json['automatic']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'path': serializer.toJson<String>(path),
+      'reason': serializer.toJson<String>(reason),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'sizeBytes': serializer.toJson<int>(sizeBytes),
+      'sourceSchemaVersion': serializer.toJson<int?>(sourceSchemaVersion),
+      'targetSchemaVersion': serializer.toJson<int?>(targetSchemaVersion),
+      'automatic': serializer.toJson<bool>(automatic),
+    };
+  }
+
+  VaultBackupEntryRow copyWith({
+    String? id,
+    String? path,
+    String? reason,
+    DateTime? createdAt,
+    int? sizeBytes,
+    Value<int?> sourceSchemaVersion = const Value.absent(),
+    Value<int?> targetSchemaVersion = const Value.absent(),
+    bool? automatic,
+  }) => VaultBackupEntryRow(
+    id: id ?? this.id,
+    path: path ?? this.path,
+    reason: reason ?? this.reason,
+    createdAt: createdAt ?? this.createdAt,
+    sizeBytes: sizeBytes ?? this.sizeBytes,
+    sourceSchemaVersion: sourceSchemaVersion.present
+        ? sourceSchemaVersion.value
+        : this.sourceSchemaVersion,
+    targetSchemaVersion: targetSchemaVersion.present
+        ? targetSchemaVersion.value
+        : this.targetSchemaVersion,
+    automatic: automatic ?? this.automatic,
+  );
+  VaultBackupEntryRow copyWithCompanion(VaultBackupEntriesCompanion data) {
+    return VaultBackupEntryRow(
+      id: data.id.present ? data.id.value : this.id,
+      path: data.path.present ? data.path.value : this.path,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      sizeBytes: data.sizeBytes.present ? data.sizeBytes.value : this.sizeBytes,
+      sourceSchemaVersion: data.sourceSchemaVersion.present
+          ? data.sourceSchemaVersion.value
+          : this.sourceSchemaVersion,
+      targetSchemaVersion: data.targetSchemaVersion.present
+          ? data.targetSchemaVersion.value
+          : this.targetSchemaVersion,
+      automatic: data.automatic.present ? data.automatic.value : this.automatic,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VaultBackupEntryRow(')
+          ..write('id: $id, ')
+          ..write('path: $path, ')
+          ..write('reason: $reason, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('sourceSchemaVersion: $sourceSchemaVersion, ')
+          ..write('targetSchemaVersion: $targetSchemaVersion, ')
+          ..write('automatic: $automatic')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    path,
+    reason,
+    createdAt,
+    sizeBytes,
+    sourceSchemaVersion,
+    targetSchemaVersion,
+    automatic,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is VaultBackupEntryRow &&
+          other.id == this.id &&
+          other.path == this.path &&
+          other.reason == this.reason &&
+          other.createdAt == this.createdAt &&
+          other.sizeBytes == this.sizeBytes &&
+          other.sourceSchemaVersion == this.sourceSchemaVersion &&
+          other.targetSchemaVersion == this.targetSchemaVersion &&
+          other.automatic == this.automatic);
+}
+
+class VaultBackupEntriesCompanion extends UpdateCompanion<VaultBackupEntryRow> {
+  final Value<String> id;
+  final Value<String> path;
+  final Value<String> reason;
+  final Value<DateTime> createdAt;
+  final Value<int> sizeBytes;
+  final Value<int?> sourceSchemaVersion;
+  final Value<int?> targetSchemaVersion;
+  final Value<bool> automatic;
+  final Value<int> rowid;
+  const VaultBackupEntriesCompanion({
+    this.id = const Value.absent(),
+    this.path = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.sizeBytes = const Value.absent(),
+    this.sourceSchemaVersion = const Value.absent(),
+    this.targetSchemaVersion = const Value.absent(),
+    this.automatic = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  VaultBackupEntriesCompanion.insert({
+    required String id,
+    required String path,
+    required String reason,
+    required DateTime createdAt,
+    required int sizeBytes,
+    this.sourceSchemaVersion = const Value.absent(),
+    this.targetSchemaVersion = const Value.absent(),
+    this.automatic = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       path = Value(path),
+       reason = Value(reason),
+       createdAt = Value(createdAt),
+       sizeBytes = Value(sizeBytes);
+  static Insertable<VaultBackupEntryRow> custom({
+    Expression<String>? id,
+    Expression<String>? path,
+    Expression<String>? reason,
+    Expression<DateTime>? createdAt,
+    Expression<int>? sizeBytes,
+    Expression<int>? sourceSchemaVersion,
+    Expression<int>? targetSchemaVersion,
+    Expression<bool>? automatic,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (path != null) 'path': path,
+      if (reason != null) 'reason': reason,
+      if (createdAt != null) 'created_at': createdAt,
+      if (sizeBytes != null) 'size_bytes': sizeBytes,
+      if (sourceSchemaVersion != null)
+        'source_schema_version': sourceSchemaVersion,
+      if (targetSchemaVersion != null)
+        'target_schema_version': targetSchemaVersion,
+      if (automatic != null) 'automatic': automatic,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  VaultBackupEntriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? path,
+    Value<String>? reason,
+    Value<DateTime>? createdAt,
+    Value<int>? sizeBytes,
+    Value<int?>? sourceSchemaVersion,
+    Value<int?>? targetSchemaVersion,
+    Value<bool>? automatic,
+    Value<int>? rowid,
+  }) {
+    return VaultBackupEntriesCompanion(
+      id: id ?? this.id,
+      path: path ?? this.path,
+      reason: reason ?? this.reason,
+      createdAt: createdAt ?? this.createdAt,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      sourceSchemaVersion: sourceSchemaVersion ?? this.sourceSchemaVersion,
+      targetSchemaVersion: targetSchemaVersion ?? this.targetSchemaVersion,
+      automatic: automatic ?? this.automatic,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (path.present) {
+      map['path'] = Variable<String>(path.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (sizeBytes.present) {
+      map['size_bytes'] = Variable<int>(sizeBytes.value);
+    }
+    if (sourceSchemaVersion.present) {
+      map['source_schema_version'] = Variable<int>(sourceSchemaVersion.value);
+    }
+    if (targetSchemaVersion.present) {
+      map['target_schema_version'] = Variable<int>(targetSchemaVersion.value);
+    }
+    if (automatic.present) {
+      map['automatic'] = Variable<bool>(automatic.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VaultBackupEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('path: $path, ')
+          ..write('reason: $reason, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('sourceSchemaVersion: $sourceSchemaVersion, ')
+          ..write('targetSchemaVersion: $targetSchemaVersion, ')
+          ..write('automatic: $automatic, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $QuarantinedRecordsTable extends QuarantinedRecords
+    with TableInfo<$QuarantinedRecordsTable, QuarantinedRecordRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuarantinedRecordsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _schemaVersionMeta = const VerificationMeta(
+    'schemaVersion',
+  );
+  @override
+  late final GeneratedColumn<int> schemaVersion = GeneratedColumn<int>(
+    'schema_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _revisionMeta = const VerificationMeta(
+    'revision',
+  );
+  @override
+  late final GeneratedColumn<String> revision = GeneratedColumn<String>(
+    'revision',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nonceMeta = const VerificationMeta('nonce');
+  @override
+  late final GeneratedColumn<Uint8List> nonce = GeneratedColumn<Uint8List>(
+    'nonce',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _macMeta = const VerificationMeta('mac');
+  @override
+  late final GeneratedColumn<Uint8List> mac = GeneratedColumn<Uint8List>(
+    'mac',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _associatedDataMeta = const VerificationMeta(
+    'associatedData',
+  );
+  @override
+  late final GeneratedColumn<Uint8List> associatedData =
+      GeneratedColumn<Uint8List>(
+        'associated_data',
+        aliasedName,
+        false,
+        type: DriftSqlType.blob,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _ciphertextMeta = const VerificationMeta(
+    'ciphertext',
+  );
+  @override
+  late final GeneratedColumn<Uint8List> ciphertext = GeneratedColumn<Uint8List>(
+    'ciphertext',
+    aliasedName,
+    false,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quarantinedAtMeta = const VerificationMeta(
+    'quarantinedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> quarantinedAt =
+      GeneratedColumn<DateTime>(
+        'quarantined_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    type,
+    schemaVersion,
+    revision,
+    nonce,
+    mac,
+    associatedData,
+    ciphertext,
+    quarantinedAt,
+    reason,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quarantined_records';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<QuarantinedRecordRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('schema_version')) {
+      context.handle(
+        _schemaVersionMeta,
+        schemaVersion.isAcceptableOrUnknown(
+          data['schema_version']!,
+          _schemaVersionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_schemaVersionMeta);
+    }
+    if (data.containsKey('revision')) {
+      context.handle(
+        _revisionMeta,
+        revision.isAcceptableOrUnknown(data['revision']!, _revisionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_revisionMeta);
+    }
+    if (data.containsKey('nonce')) {
+      context.handle(
+        _nonceMeta,
+        nonce.isAcceptableOrUnknown(data['nonce']!, _nonceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nonceMeta);
+    }
+    if (data.containsKey('mac')) {
+      context.handle(
+        _macMeta,
+        mac.isAcceptableOrUnknown(data['mac']!, _macMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_macMeta);
+    }
+    if (data.containsKey('associated_data')) {
+      context.handle(
+        _associatedDataMeta,
+        associatedData.isAcceptableOrUnknown(
+          data['associated_data']!,
+          _associatedDataMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_associatedDataMeta);
+    }
+    if (data.containsKey('ciphertext')) {
+      context.handle(
+        _ciphertextMeta,
+        ciphertext.isAcceptableOrUnknown(data['ciphertext']!, _ciphertextMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ciphertextMeta);
+    }
+    if (data.containsKey('quarantined_at')) {
+      context.handle(
+        _quarantinedAtMeta,
+        quarantinedAt.isAcceptableOrUnknown(
+          data['quarantined_at']!,
+          _quarantinedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_quarantinedAtMeta);
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reasonMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  QuarantinedRecordRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return QuarantinedRecordRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      schemaVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}schema_version'],
+      )!,
+      revision: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}revision'],
+      )!,
+      nonce: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}nonce'],
+      )!,
+      mac: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}mac'],
+      )!,
+      associatedData: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}associated_data'],
+      )!,
+      ciphertext: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}ciphertext'],
+      )!,
+      quarantinedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}quarantined_at'],
+      )!,
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      )!,
+    );
+  }
+
+  @override
+  $QuarantinedRecordsTable createAlias(String alias) {
+    return $QuarantinedRecordsTable(attachedDatabase, alias);
+  }
+}
+
+class QuarantinedRecordRow extends DataClass
+    implements Insertable<QuarantinedRecordRow> {
+  final String id;
+  final String type;
+  final int schemaVersion;
+  final String revision;
+  final Uint8List nonce;
+  final Uint8List mac;
+  final Uint8List associatedData;
+  final Uint8List ciphertext;
+  final DateTime quarantinedAt;
+  final String reason;
+  const QuarantinedRecordRow({
+    required this.id,
+    required this.type,
+    required this.schemaVersion,
+    required this.revision,
+    required this.nonce,
+    required this.mac,
+    required this.associatedData,
+    required this.ciphertext,
+    required this.quarantinedAt,
+    required this.reason,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['type'] = Variable<String>(type);
+    map['schema_version'] = Variable<int>(schemaVersion);
+    map['revision'] = Variable<String>(revision);
+    map['nonce'] = Variable<Uint8List>(nonce);
+    map['mac'] = Variable<Uint8List>(mac);
+    map['associated_data'] = Variable<Uint8List>(associatedData);
+    map['ciphertext'] = Variable<Uint8List>(ciphertext);
+    map['quarantined_at'] = Variable<DateTime>(quarantinedAt);
+    map['reason'] = Variable<String>(reason);
+    return map;
+  }
+
+  QuarantinedRecordsCompanion toCompanion(bool nullToAbsent) {
+    return QuarantinedRecordsCompanion(
+      id: Value(id),
+      type: Value(type),
+      schemaVersion: Value(schemaVersion),
+      revision: Value(revision),
+      nonce: Value(nonce),
+      mac: Value(mac),
+      associatedData: Value(associatedData),
+      ciphertext: Value(ciphertext),
+      quarantinedAt: Value(quarantinedAt),
+      reason: Value(reason),
+    );
+  }
+
+  factory QuarantinedRecordRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return QuarantinedRecordRow(
+      id: serializer.fromJson<String>(json['id']),
+      type: serializer.fromJson<String>(json['type']),
+      schemaVersion: serializer.fromJson<int>(json['schemaVersion']),
+      revision: serializer.fromJson<String>(json['revision']),
+      nonce: serializer.fromJson<Uint8List>(json['nonce']),
+      mac: serializer.fromJson<Uint8List>(json['mac']),
+      associatedData: serializer.fromJson<Uint8List>(json['associatedData']),
+      ciphertext: serializer.fromJson<Uint8List>(json['ciphertext']),
+      quarantinedAt: serializer.fromJson<DateTime>(json['quarantinedAt']),
+      reason: serializer.fromJson<String>(json['reason']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'type': serializer.toJson<String>(type),
+      'schemaVersion': serializer.toJson<int>(schemaVersion),
+      'revision': serializer.toJson<String>(revision),
+      'nonce': serializer.toJson<Uint8List>(nonce),
+      'mac': serializer.toJson<Uint8List>(mac),
+      'associatedData': serializer.toJson<Uint8List>(associatedData),
+      'ciphertext': serializer.toJson<Uint8List>(ciphertext),
+      'quarantinedAt': serializer.toJson<DateTime>(quarantinedAt),
+      'reason': serializer.toJson<String>(reason),
+    };
+  }
+
+  QuarantinedRecordRow copyWith({
+    String? id,
+    String? type,
+    int? schemaVersion,
+    String? revision,
+    Uint8List? nonce,
+    Uint8List? mac,
+    Uint8List? associatedData,
+    Uint8List? ciphertext,
+    DateTime? quarantinedAt,
+    String? reason,
+  }) => QuarantinedRecordRow(
+    id: id ?? this.id,
+    type: type ?? this.type,
+    schemaVersion: schemaVersion ?? this.schemaVersion,
+    revision: revision ?? this.revision,
+    nonce: nonce ?? this.nonce,
+    mac: mac ?? this.mac,
+    associatedData: associatedData ?? this.associatedData,
+    ciphertext: ciphertext ?? this.ciphertext,
+    quarantinedAt: quarantinedAt ?? this.quarantinedAt,
+    reason: reason ?? this.reason,
+  );
+  QuarantinedRecordRow copyWithCompanion(QuarantinedRecordsCompanion data) {
+    return QuarantinedRecordRow(
+      id: data.id.present ? data.id.value : this.id,
+      type: data.type.present ? data.type.value : this.type,
+      schemaVersion: data.schemaVersion.present
+          ? data.schemaVersion.value
+          : this.schemaVersion,
+      revision: data.revision.present ? data.revision.value : this.revision,
+      nonce: data.nonce.present ? data.nonce.value : this.nonce,
+      mac: data.mac.present ? data.mac.value : this.mac,
+      associatedData: data.associatedData.present
+          ? data.associatedData.value
+          : this.associatedData,
+      ciphertext: data.ciphertext.present
+          ? data.ciphertext.value
+          : this.ciphertext,
+      quarantinedAt: data.quarantinedAt.present
+          ? data.quarantinedAt.value
+          : this.quarantinedAt,
+      reason: data.reason.present ? data.reason.value : this.reason,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuarantinedRecordRow(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('schemaVersion: $schemaVersion, ')
+          ..write('revision: $revision, ')
+          ..write('nonce: $nonce, ')
+          ..write('mac: $mac, ')
+          ..write('associatedData: $associatedData, ')
+          ..write('ciphertext: $ciphertext, ')
+          ..write('quarantinedAt: $quarantinedAt, ')
+          ..write('reason: $reason')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    type,
+    schemaVersion,
+    revision,
+    $driftBlobEquality.hash(nonce),
+    $driftBlobEquality.hash(mac),
+    $driftBlobEquality.hash(associatedData),
+    $driftBlobEquality.hash(ciphertext),
+    quarantinedAt,
+    reason,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is QuarantinedRecordRow &&
+          other.id == this.id &&
+          other.type == this.type &&
+          other.schemaVersion == this.schemaVersion &&
+          other.revision == this.revision &&
+          $driftBlobEquality.equals(other.nonce, this.nonce) &&
+          $driftBlobEquality.equals(other.mac, this.mac) &&
+          $driftBlobEquality.equals(
+            other.associatedData,
+            this.associatedData,
+          ) &&
+          $driftBlobEquality.equals(other.ciphertext, this.ciphertext) &&
+          other.quarantinedAt == this.quarantinedAt &&
+          other.reason == this.reason);
+}
+
+class QuarantinedRecordsCompanion
+    extends UpdateCompanion<QuarantinedRecordRow> {
+  final Value<String> id;
+  final Value<String> type;
+  final Value<int> schemaVersion;
+  final Value<String> revision;
+  final Value<Uint8List> nonce;
+  final Value<Uint8List> mac;
+  final Value<Uint8List> associatedData;
+  final Value<Uint8List> ciphertext;
+  final Value<DateTime> quarantinedAt;
+  final Value<String> reason;
+  final Value<int> rowid;
+  const QuarantinedRecordsCompanion({
+    this.id = const Value.absent(),
+    this.type = const Value.absent(),
+    this.schemaVersion = const Value.absent(),
+    this.revision = const Value.absent(),
+    this.nonce = const Value.absent(),
+    this.mac = const Value.absent(),
+    this.associatedData = const Value.absent(),
+    this.ciphertext = const Value.absent(),
+    this.quarantinedAt = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  QuarantinedRecordsCompanion.insert({
+    required String id,
+    required String type,
+    required int schemaVersion,
+    required String revision,
+    required Uint8List nonce,
+    required Uint8List mac,
+    required Uint8List associatedData,
+    required Uint8List ciphertext,
+    required DateTime quarantinedAt,
+    required String reason,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       type = Value(type),
+       schemaVersion = Value(schemaVersion),
+       revision = Value(revision),
+       nonce = Value(nonce),
+       mac = Value(mac),
+       associatedData = Value(associatedData),
+       ciphertext = Value(ciphertext),
+       quarantinedAt = Value(quarantinedAt),
+       reason = Value(reason);
+  static Insertable<QuarantinedRecordRow> custom({
+    Expression<String>? id,
+    Expression<String>? type,
+    Expression<int>? schemaVersion,
+    Expression<String>? revision,
+    Expression<Uint8List>? nonce,
+    Expression<Uint8List>? mac,
+    Expression<Uint8List>? associatedData,
+    Expression<Uint8List>? ciphertext,
+    Expression<DateTime>? quarantinedAt,
+    Expression<String>? reason,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (type != null) 'type': type,
+      if (schemaVersion != null) 'schema_version': schemaVersion,
+      if (revision != null) 'revision': revision,
+      if (nonce != null) 'nonce': nonce,
+      if (mac != null) 'mac': mac,
+      if (associatedData != null) 'associated_data': associatedData,
+      if (ciphertext != null) 'ciphertext': ciphertext,
+      if (quarantinedAt != null) 'quarantined_at': quarantinedAt,
+      if (reason != null) 'reason': reason,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  QuarantinedRecordsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? type,
+    Value<int>? schemaVersion,
+    Value<String>? revision,
+    Value<Uint8List>? nonce,
+    Value<Uint8List>? mac,
+    Value<Uint8List>? associatedData,
+    Value<Uint8List>? ciphertext,
+    Value<DateTime>? quarantinedAt,
+    Value<String>? reason,
+    Value<int>? rowid,
+  }) {
+    return QuarantinedRecordsCompanion(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      schemaVersion: schemaVersion ?? this.schemaVersion,
+      revision: revision ?? this.revision,
+      nonce: nonce ?? this.nonce,
+      mac: mac ?? this.mac,
+      associatedData: associatedData ?? this.associatedData,
+      ciphertext: ciphertext ?? this.ciphertext,
+      quarantinedAt: quarantinedAt ?? this.quarantinedAt,
+      reason: reason ?? this.reason,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (schemaVersion.present) {
+      map['schema_version'] = Variable<int>(schemaVersion.value);
+    }
+    if (revision.present) {
+      map['revision'] = Variable<String>(revision.value);
+    }
+    if (nonce.present) {
+      map['nonce'] = Variable<Uint8List>(nonce.value);
+    }
+    if (mac.present) {
+      map['mac'] = Variable<Uint8List>(mac.value);
+    }
+    if (associatedData.present) {
+      map['associated_data'] = Variable<Uint8List>(associatedData.value);
+    }
+    if (ciphertext.present) {
+      map['ciphertext'] = Variable<Uint8List>(ciphertext.value);
+    }
+    if (quarantinedAt.present) {
+      map['quarantined_at'] = Variable<DateTime>(quarantinedAt.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuarantinedRecordsCompanion(')
+          ..write('id: $id, ')
+          ..write('type: $type, ')
+          ..write('schemaVersion: $schemaVersion, ')
+          ..write('revision: $revision, ')
+          ..write('nonce: $nonce, ')
+          ..write('mac: $mac, ')
+          ..write('associatedData: $associatedData, ')
+          ..write('ciphertext: $ciphertext, ')
+          ..write('quarantinedAt: $quarantinedAt, ')
+          ..write('reason: $reason, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$SerlinkDatabase extends GeneratedDatabase {
   _$SerlinkDatabase(QueryExecutor e) : super(e);
   $SerlinkDatabaseManager get managers => $SerlinkDatabaseManager(this);
@@ -840,6 +1994,10 @@ abstract class _$SerlinkDatabase extends GeneratedDatabase {
   late final $EncryptedRecordsTable encryptedRecords = $EncryptedRecordsTable(
     this,
   );
+  late final $VaultBackupEntriesTable vaultBackupEntries =
+      $VaultBackupEntriesTable(this);
+  late final $QuarantinedRecordsTable quarantinedRecords =
+      $QuarantinedRecordsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -847,6 +2005,8 @@ abstract class _$SerlinkDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     vaultHeaders,
     encryptedRecords,
+    vaultBackupEntries,
+    quarantinedRecords,
   ];
 }
 
@@ -1310,6 +2470,596 @@ typedef $$EncryptedRecordsTableProcessedTableManager =
       EncryptedRecordRow,
       PrefetchHooks Function()
     >;
+typedef $$VaultBackupEntriesTableCreateCompanionBuilder =
+    VaultBackupEntriesCompanion Function({
+      required String id,
+      required String path,
+      required String reason,
+      required DateTime createdAt,
+      required int sizeBytes,
+      Value<int?> sourceSchemaVersion,
+      Value<int?> targetSchemaVersion,
+      Value<bool> automatic,
+      Value<int> rowid,
+    });
+typedef $$VaultBackupEntriesTableUpdateCompanionBuilder =
+    VaultBackupEntriesCompanion Function({
+      Value<String> id,
+      Value<String> path,
+      Value<String> reason,
+      Value<DateTime> createdAt,
+      Value<int> sizeBytes,
+      Value<int?> sourceSchemaVersion,
+      Value<int?> targetSchemaVersion,
+      Value<bool> automatic,
+      Value<int> rowid,
+    });
+
+class $$VaultBackupEntriesTableFilterComposer
+    extends Composer<_$SerlinkDatabase, $VaultBackupEntriesTable> {
+  $$VaultBackupEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get path => $composableBuilder(
+    column: $table.path,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sizeBytes => $composableBuilder(
+    column: $table.sizeBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sourceSchemaVersion => $composableBuilder(
+    column: $table.sourceSchemaVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get targetSchemaVersion => $composableBuilder(
+    column: $table.targetSchemaVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get automatic => $composableBuilder(
+    column: $table.automatic,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$VaultBackupEntriesTableOrderingComposer
+    extends Composer<_$SerlinkDatabase, $VaultBackupEntriesTable> {
+  $$VaultBackupEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get path => $composableBuilder(
+    column: $table.path,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sizeBytes => $composableBuilder(
+    column: $table.sizeBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sourceSchemaVersion => $composableBuilder(
+    column: $table.sourceSchemaVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get targetSchemaVersion => $composableBuilder(
+    column: $table.targetSchemaVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get automatic => $composableBuilder(
+    column: $table.automatic,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$VaultBackupEntriesTableAnnotationComposer
+    extends Composer<_$SerlinkDatabase, $VaultBackupEntriesTable> {
+  $$VaultBackupEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get path =>
+      $composableBuilder(column: $table.path, builder: (column) => column);
+
+  GeneratedColumn<String> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get sizeBytes =>
+      $composableBuilder(column: $table.sizeBytes, builder: (column) => column);
+
+  GeneratedColumn<int> get sourceSchemaVersion => $composableBuilder(
+    column: $table.sourceSchemaVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get targetSchemaVersion => $composableBuilder(
+    column: $table.targetSchemaVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get automatic =>
+      $composableBuilder(column: $table.automatic, builder: (column) => column);
+}
+
+class $$VaultBackupEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$SerlinkDatabase,
+          $VaultBackupEntriesTable,
+          VaultBackupEntryRow,
+          $$VaultBackupEntriesTableFilterComposer,
+          $$VaultBackupEntriesTableOrderingComposer,
+          $$VaultBackupEntriesTableAnnotationComposer,
+          $$VaultBackupEntriesTableCreateCompanionBuilder,
+          $$VaultBackupEntriesTableUpdateCompanionBuilder,
+          (
+            VaultBackupEntryRow,
+            BaseReferences<
+              _$SerlinkDatabase,
+              $VaultBackupEntriesTable,
+              VaultBackupEntryRow
+            >,
+          ),
+          VaultBackupEntryRow,
+          PrefetchHooks Function()
+        > {
+  $$VaultBackupEntriesTableTableManager(
+    _$SerlinkDatabase db,
+    $VaultBackupEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$VaultBackupEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$VaultBackupEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$VaultBackupEntriesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> path = const Value.absent(),
+                Value<String> reason = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> sizeBytes = const Value.absent(),
+                Value<int?> sourceSchemaVersion = const Value.absent(),
+                Value<int?> targetSchemaVersion = const Value.absent(),
+                Value<bool> automatic = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VaultBackupEntriesCompanion(
+                id: id,
+                path: path,
+                reason: reason,
+                createdAt: createdAt,
+                sizeBytes: sizeBytes,
+                sourceSchemaVersion: sourceSchemaVersion,
+                targetSchemaVersion: targetSchemaVersion,
+                automatic: automatic,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String path,
+                required String reason,
+                required DateTime createdAt,
+                required int sizeBytes,
+                Value<int?> sourceSchemaVersion = const Value.absent(),
+                Value<int?> targetSchemaVersion = const Value.absent(),
+                Value<bool> automatic = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => VaultBackupEntriesCompanion.insert(
+                id: id,
+                path: path,
+                reason: reason,
+                createdAt: createdAt,
+                sizeBytes: sizeBytes,
+                sourceSchemaVersion: sourceSchemaVersion,
+                targetSchemaVersion: targetSchemaVersion,
+                automatic: automatic,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$VaultBackupEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$SerlinkDatabase,
+      $VaultBackupEntriesTable,
+      VaultBackupEntryRow,
+      $$VaultBackupEntriesTableFilterComposer,
+      $$VaultBackupEntriesTableOrderingComposer,
+      $$VaultBackupEntriesTableAnnotationComposer,
+      $$VaultBackupEntriesTableCreateCompanionBuilder,
+      $$VaultBackupEntriesTableUpdateCompanionBuilder,
+      (
+        VaultBackupEntryRow,
+        BaseReferences<
+          _$SerlinkDatabase,
+          $VaultBackupEntriesTable,
+          VaultBackupEntryRow
+        >,
+      ),
+      VaultBackupEntryRow,
+      PrefetchHooks Function()
+    >;
+typedef $$QuarantinedRecordsTableCreateCompanionBuilder =
+    QuarantinedRecordsCompanion Function({
+      required String id,
+      required String type,
+      required int schemaVersion,
+      required String revision,
+      required Uint8List nonce,
+      required Uint8List mac,
+      required Uint8List associatedData,
+      required Uint8List ciphertext,
+      required DateTime quarantinedAt,
+      required String reason,
+      Value<int> rowid,
+    });
+typedef $$QuarantinedRecordsTableUpdateCompanionBuilder =
+    QuarantinedRecordsCompanion Function({
+      Value<String> id,
+      Value<String> type,
+      Value<int> schemaVersion,
+      Value<String> revision,
+      Value<Uint8List> nonce,
+      Value<Uint8List> mac,
+      Value<Uint8List> associatedData,
+      Value<Uint8List> ciphertext,
+      Value<DateTime> quarantinedAt,
+      Value<String> reason,
+      Value<int> rowid,
+    });
+
+class $$QuarantinedRecordsTableFilterComposer
+    extends Composer<_$SerlinkDatabase, $QuarantinedRecordsTable> {
+  $$QuarantinedRecordsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get schemaVersion => $composableBuilder(
+    column: $table.schemaVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get nonce => $composableBuilder(
+    column: $table.nonce,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get mac => $composableBuilder(
+    column: $table.mac,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get associatedData => $composableBuilder(
+    column: $table.associatedData,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get ciphertext => $composableBuilder(
+    column: $table.ciphertext,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get quarantinedAt => $composableBuilder(
+    column: $table.quarantinedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$QuarantinedRecordsTableOrderingComposer
+    extends Composer<_$SerlinkDatabase, $QuarantinedRecordsTable> {
+  $$QuarantinedRecordsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get schemaVersion => $composableBuilder(
+    column: $table.schemaVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get revision => $composableBuilder(
+    column: $table.revision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get nonce => $composableBuilder(
+    column: $table.nonce,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get mac => $composableBuilder(
+    column: $table.mac,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get associatedData => $composableBuilder(
+    column: $table.associatedData,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get ciphertext => $composableBuilder(
+    column: $table.ciphertext,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get quarantinedAt => $composableBuilder(
+    column: $table.quarantinedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$QuarantinedRecordsTableAnnotationComposer
+    extends Composer<_$SerlinkDatabase, $QuarantinedRecordsTable> {
+  $$QuarantinedRecordsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<int> get schemaVersion => $composableBuilder(
+    column: $table.schemaVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get revision =>
+      $composableBuilder(column: $table.revision, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get nonce =>
+      $composableBuilder(column: $table.nonce, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get mac =>
+      $composableBuilder(column: $table.mac, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get associatedData => $composableBuilder(
+    column: $table.associatedData,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<Uint8List> get ciphertext => $composableBuilder(
+    column: $table.ciphertext,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get quarantinedAt => $composableBuilder(
+    column: $table.quarantinedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+}
+
+class $$QuarantinedRecordsTableTableManager
+    extends
+        RootTableManager<
+          _$SerlinkDatabase,
+          $QuarantinedRecordsTable,
+          QuarantinedRecordRow,
+          $$QuarantinedRecordsTableFilterComposer,
+          $$QuarantinedRecordsTableOrderingComposer,
+          $$QuarantinedRecordsTableAnnotationComposer,
+          $$QuarantinedRecordsTableCreateCompanionBuilder,
+          $$QuarantinedRecordsTableUpdateCompanionBuilder,
+          (
+            QuarantinedRecordRow,
+            BaseReferences<
+              _$SerlinkDatabase,
+              $QuarantinedRecordsTable,
+              QuarantinedRecordRow
+            >,
+          ),
+          QuarantinedRecordRow,
+          PrefetchHooks Function()
+        > {
+  $$QuarantinedRecordsTableTableManager(
+    _$SerlinkDatabase db,
+    $QuarantinedRecordsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuarantinedRecordsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuarantinedRecordsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuarantinedRecordsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<int> schemaVersion = const Value.absent(),
+                Value<String> revision = const Value.absent(),
+                Value<Uint8List> nonce = const Value.absent(),
+                Value<Uint8List> mac = const Value.absent(),
+                Value<Uint8List> associatedData = const Value.absent(),
+                Value<Uint8List> ciphertext = const Value.absent(),
+                Value<DateTime> quarantinedAt = const Value.absent(),
+                Value<String> reason = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => QuarantinedRecordsCompanion(
+                id: id,
+                type: type,
+                schemaVersion: schemaVersion,
+                revision: revision,
+                nonce: nonce,
+                mac: mac,
+                associatedData: associatedData,
+                ciphertext: ciphertext,
+                quarantinedAt: quarantinedAt,
+                reason: reason,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String type,
+                required int schemaVersion,
+                required String revision,
+                required Uint8List nonce,
+                required Uint8List mac,
+                required Uint8List associatedData,
+                required Uint8List ciphertext,
+                required DateTime quarantinedAt,
+                required String reason,
+                Value<int> rowid = const Value.absent(),
+              }) => QuarantinedRecordsCompanion.insert(
+                id: id,
+                type: type,
+                schemaVersion: schemaVersion,
+                revision: revision,
+                nonce: nonce,
+                mac: mac,
+                associatedData: associatedData,
+                ciphertext: ciphertext,
+                quarantinedAt: quarantinedAt,
+                reason: reason,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$QuarantinedRecordsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$SerlinkDatabase,
+      $QuarantinedRecordsTable,
+      QuarantinedRecordRow,
+      $$QuarantinedRecordsTableFilterComposer,
+      $$QuarantinedRecordsTableOrderingComposer,
+      $$QuarantinedRecordsTableAnnotationComposer,
+      $$QuarantinedRecordsTableCreateCompanionBuilder,
+      $$QuarantinedRecordsTableUpdateCompanionBuilder,
+      (
+        QuarantinedRecordRow,
+        BaseReferences<
+          _$SerlinkDatabase,
+          $QuarantinedRecordsTable,
+          QuarantinedRecordRow
+        >,
+      ),
+      QuarantinedRecordRow,
+      PrefetchHooks Function()
+    >;
 
 class $SerlinkDatabaseManager {
   final _$SerlinkDatabase _db;
@@ -1318,4 +3068,8 @@ class $SerlinkDatabaseManager {
       $$VaultHeadersTableTableManager(_db, _db.vaultHeaders);
   $$EncryptedRecordsTableTableManager get encryptedRecords =>
       $$EncryptedRecordsTableTableManager(_db, _db.encryptedRecords);
+  $$VaultBackupEntriesTableTableManager get vaultBackupEntries =>
+      $$VaultBackupEntriesTableTableManager(_db, _db.vaultBackupEntries);
+  $$QuarantinedRecordsTableTableManager get quarantinedRecords =>
+      $$QuarantinedRecordsTableTableManager(_db, _db.quarantinedRecords);
 }

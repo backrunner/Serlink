@@ -128,6 +128,61 @@ void main() {
     );
   });
 
+  test('rejects repair push when local data is unhealthy', () async {
+    service = SyncRunService(
+      vault: vault,
+      records: records,
+      localDataHealthy: () async => false,
+    );
+
+    await expectLater(
+      service.pushEncryptedSnapshotForRepair(
+        LocalDirectorySyncProvider(tempDir),
+      ),
+      throwsA(
+        isA<SyncRunException>().having(
+          (error) => error.code,
+          'code',
+          'sync.local_unhealthy',
+        ),
+      ),
+    );
+  });
+
+  test(
+    'repair restore pulls remote snapshot even when local data is unhealthy',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final remoteEnvelope = await vault.encryptRecord(
+        id: VaultRecordId('host:restore'),
+        type: 'host',
+        plaintext: utf8.encode('remote'),
+      );
+      await records.upsert(remoteEnvelope);
+      await service.pushEncryptedSnapshot(provider);
+
+      records = InMemoryVaultRecordRepository();
+      final localEnvelope = await vault.encryptRecord(
+        id: remoteEnvelope.id,
+        type: remoteEnvelope.type,
+        plaintext: utf8.encode('local'),
+      );
+      await records.upsert(localEnvelope);
+      service = SyncRunService(
+        vault: vault,
+        records: records,
+        localDataHealthy: () async => false,
+      );
+
+      final result = await service.restoreLocalFromRemoteForRepair(provider);
+
+      expect(result.recordsDownloaded, 1);
+      final restored = await records.read(remoteEnvelope.id);
+      expect(restored!.revision, remoteEnvelope.revision);
+      expect(utf8.decode(await vault.decryptRecord(restored)), 'remote');
+    },
+  );
+
   test('pull imports missing encrypted records from remote manifest', () async {
     final remoteVault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),

@@ -80,11 +80,13 @@ class SyncRunService {
     required VaultRecordRepository records,
     SyncDeviceService? devices,
     SyncFieldMergeService? fieldMerge,
+    Future<bool> Function()? localDataHealthy,
   }) : this._(
          vault,
          records,
          devices,
          fieldMerge ?? const SyncFieldMergeService(),
+         localDataHealthy,
        );
 
   const SyncRunService._(
@@ -92,12 +94,14 @@ class SyncRunService {
     this._records,
     this._devices,
     this._fieldMerge,
+    this._localDataHealthy,
   );
 
   final VaultService _vault;
   final VaultRecordRepository _records;
   final SyncDeviceService? _devices;
   final SyncFieldMergeService _fieldMerge;
+  final Future<bool> Function()? _localDataHealthy;
 
   Future<SyncRunResult> syncEncryptedSnapshot(SyncProvider provider) async {
     final pull = await pullEncryptedSnapshot(provider, missingManifestOk: true);
@@ -363,8 +367,30 @@ class SyncRunService {
     );
   }
 
-  Future<SyncRunResult> pushEncryptedSnapshotForRepair(SyncProvider provider) {
+  Future<SyncRunResult> pushEncryptedSnapshotForRepair(
+    SyncProvider provider,
+  ) async {
+    await _ensureLocalDataHealthyForRepair();
     return _pushEncryptedSnapshot(provider, pruneRemote: true);
+  }
+
+  Future<SyncRunResult> restoreLocalFromRemoteForRepair(
+    SyncProvider provider,
+  ) async {
+    final pull = await _pullEncryptedSnapshot(
+      provider,
+      conflictPolicy: _SyncConflictPolicy.useRemote,
+    );
+    final push = await pushEncryptedSnapshot(provider);
+    return SyncRunResult(
+      recordsUploaded: push.recordsUploaded,
+      recordsDownloaded: pull.recordsDownloaded,
+      recordsUnchanged: pull.recordsUnchanged,
+      headerUploaded: push.headerUploaded,
+      completedAt: push.completedAt,
+      writerDevice: push.writerDevice,
+      remoteDevice: pull.remoteDevice,
+    );
   }
 
   Future<Map<String, Object?>> _decryptManifest(RemoteManifest manifest) async {
@@ -442,6 +468,17 @@ class SyncRunService {
         'Unlock the vault before syncing.',
       );
     }
+  }
+
+  Future<void> _ensureLocalDataHealthyForRepair() async {
+    final check = _localDataHealthy;
+    if (check == null || await check()) {
+      return;
+    }
+    throw const SyncRunException(
+      'sync.local_unhealthy',
+      'Local vault data needs recovery before rebuilding remote sync.',
+    );
   }
 
   Future<Map<VaultRecordId, SyncDeleteTombstone>> _localTombstones() async {

@@ -13,6 +13,26 @@ abstract interface class VaultHeaderStore {
   Future<void> clear();
 }
 
+class QuarantinedVaultRecord {
+  const QuarantinedVaultRecord({
+    required this.envelope,
+    required this.quarantinedAt,
+    required this.reason,
+  });
+
+  final VaultRecordEnvelope envelope;
+  final DateTime quarantinedAt;
+  final String reason;
+}
+
+abstract interface class VaultRecordQuarantineRepository {
+  Future<void> quarantine({
+    required VaultRecordEnvelope envelope,
+    required String reason,
+  });
+  Future<List<QuarantinedVaultRecord>> list();
+}
+
 class DriftVaultHeaderStore implements VaultHeaderStore {
   DriftVaultHeaderStore(this._database);
 
@@ -108,6 +128,63 @@ class DriftVaultRecordRepository implements VaultRecordRepository {
   @override
   Future<void> clear() async {
     await _database.delete(_database.encryptedRecords).go();
+  }
+}
+
+class DriftVaultRecordQuarantineRepository
+    implements VaultRecordQuarantineRepository {
+  DriftVaultRecordQuarantineRepository(this._database);
+
+  final SerlinkDatabase _database;
+
+  @override
+  Future<void> quarantine({
+    required VaultRecordEnvelope envelope,
+    required String reason,
+  }) async {
+    await _database
+        .into(_database.quarantinedRecords)
+        .insertOnConflictUpdate(
+          QuarantinedRecordsCompanion.insert(
+            id: envelope.id.value,
+            type: envelope.type,
+            schemaVersion: envelope.schemaVersion,
+            revision: envelope.revision,
+            nonce: Uint8List.fromList(envelope.nonce),
+            mac: Uint8List.fromList(envelope.mac),
+            associatedData: Uint8List.fromList(envelope.associatedData),
+            ciphertext: Uint8List.fromList(envelope.ciphertext),
+            quarantinedAt: DateTime.now().toUtc(),
+            reason: reason,
+          ),
+        );
+  }
+
+  @override
+  Future<List<QuarantinedVaultRecord>> list() async {
+    final query = _database.select(_database.quarantinedRecords)
+      ..orderBy([
+        (table) => OrderingTerm.desc(table.quarantinedAt),
+        (table) => OrderingTerm.asc(table.id),
+      ]);
+    final rows = await query.get();
+    return [
+      for (final row in rows)
+        QuarantinedVaultRecord(
+          envelope: VaultRecordEnvelope(
+            id: VaultRecordId(row.id),
+            type: row.type,
+            schemaVersion: row.schemaVersion,
+            revision: row.revision,
+            nonce: List<int>.unmodifiable(row.nonce),
+            mac: List<int>.unmodifiable(row.mac),
+            associatedData: List<int>.unmodifiable(row.associatedData),
+            ciphertext: List<int>.unmodifiable(row.ciphertext),
+          ),
+          quarantinedAt: row.quarantinedAt,
+          reason: row.reason,
+        ),
+    ];
   }
 }
 

@@ -38,9 +38,16 @@ class RemoteManifest {
   List<int> toBytes() => utf8.encode(jsonEncode(toJson()));
 
   factory RemoteManifest.fromBytes(List<int> bytes) {
-    return RemoteManifest.fromJson(
-      jsonDecode(utf8.decode(bytes)) as Map<String, Object?>,
-    );
+    try {
+      return RemoteManifest.fromJson(
+        jsonDecode(utf8.decode(bytes)) as Map<String, Object?>,
+      );
+    } on Object {
+      throw const SyncProviderException(
+        'sync.provider.manifest_invalid',
+        'Remote sync manifest is invalid.',
+      );
+    }
   }
 }
 

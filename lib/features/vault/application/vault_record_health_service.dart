@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:sqlite3/sqlite3.dart';
@@ -5,6 +6,7 @@ import 'package:sqlite3/sqlite3.dart';
 import '../../../database/database_recovery.dart';
 import '../../../core/ids/entity_id.dart';
 import '../../import_export/application/automatic_vault_backup_service.dart';
+import '../../sync/domain/sync_provider.dart';
 import '../data/drift_vault_repository.dart';
 import 'vault_record_repository.dart';
 import 'vault_service.dart';
@@ -46,19 +48,22 @@ class VaultRecordHealthService {
     required VaultRecordRepository records,
     VaultRecordQuarantineRepository? quarantine,
     AutomaticVaultBackupService? backups,
-  }) : this._(vault, records, quarantine, backups);
+    SyncProvider? remote,
+  }) : this._(vault, records, quarantine, backups, remote);
 
   const VaultRecordHealthService._(
     this._vault,
     this._records,
     this._quarantine,
     this._backups,
+    this._remote,
   );
 
   final VaultService _vault;
   final VaultRecordRepository _records;
   final VaultRecordQuarantineRepository? _quarantine;
   final AutomaticVaultBackupService? _backups;
+  final SyncProvider? _remote;
 
   Future<VaultRecordHealthReport> inspect() async {
     final envelopes = await _records.list();
@@ -115,7 +120,9 @@ class VaultRecordHealthService {
     }
     await _backups?.createSnapshot(reason: 'before-record-quarantine');
     for (final issue in report.corruptRecords) {
-      final restored = await _healthyRecordFromAutomaticBackups(issue);
+      final restored =
+          await _healthyRecordFromRemote(issue) ??
+          await _healthyRecordFromAutomaticBackups(issue);
       if (restored != null) {
         await _records.upsert(restored);
       }
@@ -181,6 +188,68 @@ class VaultRecordHealthService {
     }
     return null;
   }
+
+  Future<VaultRecordEnvelope?> _healthyRecordFromRemote(
+    VaultRecordHealthIssue issue,
+  ) async {
+    final remote = _remote;
+    if (remote == null) {
+      return null;
+    }
+    try {
+      final manifest = await remote.readManifest();
+      if (manifest == null) {
+        return null;
+      }
+      if (manifest.protocolVersion > 1) {
+        return null;
+      }
+      final header = _vault.header;
+      if (header == null || manifest.vaultId != _vaultId(header)) {
+        return null;
+      }
+      final manifestEnvelope = VaultRecordEnvelope.fromJson(
+        jsonDecode(utf8.decode(manifest.encryptedPayload))
+            as Map<String, Object?>,
+      );
+      final manifestPlaintext = await _vault.decryptRecord(manifestEnvelope);
+      final manifestData =
+          jsonDecode(utf8.decode(manifestPlaintext)) as Map<String, Object?>;
+      final records = manifestData['records'];
+      if (records is! List<Object?>) {
+        return null;
+      }
+      for (final rawRecord in records) {
+        if (rawRecord is! Map<Object?, Object?>) {
+          continue;
+        }
+        final record = Map<String, Object?>.from(rawRecord);
+        if (record['id'] != issue.id.value) {
+          continue;
+        }
+        final path = record['path'];
+        if (path is! String) {
+          return null;
+        }
+        final envelope = VaultRecordEnvelope.fromJson(
+          jsonDecode(
+                utf8.decode(await remote.readObject(RemoteObjectRef(path))),
+              )
+              as Map<String, Object?>,
+        );
+        if (envelope.id != issue.id ||
+            envelope.type != record['type'] ||
+            envelope.revision != record['revision']) {
+          return null;
+        }
+        await _vault.decryptRecord(envelope);
+        return envelope;
+      }
+    } on Object {
+      return null;
+    }
+    return null;
+  }
 }
 
 bool _isRecordCorruption(VaultException error) {
@@ -199,4 +268,8 @@ VaultRecordEnvelope _envelopeFromBackupRow(Row row) {
     associatedData: List<int>.unmodifiable(row['associated_data'] as List<int>),
     ciphertext: List<int>.unmodifiable(row['ciphertext'] as List<int>),
   );
+}
+
+String _vaultId(VaultHeader header) {
+  return base64Url.encode(header.passphraseSalt).replaceAll('=', '');
 }

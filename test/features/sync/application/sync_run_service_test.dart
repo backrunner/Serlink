@@ -277,7 +277,46 @@ void main() {
     },
   );
 
-  test('pull reports conflicts without overwriting local records', () async {
+  test(
+    'pull maps malformed manifest record entries to remote corruption',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final manifestEnvelope = await vault.encryptRecord(
+        id: VaultRecordId('sync:manifest'),
+        type: 'sync_manifest',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'schemaVersion': 1,
+            'createdAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+            'headerPath': 'vault/header.json',
+            'records': ['not-a-record-entry'],
+          }),
+        ),
+      );
+      await provider.writeManifest(
+        RemoteManifest(
+          vaultId: base64Url
+              .encode(vault.header!.passphraseSalt)
+              .replaceAll('=', ''),
+          protocolVersion: 1,
+          encryptedPayload: utf8.encode(jsonEncode(manifestEnvelope.toJson())),
+        ),
+      );
+
+      await expectLater(
+        service.pullEncryptedSnapshot(provider),
+        throwsA(
+          isA<SyncRunException>().having(
+            (error) => error.code,
+            'code',
+            'sync.remote_manifest_invalid',
+          ),
+        ),
+      );
+    },
+  );
+
+  test('pull can still report conflicts for manual review', () async {
     final provider = LocalDirectorySyncProvider(tempDir);
     final remoteEnvelope = await vault.encryptRecord(
       id: VaultRecordId('host:conflict'),
@@ -294,7 +333,10 @@ void main() {
     );
     await records.upsert(localEnvelope);
 
-    final pull = await service.pullEncryptedSnapshot(provider);
+    final pull = await service.pullEncryptedSnapshot(
+      provider,
+      reportConflicts: true,
+    );
 
     expect(pull.conflicts, hasLength(1));
     expect(pull.conflicts.single.id, localEnvelope.id);
@@ -360,7 +402,10 @@ void main() {
       );
       await records.upsert(localEnvelope);
 
-      final pull = await service.pullEncryptedSnapshot(provider);
+      final pull = await service.pullEncryptedSnapshot(
+        provider,
+        reportConflicts: true,
+      );
       final fieldSet = pull.conflicts.single.fieldSet!;
 
       expect(fieldSet.supportsFieldMerge, isTrue);
@@ -375,6 +420,181 @@ void main() {
           'startupCommands',
         ]),
       );
+    },
+  );
+
+  test('sync automatically keeps the newest remote record', () async {
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final remoteEnvelope = await vault.encryptRecord(
+      id: VaultRecordId('host:latest'),
+      type: 'host',
+      plaintext: utf8.encode(
+        jsonEncode({
+          'hostname': 'remote.example.test',
+          'updatedAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+        }),
+      ),
+    );
+    await records.upsert(remoteEnvelope);
+    await service.pushEncryptedSnapshot(provider);
+
+    final localEnvelope = await vault.encryptRecord(
+      id: remoteEnvelope.id,
+      type: remoteEnvelope.type,
+      plaintext: utf8.encode(
+        jsonEncode({
+          'hostname': 'local.example.test',
+          'updatedAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+        }),
+      ),
+    );
+    await records.upsert(localEnvelope);
+
+    final result = await service.syncEncryptedSnapshot(provider);
+
+    expect(result.recordsDownloaded, 1);
+    final restored = await records.read(remoteEnvelope.id);
+    expect(restored!.revision, remoteEnvelope.revision);
+    final restoredJson =
+        jsonDecode(utf8.decode(await vault.decryptRecord(restored)))
+            as Map<String, Object?>;
+    expect(restoredJson['hostname'], 'remote.example.test');
+  });
+
+  test('sync automatically keeps the newest local record', () async {
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final remoteEnvelope = await vault.encryptRecord(
+      id: VaultRecordId('host:latest'),
+      type: 'host',
+      plaintext: utf8.encode(
+        jsonEncode({
+          'hostname': 'remote.example.test',
+          'updatedAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+        }),
+      ),
+    );
+    await records.upsert(remoteEnvelope);
+    await service.pushEncryptedSnapshot(provider);
+
+    final localEnvelope = await vault.encryptRecord(
+      id: remoteEnvelope.id,
+      type: remoteEnvelope.type,
+      plaintext: utf8.encode(
+        jsonEncode({
+          'hostname': 'local.example.test',
+          'updatedAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+        }),
+      ),
+    );
+    await records.upsert(localEnvelope);
+
+    final result = await service.syncEncryptedSnapshot(provider);
+
+    expect(result.recordsDownloaded, 0);
+    expect(
+      (await records.read(localEnvelope.id))!.revision,
+      localEnvelope.revision,
+    );
+    final remoteObject = VaultRecordEnvelope.fromJson(
+      jsonDecode(
+            utf8.decode(
+              await provider.readObject(
+                const RemoteObjectRef('records/host%3Alatest.json'),
+              ),
+            ),
+          )
+          as Map<String, Object?>,
+    );
+    expect(remoteObject.revision, localEnvelope.revision);
+  });
+
+  test(
+    'sync keeps newest local identity secret using related identity timestamp',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final remoteIdentity = await vault.encryptRecord(
+        id: VaultRecordId('identity:linked-secret'),
+        type: 'identity',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'id': 'linked-secret',
+            'displayName': 'Remote Key',
+            'kind': 'privateKey',
+            'secretRecordId': 'secret:linked-secret',
+            'createdAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+            'updatedAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+          }),
+        ),
+      );
+      final remoteSecret = await vault.encryptRecord(
+        id: VaultRecordId('secret:linked-secret'),
+        type: 'identity_secret',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'password': 'remote-secret',
+            'privateKeyPem': null,
+            'privateKeyPassphrase': null,
+            'openSshCertificate': null,
+            'keyboardInteractiveResponses': <String>[],
+          }),
+        ),
+      );
+      await records.upsert(remoteIdentity);
+      await records.upsert(remoteSecret);
+      await service.pushEncryptedSnapshot(provider);
+
+      final localIdentity = await vault.encryptRecord(
+        id: remoteIdentity.id,
+        type: remoteIdentity.type,
+        plaintext: utf8.encode(
+          jsonEncode({
+            'id': 'linked-secret',
+            'displayName': 'Local Key',
+            'kind': 'privateKey',
+            'secretRecordId': 'secret:linked-secret',
+            'createdAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+            'updatedAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+          }),
+        ),
+      );
+      final localSecret = await vault.encryptRecord(
+        id: remoteSecret.id,
+        type: remoteSecret.type,
+        plaintext: utf8.encode(
+          jsonEncode({
+            'password': 'local-secret',
+            'privateKeyPem': null,
+            'privateKeyPassphrase': null,
+            'openSshCertificate': null,
+            'keyboardInteractiveResponses': <String>[],
+          }),
+        ),
+      );
+      await records.upsert(localIdentity);
+      await records.upsert(localSecret);
+
+      final result = await service.syncEncryptedSnapshot(provider);
+
+      expect(result.recordsDownloaded, 0);
+      expect(
+        (await records.read(localIdentity.id))!.revision,
+        localIdentity.revision,
+      );
+      expect(
+        (await records.read(localSecret.id))!.revision,
+        localSecret.revision,
+      );
+      final remoteSecretObject = VaultRecordEnvelope.fromJson(
+        jsonDecode(
+              utf8.decode(
+                await provider.readObject(
+                  const RemoteObjectRef('records/secret%3Alinked-secret.json'),
+                ),
+              ),
+            )
+            as Map<String, Object?>,
+      );
+      expect(remoteSecretObject.revision, localSecret.revision);
     },
   );
 
@@ -557,6 +777,56 @@ void main() {
   );
 
   test(
+    'newer remote record restores a locally deleted record and clears tombstone',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final remoteEnvelope = await vault.encryptRecord(
+        id: VaultRecordId('host:deleted-newer-remote'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'remote-newer.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+          }),
+        ),
+      );
+      await records.upsert(remoteEnvelope);
+      await service.pushEncryptedSnapshot(provider);
+
+      await records.delete(remoteEnvelope.id);
+      await EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ).save(
+        SyncDeleteTombstone(
+          targetRecordId: remoteEnvelope.id,
+          targetRecordType: remoteEnvelope.type,
+          deletedAt: DateTime.utc(2026, 5, 28),
+        ),
+      );
+
+      final result = await service.syncEncryptedSnapshot(provider);
+
+      expect(result.recordsDownloaded, 1);
+      final restored = await records.read(remoteEnvelope.id);
+      expect(restored, isNotNull);
+      expect(
+        utf8.decode(await vault.decryptRecord(restored!)),
+        contains('remote-newer'),
+      );
+      final refs = await provider.listRecordObjects(prefix: 'records/');
+      expect(
+        refs.map((ref) => ref.path),
+        contains('records/host%3Adeleted-newer-remote.json'),
+      );
+      expect(
+        refs.map((ref) => ref.path),
+        isNot(contains(startsWith('records/sync%3Atombstone%3A'))),
+      );
+    },
+  );
+
+  test(
     'device tombstone prevents revoked remote device from being restored',
     () async {
       final provider = LocalDirectorySyncProvider(tempDir);
@@ -641,5 +911,62 @@ void main() {
 
     expect(result.recordsDownloaded, 1);
     expect(await records.read(staleEnvelope.id), isNull);
+  });
+
+  test('newer local record survives an older remote tombstone', () async {
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final remoteRecords = InMemoryVaultRecordRepository();
+    final remoteService = SyncRunService(vault: vault, records: remoteRecords);
+    final staleEnvelope = await vault.encryptRecord(
+      id: VaultRecordId('host:survives'),
+      type: 'host',
+      plaintext: utf8.encode(
+        jsonEncode({
+          'hostname': 'stale.example.test',
+          'updatedAt': DateTime.utc(2026, 5, 27).toIso8601String(),
+        }),
+      ),
+    );
+    await remoteRecords.upsert(staleEnvelope);
+    await remoteService.pushEncryptedSnapshot(provider);
+    await remoteRecords.delete(staleEnvelope.id);
+    await EncryptedSyncDeleteTombstoneRepository(
+      vault: vault,
+      records: remoteRecords,
+    ).save(
+      SyncDeleteTombstone(
+        targetRecordId: staleEnvelope.id,
+        targetRecordType: staleEnvelope.type,
+        deletedAt: DateTime.utc(2026, 5, 28),
+      ),
+    );
+    await remoteService.pushEncryptedSnapshot(provider);
+
+    final localEnvelope = await vault.encryptRecord(
+      id: staleEnvelope.id,
+      type: staleEnvelope.type,
+      plaintext: utf8.encode(
+        jsonEncode({
+          'hostname': 'local-newer.example.test',
+          'updatedAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+        }),
+      ),
+    );
+    await records.upsert(localEnvelope);
+
+    final result = await service.syncEncryptedSnapshot(provider);
+
+    expect(result.recordsDownloaded, 1);
+    final preserved = await records.read(staleEnvelope.id);
+    expect(preserved!.revision, localEnvelope.revision);
+    final refs = await provider.listRecordObjects(prefix: 'records/');
+    expect(
+      refs.map((ref) => ref.path),
+      contains('records/host%3Asurvives.json'),
+    );
+    expect(
+      refs.map((ref) => ref.path),
+      isNot(contains(startsWith('records/sync%3Atombstone%3A'))),
+    );
   });
 }

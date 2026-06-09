@@ -1096,11 +1096,20 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       final backups = await ref.read(
         automaticVaultBackupServiceProvider.future,
       );
+      SyncProvider? remote;
+      try {
+        remote = await ref
+            .read(syncSettingsServiceProvider)
+            .activeSyncProvider();
+      } on Object {
+        remote = null;
+      }
       final health = VaultRecordHealthService(
         vault: service,
         records: ref.read(vaultRecordRepositoryProvider),
         quarantine: ref.read(vaultRecordQuarantineRepositoryProvider),
         backups: backups,
+        remote: remote,
       );
       final report = await health.quarantineCorruptRecords();
       state = AsyncData(

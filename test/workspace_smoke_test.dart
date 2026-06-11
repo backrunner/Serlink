@@ -843,6 +843,12 @@ void main() {
 
     expect(find.text('About'), findsOneWidget);
     expect(find.text('Serlink'), findsOneWidget);
+    expect(find.text('GitHub'), findsOneWidget);
+    expect(find.text('https://github.com/backrunner/serlink'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-about-github-button')),
+      findsOneWidget,
+    );
     final versionLabel = find.byKey(
       const ValueKey('settings-about-version-label'),
     );

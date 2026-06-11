@@ -272,6 +272,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAboutSection => '关于';
 
   @override
+  String get settingsRepositoryOpenFailed => '无法打开仓库链接。';
+
+  @override
   String settingsAppVersionOnly(String version) {
     return '版本 $version';
   }

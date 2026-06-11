@@ -616,6 +616,12 @@ abstract class AppLocalizations {
   /// **'About'**
   String get settingsAboutSection;
 
+  /// No description provided for @settingsRepositoryOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Repository link could not be opened.'**
+  String get settingsRepositoryOpenFailed;
+
   /// No description provided for @settingsAppVersionOnly.
   ///
   /// In en, this message translates to:

@@ -103,6 +103,7 @@
   "settingsDiagnosticBundleTitle": "Diagnostic logs",
   "settingsExportAction": "Export",
   "settingsAboutSection": "About",
+  "settingsRepositoryOpenFailed": "Repository link could not be opened.",
   "settingsAppVersionOnly": "Version {version}",
   "@settingsAppVersionOnly": {
     "placeholders": {

@@ -273,6 +273,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAboutSection => '情報';
 
   @override
+  String get settingsRepositoryOpenFailed => 'リポジトリのリンクを開けませんでした。';
+
+  @override
   String settingsAppVersionOnly(String version) {
     return 'バージョン $version';
   }

@@ -300,6 +300,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAboutSection => 'About';
 
   @override
+  String get settingsRepositoryOpenFailed =>
+      'Repository link could not be opened.';
+
+  @override
   String settingsAppVersionOnly(String version) {
     return 'Version $version';
   }

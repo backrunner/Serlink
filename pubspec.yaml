@@ -61,6 +61,7 @@ dependencies:
   ffi: ^2.2.0
   forui: ^0.22.3
   desktop_drop: ^0.7.1
+  url_launcher: ^6.3.2
 
 dependency_overrides:
   xterm:

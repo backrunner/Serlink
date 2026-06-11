@@ -86,6 +86,7 @@
   "settingsDiagnosticBundleTitle": "診断ログ",
   "settingsExportAction": "エクスポート",
   "settingsAboutSection": "情報",
+  "settingsRepositoryOpenFailed": "リポジトリのリンクを開けませんでした。",
   "settingsAppVersionOnly": "バージョン {version}",
   "settingsAppVersionLabel": "バージョン {version}（{buildNumber}）",
   "settingsAppVersionLoading": "バージョンを読み込み中",

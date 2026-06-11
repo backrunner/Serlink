@@ -1,5 +1,7 @@
 part of '../workspace_screen.dart';
 
+const String _serlinkRepositoryUrl = 'https://github.com/backrunner/serlink';
+
 class _SettingsSurface extends ConsumerWidget {
   const _SettingsSurface();
 
@@ -250,6 +252,18 @@ class _SettingsSurface extends ConsumerWidget {
                         ),
                       ),
                     ),
+                    _SettingsActionRow(
+                      icon: Icons.code_outlined,
+                      title: 'GitHub',
+                      subtitle: _serlinkRepositoryUrl,
+                      action: _SettingsTextButton.icon(
+                        key: const ValueKey('settings-about-github-button'),
+                        onPressed: () =>
+                            unawaited(_openSerlinkRepository(context)),
+                        icon: const Icon(Icons.open_in_new, size: 18),
+                        label: Text(l10n.settingsOpenAction),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -277,6 +291,21 @@ String _settingsAppVersionLabel(
     loading: () => l10n.settingsAppVersionLoading,
     error: (_, _) => l10n.settingsAppVersionUnavailable,
   );
+}
+
+Future<void> _openSerlinkRepository(BuildContext context) async {
+  var opened = false;
+  try {
+    opened = await launchUrl(
+      Uri.parse(_serlinkRepositoryUrl),
+      mode: LaunchMode.externalApplication,
+    );
+  } catch (_) {
+    opened = false;
+  }
+  if (!opened && context.mounted) {
+    _showSnackBar(context, context.l10n.settingsRepositoryOpenFailed);
+  }
 }
 
 class _SettingsInlineValue extends StatelessWidget {

@@ -41,7 +41,8 @@ profiles, and local entitlements stay aligned.
 
 For development builds, CloudKit should use the Development environment. Before
 shipping or testing release distribution, deploy the schema in CloudKit Console
-and test against Production.
+and test against Production. Use `docs/cloudkit_production_release.md` for the
+release gate and smoke plan.
 
 ## Local debug flow
 

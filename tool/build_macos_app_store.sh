@@ -6,6 +6,10 @@ ARCHIVE_PATH="${SERLINK_ARCHIVE_PATH:-$ROOT_DIR/build/macos/archives/serlink-app
 CODE_SIGN_IDENTITY="${SERLINK_MACOS_CODE_SIGN_IDENTITY:-Mac App Distribution}"
 cd "$ROOT_DIR"
 
+"$ROOT_DIR/tool/check_cloudkit_release_ready.sh" \
+  --distribution app_store \
+  --require-schema-production
+
 flutter build macos \
   --release \
   --dart-define=SERLINK_DISTRIBUTION=app_store \

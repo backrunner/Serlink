@@ -7,7 +7,8 @@ Serlink uses one codebase with build-time distribution switches.
 Use this channel for App Store Connect uploads:
 
 ```sh
-./tool/build_macos_app_store.sh
+SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
+  ./tool/build_macos_app_store.sh
 ```
 
 The script archives with:
@@ -16,6 +17,10 @@ The script archives with:
 - `Runner/Release.entitlements`
 - Mac App Store sandbox entitlements
 - `Mac App Distribution` signing identity
+
+The script first runs `tool/check_cloudkit_release_ready.sh --distribution
+app_store --require-schema-production`, so the CloudKit schema must already be
+deployed to Production in CloudKit Console.
 
 The App Store/TestFlight channel disables capabilities that are not compatible
 with a sandboxed Mac App Store build:
@@ -42,5 +47,7 @@ The script builds with:
 - `Developer ID Application` signing identity
 
 This channel keeps desktop-local features enabled, including local terminal
-tabs and SSH agent authentication. Package the resulting app into a DMG and
-notarize it before distribution.
+tabs and SSH agent authentication. It can still use CloudKit as long as the
+app is signed with the required CloudKit entitlements and a Developer ID
+provisioning profile. Package the resulting app into a DMG and notarize it
+before distribution.

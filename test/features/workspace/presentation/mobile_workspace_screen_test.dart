@@ -48,7 +48,10 @@ void main() {
         child: const SerlinkApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('mobile-workspace-header')),
+    );
 
     expect(
       find.byWidgetPredicate((widget) => widget is FHeader),
@@ -113,10 +116,18 @@ void main() {
         child: const SerlinkApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpUntilFound(tester, find.text('Transfers'));
 
     await tester.tap(find.text('Transfers'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 120));
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('mobile-workspace-search-field')),
+    );
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('mobile-header-count-badge')),
+    );
 
     expect(
       find.byKey(const ValueKey('mobile-workspace-search-field')),
@@ -137,7 +148,7 @@ void main() {
       find.byKey(const ValueKey('mobile-workspace-search-field')),
       'access',
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('release.zip'), findsNothing);
     expect(find.text('access.log'), findsOneWidget);
@@ -146,7 +157,7 @@ void main() {
       find.byKey(const ValueKey('mobile-workspace-search-field')),
       'missing',
     );
-    await tester.pumpAndSettle();
+    await _pumpUntilFound(tester, find.text('No Matches'));
 
     expect(find.text('No Matches'), findsOneWidget);
     expect(
@@ -156,6 +167,15 @@ void main() {
     expect(find.text('release.zip'), findsNothing);
     expect(find.text('access.log'), findsNothing);
   });
+}
+
+Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
+  for (var attempt = 0; attempt < 30; attempt += 1) {
+    await tester.pump(const Duration(milliseconds: 20));
+    if (finder.evaluate().isNotEmpty) {
+      return;
+    }
+  }
 }
 
 class _CompletingSftpConnection implements SftpConnection {

@@ -72,6 +72,9 @@ void main() {
           transferQueueControllerProvider.overrideWithValue(transferQueue),
           secretStoreProvider.overrideWithValue(secretStore),
           autoSyncEnabledProvider.overrideWithValue(false),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(
+            () async => false,
+          ),
           appPackageInfoProvider.overrideWith((ref) async {
             return _testPackageInfo();
           }),
@@ -79,7 +82,7 @@ void main() {
         child: const SerlinkApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpUntilFound(tester, find.text('Create Vault'));
 
     expect(find.text('Create Vault'), findsWidgets);
 
@@ -860,6 +863,33 @@ void main() {
     expect(versionRect.center.dy, closeTo(appTitleRect.center.dy, 4));
   });
 
+  testWidgets(
+    'macOS App Store distribution hides local-only host affordances',
+    (tester) async {
+      await _pumpLockedVaultApp(
+        tester,
+        capabilities: const PlatformCapabilities(
+          operatingSystem: 'macos',
+          targetPlatform: TargetPlatform.macOS,
+          distribution: SerlinkDistribution.appStore,
+        ),
+      );
+      await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+      expect(_byTooltipLabel('Open local terminal tab'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('workspace-search-field')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('host-password-field')), findsOneWidget);
+      expect(find.text('Agent'), findsNothing);
+    },
+  );
+
   testWidgets('iOS add host form uses compact wide dialog', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
@@ -1357,6 +1387,13 @@ void main() {
         passphrase: 'correct horse battery staple',
       );
       await DriftVaultHeaderStore(database).save(initialized.header);
+      await DriftVaultRecordRepository(database).upsert(
+        await bootstrapVault.encryptRecord(
+          id: VaultRecordId('loading-test-record'),
+          type: 'test',
+          plaintext: utf8.encode('secret'),
+        ),
+      );
       final now = DateTime.utc(2026);
       final hosts = _DelayedHostRepository([
         HostConfig(
@@ -1393,6 +1430,9 @@ void main() {
             transferQueueControllerProvider.overrideWithValue(transferQueue),
             secretStoreProvider.overrideWithValue(secretStore),
             autoSyncEnabledProvider.overrideWithValue(false),
+            cloudKitAvailabilityCheckProvider.overrideWithValue(
+              () async => false,
+            ),
             appPackageInfoProvider.overrideWith((ref) async {
               return _testPackageInfo();
             }),
@@ -1407,10 +1447,8 @@ void main() {
         'correct horse battery staple',
       );
       await tester.tap(find.byKey(const ValueKey('vault-submit-button')));
-      await _pumpUntilFound(
-        tester,
-        find.text('Loading encrypted host records'),
-      );
+      await _pumpUntil(tester, () => hosts.listRequested);
+      await tester.pump();
 
       expect(find.text('Loading encrypted host records'), findsOneWidget);
       expect(find.text('Loading encrypted host records.'), findsNothing);
@@ -1418,7 +1456,7 @@ void main() {
       expect(find.text('No Hosts'), findsNothing);
 
       hosts.completeList();
-      await tester.pumpAndSettle();
+      await _pumpUntilFound(tester, find.text('Persisted Bastion'));
 
       expect(find.text('Persisted Bastion'), findsOneWidget);
       expect(find.text('ops@persisted.internal:22'), findsOneWidget);
@@ -1529,12 +1567,23 @@ Future<void> _submitVaultPassphrase(
 }
 
 Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
-  for (var attempt = 0; attempt < 30; attempt += 1) {
-    await tester.pump(const Duration(milliseconds: 20));
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    await tester.pump(const Duration(milliseconds: 50));
     if (finder.evaluate().isNotEmpty) {
       return;
     }
   }
+  fail('Timed out waiting for $finder');
+}
+
+Future<void> _pumpUntil(WidgetTester tester, bool Function() predicate) async {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    if (predicate()) {
+      return;
+    }
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+  fail('Timed out waiting for predicate to become true');
 }
 
 Future<void> _openHostContextMenu(WidgetTester tester, String hostName) async {
@@ -1553,6 +1602,9 @@ class _DelayedHostRepository implements HostRepository {
 
   final List<HostConfig> _hosts;
   final Completer<void> _listReady = Completer<void>();
+  final Completer<void> _listRequested = Completer<void>();
+
+  bool get listRequested => _listRequested.isCompleted;
 
   void completeList() {
     if (!_listReady.isCompleted) {
@@ -1577,6 +1629,9 @@ class _DelayedHostRepository implements HostRepository {
 
   @override
   Future<List<HostConfig>> list() async {
+    if (!_listRequested.isCompleted) {
+      _listRequested.complete();
+    }
     await _listReady.future;
     return _hosts;
   }

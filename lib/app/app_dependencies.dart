@@ -27,6 +27,7 @@ import '../features/snippets/application/snippet_repository.dart';
 import '../features/snippets/application/snippet_write_service.dart';
 import '../features/snippets/domain/snippet.dart';
 import '../features/sync/application/auto_sync_controller.dart';
+import '../features/sync/application/remote_vault_discovery_service.dart';
 import '../features/sync/application/sync_delete_tombstone_repository.dart';
 import '../features/sync/application/sync_device_service.dart';
 import '../features/sync/application/sync_field_merge_service.dart';
@@ -96,6 +97,21 @@ final secretStoreProvider = Provider<SecretStore>((ref) {
 
 final platformCapabilitiesProvider = Provider<PlatformCapabilities>((ref) {
   return PlatformCapabilities.current();
+});
+
+typedef CloudKitAvailabilityCheck = Future<bool> Function();
+typedef SyncProviderFactory = SyncProvider Function();
+
+final cloudKitAvailabilityCheckProvider = Provider<CloudKitAvailabilityCheck>((
+  ref,
+) {
+  return () => CloudKitSyncProvider.isAvailable();
+});
+
+final cloudKitSyncProviderFactoryProvider = Provider<SyncProviderFactory>((
+  ref,
+) {
+  return () => CloudKitSyncProvider();
 });
 
 final appPackageInfoProvider = FutureProvider<PackageInfo>((ref) {
@@ -318,7 +334,7 @@ final iCloudAvailableProvider = FutureProvider<bool>((ref) {
   if (!ref.watch(platformCapabilitiesProvider).cloudKitSync) {
     return false;
   }
-  return CloudKitSyncProvider.isAvailable();
+  return ref.watch(cloudKitAvailabilityCheckProvider)();
 });
 
 final cloudKitSyncSettingsProvider = FutureProvider<CloudKitSyncSettings?>((
@@ -801,6 +817,7 @@ class VaultSessionState {
 
 class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   InMemoryVaultService? _service;
+  bool _cloudKitHeaderDiscovered = false;
 
   VaultService get service {
     return _service ??= _createService();
@@ -812,7 +829,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<VaultSessionState> _loadInitialState() async {
-    final VaultHeader? header;
+    _cloudKitHeaderDiscovered = false;
+    VaultHeader? header;
     try {
       header = await ref.watch(vaultHeaderStoreProvider).read();
     } on DatabaseIntegrityException catch (error) {
@@ -828,6 +846,26 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         failureMessage: _vaultStructuralFailureMessage(error),
       );
     }
+    if (header == null) {
+      try {
+        header = await _discoverCloudKitVaultHeader();
+        if (header != null) {
+          _cloudKitHeaderDiscovered = true;
+        }
+      } on SyncRunException catch (error) {
+        return VaultSessionState(
+          vaultState: VaultState.locked,
+          recoveryStatus: VaultRecoveryStatus.vaultHeaderInvalid,
+          failureMessage: error.message,
+        );
+      } on SyncProviderException catch (error) {
+        return VaultSessionState(
+          vaultState: VaultState.locked,
+          recoveryStatus: VaultRecoveryStatus.vaultHeaderInvalid,
+          failureMessage: error.message,
+        );
+      }
+    }
     _service = _createService(header: header);
     final localUnlockAvailable = await service.hasLocalUnlock(
       secrets: ref.read(secretStoreProvider),
@@ -836,6 +874,24 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       vaultState: header == null ? VaultState.uninitialized : VaultState.locked,
       localUnlockAvailable: localUnlockAvailable,
     );
+  }
+
+  Future<VaultHeader?> _discoverCloudKitVaultHeader() async {
+    if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
+      return null;
+    }
+    final available = await ref.read(cloudKitAvailabilityCheckProvider)();
+    if (!available) {
+      return null;
+    }
+    try {
+      final discovery = await RemoteVaultDiscoveryService(
+        ref.read(cloudKitSyncProviderFactoryProvider)(),
+      ).discover();
+      return discovery?.header;
+    } on Object {
+      rethrow;
+    }
   }
 
   InMemoryVaultService _createService({VaultHeader? header}) {
@@ -893,11 +949,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlock(passphrase: passphrase);
+      await _pullCloudKitSnapshotAfterUnlockIfNeeded();
       state = AsyncData(await _unlockedState(previous));
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
       );
     } on Object catch (error) {
+      await _lockServiceIfUnlocked();
       state = AsyncData(
         previous.copyWith(
           failureMessage: _vaultFailureMessage(error),
@@ -921,12 +979,14 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlockWithRecoveryKey(VaultRecoveryKey(recoveryCode));
+      await _pullCloudKitSnapshotAfterUnlockIfNeeded();
       state = AsyncData(await _unlockedState(previous));
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
       );
       return null;
     } on Object catch (error) {
+      await _lockServiceIfUnlocked();
       final message = _vaultFailureMessage(error);
       state = AsyncData(
         previous.copyWith(
@@ -951,11 +1011,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlockWithLocalKey(secrets: ref.read(secretStoreProvider));
+      await _pullCloudKitSnapshotAfterUnlockIfNeeded();
       state = AsyncData(await _unlockedState(previous));
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
       );
     } on Object catch (error) {
+      await _lockServiceIfUnlocked();
       state = AsyncData(
         previous.copyWith(
           failureMessage: _vaultFailureMessage(error),
@@ -963,6 +1025,100 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           isBusy: false,
         ),
       );
+    }
+  }
+
+  Future<void> _pullCloudKitSnapshotAfterUnlockIfNeeded() async {
+    if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
+      return;
+    }
+    final records = ref.read(vaultRecordRepositoryProvider);
+    final requireInitialPull = _cloudKitHeaderDiscovered;
+    if (!requireInitialPull && (await records.list()).isNotEmpty) {
+      return;
+    }
+    final header = service.header;
+    if (header == null) {
+      return;
+    }
+
+    final provider = ref.read(cloudKitSyncProviderFactoryProvider)();
+    final RemoteManifest? manifest;
+    try {
+      manifest = await provider.readManifest();
+    } on Object {
+      if (requireInitialPull) {
+        throw const SyncRunException(
+          'sync.remote_manifest_unavailable',
+          'Remote sync manifest could not be read.',
+        );
+      }
+      return;
+    }
+    if (manifest == null) {
+      if (requireInitialPull) {
+        throw const SyncRunException(
+          'sync.remote_manifest_missing',
+          'Remote sync manifest is missing.',
+        );
+      }
+      return;
+    }
+    if (manifest.vaultId != syncVaultId(header)) {
+      if (requireInitialPull) {
+        throw const SyncRunException(
+          'sync.remote_manifest_wrong_vault',
+          'Remote sync data belongs to another vault.',
+        );
+      }
+      return;
+    }
+    if (manifest.protocolVersion > 1) {
+      throw const SyncRunException(
+        'sync.remote_protocol_unsupported',
+        'Remote sync data was written by a newer Serlink version.',
+      );
+    }
+
+    if (requireInitialPull) {
+      final restoredRecords = InMemoryVaultRecordRepository();
+      await SyncRunService(
+        vault: service,
+        records: restoredRecords,
+      ).pullEncryptedSnapshot(provider);
+      await _commitCloudKitBootstrapSnapshot(
+        header: header,
+        records: await restoredRecords.list(),
+      );
+    } else {
+      await SyncRunService(
+        vault: service,
+        records: records,
+      ).pullEncryptedSnapshot(provider);
+    }
+    _cloudKitHeaderDiscovered = false;
+    ref.invalidate(cloudKitSyncSettingsProvider);
+    ref.invalidate(syncKnownDevicesProvider);
+  }
+
+  Future<void> _commitCloudKitBootstrapSnapshot({
+    required VaultHeader header,
+    required List<VaultRecordEnvelope> records,
+  }) {
+    final database = ref.read(serlinkDatabaseProvider);
+    return database.transaction(() async {
+      final recordRepository = ref.read(_driftVaultRecordRepositoryProvider);
+      await recordRepository.clear();
+      for (final record in records) {
+        await recordRepository.upsert(record);
+      }
+      await ref.read(vaultHeaderStoreProvider).save(header);
+    });
+  }
+
+  Future<void> _lockServiceIfUnlocked() async {
+    if (service.state == VaultState.unlocked) {
+      await service.lock();
     }
   }
 
@@ -1234,6 +1390,12 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
 
 String _vaultFailureMessage(Object error) {
   if (error is VaultException) {
+    return error.message;
+  }
+  if (error is SyncRunException) {
+    return error.message;
+  }
+  if (error is SyncProviderException) {
     return error.message;
   }
   if (error is AppProfileLockException) {

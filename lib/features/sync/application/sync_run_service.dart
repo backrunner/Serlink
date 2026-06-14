@@ -397,7 +397,7 @@ class SyncRunService {
     );
     await provider.writeManifest(
       RemoteManifest(
-        vaultId: _vaultId(header),
+        vaultId: syncVaultId(header),
         protocolVersion: 1,
         encryptedPayload: utf8.encode(jsonEncode(manifestEnvelope.toJson())),
       ),
@@ -469,7 +469,7 @@ class SyncRunService {
         'Vault header is missing.',
       );
     }
-    if (manifest.vaultId != _vaultId(header)) {
+    if (manifest.vaultId != syncVaultId(header)) {
       throw const SyncRunException(
         'sync.remote_manifest_wrong_vault',
         'Remote sync data belongs to another vault.',
@@ -849,7 +849,7 @@ String _recordObjectPath(String recordId) {
   return 'records/${Uri.encodeComponent(recordId)}.json';
 }
 
-String _vaultId(VaultHeader header) {
+String syncVaultId(VaultHeader header) {
   return base64Url.encode(header.passphraseSalt).replaceAll('=', '');
 }
 

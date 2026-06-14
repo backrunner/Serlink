@@ -3,21 +3,41 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:forui/forui.dart';
 
+const _distributionName = String.fromEnvironment(
+  'SERLINK_DISTRIBUTION',
+  defaultValue: 'direct',
+);
+
+enum SerlinkDistribution { direct, appStore }
+
+SerlinkDistribution _currentDistribution() {
+  return switch (_distributionName) {
+    'app_store' || 'app-store' || 'appStore' => SerlinkDistribution.appStore,
+    _ => SerlinkDistribution.direct,
+  };
+}
+
 class PlatformCapabilities {
   const PlatformCapabilities({
     required this.operatingSystem,
     required this.targetPlatform,
+    this.distribution = SerlinkDistribution.direct,
   });
 
   factory PlatformCapabilities.current() {
     return PlatformCapabilities(
       operatingSystem: Platform.operatingSystem,
       targetPlatform: defaultTargetPlatform,
+      distribution: _currentDistribution(),
     );
   }
 
   final String operatingSystem;
   final TargetPlatform targetPlatform;
+  final SerlinkDistribution distribution;
+
+  bool get isAppStoreDistribution =>
+      distribution == SerlinkDistribution.appStore;
 
   bool get isIOS =>
       operatingSystem == 'ios' || targetPlatform == TargetPlatform.iOS;
@@ -36,7 +56,7 @@ class PlatformCapabilities {
 
   bool get prefersMobileWorkspaceShell => prefersTouchUi;
 
-  bool get localTerminal => isDesktop;
+  bool get localTerminal => isDesktop && !isAppStoreDistribution;
 
   bool get customWindowChrome => isDesktop;
 
@@ -50,7 +70,7 @@ class PlatformCapabilities {
 
   bool get terminalZmodemTransfers => isDesktop;
 
-  bool get sshAgentAuth => isDesktop;
+  bool get sshAgentAuth => isDesktop && !isAppStoreDistribution;
 
   bool get hardwareKeyAuth => false;
 
@@ -58,7 +78,7 @@ class PlatformCapabilities {
 
   bool get localDirectoryTransfer => !isIOS;
 
-  bool get openLocalFile => isDesktop;
+  bool get openLocalFile => isDesktop && !isAppStoreDistribution;
 
   bool get documentExport => true;
 

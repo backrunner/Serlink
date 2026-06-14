@@ -12,3 +12,8 @@ PRODUCT_BUNDLE_IDENTIFIER = com.alkinum.serlink
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 BackRunner. All rights reserved.
+
+// Default macOS release signing settings. Build scripts override these for
+// Mac App Store or Developer ID distribution.
+SERLINK_MACOS_CODE_SIGN_IDENTITY = Apple Development
+SERLINK_MACOS_ENTITLEMENTS = Runner/Release.entitlements

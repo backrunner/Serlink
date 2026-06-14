@@ -79,6 +79,7 @@ x86/
 .env
 .env.*
 !.env.example
+android/local.properties
 
 # Credentials, signing material, and local SSH keys
 *.jks

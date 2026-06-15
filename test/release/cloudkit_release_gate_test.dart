@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 void main() {
   test('CloudKit bridge keeps the production schema contract stable', () {
@@ -90,6 +91,9 @@ void main() {
 
   test('iOS TestFlight upload uses App Store Connect export options', () {
     final script = File('tool/upload_ios_testflight.sh').readAsStringSync();
+    final buildNumberScript = File(
+      'tool/bump_build_number.sh',
+    ).readAsStringSync();
     final signingCheck = File(
       'tool/check_ios_testflight_signing.sh',
     ).readAsStringSync();
@@ -102,6 +106,9 @@ void main() {
     expect(script, contains('--distribution ios_app_store'));
     expect(script, contains('-allowProvisioningUpdates'));
     expect(script, contains('SERLINK_SKIP_LOCAL_SIGNING_CHECK'));
+    expect(script, contains('tool/bump_build_number.sh'));
+    expect(script, contains('--bump-build-number'));
+    expect(script, contains('--build-number'));
     expect(script, contains('flutter build ios'));
     expect(script, contains('--dart-define=SERLINK_DISTRIBUTION=app_store'));
     expect(script, contains('generic/platform=iOS'));
@@ -111,6 +118,8 @@ void main() {
     expect(signingCheck, contains('Apple Distribution'));
     expect(signingCheck, contains('get-task-allow'));
     expect(signingCheck, contains('iCloud.com.alkinum.serlink'));
+    expect(buildNumberScript, contains('version: " next_version'));
+    expect(buildNumberScript, contains('flutter pub get'));
     expect(exportOptions, contains('<string>app-store-connect</string>'));
     expect(exportOptions, contains('<string>upload</string>'));
     expect(exportOptions, contains('<string>Production</string>'));
@@ -119,5 +128,50 @@ void main() {
     expect(docs, contains('Product > Archive'));
     expect(docs, contains('Distribute App > App Store Connect > Upload'));
     expect(docs, contains('iCloud.com.alkinum.serlink'));
+  });
+
+  test('build number script previews the next pubspec build number', () {
+    final result = Process.runSync('bash', [
+      'tool/bump_build_number.sh',
+      '--dry-run',
+      '--no-pub-get',
+    ]);
+
+    expect(result.exitCode, 0, reason: result.stderr.toString());
+    expect(
+      result.stdout.toString().trim(),
+      matches(RegExp(r'^\d+\.\d+\.\d+\+\d+$')),
+    );
+  });
+
+  test('build number script can set a specific pubspec build number', () {
+    final tempRoot = Directory.systemTemp.createTempSync(
+      'serlink-build-number-',
+    );
+    final fixture = File(p.join(tempRoot.path, 'pubspec.yaml'));
+    final script = File(p.join(tempRoot.path, 'tool/bump_build_number.sh'));
+
+    try {
+      Directory(p.join(tempRoot.path, 'tool')).createSync();
+      fixture.writeAsStringSync('''
+name: fixture
+version: 2.3.4+8
+''');
+      script.writeAsStringSync(
+        File('tool/bump_build_number.sh').readAsStringSync(),
+      );
+
+      final result = Process.runSync('bash', [
+        script.path,
+        '--set',
+        '42',
+        '--no-pub-get',
+      ]);
+
+      expect(result.exitCode, 0, reason: result.stderr.toString());
+      expect(fixture.readAsStringSync(), contains('version: 2.3.4+42'));
+    } finally {
+      tempRoot.deleteSync(recursive: true);
+    }
   });
 }

@@ -176,6 +176,8 @@ plist_rejects_development_environment "ios/Runner/Release.entitlements" "iOS Rel
 
 if [[ "$DISTRIBUTION" == "ios_app_store" || "$DISTRIBUTION" == "all" ]]; then
   check_script_contains "tool/upload_ios_testflight.sh" "--dart-define=SERLINK_DISTRIBUTION=app_store" "iOS TestFlight upload script"
+  check_script_contains "tool/upload_ios_testflight.sh" "tool/bump_build_number.sh" "iOS TestFlight upload script"
+  check_script_contains "tool/upload_ios_testflight.sh" "--bump-build-number" "iOS TestFlight upload script"
   check_script_contains "tool/upload_ios_testflight.sh" "ios/Runner/ExportOptionsAppStore.plist" "iOS TestFlight upload script"
   check_script_contains "tool/upload_ios_testflight.sh" "xcodebuild archive" "iOS TestFlight upload script"
   check_script_contains "ios/Runner/ExportOptionsAppStore.plist" "<string>app-store-connect</string>" "iOS App Store export options"

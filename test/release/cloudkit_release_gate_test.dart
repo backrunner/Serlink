@@ -122,6 +122,7 @@ void main() {
     expect(signingCheck, contains('Apple Distribution'));
     expect(signingCheck, contains('get-task-allow'));
     expect(signingCheck, contains('iCloud.com.alkinum.serlink'));
+    expect(signingCheck, contains('Xcode-managed automatic signing'));
     expect(buildNumberScript, contains('version: " next_version'));
     expect(buildNumberScript, contains('flutter pub get'));
     expect(exportOptions, contains('<string>app-store-connect</string>'));
@@ -129,6 +130,8 @@ void main() {
     expect(exportOptions, contains('<string>Production</string>'));
     expect(exportOptions, contains('<string>Apple Distribution</string>'));
     expect(docs, contains('Apple Distribution'));
+    expect(docs, contains('Xcode-managed automatic signing'));
+    expect(docs, contains('-allowProvisioningUpdates'));
     expect(docs, contains('Product > Archive'));
     expect(docs, contains('Distribute App > App Store Connect > Upload'));
     expect(docs, contains('iCloud.com.alkinum.serlink'));

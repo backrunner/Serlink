@@ -3,6 +3,9 @@
 iOS TestFlight uses the App Store Connect distribution path. It is separate
 from local development signing and from macOS Developer ID distribution.
 
+For the short command reference, see
+`docs/development_release_commands.md`.
+
 ## Apple Developer account
 
 Prepare these items in Apple Developer and App Store Connect:

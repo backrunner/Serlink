@@ -5,6 +5,9 @@ The production release gate keeps the CloudKit schema, entitlements, iOS
 TestFlight upload path, and macOS distribution split aligned before uploading a
 TestFlight, App Store, or DMG build.
 
+For the short command reference, see
+`docs/development_release_commands.md`.
+
 ## CloudKit schema contract
 
 The current CloudKit schema uses the default private database in:

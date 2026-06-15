@@ -35,6 +35,8 @@ void main() {
       script,
       contains('SERLINK_MACOS_ENTITLEMENTS=Runner/Release.entitlements'),
     );
+    expect(script, contains('ALLOW_PROVISIONING_UPDATES'));
+    expect(script, contains('SERLINK_MACOS_CODE_SIGN_IDENTITY'));
     expect(script, contains('xcodebuild archive'));
     expect(releaseGate, contains('ios_app_store|app_store|direct|all'));
   });

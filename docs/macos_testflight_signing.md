@@ -3,6 +3,9 @@
 macOS TestFlight uses the Mac App Store signing path. It is separate from the
 Developer ID signing used for DMG distribution.
 
+For the short command reference, see
+`docs/development_release_commands.md`.
+
 ## Apple Developer account
 
 Prepare these items in Apple Developer and App Store Connect:

@@ -163,6 +163,11 @@ As of 2026-06-04:
 - `flutter analyze` passes
 - Targeted iOS/mobile foundation tests pass
 
+### Release Commands
+
+Common local verification, build-number, and TestFlight upload commands are in
+[docs/development_release_commands.md](docs/development_release_commands.md).
+
 ## Repository Layout
 
 ```text
@@ -213,3 +218,11 @@ Detailed planning and implementation docs live under `.agents/`:
 - [.agents/12-gap-analysis.md](.agents/12-gap-analysis.md)
 - [.agents/13-progress-status.md](.agents/13-progress-status.md)
 - [.agents/14-release-scope-decisions.md](.agents/14-release-scope-decisions.md)
+
+Release and platform-operation docs:
+
+- [docs/development_release_commands.md](docs/development_release_commands.md)
+- [docs/cloudkit_production_release.md](docs/cloudkit_production_release.md)
+- [docs/ios_testflight_signing.md](docs/ios_testflight_signing.md)
+- [docs/macos_testflight_signing.md](docs/macos_testflight_signing.md)
+- [docs/macos_distribution.md](docs/macos_distribution.md)

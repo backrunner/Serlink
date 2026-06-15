@@ -61,12 +61,20 @@ void main() {
       final doc = File(
         'docs/cloudkit_production_release.md',
       ).readAsStringSync();
+      final commandDoc = File(
+        'docs/development_release_commands.md',
+      ).readAsStringSync();
 
       expect(doc, contains('iCloud.com.alkinum.serlink'));
       expect(doc, contains('SerlinkSyncObject'));
       expect(doc, contains('`path`: String'));
       expect(doc, contains('`data`: Asset'));
       expect(doc, contains('SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1'));
+      expect(commandDoc, contains('upload_ios_testflight.sh'));
+      expect(commandDoc, contains('upload_macos_testflight.sh'));
+      expect(commandDoc, contains('--bump-build-number'));
+      expect(commandDoc, contains('-allowProvisioningUpdates'));
+      expect(commandDoc, contains('sips -g hasAlpha'));
     },
   );
 

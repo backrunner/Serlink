@@ -6,6 +6,8 @@ from local development signing and from macOS Developer ID distribution.
 For the short command reference, see
 `docs/development_release_commands.md`.
 
+For the full iOS release runbook, see `docs/ios_release.md`.
+
 ## Apple Developer account
 
 Prepare these items in Apple Developer and App Store Connect:

@@ -6,6 +6,8 @@ Developer ID signing used for DMG distribution.
 For the short command reference, see
 `docs/development_release_commands.md`.
 
+For the full macOS release runbook, see `docs/macos_release.md`.
+
 ## Apple Developer account
 
 Prepare these items in Apple Developer and App Store Connect:

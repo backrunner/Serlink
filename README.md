@@ -167,6 +167,8 @@ As of 2026-06-04:
 
 Common local verification, build-number, and TestFlight upload commands are in
 [docs/development_release_commands.md](docs/development_release_commands.md).
+Full platform release runbooks are in [docs/ios_release.md](docs/ios_release.md)
+and [docs/macos_release.md](docs/macos_release.md).
 
 ## Repository Layout
 
@@ -221,6 +223,8 @@ Detailed planning and implementation docs live under `.agents/`:
 
 Release and platform-operation docs:
 
+- [docs/ios_release.md](docs/ios_release.md)
+- [docs/macos_release.md](docs/macos_release.md)
 - [docs/development_release_commands.md](docs/development_release_commands.md)
 - [docs/cloudkit_production_release.md](docs/cloudkit_production_release.md)
 - [docs/ios_testflight_signing.md](docs/ios_testflight_signing.md)

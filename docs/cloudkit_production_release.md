@@ -1,9 +1,9 @@
 # CloudKit production release
 
 Serlink stores encrypted sync objects in the user's private CloudKit database.
-The production release gate keeps the CloudKit schema, entitlements, and macOS
-distribution split aligned before uploading a TestFlight, App Store, or DMG
-build.
+The production release gate keeps the CloudKit schema, entitlements, iOS
+TestFlight upload path, and macOS distribution split aligned before uploading a
+TestFlight, App Store, or DMG build.
 
 ## CloudKit schema contract
 
@@ -47,7 +47,14 @@ For a full preflight without the production confirmation gate:
 ./tool/check_cloudkit_release_ready.sh
 ```
 
-For App Store, TestFlight, and DMG releases:
+For iOS TestFlight:
+
+```sh
+SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
+  ./tool/upload_ios_testflight.sh
+```
+
+For macOS App Store, macOS TestFlight, and DMG releases:
 
 ```sh
 SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
@@ -58,6 +65,8 @@ The App Store build script runs the release gate before it configures and
 archives the macOS app. It verifies:
 
 - iOS and macOS release entitlements are not pinned to CloudKit Development.
+- iOS TestFlight upload uses App Store Connect export options and CloudKit
+  Production.
 - macOS App Store entitlements include the App Sandbox and required file/network
   permissions.
 - macOS Direct entitlements keep CloudKit but do not enable the App Sandbox.

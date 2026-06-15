@@ -22,6 +22,9 @@ The script first runs `tool/check_cloudkit_release_ready.sh --distribution
 app_store --require-schema-production`, so the CloudKit schema must already be
 deployed to Production in CloudKit Console.
 
+Use `docs/macos_testflight_signing.md` to prepare the Mac App Store certificate,
+provisioning profile, and App Store Connect upload path.
+
 The App Store/TestFlight channel disables capabilities that are not compatible
 with a sandboxed Mac App Store build:
 

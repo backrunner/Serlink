@@ -123,6 +123,9 @@ check_profiles
 
 if [[ "$failures" -gt 0 ]]; then
   echo
+  note "If you use Xcode-managed automatic signing, upload with:"
+  note "  SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 ./tool/upload_ios_testflight.sh -allowProvisioningUpdates"
+  note "or open ios/Runner.xcworkspace in Xcode and archive with automatic signing."
   fail "iOS TestFlight signing is not ready"
   exit 1
 fi

@@ -200,6 +200,7 @@ if [[ "$DISTRIBUTION" == "app_store" || "$DISTRIBUTION" == "all" ]]; then
   check_script_contains "tool/build_macos_app_store.sh" "--dart-define=SERLINK_DISTRIBUTION=app_store" "macOS App Store build script"
   check_script_contains "tool/build_macos_app_store.sh" "SERLINK_MACOS_ENTITLEMENTS=Runner/Release.entitlements" "macOS App Store build script"
   check_script_contains "tool/build_macos_app_store.sh" "xcodebuild archive" "macOS App Store build script"
+  check_script_contains "tool/build_macos_app_store.sh" "ALLOW_PROVISIONING_UPDATES" "macOS App Store build script"
   check_script_contains "tool/upload_macos_testflight.sh" "tool/bump_build_number.sh" "macOS TestFlight upload script"
   check_script_contains "tool/upload_macos_testflight.sh" "--bump-build-number" "macOS TestFlight upload script"
   ok "macOS App Store release surface is locked"

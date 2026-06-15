@@ -54,4 +54,25 @@ void main() {
     expect(doc, contains('`data`: Asset'));
     expect(doc, contains('SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1'));
   });
+
+  test('macOS TestFlight upload uses App Store Connect export options', () {
+    final script = File('tool/upload_macos_testflight.sh').readAsStringSync();
+    final exportOptions = File(
+      'macos/Runner/ExportOptionsAppStore.plist',
+    ).readAsStringSync();
+    final docs = File('docs/macos_testflight_signing.md').readAsStringSync();
+
+    expect(script, contains('tool/check_macos_testflight_signing.sh'));
+    expect(script, contains('-allowProvisioningUpdates'));
+    expect(script, contains('SERLINK_SKIP_LOCAL_SIGNING_CHECK'));
+    expect(script, contains('tool/build_macos_app_store.sh'));
+    expect(script, contains('xcodebuild -exportArchive'));
+    expect(script, contains('ExportOptionsAppStore.plist'));
+    expect(exportOptions, contains('<string>app-store-connect</string>'));
+    expect(exportOptions, contains('<string>upload</string>'));
+    expect(exportOptions, contains('<string>Production</string>'));
+    expect(exportOptions, contains('<string>Mac App Distribution</string>'));
+    expect(docs, contains('Mac App Distribution'));
+    expect(docs, contains('iCloud.com.alkinum.serlink'));
+  });
 }

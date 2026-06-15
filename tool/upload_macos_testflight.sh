@@ -6,11 +6,33 @@ ARCHIVE_PATH="${SERLINK_ARCHIVE_PATH:-$ROOT_DIR/build/macos/archives/serlink-app
 EXPORT_PATH="${SERLINK_EXPORT_PATH:-$ROOT_DIR/build/macos/testflight-export}"
 EXPORT_OPTIONS="${SERLINK_EXPORT_OPTIONS_PLIST:-$ROOT_DIR/macos/Runner/ExportOptionsAppStore.plist}"
 ALLOW_PROVISIONING_UPDATES=0
+BUMP_BUILD_NUMBER=0
+SET_BUILD_NUMBER=""
+XCODEBUILD_ARGUMENTS=()
 
-for argument in "$@"; do
-  if [[ "$argument" == "-allowProvisioningUpdates" ]]; then
-    ALLOW_PROVISIONING_UPDATES=1
-  fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --bump-build-number)
+      BUMP_BUILD_NUMBER=1
+      ;;
+    --build-number)
+      BUMP_BUILD_NUMBER=1
+      shift
+      [[ $# -gt 0 ]] || {
+        echo "error: --build-number requires a value" >&2
+        exit 1
+      }
+      SET_BUILD_NUMBER="$1"
+      ;;
+    -allowProvisioningUpdates)
+      ALLOW_PROVISIONING_UPDATES=1
+      XCODEBUILD_ARGUMENTS+=("$1")
+      ;;
+    *)
+      XCODEBUILD_ARGUMENTS+=("$1")
+      ;;
+  esac
+  shift
 done
 
 cd "$ROOT_DIR"
@@ -23,10 +45,18 @@ else
   "$ROOT_DIR/tool/check_macos_testflight_signing.sh"
 fi
 
-"$ROOT_DIR/tool/build_macos_app_store.sh" "$@"
+if [[ "$BUMP_BUILD_NUMBER" -eq 1 ]]; then
+  if [[ -n "$SET_BUILD_NUMBER" ]]; then
+    "$ROOT_DIR/tool/bump_build_number.sh" --set "$SET_BUILD_NUMBER"
+  else
+    "$ROOT_DIR/tool/bump_build_number.sh"
+  fi
+fi
+
+"$ROOT_DIR/tool/build_macos_app_store.sh" "${XCODEBUILD_ARGUMENTS[@]}"
 
 xcodebuild -exportArchive \
   -archivePath "$ARCHIVE_PATH" \
   -exportPath "$EXPORT_PATH" \
   -exportOptionsPlist "$EXPORT_OPTIONS" \
-  "$@"
+  "${XCODEBUILD_ARGUMENTS[@]}"

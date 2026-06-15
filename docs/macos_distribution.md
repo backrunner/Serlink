@@ -8,10 +8,10 @@ Use this channel for App Store Connect uploads:
 
 ```sh
 SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
-  ./tool/build_macos_app_store.sh
+  ./tool/upload_macos_testflight.sh --bump-build-number
 ```
 
-The script archives with:
+The upload script increments the shared Flutter build number, archives with:
 
 - `SERLINK_DISTRIBUTION=app_store`
 - `Runner/Release.entitlements`

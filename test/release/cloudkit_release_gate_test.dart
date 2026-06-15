@@ -78,6 +78,9 @@ void main() {
     expect(script, contains('tool/check_macos_testflight_signing.sh'));
     expect(script, contains('-allowProvisioningUpdates'));
     expect(script, contains('SERLINK_SKIP_LOCAL_SIGNING_CHECK'));
+    expect(script, contains('tool/bump_build_number.sh'));
+    expect(script, contains('--bump-build-number'));
+    expect(script, contains('--build-number'));
     expect(script, contains('tool/build_macos_app_store.sh'));
     expect(script, contains('xcodebuild -exportArchive'));
     expect(script, contains('ExportOptionsAppStore.plist'));
@@ -86,6 +89,7 @@ void main() {
     expect(exportOptions, contains('<string>Production</string>'));
     expect(exportOptions, contains('<string>Mac App Distribution</string>'));
     expect(docs, contains('Mac App Distribution'));
+    expect(docs, contains('--bump-build-number'));
     expect(docs, contains('iCloud.com.alkinum.serlink'));
   });
 

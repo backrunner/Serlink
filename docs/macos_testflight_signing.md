@@ -58,15 +58,31 @@ After the CloudKit schema has been deployed to Production:
 
 ```sh
 SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
-  ./tool/upload_macos_testflight.sh
+  ./tool/upload_macos_testflight.sh --bump-build-number
 ```
 
 The upload script:
 
 1. Runs the signing readiness check.
-2. Archives with `SERLINK_DISTRIBUTION=app_store`.
-3. Uses `macos/Runner/ExportOptionsAppStore.plist`.
-4. Exports with `method=app-store-connect` and `destination=upload`.
+2. Optionally increments the Flutter build number when
+   `--bump-build-number` is provided.
+3. Archives with `SERLINK_DISTRIBUTION=app_store`.
+4. Uses `macos/Runner/ExportOptionsAppStore.plist`.
+5. Exports with `method=app-store-connect` and `destination=upload`.
+
+To set a specific build number instead of incrementing:
+
+```sh
+SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
+  ./tool/upload_macos_testflight.sh --build-number 42
+```
+
+For manual Xcode Organizer archives, increment the shared Flutter build number
+before archiving:
+
+```sh
+./tool/bump_build_number.sh
+```
 
 For CI or a clean machine, use Xcode's automatic provisioning options by passing
 the normal `xcodebuild` authentication flags through the scripts:

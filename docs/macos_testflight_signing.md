@@ -32,6 +32,11 @@ provisioning profile into:
 Xcode can also download managed certificates and profiles when the Apple
 Developer account is signed in under Xcode > Settings > Accounts.
 
+If you use Xcode-managed automatic signing, the local provisioning profile may
+not exist until Xcode archives or exports the app. In that case, use the upload
+script with `-allowProvisioningUpdates` instead of relying on the local profile
+readiness check.
+
 ## Local readiness check
 
 Run:
@@ -58,7 +63,7 @@ After the CloudKit schema has been deployed to Production:
 
 ```sh
 SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
-  ./tool/upload_macos_testflight.sh --bump-build-number
+  ./tool/upload_macos_testflight.sh --bump-build-number -allowProvisioningUpdates
 ```
 
 The upload script:
@@ -85,11 +90,12 @@ before archiving:
 ```
 
 For CI or a clean machine, use Xcode's automatic provisioning options by passing
-the normal `xcodebuild` authentication flags through the scripts:
+the normal `xcodebuild` provisioning/authentication flags through the scripts:
 
 ```sh
 SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
   ./tool/upload_macos_testflight.sh \
+  --bump-build-number \
   -allowProvisioningUpdates \
   -authenticationKeyPath /path/to/AuthKey.p8 \
   -authenticationKeyID KEY_ID \

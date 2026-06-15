@@ -70,6 +70,9 @@ void main() {
 
   test('macOS TestFlight upload uses App Store Connect export options', () {
     final script = File('tool/upload_macos_testflight.sh').readAsStringSync();
+    final signingCheck = File(
+      'tool/check_macos_testflight_signing.sh',
+    ).readAsStringSync();
     final exportOptions = File(
       'macos/Runner/ExportOptionsAppStore.plist',
     ).readAsStringSync();
@@ -88,8 +91,11 @@ void main() {
     expect(exportOptions, contains('<string>upload</string>'));
     expect(exportOptions, contains('<string>Production</string>'));
     expect(exportOptions, contains('<string>Mac App Distribution</string>'));
+    expect(signingCheck, contains('Xcode-managed automatic signing'));
     expect(docs, contains('Mac App Distribution'));
     expect(docs, contains('--bump-build-number'));
+    expect(docs, contains('-allowProvisioningUpdates'));
+    expect(docs, contains('Xcode-managed automatic signing'));
     expect(docs, contains('iCloud.com.alkinum.serlink'));
   });
 

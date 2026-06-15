@@ -58,22 +58,32 @@ On this machine, the current known missing pieces are:
 
 After the CloudKit schema has been deployed to Production:
 
-1. Open `ios/Runner.xcworkspace` in Xcode.
-2. Select the `Runner` scheme.
-3. Select `Any iOS Device` or `Any iOS Device (arm64)` as the run destination.
-4. Confirm Signing & Capabilities uses team `PB8H83VL3Z`, bundle ID
+1. Increment the build number:
+
+   ```sh
+   ./tool/bump_build_number.sh
+   ```
+
+2. Open `ios/Runner.xcworkspace` in Xcode.
+3. Select the `Runner` scheme.
+4. Select `Any iOS Device` or `Any iOS Device (arm64)` as the run destination.
+5. Confirm Signing & Capabilities uses team `PB8H83VL3Z`, bundle ID
    `com.alkinum.serlink`, iCloud, CloudKit, and container
    `iCloud.com.alkinum.serlink`.
-5. Choose Product > Archive.
-6. In Organizer, select the new archive.
-7. Choose Distribute App > App Store Connect > Upload.
-8. Use automatic signing, confirm CloudKit Production, upload symbols, and
+6. Choose Product > Archive.
+7. In Organizer, select the new archive.
+8. Choose Distribute App > App Store Connect > Upload.
+9. Use automatic signing, confirm CloudKit Production, upload symbols, and
    finish the upload.
-9. Open App Store Connect > Serlink > TestFlight after processing completes.
+10. Open App Store Connect > Serlink > TestFlight after processing completes.
 
 Apple creates the first beta version after the first build upload. The build
 still needs to finish App Store Connect processing before it can be assigned to
 internal or external testers.
+
+`tool/bump_build_number.sh` updates the `version: x.y.z+n` line in
+`pubspec.yaml` and runs `flutter pub get`, which refreshes Flutter's generated
+build settings before Xcode archives the app.
 
 ## Scripted upload
 
@@ -81,18 +91,27 @@ After the CloudKit schema has been deployed to Production:
 
 ```sh
 SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
-  ./tool/upload_ios_testflight.sh
+  ./tool/upload_ios_testflight.sh --bump-build-number
 ```
 
 The upload script:
 
 1. Runs the signing readiness check.
-2. Configures the Flutter iOS release build with
+2. Optionally increments the Flutter build number when
+   `--bump-build-number` is provided.
+3. Configures the Flutter iOS release build with
    `SERLINK_DISTRIBUTION=app_store`.
-3. Archives `ios/Runner.xcworkspace` for `generic/platform=iOS`.
-4. Uses `ios/Runner/ExportOptionsAppStore.plist`.
-5. Exports with `method=app-store-connect`, `destination=upload`, and
+4. Archives `ios/Runner.xcworkspace` for `generic/platform=iOS`.
+5. Uses `ios/Runner/ExportOptionsAppStore.plist`.
+6. Exports with `method=app-store-connect`, `destination=upload`, and
    CloudKit Production.
+
+To set a specific build number instead of incrementing:
+
+```sh
+SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
+  ./tool/upload_ios_testflight.sh --build-number 42
+```
 
 For CI or a clean machine, use Xcode's automatic provisioning options by
 passing the normal `xcodebuild` authentication flags through the script:

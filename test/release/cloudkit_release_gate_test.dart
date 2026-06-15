@@ -64,17 +64,35 @@ void main() {
       final commandDoc = File(
         'docs/development_release_commands.md',
       ).readAsStringSync();
+      final iosReleaseDoc = File('docs/ios_release.md').readAsStringSync();
+      final macosReleaseDoc = File('docs/macos_release.md').readAsStringSync();
 
       expect(doc, contains('iCloud.com.alkinum.serlink'));
       expect(doc, contains('SerlinkSyncObject'));
       expect(doc, contains('`path`: String'));
       expect(doc, contains('`data`: Asset'));
       expect(doc, contains('SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1'));
+      expect(doc, contains('docs/ios_release.md'));
+      expect(doc, contains('docs/macos_release.md'));
       expect(commandDoc, contains('upload_ios_testflight.sh'));
       expect(commandDoc, contains('upload_macos_testflight.sh'));
       expect(commandDoc, contains('--bump-build-number'));
       expect(commandDoc, contains('-allowProvisioningUpdates'));
       expect(commandDoc, contains('sips -g hasAlpha'));
+      expect(commandDoc, contains('docs/ios_release.md'));
+      expect(commandDoc, contains('docs/macos_release.md'));
+      expect(iosReleaseDoc, contains('ios/Runner.xcworkspace'));
+      expect(iosReleaseDoc, contains('cd ios && pod install && cd ..'));
+      expect(iosReleaseDoc, contains('upload_ios_testflight.sh'));
+      expect(iosReleaseDoc, contains('--distribution ios_app_store'));
+      expect(iosReleaseDoc, contains('Product > Archive'));
+      expect(iosReleaseDoc, contains('Distribute App > App Store Connect'));
+      expect(macosReleaseDoc, contains('macos/Runner.xcworkspace'));
+      expect(macosReleaseDoc, contains('cd macos && pod install && cd ..'));
+      expect(macosReleaseDoc, contains('upload_macos_testflight.sh'));
+      expect(macosReleaseDoc, contains('build_macos_direct.sh'));
+      expect(macosReleaseDoc, contains('SERLINK_DISTRIBUTION=direct'));
+      expect(macosReleaseDoc, contains('Developer ID Application'));
     },
   );
 

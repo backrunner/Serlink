@@ -8,6 +8,9 @@ TestFlight, App Store, or DMG build.
 For the short command reference, see
 `docs/development_release_commands.md`.
 
+For platform release runbooks, see `docs/ios_release.md` and
+`docs/macos_release.md`.
+
 ## CloudKit schema contract
 
 The current CloudKit schema uses the default private database in:

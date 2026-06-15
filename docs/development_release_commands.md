@@ -5,6 +5,9 @@ management, and App Store Connect/TestFlight uploads. Platform-specific signing
 details live in `docs/ios_testflight_signing.md` and
 `docs/macos_testflight_signing.md`.
 
+Use `docs/ios_release.md` and `docs/macos_release.md` for the full release
+runbooks.
+
 ## Routine verification
 
 Run static analysis:

@@ -2,6 +2,8 @@
 
 Serlink uses one codebase with build-time distribution switches.
 
+For the full macOS release runbook, see `docs/macos_release.md`.
+
 ## App Store and TestFlight
 
 Use this channel for App Store Connect uploads:

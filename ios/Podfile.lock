@@ -14,6 +14,8 @@ PODS:
     - Flutter
     - FlutterMacOS
     - Sentry/HybridSDK (= 8.58.3)
+  - url_launcher_ios (0.0.1):
+    - Flutter
 
 DEPENDENCIES:
   - file_selector_ios (from `.symlinks/plugins/file_selector_ios/ios`)
@@ -22,6 +24,7 @@ DEPENDENCIES:
   - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - sentry_flutter (from `.symlinks/plugins/sentry_flutter/ios`)
+  - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
 
 SPEC REPOS:
   trunk:
@@ -40,6 +43,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/package_info_plus/ios"
   sentry_flutter:
     :path: ".symlinks/plugins/sentry_flutter/ios"
+  url_launcher_ios:
+    :path: ".symlinks/plugins/url_launcher_ios/ios"
 
 SPEC CHECKSUMS:
   file_selector_ios: ec57ec07954363dd730b642e765e58f199bb621a
@@ -49,6 +54,7 @@ SPEC CHECKSUMS:
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   Sentry: 108fdbb76299c4189af12246bf0308c09c278922
   sentry_flutter: 32e67cb4756ce3de42bbd56581fa935922ff328f
+  url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
 
 PODFILE CHECKSUM: fb98732b762b71e0f7010d968cef4109fcf03159
 

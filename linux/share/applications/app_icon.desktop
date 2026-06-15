@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Your Flutter App
+Comment=Replace Name, Comment, Exec, and Icon with your Flutter Linux APPLICATION_ID values.
+Exec=your_flutter_binary
+Icon=app_icon
+Terminal=false
+Categories=Utility;

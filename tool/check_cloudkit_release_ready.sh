@@ -14,7 +14,7 @@ usage() {
 Usage: tool/check_cloudkit_release_ready.sh [options]
 
 Options:
-  --distribution app_store|direct|all
+  --distribution ios_app_store|app_store|direct|all
       Limit distribution-channel checks. Defaults to all.
 
   --require-schema-production
@@ -58,7 +58,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$DISTRIBUTION" in
-  app_store|direct|all) ;;
+  ios_app_store|app_store|direct|all) ;;
   *) fail "unsupported distribution: $DISTRIBUTION" ;;
 esac
 
@@ -173,6 +173,16 @@ plist_requires_development_environment "ios/Runner/DebugProfile.entitlements" "i
 
 check_cloudkit_entitlements "ios/Runner/Release.entitlements" "iOS Release entitlements"
 plist_rejects_development_environment "ios/Runner/Release.entitlements" "iOS Release entitlements"
+
+if [[ "$DISTRIBUTION" == "ios_app_store" || "$DISTRIBUTION" == "all" ]]; then
+  check_script_contains "tool/upload_ios_testflight.sh" "--dart-define=SERLINK_DISTRIBUTION=app_store" "iOS TestFlight upload script"
+  check_script_contains "tool/upload_ios_testflight.sh" "ios/Runner/ExportOptionsAppStore.plist" "iOS TestFlight upload script"
+  check_script_contains "tool/upload_ios_testflight.sh" "xcodebuild archive" "iOS TestFlight upload script"
+  check_script_contains "ios/Runner/ExportOptionsAppStore.plist" "<string>app-store-connect</string>" "iOS App Store export options"
+  check_script_contains "ios/Runner/ExportOptionsAppStore.plist" "<string>upload</string>" "iOS App Store export options"
+  check_script_contains "ios/Runner/ExportOptionsAppStore.plist" "<string>Production</string>" "iOS App Store export options"
+  ok "iOS App Store Connect release surface is locked"
+fi
 
 check_cloudkit_entitlements "macos/Runner/DebugProfile.entitlements" "macOS Debug/Profile entitlements"
 plist_requires_development_environment "macos/Runner/DebugProfile.entitlements" "macOS Debug/Profile entitlements"

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/core/ids/entity_id.dart';
+import 'package:serlink/database/database_recovery.dart';
 import 'package:serlink/database/serlink_database.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
 import 'package:serlink/features/sync/data/local_sync_provider.dart';
@@ -189,6 +190,61 @@ void main() {
       );
       expect(await DriftVaultHeaderStore(database).read(), isNull);
       expect(await DriftVaultRecordRepository(database).list(), isEmpty);
+    },
+  );
+
+  test(
+    'CloudKit header corruption is reported as remote recovery state',
+    () async {
+      final sourceVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await sourceVault.initialize(passphrase: 'passphrase');
+      final sourceRecords = InMemoryVaultRecordRepository();
+      final host = await sourceVault.encryptRecord(
+        id: VaultRecordId('host:corrupt-header'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"corrupt.example.test"}'),
+      );
+      await sourceRecords.upsert(host);
+      final provider = LocalDirectorySyncProvider(remoteDir);
+      await SyncRunService(
+        vault: sourceVault,
+        records: sourceRecords,
+      ).pushEncryptedSnapshot(provider);
+      await provider.deleteObject(const RemoteObjectRef('vault/header.json'));
+
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'ios',
+              targetPlatform: TargetPlatform.iOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => LocalDirectorySyncProvider(remoteDir),
+          ),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      final state = await container.read(vaultSessionControllerProvider.future);
+
+      expect(state.vaultState, VaultState.locked);
+      expect(state.recoveryStatus, VaultRecoveryStatus.remoteCorrupt);
+      expect(state.failureMessage, 'Remote vault header is missing.');
     },
   );
 

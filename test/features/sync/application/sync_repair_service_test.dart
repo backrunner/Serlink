@@ -112,6 +112,20 @@ void main() {
       expect(plan?.action, SyncRepairAction.rebuildRemoteFromLocal);
       expect(plan?.destructive, isTrue);
     });
+
+    for (final code in [
+      'sync.remote_header_missing',
+      'sync.remote_header_invalid',
+    ]) {
+      test('offers remote repair for $code', () {
+        final plan = service.planFor(
+          SyncRunException(code, 'Remote vault header is unavailable.'),
+        );
+
+        expect(plan?.action, SyncRepairAction.rebuildRemoteFromLocal);
+        expect(plan?.destructive, isTrue);
+      });
+    }
   });
 }
 

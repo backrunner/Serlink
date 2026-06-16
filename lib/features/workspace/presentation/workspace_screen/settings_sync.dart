@@ -185,10 +185,11 @@ class _SyncRepairRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    final copy = _syncRepairCopy(l10n, plan);
     return _SettingsActionRow(
       icon: Icons.build_outlined,
       title: l10n.syncRepairTitle,
-      subtitle: plan.message,
+      subtitle: copy.message,
       action: _SettingsTextButton(
         onPressed: () => _repairWebDavSync(context, ref, plan),
         child: Text(l10n.syncRepairAction),
@@ -210,10 +211,11 @@ Future<void> _repairWebDavSync(
     await _trustWebDavCertificate(context, ref, plan);
     return;
   }
+  final copy = _syncRepairCopy(context.l10n, plan);
   final confirmed = await _confirmDialog(
     context,
-    title: plan.title,
-    body: plan.message,
+    title: copy.title,
+    body: copy.message,
     confirmLabel: context.l10n.syncRepairAction,
     destructive: plan.destructive,
   );
@@ -263,7 +265,7 @@ Future<void> _trustWebDavCertificate(
       ? WebDavTlsCertificateDetails.tryParse(lastFailure.diagnostic)
       : null;
   if (certificate == null) {
-    _showSnackBar(context, plan.message);
+    _showSnackBar(context, _syncRepairCopy(context.l10n, plan).message);
     return;
   }
   final l10n = context.l10n;
@@ -300,19 +302,20 @@ Future<void> _reviewLocalClock(
   final certificate = lastFailure is SyncProviderException
       ? WebDavTlsCertificateDetails.tryParse(lastFailure.diagnostic)
       : null;
+  final copy = _syncRepairCopy(context.l10n, plan);
   await showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
-      title: Text(plan.title),
+      title: Text(copy.title),
       content: SizedBox(
         width: 520,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(plan.message),
+            Text(copy.message),
             const SizedBox(height: 12),
             Text(
               context.l10n.syncLocalTimeLabel(
@@ -544,6 +547,38 @@ String _autoSyncStatusSubtitle(AppLocalizations l10n, AutoSyncStatus status) {
     AutoSyncPhase.conflicts => l10n.syncConflictCount(status.conflictCount),
     AutoSyncPhase.failed =>
       status.lastFailureMessage ?? l10n.syncAutoSyncFailed,
+  };
+}
+
+({String title, String message}) _syncRepairCopy(
+  AppLocalizations l10n,
+  SyncRepairPlan plan,
+) {
+  return switch (plan.action) {
+    SyncRepairAction.reviewLocalClock => (
+      title: l10n.syncRepairClockTitle,
+      message: l10n.syncRepairClockBody,
+    ),
+    SyncRepairAction.trustWebDavCertificate => (
+      title: l10n.syncRepairTrustCertificateTitle,
+      message: l10n.syncRepairTrustCertificateBody,
+    ),
+    SyncRepairAction.initializeEmptyRemote => (
+      title: l10n.syncRepairInitializeRemoteTitle,
+      message: l10n.syncRepairInitializeRemoteBody,
+    ),
+    SyncRepairAction.rebuildRemoteFromLocal => (
+      title: plan.destructive
+          ? l10n.syncRepairReplaceRemoteTitle
+          : l10n.syncRepairRemoteRebuildTitle,
+      message: plan.destructive
+          ? l10n.syncRepairReplaceRemoteBody
+          : l10n.syncRepairRemoteRebuildBody,
+    ),
+    SyncRepairAction.restoreLocalFromRemote => (
+      title: l10n.syncRepairRestoreLocalTitle,
+      message: l10n.syncRepairRestoreLocalBody,
+    ),
   };
 }
 

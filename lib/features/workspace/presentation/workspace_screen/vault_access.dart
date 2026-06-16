@@ -232,31 +232,30 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final t = context.tokens;
-    final session = ref.watch(vaultSessionControllerProvider).value ??
-        widget.session;
+    final session =
+        ref.watch(vaultSessionControllerProvider).value ?? widget.session;
     final busy = session.isBusy;
     final message =
         _localErrorMessage ?? session.failureMessage ?? widget.errorMessage;
     final recordReport = session.recordHealthReport;
     final corruptCount = recordReport?.corruptRecords.length ?? 0;
     final title = switch (session.recoveryStatus) {
-      VaultRecoveryStatus.databaseCorrupt => 'Database recovery',
-      VaultRecoveryStatus.vaultHeaderInvalid => 'Vault header recovery',
-      VaultRecoveryStatus.recordsCorrupt => 'Record recovery',
-      VaultRecoveryStatus.remoteCorrupt => 'Remote sync recovery',
-      VaultRecoveryStatus.healthy => 'Vault recovery',
+      VaultRecoveryStatus.databaseCorrupt => l10n.vaultRecoveryDatabaseTitle,
+      VaultRecoveryStatus.vaultHeaderInvalid => l10n.vaultRecoveryHeaderTitle,
+      VaultRecoveryStatus.recordsCorrupt => l10n.vaultRecoveryRecordsTitle,
+      VaultRecoveryStatus.remoteCorrupt => l10n.vaultRecoveryRemoteTitle,
+      VaultRecoveryStatus.healthy => l10n.vaultRecoveryTitle,
     };
     final body = switch (session.recoveryStatus) {
-      VaultRecoveryStatus.databaseCorrupt =>
-        'Serlink could not open this local database safely.',
-      VaultRecoveryStatus.vaultHeaderInvalid =>
-        'The local vault header is invalid or incomplete.',
-      VaultRecoveryStatus.recordsCorrupt =>
-        '$corruptCount encrypted record${corruptCount == 1 ? '' : 's'} failed authentication.',
-      VaultRecoveryStatus.remoteCorrupt =>
-        'The remote sync set needs repair before it can be used.',
-      VaultRecoveryStatus.healthy => 'Vault recovery is available.',
+      VaultRecoveryStatus.databaseCorrupt => l10n.vaultRecoveryDatabaseBody,
+      VaultRecoveryStatus.vaultHeaderInvalid => l10n.vaultRecoveryHeaderBody,
+      VaultRecoveryStatus.recordsCorrupt => l10n.vaultRecoveryRecordsBody(
+        corruptCount,
+      ),
+      VaultRecoveryStatus.remoteCorrupt => l10n.vaultRecoveryRemoteBody,
+      VaultRecoveryStatus.healthy => l10n.vaultRecoveryBody,
     };
 
     return Center(
@@ -300,7 +299,9 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
                   onPressed: busy ? null : _restoreLatestBackup,
                   icon: const Icon(Icons.restore_outlined, size: 19),
                   label: Text(
-                    busy ? context.l10n.savingAction : 'Restore latest backup',
+                    busy
+                        ? context.l10n.savingAction
+                        : context.l10n.vaultRestoreLatestBackupAction,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -318,7 +319,7 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
                     key: const ValueKey('vault-quarantine-records-button'),
                     onPressed: busy ? null : _quarantineCorruptRecords,
                     icon: const Icon(Icons.inventory_2_outlined, size: 19),
-                    label: const Text('Quarantine corrupt records'),
+                    label: Text(context.l10n.vaultQuarantineRecordsAction),
                   ),
                 ],
                 const SizedBox(height: 10),
@@ -327,7 +328,9 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
                       ? null
                       : () => _exportDiagnosticBundle(context, ref),
                   icon: const Icon(Icons.bug_report_outlined, size: 19),
-                  label: Text(context.l10n.dataExchangeExportDiagnosticBundleTitle),
+                  label: Text(
+                    context.l10n.dataExchangeExportDiagnosticBundleTitle,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 SerlinkTextButton.danger(
@@ -397,7 +400,7 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
       return;
     }
     if (error == null) {
-      _showSnackBar(context, 'Corrupt records quarantined.');
+      _showSnackBar(context, context.l10n.vaultCorruptRecordsQuarantinedSnack);
       return;
     }
     setState(() {

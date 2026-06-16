@@ -855,13 +855,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       } on SyncRunException catch (error) {
         return VaultSessionState(
           vaultState: VaultState.locked,
-          recoveryStatus: VaultRecoveryStatus.vaultHeaderInvalid,
+          recoveryStatus: VaultRecoveryStatus.remoteCorrupt,
           failureMessage: error.message,
         );
       } on SyncProviderException catch (error) {
         return VaultSessionState(
           vaultState: VaultState.locked,
-          recoveryStatus: VaultRecoveryStatus.vaultHeaderInvalid,
+          recoveryStatus: VaultRecoveryStatus.remoteCorrupt,
           failureMessage: error.message,
         );
       }

@@ -255,7 +255,6 @@ class _SettingsSurface extends ConsumerWidget {
                     _SettingsActionRow(
                       icon: Icons.code_outlined,
                       title: 'GitHub',
-                      subtitle: _serlinkRepositoryUrl,
                       action: _SettingsTextButton.icon(
                         key: const ValueKey('settings-about-github-button'),
                         onPressed: () =>

@@ -16,4 +16,20 @@ import UIKit
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     cloudKitChannel.register(with: engineBridge.applicationRegistrar.messenger())
   }
+
+  override func application(
+    _ application: UIApplication,
+    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+  ) {
+    if cloudKitChannel.handleRemoteNotification(userInfo) {
+      completionHandler(.newData)
+      return
+    }
+    super.application(
+      application,
+      didReceiveRemoteNotification: userInfo,
+      fetchCompletionHandler: completionHandler
+    )
+  }
 }

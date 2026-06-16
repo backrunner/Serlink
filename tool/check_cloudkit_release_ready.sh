@@ -6,6 +6,8 @@ CONTAINER_ID="iCloud.com.alkinum.serlink"
 RECORD_TYPE="SerlinkSyncObject"
 PATH_FIELD="path"
 DATA_FIELD="data"
+EVENT_CHANNEL="serlink/cloudkit/events"
+SUBSCRIPTION_ID="serlink-sync-objects"
 REQUIRE_SCHEMA_PRODUCTION=0
 DISTRIBUTION="all"
 
@@ -115,6 +117,16 @@ plist_requires_development_environment() {
   ok "$label stays on the CloudKit development environment"
 }
 
+plist_requires_aps_environment() {
+  local plist="$1"
+  local expected="$2"
+  local label="$3"
+  local actual
+  actual="$(plist_value "$plist" "com.apple.developer.aps-environment")"
+  [[ "$actual" == "$expected" ]] || fail "$label requires APS $expected, found '${actual:-missing}'"
+  ok "$label uses APS $expected"
+}
+
 check_cloudkit_entitlements() {
   local plist="$1"
   local label="$2"
@@ -137,7 +149,13 @@ check_swift_contract() {
     || fail "$label does not use path field $PATH_FIELD"
   grep -q "dataField = \"$DATA_FIELD\"" "$file" \
     || fail "$label does not use data field $DATA_FIELD"
-  ok "$label matches the CloudKit schema contract"
+  grep -q "eventsChannelName = \"$EVENT_CHANNEL\"" "$file" \
+    || fail "$label does not expose the CloudKit event channel"
+  grep -q "subscriptionID = \"$SUBSCRIPTION_ID\"" "$file" \
+    || fail "$label does not install the remote change subscription"
+  grep -q "writeObjectIfUnchanged" "$file" \
+    || fail "$label does not expose conditional manifest writes"
+  ok "$label matches the CloudKit schema and realtime sync contract"
 }
 
 check_script_contains() {
@@ -170,9 +188,12 @@ cd "$ROOT_DIR"
 
 check_cloudkit_entitlements "ios/Runner/DebugProfile.entitlements" "iOS Debug/Profile entitlements"
 plist_requires_development_environment "ios/Runner/DebugProfile.entitlements" "iOS Debug/Profile entitlements"
+plist_requires_aps_environment "ios/Runner/DebugProfile.entitlements" "development" "iOS Debug/Profile entitlements"
 
 check_cloudkit_entitlements "ios/Runner/Release.entitlements" "iOS Release entitlements"
 plist_rejects_development_environment "ios/Runner/Release.entitlements" "iOS Release entitlements"
+plist_requires_aps_environment "ios/Runner/Release.entitlements" "production" "iOS Release entitlements"
+check_script_contains "ios/Runner/Info.plist" "remote-notification" "iOS Info.plist"
 
 if [[ "$DISTRIBUTION" == "ios_app_store" || "$DISTRIBUTION" == "all" ]]; then
   check_script_contains "tool/upload_ios_testflight.sh" "--dart-define=SERLINK_DISTRIBUTION=app_store" "iOS TestFlight upload script"
@@ -188,10 +209,12 @@ fi
 
 check_cloudkit_entitlements "macos/Runner/DebugProfile.entitlements" "macOS Debug/Profile entitlements"
 plist_requires_development_environment "macos/Runner/DebugProfile.entitlements" "macOS Debug/Profile entitlements"
+plist_requires_aps_environment "macos/Runner/DebugProfile.entitlements" "development" "macOS Debug/Profile entitlements"
 
 if [[ "$DISTRIBUTION" == "app_store" || "$DISTRIBUTION" == "all" ]]; then
   check_cloudkit_entitlements "macos/Runner/Release.entitlements" "macOS App Store entitlements"
   plist_rejects_development_environment "macos/Runner/Release.entitlements" "macOS App Store entitlements"
+  plist_requires_aps_environment "macos/Runner/Release.entitlements" "production" "macOS App Store entitlements"
   plist_requires_bool "macos/Runner/Release.entitlements" "com.apple.security.app-sandbox" "true" "macOS App Store entitlements"
   plist_requires_bool "macos/Runner/Release.entitlements" "com.apple.security.network.client" "true" "macOS App Store entitlements"
   plist_requires_bool "macos/Runner/Release.entitlements" "com.apple.security.network.server" "true" "macOS App Store entitlements"
@@ -209,6 +232,7 @@ fi
 if [[ "$DISTRIBUTION" == "direct" || "$DISTRIBUTION" == "all" ]]; then
   check_cloudkit_entitlements "macos/Runner/Direct.entitlements" "macOS Direct entitlements"
   plist_rejects_development_environment "macos/Runner/Direct.entitlements" "macOS Direct entitlements"
+  plist_requires_aps_environment "macos/Runner/Direct.entitlements" "production" "macOS Direct entitlements"
   if [[ "$(plist_value "macos/Runner/Direct.entitlements" "com.apple.security.app-sandbox")" == "true" ]]; then
     fail "macOS Direct entitlements should not enable the App Sandbox"
   fi

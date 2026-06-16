@@ -50,12 +50,30 @@ void main() {
     final refs = await provider.listRecordObjects();
     expect([
       for (final ref in refs) ref.path,
-    ], containsAll(['records/host%3A1.json', 'vault/header.json']));
+    ], containsAll([startsWith('records/host%3A1-'), 'vault/header.json']));
 
     final remoteRecord = utf8.decode(
-      await provider.readObject(const RemoteObjectRef('records/host%3A1.json')),
+      await provider.readObject(
+        await _manifestRecordRef(
+          provider: provider,
+          vault: vault,
+          id: VaultRecordId('host:1'),
+        ),
+      ),
     );
     expect(remoteRecord, isNot(contains('secret.example.test')));
+
+    final remoteHeader = VaultHeader.fromJson(
+      jsonDecode(
+            utf8.decode(
+              await provider.readObject(
+                const RemoteObjectRef('vault/header.json'),
+              ),
+            ),
+          )
+          as Map<String, Object?>,
+    );
+    expect(remoteHeader.localUnlockProtectors, isEmpty);
 
     final manifest = await provider.readManifest();
     expect(manifest, isNotNull);
@@ -90,7 +108,10 @@ void main() {
     expect(result.writerDevice!.displayName, 'Ops Laptop');
 
     final refs = await provider.listRecordObjects(prefix: 'records/');
-    expect(refs.map((ref) => ref.path), contains('records/host%3A1.json'));
+    expect(
+      refs.map((ref) => ref.path),
+      contains(startsWith('records/host%3A1-')),
+    );
     expect(
       refs.map((ref) => ref.path),
       contains(startsWith('records/sync%3Adevice%3A')),
@@ -348,6 +369,68 @@ void main() {
   });
 
   test(
+    'sync reports same-record conflicts without overwriting unlocked local data',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final remoteEnvelope = await vault.encryptRecord(
+        id: VaultRecordId('host:auto-conflict'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'remote.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+          }),
+        ),
+      );
+      await records.upsert(remoteEnvelope);
+      await service.pushEncryptedSnapshot(provider);
+
+      final localEnvelope = await vault.encryptRecord(
+        id: remoteEnvelope.id,
+        type: remoteEnvelope.type,
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'local.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 30).toIso8601String(),
+          }),
+        ),
+      );
+      await records.upsert(localEnvelope);
+
+      await expectLater(
+        service.syncEncryptedSnapshot(provider, reportConflicts: true),
+        throwsA(
+          isA<SyncRunConflictException>().having(
+            (error) => error.conflicts.single.id,
+            'conflict id',
+            localEnvelope.id,
+          ),
+        ),
+      );
+      expect(vault.state, VaultState.unlocked);
+      expect(
+        (await records.read(localEnvelope.id))!.revision,
+        localEnvelope.revision,
+      );
+      final remoteObject = VaultRecordEnvelope.fromJson(
+        jsonDecode(
+              utf8.decode(
+                await provider.readObject(
+                  await _manifestRecordRef(
+                    provider: provider,
+                    vault: vault,
+                    id: remoteEnvelope.id,
+                  ),
+                ),
+              ),
+            )
+            as Map<String, Object?>,
+      );
+      expect(remoteObject.revision, remoteEnvelope.revision);
+    },
+  );
+
+  test(
     'conflict field set exposes field merge choices for host records',
     () async {
       final provider = LocalDirectorySyncProvider(tempDir);
@@ -499,7 +582,11 @@ void main() {
       jsonDecode(
             utf8.decode(
               await provider.readObject(
-                const RemoteObjectRef('records/host%3Alatest.json'),
+                await _manifestRecordRef(
+                  provider: provider,
+                  vault: vault,
+                  id: localEnvelope.id,
+                ),
               ),
             ),
           )
@@ -588,7 +675,11 @@ void main() {
         jsonDecode(
               utf8.decode(
                 await provider.readObject(
-                  const RemoteObjectRef('records/secret%3Alinked-secret.json'),
+                  await _manifestRecordRef(
+                    provider: provider,
+                    vault: vault,
+                    id: localSecret.id,
+                  ),
                 ),
               ),
             )
@@ -665,6 +756,60 @@ void main() {
       expect(result.recordsDownloaded, 1);
       expect(result.recordsUploaded, 2);
       expect(await records.read(remoteEnvelope.id), isNotNull);
+      expect(vault.state, VaultState.unlocked);
+    },
+  );
+
+  test(
+    'sync retries a conditional manifest conflict and merges concurrent remote additions',
+    () async {
+      final provider = _ManifestConflictProvider(
+        LocalDirectorySyncProvider(tempDir),
+      );
+      final baseEnvelope = await vault.encryptRecord(
+        id: VaultRecordId('host:base'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"base.example.test"}'),
+      );
+      await records.upsert(baseEnvelope);
+      await service.pushEncryptedSnapshot(provider.inner);
+
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await remoteRecords.upsert(baseEnvelope);
+      final concurrentRemote = await vault.encryptRecord(
+        id: VaultRecordId('host:concurrent-remote'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"remote-new.example.test"}'),
+      );
+      await remoteRecords.upsert(concurrentRemote);
+
+      final localEnvelope = await vault.encryptRecord(
+        id: VaultRecordId('host:local-new'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"local-new.example.test"}'),
+      );
+      await records.upsert(localEnvelope);
+      provider.onFirstManifestConflict = () async {
+        await SyncRunService(
+          vault: vault,
+          records: remoteRecords,
+        ).pushEncryptedSnapshot(provider.inner);
+      };
+
+      final result = await service.syncEncryptedSnapshot(provider);
+
+      expect(result.recordsDownloaded, 1);
+      expect(await records.read(concurrentRemote.id), isNotNull);
+      expect(await records.read(localEnvelope.id), isNotNull);
+      final refs = await provider.inner.listRecordObjects(prefix: 'records/');
+      expect(
+        refs.map((ref) => ref.path),
+        contains(startsWith('records/host%3Aconcurrent-remote-')),
+      );
+      expect(
+        refs.map((ref) => ref.path),
+        contains(startsWith('records/host%3Alocal-new-')),
+      );
     },
   );
 
@@ -697,7 +842,11 @@ void main() {
         jsonDecode(
               utf8.decode(
                 await provider.readObject(
-                  const RemoteObjectRef('records/host%3Aconflict.json'),
+                  await _manifestRecordRef(
+                    provider: provider,
+                    vault: vault,
+                    id: localEnvelope.id,
+                  ),
                 ),
               ),
             )
@@ -767,7 +916,7 @@ void main() {
       final refs = await provider.listRecordObjects(prefix: 'records/');
       expect(
         refs.map((ref) => ref.path),
-        isNot(contains('records/host%3Adeleted.json')),
+        isNot(contains(startsWith('records/host%3Adeleted-'))),
       );
       expect(
         refs.map((ref) => ref.path),
@@ -817,7 +966,7 @@ void main() {
       final refs = await provider.listRecordObjects(prefix: 'records/');
       expect(
         refs.map((ref) => ref.path),
-        contains('records/host%3Adeleted-newer-remote.json'),
+        contains(startsWith('records/host%3Adeleted-newer-remote-')),
       );
       expect(
         refs.map((ref) => ref.path),
@@ -873,7 +1022,7 @@ void main() {
       final refs = await provider.listRecordObjects(prefix: 'records/');
       expect(
         refs.map((ref) => ref.path),
-        isNot(contains('records/sync%3Adevice%3Arevoked-device.json')),
+        isNot(contains(startsWith('records/sync%3Adevice%3Arevoked-device-'))),
       );
       expect(
         refs.map((ref) => ref.path),
@@ -962,11 +1111,117 @@ void main() {
     final refs = await provider.listRecordObjects(prefix: 'records/');
     expect(
       refs.map((ref) => ref.path),
-      contains('records/host%3Asurvives.json'),
+      contains(startsWith('records/host%3Asurvives-')),
     );
     expect(
       refs.map((ref) => ref.path),
       isNot(contains(startsWith('records/sync%3Atombstone%3A'))),
     );
   });
+}
+
+Future<RemoteObjectRef> _manifestRecordRef({
+  required LocalDirectorySyncProvider provider,
+  required InMemoryVaultService vault,
+  required VaultRecordId id,
+}) async {
+  final manifest = await provider.readManifest();
+  expect(manifest, isNotNull);
+  final manifestEnvelope = VaultRecordEnvelope.fromJson(
+    jsonDecode(utf8.decode(manifest!.encryptedPayload)) as Map<String, Object?>,
+  );
+  final manifestData =
+      jsonDecode(utf8.decode(await vault.decryptRecord(manifestEnvelope)))
+          as Map<String, Object?>;
+  final entries = manifestData['records'] as List<Object?>;
+  for (final raw in entries) {
+    final entry = raw as Map<String, Object?>;
+    if (entry['id'] == id.value) {
+      return RemoteObjectRef(entry['path'] as String);
+    }
+  }
+  fail('Manifest did not contain ${id.value}');
+}
+
+class _ManifestConflictProvider implements SyncProvider {
+  _ManifestConflictProvider(this.inner);
+
+  final LocalDirectorySyncProvider inner;
+  Future<void> Function()? onFirstManifestConflict;
+  var _conflicted = false;
+
+  @override
+  Future<ProviderCapabilities> capabilities() {
+    return inner.capabilities();
+  }
+
+  @override
+  Future<RemoteManifest?> readManifest() {
+    return inner.readManifest();
+  }
+
+  @override
+  Future<void> writeManifest(RemoteManifest manifest) {
+    return inner.writeManifest(manifest);
+  }
+
+  @override
+  Future<void> writeManifestIfUnchanged(
+    RemoteManifest manifest,
+    RemoteManifest? expectedCurrent,
+  ) async {
+    if (!_conflicted && onFirstManifestConflict != null) {
+      _conflicted = true;
+      await onFirstManifestConflict!();
+    }
+    final current = await inner.readManifest();
+    if (!_sameManifest(current, expectedCurrent)) {
+      throw const SyncProviderException(
+        'sync.provider.conflict',
+        'Remote sync data changed while syncing.',
+      );
+    }
+    await inner.writeManifest(manifest);
+  }
+
+  @override
+  Future<List<RemoteObjectRef>> listRecordObjects({String? prefix}) {
+    return inner.listRecordObjects(prefix: prefix);
+  }
+
+  @override
+  Future<List<int>> readObject(RemoteObjectRef ref) {
+    return inner.readObject(ref);
+  }
+
+  @override
+  Future<void> writeObject(RemoteObjectRef ref, List<int> bytes) {
+    return inner.writeObject(ref, bytes);
+  }
+
+  @override
+  Future<void> deleteObject(RemoteObjectRef ref) {
+    return inner.deleteObject(ref);
+  }
+}
+
+bool _sameManifest(RemoteManifest? a, RemoteManifest? b) {
+  if (a == null || b == null) {
+    return a == b;
+  }
+  return a.vaultId == b.vaultId &&
+      a.protocolVersion == b.protocolVersion &&
+      _sameBytes(a.encryptedPayload, b.encryptedPayload);
+}
+
+bool _sameBytes(List<int> a, List<int> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var i = 0; i < a.length; i += 1) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
 }

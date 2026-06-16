@@ -102,6 +102,10 @@ void main() {
           .requireValue;
       expect(unlocked.failureMessage, isNull);
       expect(unlocked.vaultState, VaultState.unlocked);
+      expect(
+        container.read(vaultSessionControllerProvider.notifier).service.state,
+        VaultState.unlocked,
+      );
 
       final targetRecords = DriftVaultRecordRepository(database);
       expect(await DriftVaultHeaderStore(database).read(), isNotNull);
@@ -145,7 +149,11 @@ void main() {
         records: sourceRecords,
       ).pushEncryptedSnapshot(provider);
       await provider.deleteObject(
-        const RemoteObjectRef('records/host%3Amissing.json'),
+        await _manifestRecordRef(
+          provider: provider,
+          vault: sourceVault,
+          id: missingHost.id,
+        ),
       );
 
       final database = SerlinkDatabase(NativeDatabase.memory());
@@ -577,6 +585,7 @@ void main() {
           autoSyncDebounceDurationProvider.overrideWithValue(
             const Duration(days: 1),
           ),
+          cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
         ],
       );
       addTearDown(targetContainer.dispose);
@@ -768,6 +777,28 @@ void main() {
       expect(after?.vaultId, remoteManifest?.vaultId);
     },
   );
+}
+
+Future<RemoteObjectRef> _manifestRecordRef({
+  required LocalDirectorySyncProvider provider,
+  required InMemoryVaultService vault,
+  required VaultRecordId id,
+}) async {
+  final manifest = await provider.readManifest();
+  expect(manifest, isNotNull);
+  final manifestEnvelope = VaultRecordEnvelope.fromJson(
+    jsonDecode(utf8.decode(manifest!.encryptedPayload)) as Map<String, Object?>,
+  );
+  final manifestData =
+      jsonDecode(utf8.decode(await vault.decryptRecord(manifestEnvelope)))
+          as Map<String, Object?>;
+  for (final raw in manifestData['records'] as List<Object?>) {
+    final entry = raw as Map<String, Object?>;
+    if (entry['id'] == id.value) {
+      return RemoteObjectRef(entry['path'] as String);
+    }
+  }
+  fail('Manifest did not contain ${id.value}');
 }
 
 Future<void> _waitForVaultState(

@@ -19,6 +19,7 @@ class SerlinkApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     final language = ref.watch(appLanguageProvider).value ?? AppLanguage.system;
     final capabilities = ref.watch(platformCapabilitiesProvider);
+    ref.watch(cloudKitVaultDiscoveryControllerProvider);
     ref.watch(autoSyncControllerProvider);
 
     final foruiTheme = capabilities.prefersTouchUi

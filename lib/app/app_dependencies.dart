@@ -416,6 +416,75 @@ final autoSyncControllerProvider =
       AutoSyncController.new,
     );
 
+final cloudKitVaultDiscoveryIntervalProvider = Provider<Duration>((ref) {
+  return const Duration(seconds: 5);
+});
+
+final cloudKitVaultDiscoveryControllerProvider =
+    NotifierProvider<CloudKitVaultDiscoveryController, void>(
+      CloudKitVaultDiscoveryController.new,
+    );
+
+class CloudKitVaultDiscoveryController extends Notifier<void> {
+  Timer? _timer;
+  bool _running = false;
+
+  @override
+  void build() {
+    ref.onDispose(() {
+      _timer?.cancel();
+    });
+    ref.listen<AsyncValue<VaultSessionState>>(
+      vaultSessionControllerProvider,
+      (_, _) => _configure(),
+    );
+    unawaited(Future<void>.microtask(_configure));
+  }
+
+  void _configure() {
+    if (!ref.mounted) {
+      return;
+    }
+    if (!_shouldPoll) {
+      _timer?.cancel();
+      _timer = null;
+      return;
+    }
+    _timer ??= Timer.periodic(
+      ref.read(cloudKitVaultDiscoveryIntervalProvider),
+      (_) => _requestDiscovery(),
+    );
+    _requestDiscovery();
+  }
+
+  void _requestDiscovery() {
+    if (_running || !_shouldPoll) {
+      return;
+    }
+    unawaited(_discover());
+  }
+
+  Future<void> _discover() async {
+    _running = true;
+    try {
+      await ref
+          .read(vaultSessionControllerProvider.notifier)
+          .refreshCloudKitVaultDiscovery();
+    } finally {
+      _running = false;
+      _configure();
+    }
+  }
+
+  bool get _shouldPoll {
+    if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
+      return false;
+    }
+    final session = ref.read(vaultSessionControllerProvider).value;
+    return session?.vaultState == VaultState.uninitialized && !session!.isBusy;
+  }
+}
+
 class AutoSyncController extends Notifier<AutoSyncStatus> {
   Timer? _debounceTimer;
   Timer? _intervalTimer;
@@ -916,10 +985,12 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     try {
       final result = await service.initialize(passphrase: passphrase);
       await ref.read(vaultHeaderStoreProvider).save(result.header);
+      final syncFailure = await _bootstrapCloudKitSnapshotAfterInitialize();
       state = AsyncData(
         VaultSessionState(
           vaultState: VaultState.unlocked,
           recoveryKey: result.recoveryKey,
+          failureMessage: syncFailure,
           unlockGeneration: previous.unlockGeneration + 1,
         ),
       );
@@ -1028,6 +1099,53 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     }
   }
 
+  Future<void> refreshCloudKitVaultDiscovery() async {
+    final previous = state.value;
+    if (previous == null ||
+        previous.vaultState != VaultState.uninitialized ||
+        previous.isBusy) {
+      return;
+    }
+    try {
+      final header = await _discoverCloudKitVaultHeader();
+      if (header == null) {
+        return;
+      }
+      final current = state.value;
+      if (current?.vaultState != VaultState.uninitialized ||
+          current?.isBusy == true) {
+        return;
+      }
+      _cloudKitHeaderDiscovered = true;
+      _service = _createService(header: header);
+      final localUnlockAvailable = await service.hasLocalUnlock(
+        secrets: ref.read(secretStoreProvider),
+      );
+      state = AsyncData(
+        VaultSessionState(
+          vaultState: VaultState.locked,
+          localUnlockAvailable: localUnlockAvailable,
+        ),
+      );
+    } on SyncRunException catch (error) {
+      state = AsyncData(
+        previous.copyWith(
+          vaultState: VaultState.locked,
+          recoveryStatus: VaultRecoveryStatus.remoteCorrupt,
+          failureMessage: error.message,
+        ),
+      );
+    } on SyncProviderException catch (error) {
+      state = AsyncData(
+        previous.copyWith(
+          vaultState: VaultState.locked,
+          recoveryStatus: VaultRecoveryStatus.remoteCorrupt,
+          failureMessage: error.message,
+        ),
+      );
+    }
+  }
+
   Future<void> _pullCloudKitSnapshotAfterUnlockIfNeeded() async {
     if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
       return;
@@ -1099,6 +1217,58 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     _cloudKitHeaderDiscovered = false;
     ref.invalidate(cloudKitSyncSettingsProvider);
     ref.invalidate(syncKnownDevicesProvider);
+  }
+
+  Future<String?> _bootstrapCloudKitSnapshotAfterInitialize() async {
+    if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
+      return null;
+    }
+    final available = await ref.read(cloudKitAvailabilityCheckProvider)();
+    if (!available) {
+      return 'iCloud sync is not available.';
+    }
+    try {
+      final records = ref.read(vaultRecordRepositoryProvider);
+      final provider = ref.read(cloudKitSyncProviderFactoryProvider)();
+      if (await provider.readManifest() != null) {
+        throw const SyncRunException(
+          'sync.remote_manifest_exists',
+          'iCloud already has a Serlink vault. Reset this local vault and restore the iCloud vault.',
+        );
+      }
+      final syncSettings = SyncSettingsService(
+        settings: EncryptedSyncSettingsRepository(
+          vault: service,
+          records: records,
+        ),
+        secrets: ref.read(secretStoreProvider),
+        cloudKitAvailable: true,
+      );
+      await syncSettings.saveCloudKit(true);
+      final tombstones = EncryptedSyncDeleteTombstoneRepository(
+        vault: service,
+        records: records,
+      );
+      final devices = SyncDeviceService(
+        devices: EncryptedSyncDeviceRepository(
+          vault: service,
+          records: records,
+        ),
+        secrets: ref.read(secretStoreProvider),
+        tombstones: tombstones,
+      );
+      await SyncRunService(
+        vault: service,
+        records: records,
+        devices: devices,
+      ).pushEncryptedSnapshot(provider);
+      ref.invalidate(cloudKitSyncSettingsProvider);
+      ref.invalidate(syncKnownDevicesProvider);
+      return null;
+    } on Object catch (error) {
+      ref.invalidate(cloudKitSyncSettingsProvider);
+      return _syncBootstrapFailureMessage(error);
+    }
   }
 
   Future<void> _commitCloudKitBootstrapSnapshot({
@@ -1419,6 +1589,19 @@ String _recoveryFailureMessage(Object error) {
     return error.message;
   }
   return 'Vault recovery failed: ${Redactor.redact(error.toString())}';
+}
+
+String _syncBootstrapFailureMessage(Object error) {
+  if (error is SyncRunException) {
+    return error.message;
+  }
+  if (error is SyncProviderException) {
+    return error.message;
+  }
+  if (error is SyncSettingsException) {
+    return error.message;
+  }
+  return 'Initial iCloud sync failed.';
 }
 
 final encryptedConnectionProfileResolverProvider =

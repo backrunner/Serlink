@@ -23,6 +23,10 @@ class RemoteVaultDiscoveryService {
     if (manifest == null) {
       return null;
     }
+    final resetMarker = await _readResetMarker();
+    if (resetMarker?.vaultId == manifest.vaultId) {
+      return null;
+    }
     if (manifest.protocolVersion > 1) {
       throw const SyncRunException(
         'sync.remote_protocol_unsupported',
@@ -61,6 +65,19 @@ class RemoteVaultDiscoveryService {
         'sync.remote_header_invalid',
         'Remote vault header is invalid or corrupted.',
       );
+    }
+  }
+
+  Future<RemoteResetMarker?> _readResetMarker() async {
+    try {
+      return RemoteResetMarker.fromBytes(
+        await _provider.readObject(resetMarkerRef),
+      );
+    } on SyncProviderException catch (error) {
+      if (error.code == 'sync.provider.not_found') {
+        return null;
+      }
+      rethrow;
     }
   }
 }

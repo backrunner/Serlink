@@ -66,6 +66,49 @@ enum _SyncConflictPolicy { report, useRemote, useLatest }
 
 enum _RecordSource { local, remote }
 
+class RemoteResetMarker {
+  const RemoteResetMarker({
+    required this.vaultId,
+    required this.resetAt,
+    this.schemaVersion = 1,
+  });
+
+  final int schemaVersion;
+  final String vaultId;
+  final DateTime resetAt;
+
+  Map<String, Object?> toJson() {
+    return {
+      'schemaVersion': schemaVersion,
+      'vaultId': vaultId,
+      'resetAt': resetAt.toUtc().toIso8601String(),
+    };
+  }
+
+  factory RemoteResetMarker.fromJson(Map<String, Object?> json) {
+    return RemoteResetMarker(
+      schemaVersion: json['schemaVersion'] as int? ?? 1,
+      vaultId: json['vaultId'] as String,
+      resetAt: DateTime.parse(json['resetAt'] as String),
+    );
+  }
+
+  List<int> toBytes() => utf8.encode(jsonEncode(toJson()));
+
+  factory RemoteResetMarker.fromBytes(List<int> bytes) {
+    try {
+      return RemoteResetMarker.fromJson(
+        jsonDecode(utf8.decode(bytes)) as Map<String, Object?>,
+      );
+    } on Object {
+      throw const SyncRunException(
+        'sync.remote_reset_marker_invalid',
+        'Remote vault reset marker is invalid.',
+      );
+    }
+  }
+}
+
 class SyncRunException implements Exception {
   const SyncRunException(this.code, this.message);
 
@@ -105,7 +148,59 @@ class SyncRunService {
   final SyncFieldMergeService _fieldMerge;
   final Future<bool> Function()? _localDataHealthy;
 
+  Future<RemoteResetMarker?> readRemoteResetMarker(
+    SyncProvider provider,
+  ) async {
+    final header = _vault.header;
+    if (header == null) {
+      return null;
+    }
+    try {
+      final marker = RemoteResetMarker.fromBytes(
+        await provider.readObject(resetMarkerRef),
+      );
+      return marker.vaultId == syncVaultId(header) ? marker : null;
+    } on SyncProviderException catch (error) {
+      if (error.code == 'sync.provider.not_found') {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  Future<bool> isRemoteReset(SyncProvider provider) async {
+    return await readRemoteResetMarker(provider) != null;
+  }
+
+  Future<void> publishRemoteReset(SyncProvider provider) async {
+    final header = _vault.header;
+    if (header == null) {
+      throw const SyncRunException(
+        'sync.vault_header_missing',
+        'Vault header is missing.',
+      );
+    }
+    final manifest = await provider.readManifest();
+    if (manifest != null && manifest.vaultId != syncVaultId(header)) {
+      return;
+    }
+    await provider.writeObject(
+      resetMarkerRef,
+      RemoteResetMarker(
+        vaultId: syncVaultId(header),
+        resetAt: DateTime.now().toUtc(),
+      ).toBytes(),
+    );
+    await _clearRemoteSnapshot(provider);
+  }
+
   Future<SyncRunResult> syncEncryptedSnapshot(SyncProvider provider) async {
+    if (await isRemoteReset(provider)) {
+      throw const SyncRunException(
+        'sync.remote_vault_reset',
+        'Remote vault was reset.',
+      );
+    }
     final pull = await pullEncryptedSnapshot(provider, missingManifestOk: true);
     final push = await pushEncryptedSnapshot(provider);
     return SyncRunResult(
@@ -139,6 +234,12 @@ class SyncRunService {
     _SyncConflictPolicy conflictPolicy = _SyncConflictPolicy.report,
   }) async {
     _ensureUnlocked();
+    if (await isRemoteReset(provider)) {
+      throw const SyncRunException(
+        'sync.remote_vault_reset',
+        'Remote vault was reset.',
+      );
+    }
     final manifest = await provider.readManifest();
     if (manifest == null) {
       if (missingManifestOk) {
@@ -344,6 +445,12 @@ class SyncRunService {
       );
     }
     _ensureUnlocked();
+    if (await isRemoteReset(provider)) {
+      throw const SyncRunException(
+        'sync.remote_vault_reset',
+        'Remote vault was reset.',
+      );
+    }
 
     final writerDevice = await _devices?.touchLocalDevice();
     final envelopes = await _records.list();
@@ -409,6 +516,33 @@ class SyncRunService {
       completedAt: DateTime.now().toUtc(),
       writerDevice: writerDevice,
     );
+  }
+
+  Future<void> _clearRemoteSnapshot(SyncProvider provider) async {
+    for (final prefix in const ['records/', 'vault/']) {
+      final refs = await provider.listRecordObjects(prefix: prefix);
+      for (final ref in refs) {
+        if (ref.path == resetMarkerRef.path) {
+          continue;
+        }
+        await _deleteRemoteObjectIfExists(provider, ref);
+      }
+    }
+    await _deleteRemoteObjectIfExists(provider, _manifestRef);
+  }
+
+  Future<void> _deleteRemoteObjectIfExists(
+    SyncProvider provider,
+    RemoteObjectRef ref,
+  ) async {
+    try {
+      await provider.deleteObject(ref);
+    } on SyncProviderException catch (error) {
+      if (error.code == 'sync.provider.not_found') {
+        return;
+      }
+      rethrow;
+    }
   }
 
   Future<SyncRunResult> pushEncryptedSnapshotForRepair(
@@ -854,3 +988,5 @@ String syncVaultId(VaultHeader header) {
 }
 
 final _manifestRecordId = VaultRecordId('sync:manifest');
+const _manifestRef = RemoteObjectRef('manifest.json');
+const resetMarkerRef = RemoteObjectRef('vault/reset.json');

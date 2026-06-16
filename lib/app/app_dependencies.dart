@@ -308,8 +308,13 @@ final snippetsProvider = FutureProvider.autoDispose
     });
 
 final syncSettingsRepositoryProvider = Provider<SyncSettingsRepository>((ref) {
+  ref.watch(
+    vaultSessionControllerProvider.select(
+      (state) => state.value?.unlockGeneration,
+    ),
+  );
   return EncryptedSyncSettingsRepository(
-    vault: ref.watch(vaultServiceProvider),
+    vault: ref.watch(vaultSessionControllerProvider.notifier).service,
     records: ref.watch(vaultRecordRepositoryProvider),
   );
 });
@@ -489,6 +494,8 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
   Timer? _debounceTimer;
   Timer? _intervalTimer;
   bool _running = false;
+  bool _rerunRequested = false;
+  bool _configureQueued = false;
   var _failureCount = 0;
 
   @override
@@ -499,30 +506,27 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     });
     ref.listen<AsyncValue<VaultSessionState>>(
       vaultSessionControllerProvider,
-      (_, _) => _configure(),
-    );
-    ref.listen<AsyncValue<WebDavSyncSettings?>>(
-      webDavSyncSettingsProvider,
-      (_, _) => _configure(),
-    );
-    ref.listen<AsyncValue<CloudKitSyncSettings?>>(
-      cloudKitSyncSettingsProvider,
-      (_, _) => _configure(),
+      (_, _) => _scheduleConfigure(),
     );
     ref.listen<AsyncValue<VaultRecordChange>>(vaultRecordChangesProvider, (
       _,
       change,
     ) {
       if (change.hasValue) {
+        _scheduleConfigure();
         requestSync();
       }
     });
-    unawaited(Future<void>.microtask(_configure));
+    _scheduleConfigure();
     return const AutoSyncStatus.disabled();
   }
 
   void requestSync({Duration? delay}) {
-    if (!_isReady || state.phase == AutoSyncPhase.conflicts) {
+    if (!_canAttemptSync || state.phase == AutoSyncPhase.conflicts) {
+      return;
+    }
+    if (_running) {
+      _rerunRequested = true;
       return;
     }
     _debounceTimer?.cancel();
@@ -531,6 +535,16 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       clearFailure: true,
       conflictCount: 0,
     );
+    if (delay == Duration.zero) {
+      unawaited(
+        Future<void>.microtask(() {
+          if (ref.mounted) {
+            _run();
+          }
+        }),
+      );
+      return;
+    }
     _debounceTimer = Timer(
       delay ?? ref.read(autoSyncDebounceDurationProvider),
       () {
@@ -553,7 +567,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     if (!ref.mounted) {
       return;
     }
-    if (!_isReady) {
+    if (!_canAttemptSync) {
       _debounceTimer?.cancel();
       _intervalTimer?.cancel();
       _debounceTimer = null;
@@ -574,16 +588,29 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     requestSync();
   }
 
+  void _scheduleConfigure() {
+    if (_configureQueued) {
+      return;
+    }
+    _configureQueued = true;
+    unawaited(
+      Future<void>.microtask(() {
+        _configureQueued = false;
+        if (ref.mounted) {
+          _configure();
+        }
+      }),
+    );
+  }
+
   Future<void> _run() async {
-    if (!_isReady || _running) {
+    if (!_canAttemptSync || _running) {
       return;
     }
     _running = true;
     state = state.copyWith(phase: AutoSyncPhase.syncing, clearFailure: true);
     try {
-      final provider = await ref
-          .read(syncSettingsServiceProvider)
-          .activeSyncProvider();
+      final provider = await _activeSyncProvider();
       if (provider == null) {
         state = const AutoSyncStatus(phase: AutoSyncPhase.idle);
         return;
@@ -609,6 +636,27 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         phase: AutoSyncPhase.conflicts,
         conflictCount: error.conflicts.length,
       );
+    } on SyncRunException catch (error) {
+      if (error.code == 'sync.remote_vault_reset') {
+        _failureCount = 0;
+        _debounceTimer?.cancel();
+        _intervalTimer?.cancel();
+        _debounceTimer = null;
+        _intervalTimer = null;
+        _rerunRequested = false;
+        await ref
+            .read(vaultSessionControllerProvider.notifier)
+            .applyRemoteReset();
+        state = const AutoSyncStatus.disabled();
+        return;
+      }
+      _failureCount += 1;
+      state = state.copyWith(
+        phase: AutoSyncPhase.failed,
+        lastFailureMessage: _autoSyncFailureMessage(error),
+        lastFailure: error,
+      );
+      requestSync(delay: _retryDelay(_failureCount));
     } on Object catch (error) {
       _failureCount += 1;
       state = state.copyWith(
@@ -619,22 +667,34 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       requestSync(delay: _retryDelay(_failureCount));
     } finally {
       _running = false;
+      if (_rerunRequested && _canAttemptSync) {
+        _rerunRequested = false;
+        requestSync(delay: Duration.zero);
+      } else if (!_canAttemptSync) {
+        _rerunRequested = false;
+      }
     }
   }
 
-  bool get _isReady {
+  bool get _canAttemptSync {
     if (!ref.read(autoSyncEnabledProvider)) {
       return false;
     }
     final vaultSession = ref.read(vaultSessionControllerProvider).value;
-    if (vaultSession?.vaultState != VaultState.unlocked) {
-      return false;
+    return vaultSession?.vaultState == VaultState.unlocked &&
+        vaultSession?.isBusy == false;
+  }
+
+  Future<SyncProvider?> _activeSyncProvider() async {
+    final cloudKit = await ref.read(cloudKitSyncSettingsProvider.future);
+    if (cloudKit?.enabled ?? false) {
+      return ref.read(cloudKitSyncProviderFactoryProvider)();
     }
-    final webDavEnabled =
-        ref.read(webDavSyncSettingsProvider).value?.enabled ?? false;
-    final cloudKitEnabled =
-        ref.read(cloudKitSyncSettingsProvider).value?.enabled ?? false;
-    return webDavEnabled || cloudKitEnabled;
+    final webDav = await ref.read(webDavSyncSettingsProvider.future);
+    if (webDav?.enabled ?? false) {
+      return ref.read(syncSettingsServiceProvider).buildWebDavProvider();
+    }
+    return null;
   }
 }
 
@@ -818,7 +878,11 @@ final vaultSessionControllerProvider =
     );
 
 final vaultServiceProvider = Provider<VaultService>((ref) {
-  ref.watch(vaultSessionControllerProvider);
+  ref.watch(
+    vaultSessionControllerProvider.select(
+      (state) => state.value?.unlockGeneration,
+    ),
+  );
   return ref.watch(vaultSessionControllerProvider.notifier).service;
 });
 
@@ -994,6 +1058,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           unlockGeneration: previous.unlockGeneration + 1,
         ),
       );
+      _invalidateSyncStateProviders();
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
       );
@@ -1022,6 +1087,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       await service.unlock(passphrase: passphrase);
       await _pullCloudKitSnapshotAfterUnlockIfNeeded();
       state = AsyncData(await _unlockedState(previous));
+      _invalidateSyncStateProviders();
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
       );
@@ -1052,6 +1118,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       await service.unlockWithRecoveryKey(VaultRecoveryKey(recoveryCode));
       await _pullCloudKitSnapshotAfterUnlockIfNeeded();
       state = AsyncData(await _unlockedState(previous));
+      _invalidateSyncStateProviders();
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
       );
@@ -1084,6 +1151,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       await service.unlockWithLocalKey(secrets: ref.read(secretStoreProvider));
       await _pullCloudKitSnapshotAfterUnlockIfNeeded();
       state = AsyncData(await _unlockedState(previous));
+      _invalidateSyncStateProviders();
       unawaited(
         ref.read(transferQueueControllerProvider).restorePersistedTasks(),
       );
@@ -1345,15 +1413,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         await _reloadAfterDatabaseReplacement();
         return null;
       }
+      await _publishRemoteResetIfConfigured();
       await _tryQuarantineCurrentDatabase(reason: 'before-reset');
-      await _clearLocalUnlockSecrets();
-      await ref.read(vaultRecordRepositoryProvider).clear();
-      await ref.read(vaultHeaderStoreProvider).clear();
-      await service.lock();
-      _service = _createService();
-      state = const AsyncData(
-        VaultSessionState(vaultState: VaultState.uninitialized),
-      );
+      await _clearLocalVaultAfterReset();
       return null;
     } on Object catch (error) {
       final message = _vaultFailureMessage(error);
@@ -1365,6 +1427,32 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         ),
       );
       return message;
+    }
+  }
+
+  Future<void> applyRemoteReset() async {
+    final previous = state.value;
+    if (previous == null || previous.vaultState == VaultState.uninitialized) {
+      return;
+    }
+    state = AsyncData(
+      previous.copyWith(
+        isBusy: true,
+        clearFailure: true,
+        clearRecoveryKey: true,
+      ),
+    );
+    try {
+      await _tryQuarantineCurrentDatabase(reason: 'before-remote-reset');
+      await _clearLocalVaultAfterReset();
+    } on Object catch (error) {
+      state = AsyncData(
+        previous.copyWith(
+          failureMessage: _vaultFailureMessage(error),
+          clearRecoveryKey: true,
+          isBusy: false,
+        ),
+      );
     }
   }
 
@@ -1521,6 +1609,60 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       // The persisted header is about to be removed. A stale local unlock
       // secret cannot unlock anything once its matching header protector is gone.
     }
+  }
+
+  void _invalidateSyncStateProviders() {
+    ref.invalidate(webDavSyncSettingsProvider);
+    ref.invalidate(cloudKitSyncSettingsProvider);
+    ref.invalidate(syncKnownDevicesProvider);
+  }
+
+  Future<void> _publishRemoteResetIfConfigured() async {
+    var published = false;
+    if (ref.read(platformCapabilitiesProvider).cloudKitSync &&
+        await ref.read(cloudKitAvailabilityCheckProvider)()) {
+      await SyncRunService(
+        vault: service,
+        records: ref.read(vaultRecordRepositoryProvider),
+      ).publishRemoteReset(ref.read(cloudKitSyncProviderFactoryProvider)());
+      published = true;
+    }
+    final webDav = await _webDavProviderOrNull();
+    if (webDav != null) {
+      await SyncRunService(
+        vault: service,
+        records: ref.read(vaultRecordRepositoryProvider),
+      ).publishRemoteReset(webDav);
+      published = true;
+    }
+    if (published) {
+      return;
+    }
+  }
+
+  Future<SyncProvider?> _webDavProviderOrNull() async {
+    try {
+      final settings = await ref.read(syncSettingsServiceProvider).readWebDav();
+      if (settings?.enabled != true) {
+        return null;
+      }
+      return await ref.read(syncSettingsServiceProvider).buildWebDavProvider();
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> _clearLocalVaultAfterReset() async {
+    await _clearLocalUnlockSecrets();
+    await ref.read(vaultRecordRepositoryProvider).clear();
+    await ref.read(vaultHeaderStoreProvider).clear();
+    await service.lock();
+    _cloudKitHeaderDiscovered = false;
+    _service = _createService();
+    ref.read(syncConflictControllerProvider.notifier).clear();
+    state = const AsyncData(
+      VaultSessionState(vaultState: VaultState.uninitialized),
+    );
   }
 
   Future<void> _closeDatabaseIfOpen() async {

@@ -61,7 +61,14 @@ class LocalDirectorySyncProvider implements SyncProvider {
 
   @override
   Future<List<int>> readObject(RemoteObjectRef ref) async {
-    return File(_objectPath(ref)).readAsBytes();
+    final file = File(_objectPath(ref));
+    if (!await file.exists()) {
+      throw const SyncProviderException(
+        'sync.provider.not_found',
+        'Sync object was not found.',
+      );
+    }
+    return file.readAsBytes();
   }
 
   @override

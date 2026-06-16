@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -14,6 +15,7 @@ class CloudKitSyncProvider implements SyncProvider {
     : _channel = channel ?? _defaultChannel;
 
   static const _defaultChannel = MethodChannel('serlink/cloudkit');
+  static const _defaultEventsChannel = EventChannel('serlink/cloudkit/events');
   static const _manifestKey = 'manifest.json';
 
   final MethodChannel _channel;
@@ -38,7 +40,7 @@ class CloudKitSyncProvider implements SyncProvider {
   Future<ProviderCapabilities> capabilities() async {
     return const ProviderCapabilities(
       kind: SyncProviderKind.cloudKit,
-      supportsConditionalWrites: false,
+      supportsConditionalWrites: true,
       requiresTls: false,
     );
   }
@@ -52,6 +54,20 @@ class CloudKitSyncProvider implements SyncProvider {
   @override
   Future<void> writeManifest(RemoteManifest manifest) async {
     await writeObject(const RemoteObjectRef(_manifestKey), manifest.toBytes());
+  }
+
+  @override
+  Future<void> writeManifestIfUnchanged(
+    RemoteManifest manifest,
+    RemoteManifest? expectedCurrent,
+  ) async {
+    await _invoke<void>('writeObjectIfUnchanged', {
+      'path': _manifestKey,
+      'data': Uint8List.fromList(manifest.toBytes()),
+      'expectedData': expectedCurrent == null
+          ? null
+          : Uint8List.fromList(expectedCurrent.toBytes()),
+    });
   }
 
   @override
@@ -113,5 +129,49 @@ class CloudKitSyncProvider implements SyncProvider {
         diagnostic: error.details?.toString(),
       );
     }
+  }
+
+  static Stream<CloudKitSyncChange> watchRemoteChanges({
+    EventChannel? channel,
+  }) async* {
+    if (!Platform.isMacOS && !Platform.isIOS) {
+      return;
+    }
+    try {
+      await for (final raw
+          in (channel ?? _defaultEventsChannel).receiveBroadcastStream()) {
+        final event = CloudKitSyncChange.tryParse(raw);
+        if (event != null) {
+          yield event;
+        }
+      }
+    } on MissingPluginException {
+      return;
+    } on PlatformException {
+      return;
+    }
+  }
+}
+
+class CloudKitSyncChange {
+  const CloudKitSyncChange({required this.source, required this.receivedAt});
+
+  final String source;
+  final DateTime receivedAt;
+
+  static CloudKitSyncChange? tryParse(Object? raw) {
+    if (raw is! Map<Object?, Object?>) {
+      return null;
+    }
+    if (raw['type'] != 'remoteChange') {
+      return null;
+    }
+    final receivedAt = raw['receivedAt'];
+    return CloudKitSyncChange(
+      source: raw['source'] as String? ?? 'cloudkit',
+      receivedAt: receivedAt is String
+          ? DateTime.tryParse(receivedAt)?.toUtc() ?? DateTime.now().toUtc()
+          : DateTime.now().toUtc(),
+    );
   }
 }

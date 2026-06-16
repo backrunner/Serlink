@@ -110,6 +110,10 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
       }
     } else if (!hidden) {
       _suspendedForBackground = false;
+      ref.read(cloudKitVaultDiscoveryControllerProvider.notifier).refreshNow();
+      ref
+          .read(autoSyncControllerProvider.notifier)
+          .requestSync(delay: Duration.zero);
     }
     if (_hidden != hidden && mounted) {
       setState(() {

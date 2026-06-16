@@ -114,6 +114,10 @@ final cloudKitSyncProviderFactoryProvider = Provider<SyncProviderFactory>((
   return () => CloudKitSyncProvider();
 });
 
+final cloudKitSyncChangesProvider = StreamProvider<CloudKitSyncChange>((ref) {
+  return CloudKitSyncProvider.watchRemoteChanges();
+});
+
 final appPackageInfoProvider = FutureProvider<PackageInfo>((ref) {
   return PackageInfo.fromPlatform();
 });
@@ -443,6 +447,14 @@ class CloudKitVaultDiscoveryController extends Notifier<void> {
       vaultSessionControllerProvider,
       (_, _) => _configure(),
     );
+    ref.listen<AsyncValue<CloudKitSyncChange>>(cloudKitSyncChangesProvider, (
+      _,
+      change,
+    ) {
+      if (change.hasValue) {
+        _requestDiscovery();
+      }
+    });
     unawaited(Future<void>.microtask(_configure));
   }
 
@@ -467,6 +479,10 @@ class CloudKitVaultDiscoveryController extends Notifier<void> {
       return;
     }
     unawaited(_discover());
+  }
+
+  void refreshNow() {
+    _requestDiscovery();
   }
 
   Future<void> _discover() async {
@@ -508,13 +524,21 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       vaultSessionControllerProvider,
       (_, _) => _scheduleConfigure(),
     );
+    ref.listen<AsyncValue<CloudKitSyncChange>>(cloudKitSyncChangesProvider, (
+      _,
+      change,
+    ) {
+      if (change.hasValue) {
+        requestSync(delay: Duration.zero);
+      }
+    });
     ref.listen<AsyncValue<VaultRecordChange>>(vaultRecordChangesProvider, (
       _,
       change,
     ) {
       if (change.hasValue) {
         _scheduleConfigure();
-        requestSync();
+        requestSync(delay: Duration.zero);
       }
     });
     _scheduleConfigure();
@@ -617,7 +641,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       }
       final result = await ref
           .read(syncRunServiceProvider)
-          .syncEncryptedSnapshot(provider);
+          .syncEncryptedSnapshot(provider, reportConflicts: true);
       ref.read(syncConflictControllerProvider.notifier).clear();
       ref.invalidate(syncKnownDevicesProvider);
       _failureCount = 0;

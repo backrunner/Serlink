@@ -67,6 +67,11 @@ abstract interface class SyncProvider {
   Future<ProviderCapabilities> capabilities();
   Future<RemoteManifest?> readManifest();
   Future<void> writeManifest(RemoteManifest manifest);
+  Future<void> writeManifestIfUnchanged(
+    RemoteManifest manifest,
+    RemoteManifest? expectedCurrent,
+  );
+
   Future<List<RemoteObjectRef>> listRecordObjects({String? prefix});
   Future<List<int>> readObject(RemoteObjectRef ref);
   Future<void> writeObject(RemoteObjectRef ref, List<int> bytes);

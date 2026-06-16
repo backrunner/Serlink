@@ -50,12 +50,14 @@ class SyncPullResult {
     required this.recordsUnchanged,
     required this.conflicts,
     this.remoteDevice,
+    this.remoteManifest,
   });
 
   final int recordsDownloaded;
   final int recordsUnchanged;
   final List<SyncRecordConflict> conflicts;
   final SyncDeviceMetadata? remoteDevice;
+  final RemoteManifest? remoteManifest;
 
   bool get hasConflicts => conflicts.isNotEmpty;
 }
@@ -194,15 +196,52 @@ class SyncRunService {
     await _clearRemoteSnapshot(provider);
   }
 
-  Future<SyncRunResult> syncEncryptedSnapshot(SyncProvider provider) async {
+  Future<SyncRunResult> syncEncryptedSnapshot(
+    SyncProvider provider, {
+    bool reportConflicts = false,
+  }) async {
+    for (var attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await _syncEncryptedSnapshotOnce(
+          provider,
+          reportConflicts: reportConflicts,
+        );
+      } on SyncProviderException catch (error) {
+        if (attempt == 0 && _isRemoteManifestWriteConflict(error)) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+    throw const SyncRunException(
+      'sync.provider.conflict',
+      'Remote sync data changed while syncing.',
+    );
+  }
+
+  Future<SyncRunResult> _syncEncryptedSnapshotOnce(
+    SyncProvider provider, {
+    required bool reportConflicts,
+  }) async {
     if (await isRemoteReset(provider)) {
       throw const SyncRunException(
         'sync.remote_vault_reset',
         'Remote vault was reset.',
       );
     }
-    final pull = await pullEncryptedSnapshot(provider, missingManifestOk: true);
-    final push = await pushEncryptedSnapshot(provider);
+    final pull = await pullEncryptedSnapshot(
+      provider,
+      missingManifestOk: true,
+      reportConflicts: reportConflicts,
+    );
+    if (pull.hasConflicts) {
+      throw SyncRunConflictException(pull.conflicts);
+    }
+    final push = await _pushEncryptedSnapshot(
+      provider,
+      pruneRemote: true,
+      expectedRemoteManifest: pull.remoteManifest,
+    );
     return SyncRunResult(
       recordsUploaded: push.recordsUploaded,
       recordsDownloaded: pull.recordsDownloaded,
@@ -380,6 +419,7 @@ class SyncRunService {
       recordsUnchanged: unchanged,
       conflicts: conflicts,
       remoteDevice: remoteDevice,
+      remoteManifest: manifest,
     );
   }
 
@@ -430,12 +470,17 @@ class SyncRunService {
   }
 
   Future<SyncRunResult> pushEncryptedSnapshot(SyncProvider provider) async {
-    return _pushEncryptedSnapshot(provider, pruneRemote: true);
+    return _pushEncryptedSnapshot(
+      provider,
+      pruneRemote: true,
+      expectedRemoteManifest: await provider.readManifest(),
+    );
   }
 
   Future<SyncRunResult> _pushEncryptedSnapshot(
     SyncProvider provider, {
     required bool pruneRemote,
+    RemoteManifest? expectedRemoteManifest,
   }) async {
     final header = _vault.header;
     if (header == null) {
@@ -457,7 +502,9 @@ class SyncRunService {
     final manifestRecords = <Map<String, Object?>>[];
     final desiredRecordPaths = <String>{};
     for (final envelope in envelopes) {
-      final ref = RemoteObjectRef(_recordObjectPath(envelope.id.value));
+      final ref = RemoteObjectRef(
+        _recordObjectPath(envelope.id.value, envelope.revision),
+      );
       await provider.writeObject(
         ref,
         utf8.encode(jsonEncode(envelope.toJson())),
@@ -471,21 +518,10 @@ class SyncRunService {
       });
     }
 
-    if (pruneRemote) {
-      final remoteObjects = await provider.listRecordObjects(
-        prefix: 'records/',
-      );
-      for (final ref in remoteObjects) {
-        if (!desiredRecordPaths.contains(ref.path)) {
-          await provider.deleteObject(ref);
-        }
-      }
-    }
-
     const headerRef = RemoteObjectRef('vault/header.json');
     await provider.writeObject(
       headerRef,
-      utf8.encode(jsonEncode(header.toJson())),
+      utf8.encode(jsonEncode(_syncHeaderForRemote(header).toJson())),
     );
 
     final manifestPlaintext = utf8.encode(
@@ -502,13 +538,25 @@ class SyncRunService {
       type: 'sync_manifest',
       plaintext: manifestPlaintext,
     );
-    await provider.writeManifest(
+    await provider.writeManifestIfUnchanged(
       RemoteManifest(
         vaultId: syncVaultId(header),
         protocolVersion: 1,
         encryptedPayload: utf8.encode(jsonEncode(manifestEnvelope.toJson())),
       ),
+      expectedRemoteManifest,
     );
+
+    if (pruneRemote) {
+      final remoteObjects = await provider.listRecordObjects(
+        prefix: 'records/',
+      );
+      for (final ref in remoteObjects) {
+        if (!desiredRecordPaths.contains(ref.path)) {
+          await _deleteRemoteObjectIfExists(provider, ref);
+        }
+      }
+    }
 
     return SyncRunResult(
       recordsUploaded: envelopes.length,
@@ -549,7 +597,11 @@ class SyncRunService {
     SyncProvider provider,
   ) async {
     await _ensureLocalDataHealthyForRepair();
-    return _pushEncryptedSnapshot(provider, pruneRemote: true);
+    return _pushEncryptedSnapshot(
+      provider,
+      pruneRemote: true,
+      expectedRemoteManifest: await provider.readManifest(),
+    );
   }
 
   Future<SyncRunResult> restoreLocalFromRemoteForRepair(
@@ -979,8 +1031,17 @@ class _ManifestRecordEntry {
   }
 }
 
-String _recordObjectPath(String recordId) {
-  return 'records/${Uri.encodeComponent(recordId)}.json';
+bool _isRemoteManifestWriteConflict(SyncProviderException error) {
+  return error.code == 'sync.provider.conflict' ||
+      error.code == 'sync.cloudkit.conflict';
+}
+
+VaultHeader _syncHeaderForRemote(VaultHeader header) {
+  return header.copyWith(localUnlockProtectors: const []);
+}
+
+String _recordObjectPath(String recordId, String revision) {
+  return 'records/${Uri.encodeComponent(recordId)}-${Uri.encodeComponent(revision)}.json';
 }
 
 String syncVaultId(VaultHeader header) {

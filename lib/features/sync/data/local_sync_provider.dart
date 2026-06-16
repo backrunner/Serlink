@@ -37,6 +37,14 @@ class LocalDirectorySyncProvider implements SyncProvider {
   }
 
   @override
+  Future<void> writeManifestIfUnchanged(
+    RemoteManifest manifest,
+    RemoteManifest? expectedCurrent,
+  ) {
+    return writeManifest(manifest);
+  }
+
+  @override
   Future<List<RemoteObjectRef>> listRecordObjects({String? prefix}) async {
     await rootDirectory.create(recursive: true);
     final refs = <RemoteObjectRef>[];

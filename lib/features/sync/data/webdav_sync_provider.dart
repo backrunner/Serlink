@@ -76,6 +76,14 @@ class WebDavSyncProvider implements SyncProvider {
   }
 
   @override
+  Future<void> writeManifestIfUnchanged(
+    RemoteManifest manifest,
+    RemoteManifest? expectedCurrent,
+  ) {
+    return writeManifest(manifest);
+  }
+
+  @override
   Future<List<RemoteObjectRef>> listRecordObjects({String? prefix}) async {
     final directory = _join(_basePath, prefix ?? '');
     final files = await _client.readDir(directory);

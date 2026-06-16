@@ -1,27 +1,88 @@
 import CloudKit
 import Flutter
 import Foundation
+import UIKit
 
 /// Bridges the `serlink/cloudkit` method channel to the user's private CloudKit
 /// database. The Flutter sync layer writes opaque encrypted objects only.
-class CloudKitSyncChannel {
+class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   static let channelName = "serlink/cloudkit"
+  static let eventsChannelName = "serlink/cloudkit/events"
 
   private static let recordType = "SerlinkSyncObject"
   private static let pathField = "path"
   private static let dataField = "data"
   private static let containerIdentifier = "iCloud.com.alkinum.serlink"
+  private static let subscriptionID = "serlink-sync-objects"
+
+  private static weak var activeChannel: CloudKitSyncChannel?
+  private static var pendingRemoteChanges = 0
+  private static let timestampFormatter = ISO8601DateFormatter()
 
   private lazy var container = CKContainer(identifier: Self.containerIdentifier)
   private lazy var database = container.privateCloudDatabase
   private var channel: FlutterMethodChannel?
+  private var eventChannel: FlutterEventChannel?
+  private var eventSink: FlutterEventSink?
+  private var subscriptionRequested = false
 
   func register(with messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(name: Self.channelName, binaryMessenger: messenger)
     channel.setMethodCallHandler { [weak self] call, result in
       self?.handle(call, result: result)
     }
+    let eventChannel = FlutterEventChannel(name: Self.eventsChannelName, binaryMessenger: messenger)
+    eventChannel.setStreamHandler(self)
     self.channel = channel
+    self.eventChannel = eventChannel
+    Self.activeChannel = self
+    UIApplication.shared.registerForRemoteNotifications()
+    ensureRemoteChangeSubscription()
+    flushPendingRemoteChanges()
+  }
+
+  func onListen(
+    withArguments arguments: Any?,
+    eventSink events: @escaping FlutterEventSink
+  ) -> FlutterError? {
+    eventSink = events
+    UIApplication.shared.registerForRemoteNotifications()
+    ensureRemoteChangeSubscription()
+    flushPendingRemoteChanges()
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    eventSink = nil
+    return nil
+  }
+
+  @discardableResult
+  func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
+    guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
+      notification.subscriptionID == Self.subscriptionID
+    else {
+      return false
+    }
+    emitRemoteChange(source: "push")
+    return true
+  }
+
+  @discardableResult
+  static func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
+    guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo),
+      notification.subscriptionID == subscriptionID
+    else {
+      return false
+    }
+    DispatchQueue.main.async {
+      if let channel = activeChannel {
+        channel.emitRemoteChange(source: "push")
+      } else {
+        pendingRemoteChanges += 1
+      }
+    }
+    return true
   }
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -43,6 +104,15 @@ class CloudKitSyncChannel {
         return
       }
       writeObject(path: path, data: data, result: result)
+    case "writeObjectIfUnchanged":
+      guard let path = arguments["path"] as? String,
+        let data = (arguments["data"] as? FlutterStandardTypedData)?.data
+      else {
+        result(Self.argumentError("path/data"))
+        return
+      }
+      let expectedData = (arguments["expectedData"] as? FlutterStandardTypedData)?.data
+      writeObjectIfUnchanged(path: path, data: data, expectedData: expectedData, result: result)
     case "deleteObject":
       guard let path = arguments["path"] as? String else {
         result(Self.argumentError("path"))
@@ -76,10 +146,7 @@ class CloudKitSyncChannel {
         Self.complete(result, Self.flutterError(error))
         return
       }
-      guard let asset = record?[Self.dataField] as? CKAsset,
-        let fileURL = asset.fileURL,
-        let data = try? Data(contentsOf: fileURL)
-      else {
+      guard let data = Self.assetData(from: record) else {
         Self.complete(result, nil)
         return
       }
@@ -88,6 +155,57 @@ class CloudKitSyncChannel {
   }
 
   private func writeObject(path: String, data: Data, result: @escaping FlutterResult) {
+    let record = CKRecord(recordType: Self.recordType, recordID: recordID(for: path))
+    saveObject(path: path, data: data, record: record, savePolicy: .allKeys, result: result)
+  }
+
+  private func writeObjectIfUnchanged(
+    path: String,
+    data: Data,
+    expectedData: Data?,
+    result: @escaping FlutterResult
+  ) {
+    let recordID = recordID(for: path)
+    database.fetch(withRecordID: recordID) { [weak self] record, error in
+      guard let self else {
+        Self.complete(result, Self.unavailableError())
+        return
+      }
+      if let error = error as? CKError, error.code == .unknownItem {
+        guard expectedData == nil else {
+          Self.complete(result, Self.conflictError())
+          return
+        }
+        let newRecord = CKRecord(recordType: Self.recordType, recordID: recordID)
+        self.saveObject(path: path, data: data, record: newRecord, savePolicy: .ifServerRecordUnchanged, result: result)
+        return
+      }
+      if let error = error {
+        Self.complete(result, Self.flutterError(error))
+        return
+      }
+      guard let record = record else {
+        Self.complete(result, Self.conflictError())
+        return
+      }
+      guard let expectedData = expectedData,
+        let currentData = Self.assetData(from: record),
+        currentData == expectedData
+      else {
+        Self.complete(result, Self.conflictError())
+        return
+      }
+      self.saveObject(path: path, data: data, record: record, savePolicy: .ifServerRecordUnchanged, result: result)
+    }
+  }
+
+  private func saveObject(
+    path: String,
+    data: Data,
+    record: CKRecord,
+    savePolicy: CKModifyRecordsOperation.RecordSavePolicy,
+    result: @escaping FlutterResult
+  ) {
     let fileURL: URL
     do {
       fileURL = try Self.temporaryFile(for: data)
@@ -95,12 +213,10 @@ class CloudKitSyncChannel {
       Self.complete(result, Self.flutterError(error))
       return
     }
-    let recordID = recordID(for: path)
-    let record = CKRecord(recordType: Self.recordType, recordID: recordID)
     record[Self.pathField] = path as CKRecordValue
     record[Self.dataField] = CKAsset(fileURL: fileURL)
     let operation = CKModifyRecordsOperation(recordsToSave: [record], recordIDsToDelete: nil)
-    operation.savePolicy = .allKeys
+    operation.savePolicy = savePolicy
     operation.modifyRecordsResultBlock = { saveResult in
       try? FileManager.default.removeItem(at: fileURL)
       switch saveResult {
@@ -203,6 +319,61 @@ class CloudKitSyncChannel {
     addOperation(CKQueryOperation(query: query))
   }
 
+  private func ensureRemoteChangeSubscription() {
+    if subscriptionRequested {
+      return
+    }
+    subscriptionRequested = true
+    saveRemoteChangeSubscription()
+  }
+
+  private func saveRemoteChangeSubscription() {
+    let options: CKQuerySubscription.Options = [
+      .firesOnRecordCreation,
+      .firesOnRecordUpdate,
+      .firesOnRecordDeletion,
+    ]
+    let subscription = CKQuerySubscription(
+      recordType: Self.recordType,
+      predicate: NSPredicate(value: true),
+      subscriptionID: Self.subscriptionID,
+      options: options
+    )
+    let notificationInfo = CKSubscription.NotificationInfo()
+    notificationInfo.shouldSendContentAvailable = true
+    subscription.notificationInfo = notificationInfo
+    let operation = CKModifySubscriptionsOperation(
+      subscriptionsToSave: [subscription],
+      subscriptionIDsToDelete: nil
+    )
+    operation.modifySubscriptionsCompletionBlock = { [weak self] _, _, error in
+      if error != nil {
+        self?.subscriptionRequested = false
+      }
+    }
+    database.add(operation)
+  }
+
+  private func emitRemoteChange(source: String) {
+    DispatchQueue.main.async {
+      guard let eventSink = self.eventSink else {
+        Self.pendingRemoteChanges += 1
+        return
+      }
+      eventSink(Self.remoteChangeEvent(source: source))
+    }
+  }
+
+  private func flushPendingRemoteChanges() {
+    DispatchQueue.main.async {
+      guard Self.pendingRemoteChanges > 0, let eventSink = self.eventSink else {
+        return
+      }
+      Self.pendingRemoteChanges = 0
+      eventSink(Self.remoteChangeEvent(source: "pending"))
+    }
+  }
+
   private func recordID(for path: String) -> CKRecord.ID {
     let encoded =
       path.data(using: .utf8)?.base64EncodedString()
@@ -210,6 +381,15 @@ class CloudKitSyncChannel {
       .replacingOccurrences(of: "+", with: "-")
       .replacingOccurrences(of: "=", with: "") ?? path
     return CKRecord.ID(recordName: encoded)
+  }
+
+  private static func assetData(from record: CKRecord?) -> Data? {
+    guard let asset = record?[dataField] as? CKAsset,
+      let fileURL = asset.fileURL
+    else {
+      return nil
+    }
+    return try? Data(contentsOf: fileURL)
   }
 
   private static func temporaryFile(for data: Data) throws -> URL {
@@ -227,10 +407,18 @@ class CloudKitSyncChannel {
     )
   }
 
+  private static func conflictError() -> FlutterError {
+    FlutterError(
+      code: "sync.provider.conflict",
+      message: "Remote sync data changed while syncing.",
+      details: nil
+    )
+  }
+
   private static func unavailableError() -> FlutterError {
     FlutterError(
       code: "sync.cloudkit.unavailable",
-      message: "iCloud sync requires a signed app with CloudKit entitlements.",
+      message: "iCloud sync is unavailable.",
       details: nil
     )
   }
@@ -241,7 +429,18 @@ class CloudKitSyncChannel {
     }
   }
 
+  private static func remoteChangeEvent(source: String) -> [String: Any] {
+    [
+      "type": "remoteChange",
+      "source": source,
+      "receivedAt": timestampFormatter.string(from: Date()),
+    ]
+  }
+
   private static func flutterError(_ error: Error) -> FlutterError {
+    if isConflict(error) {
+      return conflictError()
+    }
     if let ckError = error as? CKError {
       switch ckError.code {
       case .notAuthenticated:
@@ -265,5 +464,18 @@ class CloudKitSyncChannel {
       message: error.localizedDescription,
       details: nil
     )
+  }
+
+  private static func isConflict(_ error: Error) -> Bool {
+    guard let ckError = error as? CKError else {
+      return false
+    }
+    if ckError.code == .serverRecordChanged {
+      return true
+    }
+    if let partialErrors = ckError.partialErrorsByItemID {
+      return partialErrors.values.contains { isConflict($0) }
+    }
+    return false
   }
 }

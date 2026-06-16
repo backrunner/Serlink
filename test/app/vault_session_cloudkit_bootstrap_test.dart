@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,10 @@ import 'package:serlink/platform/platform_capabilities.dart';
 
 void main() {
   late Directory remoteDir;
+
+  setUpAll(() {
+    driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+  });
 
   setUp(() async {
     remoteDir = await Directory.systemTemp.createTemp(
@@ -283,6 +288,250 @@ void main() {
 
       expect(initial.vaultState, VaultState.uninitialized);
       expect(await DriftVaultHeaderStore(database).read(), isNull);
+    },
+  );
+
+  test(
+    'new Apple vault immediately publishes an initial CloudKit snapshot',
+    () async {
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'ios',
+              targetPlatform: TargetPlatform.iOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => LocalDirectorySyncProvider(remoteDir),
+          ),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      await container.read(vaultSessionControllerProvider.future);
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .initialize(passphrase: 'passphrase');
+
+      final state = container.read(vaultSessionControllerProvider).requireValue;
+      expect(state.vaultState, VaultState.unlocked);
+      expect(state.failureMessage, isNull);
+
+      final provider = LocalDirectorySyncProvider(remoteDir);
+      expect(await provider.readManifest(), isNotNull);
+      expect(
+        await provider.readObject(const RemoteObjectRef('vault/header.json')),
+        isNotEmpty,
+      );
+
+      final targetDatabase = SerlinkDatabase(NativeDatabase.memory());
+      final targetTransferQueue = TransferQueueController();
+      final targetContainer = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(targetDatabase),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'macos',
+              targetPlatform: TargetPlatform.macOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => LocalDirectorySyncProvider(remoteDir),
+          ),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(
+            targetTransferQueue,
+          ),
+        ],
+      );
+      addTearDown(targetContainer.dispose);
+      addTearDown(targetTransferQueue.dispose);
+      addTearDown(targetDatabase.close);
+
+      final discovered = await targetContainer.read(
+        vaultSessionControllerProvider.future,
+      );
+      expect(discovered.vaultState, VaultState.locked);
+    },
+  );
+
+  test(
+    'uninitialized Apple device discovers a CloudKit vault after launch',
+    () async {
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'macos',
+              targetPlatform: TargetPlatform.macOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => LocalDirectorySyncProvider(remoteDir),
+          ),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      final initial = await container.read(
+        vaultSessionControllerProvider.future,
+      );
+      expect(initial.vaultState, VaultState.uninitialized);
+
+      final sourceVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await sourceVault.initialize(passphrase: 'passphrase');
+      await SyncRunService(
+        vault: sourceVault,
+        records: InMemoryVaultRecordRepository(),
+      ).pushEncryptedSnapshot(LocalDirectorySyncProvider(remoteDir));
+
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .refreshCloudKitVaultDiscovery();
+
+      final discovered = container
+          .read(vaultSessionControllerProvider)
+          .requireValue;
+      expect(discovered.vaultState, VaultState.locked);
+      expect(discovered.failureMessage, isNull);
+      expect(await DriftVaultHeaderStore(database).read(), isNull);
+    },
+  );
+
+  test(
+    'CloudKit bootstrap failure does not block local vault creation',
+    () async {
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'ios',
+              targetPlatform: TargetPlatform.iOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(
+            () async => false,
+          ),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => LocalDirectorySyncProvider(remoteDir),
+          ),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      await container.read(vaultSessionControllerProvider.future);
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .initialize(passphrase: 'passphrase');
+
+      final state = container.read(vaultSessionControllerProvider).requireValue;
+      expect(state.vaultState, VaultState.unlocked);
+      expect(state.failureMessage, 'iCloud sync is not available.');
+      expect(await DriftVaultHeaderStore(database).read(), isNotNull);
+      expect(
+        await LocalDirectorySyncProvider(remoteDir).readManifest(),
+        isNull,
+      );
+    },
+  );
+
+  test(
+    'CloudKit bootstrap does not overwrite an existing remote vault',
+    () async {
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'ios',
+              targetPlatform: TargetPlatform.iOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => LocalDirectorySyncProvider(remoteDir),
+          ),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      final initial = await container.read(
+        vaultSessionControllerProvider.future,
+      );
+      expect(initial.vaultState, VaultState.uninitialized);
+
+      final remoteVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await remoteVault.initialize(passphrase: 'remote passphrase');
+      await SyncRunService(
+        vault: remoteVault,
+        records: InMemoryVaultRecordRepository(),
+      ).pushEncryptedSnapshot(LocalDirectorySyncProvider(remoteDir));
+      final remoteManifest = await LocalDirectorySyncProvider(
+        remoteDir,
+      ).readManifest();
+
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .initialize(passphrase: 'local passphrase');
+
+      final state = container.read(vaultSessionControllerProvider).requireValue;
+      expect(state.vaultState, VaultState.unlocked);
+      expect(
+        state.failureMessage,
+        'iCloud already has a Serlink vault. Reset this local vault and restore the iCloud vault.',
+      );
+      final after = await LocalDirectorySyncProvider(remoteDir).readManifest();
+      expect(after?.vaultId, remoteManifest?.vaultId);
     },
   );
 }

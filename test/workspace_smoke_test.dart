@@ -847,7 +847,7 @@ void main() {
     expect(find.text('About'), findsOneWidget);
     expect(find.text('Serlink'), findsOneWidget);
     expect(find.text('GitHub'), findsOneWidget);
-    expect(find.text('https://github.com/backrunner/serlink'), findsOneWidget);
+    expect(find.text('https://github.com/backrunner/serlink'), findsNothing);
     expect(
       find.byKey(const ValueKey('settings-about-github-button')),
       findsOneWidget,

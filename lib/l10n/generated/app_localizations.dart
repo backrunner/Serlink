@@ -790,6 +790,78 @@ abstract class AppLocalizations {
   /// **'Repair'**
   String get syncRepairAction;
 
+  /// No description provided for @syncRepairClockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check local clock'**
+  String get syncRepairClockTitle;
+
+  /// No description provided for @syncRepairClockBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The WebDAV certificate is not valid yet. Check this device clock and time zone, then let automatic sync retry.'**
+  String get syncRepairClockBody;
+
+  /// No description provided for @syncRepairTrustCertificateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Trust WebDAV certificate?'**
+  String get syncRepairTrustCertificateTitle;
+
+  /// No description provided for @syncRepairTrustCertificateBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The WebDAV server uses an untrusted certificate. Review the fingerprint before saving trust for this endpoint.'**
+  String get syncRepairTrustCertificateBody;
+
+  /// No description provided for @syncRepairRemoteRebuildTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair remote sync?'**
+  String get syncRepairRemoteRebuildTitle;
+
+  /// No description provided for @syncRepairRemoteRebuildBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The remote manifest or record objects are incomplete or corrupted. Serlink can rebuild them from local encrypted records.'**
+  String get syncRepairRemoteRebuildBody;
+
+  /// No description provided for @syncRepairInitializeRemoteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Initialize remote sync?'**
+  String get syncRepairInitializeRemoteTitle;
+
+  /// No description provided for @syncRepairInitializeRemoteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The remote location has no Serlink manifest. Serlink can create one from this encrypted vault.'**
+  String get syncRepairInitializeRemoteBody;
+
+  /// No description provided for @syncRepairReplaceRemoteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace remote vault?'**
+  String get syncRepairReplaceRemoteTitle;
+
+  /// No description provided for @syncRepairReplaceRemoteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The remote location belongs to another vault. Replacing it will overwrite that remote Serlink sync set with this encrypted vault.'**
+  String get syncRepairReplaceRemoteBody;
+
+  /// No description provided for @syncRepairRestoreLocalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore local sync data?'**
+  String get syncRepairRestoreLocalTitle;
+
+  /// No description provided for @syncRepairRestoreLocalBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Local vault data needs recovery before remote sync can be rebuilt. Serlink can restore local encrypted records from the current remote sync set.'**
+  String get syncRepairRestoreLocalBody;
+
   /// No description provided for @syncRemoteRepaired.
   ///
   /// In en, this message translates to:
@@ -2661,6 +2733,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'I have saved it'**
   String get vaultRecoveryKeySavedAction;
+
+  /// No description provided for @vaultRecoveryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault recovery'**
+  String get vaultRecoveryTitle;
+
+  /// No description provided for @vaultRecoveryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault recovery tools are available.'**
+  String get vaultRecoveryBody;
+
+  /// No description provided for @vaultRecoveryDatabaseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Database recovery'**
+  String get vaultRecoveryDatabaseTitle;
+
+  /// No description provided for @vaultRecoveryDatabaseBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Serlink could not open this local database safely.'**
+  String get vaultRecoveryDatabaseBody;
+
+  /// No description provided for @vaultRecoveryHeaderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault header recovery'**
+  String get vaultRecoveryHeaderTitle;
+
+  /// No description provided for @vaultRecoveryHeaderBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The local vault header is invalid or incomplete.'**
+  String get vaultRecoveryHeaderBody;
+
+  /// No description provided for @vaultRecoveryRecordsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record recovery'**
+  String get vaultRecoveryRecordsTitle;
+
+  /// No description provided for @vaultRecoveryRecordsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one {# encrypted record failed authentication.} other {# encrypted records failed authentication.}}'**
+  String vaultRecoveryRecordsBody(num count);
+
+  /// No description provided for @vaultRecoveryRemoteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote sync recovery'**
+  String get vaultRecoveryRemoteTitle;
+
+  /// No description provided for @vaultRecoveryRemoteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The remote sync set needs repair before it can be used.'**
+  String get vaultRecoveryRemoteBody;
+
+  /// No description provided for @vaultRestoreLatestBackupAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore latest backup'**
+  String get vaultRestoreLatestBackupAction;
+
+  /// No description provided for @vaultQuarantineRecordsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Quarantine corrupt records'**
+  String get vaultQuarantineRecordsAction;
+
+  /// No description provided for @vaultCorruptRecordsQuarantinedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Corrupt records quarantined.'**
+  String get vaultCorruptRecordsQuarantinedSnack;
 
   /// No description provided for @vaultResetTitle.
   ///

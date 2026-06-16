@@ -367,6 +367,48 @@ class AppLocalizationsJa extends AppLocalizations {
   String get syncRepairAction => '修復';
 
   @override
+  String get syncRepairClockTitle => 'ローカル時刻を確認';
+
+  @override
+  String get syncRepairClockBody =>
+      'WebDAV 証明書はまだ有効ではありません。このデバイスの時刻とタイムゾーンを確認し、自動同期の再試行を待ってください。';
+
+  @override
+  String get syncRepairTrustCertificateTitle => 'WebDAV 証明書を信頼しますか?';
+
+  @override
+  String get syncRepairTrustCertificateBody =>
+      'WebDAV サーバーは信頼されていない証明書を使用しています。このエンドポイントの信頼を保存する前にフィンガープリントを確認してください。';
+
+  @override
+  String get syncRepairRemoteRebuildTitle => 'リモート同期を修復しますか?';
+
+  @override
+  String get syncRepairRemoteRebuildBody =>
+      'リモートのマニフェストまたはレコードオブジェクトが不完全か破損しています。Serlink はローカルの暗号化レコードから再構築できます。';
+
+  @override
+  String get syncRepairInitializeRemoteTitle => 'リモート同期を初期化しますか?';
+
+  @override
+  String get syncRepairInitializeRemoteBody =>
+      'リモートの場所に Serlink マニフェストがありません。Serlink はこの暗号化ボールトから作成できます。';
+
+  @override
+  String get syncRepairReplaceRemoteTitle => 'リモートボールトを置き換えますか?';
+
+  @override
+  String get syncRepairReplaceRemoteBody =>
+      'リモートの場所は別のボールトに属しています。置き換えると、そのリモート Serlink 同期データがこの暗号化ボールトで上書きされます。';
+
+  @override
+  String get syncRepairRestoreLocalTitle => 'ローカル同期データを復元しますか?';
+
+  @override
+  String get syncRepairRestoreLocalBody =>
+      'リモート同期を再構築する前にローカルボールトデータの復旧が必要です。Serlink は現在のリモート同期データからローカルの暗号化レコードを復元できます。';
+
+  @override
   String get syncRemoteRepaired => 'リモート同期を修復しました。';
 
   @override
@@ -1374,6 +1416,47 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get vaultRecoveryKeySavedAction => '保存しました';
+
+  @override
+  String get vaultRecoveryTitle => 'ボールト復旧';
+
+  @override
+  String get vaultRecoveryBody => 'ボールト復旧ツールを使用できます。';
+
+  @override
+  String get vaultRecoveryDatabaseTitle => 'データベース復旧';
+
+  @override
+  String get vaultRecoveryDatabaseBody => 'Serlink はこのローカルデータベースを安全に開けませんでした。';
+
+  @override
+  String get vaultRecoveryHeaderTitle => 'ボールトヘッダー復旧';
+
+  @override
+  String get vaultRecoveryHeaderBody => 'ローカルボールトヘッダーが無効または不完全です。';
+
+  @override
+  String get vaultRecoveryRecordsTitle => 'レコード復旧';
+
+  @override
+  String vaultRecoveryRecordsBody(num count) {
+    return '$count 件の暗号化レコードが認証に失敗しました。';
+  }
+
+  @override
+  String get vaultRecoveryRemoteTitle => 'リモート同期復旧';
+
+  @override
+  String get vaultRecoveryRemoteBody => 'リモート同期データは使用前に修復が必要です。';
+
+  @override
+  String get vaultRestoreLatestBackupAction => '最新バックアップを復元';
+
+  @override
+  String get vaultQuarantineRecordsAction => '破損レコードを隔離';
+
+  @override
+  String get vaultCorruptRecordsQuarantinedSnack => '破損レコードを隔離しました。';
 
   @override
   String get vaultResetTitle => 'ボールトをリセット';

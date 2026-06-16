@@ -399,6 +399,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get syncRepairAction => 'Repair';
 
   @override
+  String get syncRepairClockTitle => 'Check local clock';
+
+  @override
+  String get syncRepairClockBody =>
+      'The WebDAV certificate is not valid yet. Check this device clock and time zone, then let automatic sync retry.';
+
+  @override
+  String get syncRepairTrustCertificateTitle => 'Trust WebDAV certificate?';
+
+  @override
+  String get syncRepairTrustCertificateBody =>
+      'The WebDAV server uses an untrusted certificate. Review the fingerprint before saving trust for this endpoint.';
+
+  @override
+  String get syncRepairRemoteRebuildTitle => 'Repair remote sync?';
+
+  @override
+  String get syncRepairRemoteRebuildBody =>
+      'The remote manifest or record objects are incomplete or corrupted. Serlink can rebuild them from local encrypted records.';
+
+  @override
+  String get syncRepairInitializeRemoteTitle => 'Initialize remote sync?';
+
+  @override
+  String get syncRepairInitializeRemoteBody =>
+      'The remote location has no Serlink manifest. Serlink can create one from this encrypted vault.';
+
+  @override
+  String get syncRepairReplaceRemoteTitle => 'Replace remote vault?';
+
+  @override
+  String get syncRepairReplaceRemoteBody =>
+      'The remote location belongs to another vault. Replacing it will overwrite that remote Serlink sync set with this encrypted vault.';
+
+  @override
+  String get syncRepairRestoreLocalTitle => 'Restore local sync data?';
+
+  @override
+  String get syncRepairRestoreLocalBody =>
+      'Local vault data needs recovery before remote sync can be rebuilt. Serlink can restore local encrypted records from the current remote sync set.';
+
+  @override
   String get syncRemoteRepaired => 'Remote sync repaired.';
 
   @override
@@ -1455,6 +1497,57 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultRecoveryKeySavedAction => 'I have saved it';
+
+  @override
+  String get vaultRecoveryTitle => 'Vault recovery';
+
+  @override
+  String get vaultRecoveryBody => 'Vault recovery tools are available.';
+
+  @override
+  String get vaultRecoveryDatabaseTitle => 'Database recovery';
+
+  @override
+  String get vaultRecoveryDatabaseBody =>
+      'Serlink could not open this local database safely.';
+
+  @override
+  String get vaultRecoveryHeaderTitle => 'Vault header recovery';
+
+  @override
+  String get vaultRecoveryHeaderBody =>
+      'The local vault header is invalid or incomplete.';
+
+  @override
+  String get vaultRecoveryRecordsTitle => 'Record recovery';
+
+  @override
+  String vaultRecoveryRecordsBody(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# encrypted records failed authentication.',
+      one: '# encrypted record failed authentication.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get vaultRecoveryRemoteTitle => 'Remote sync recovery';
+
+  @override
+  String get vaultRecoveryRemoteBody =>
+      'The remote sync set needs repair before it can be used.';
+
+  @override
+  String get vaultRestoreLatestBackupAction => 'Restore latest backup';
+
+  @override
+  String get vaultQuarantineRecordsAction => 'Quarantine corrupt records';
+
+  @override
+  String get vaultCorruptRecordsQuarantinedSnack =>
+      'Corrupt records quarantined.';
 
   @override
   String get vaultResetTitle => 'Reset Vault';

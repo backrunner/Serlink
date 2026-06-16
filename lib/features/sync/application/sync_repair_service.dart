@@ -83,7 +83,9 @@ class SyncRepairService {
         destructive: true,
       ),
       'sync.remote_manifest_invalid' ||
-      'sync.remote_manifest_mismatch' => const SyncRepairPlan(
+      'sync.remote_manifest_mismatch' ||
+      'sync.remote_header_missing' ||
+      'sync.remote_header_invalid' => const SyncRepairPlan(
         action: SyncRepairAction.rebuildRemoteFromLocal,
         title: 'Repair remote sync?',
         message:

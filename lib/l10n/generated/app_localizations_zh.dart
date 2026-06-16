@@ -364,6 +364,47 @@ class AppLocalizationsZh extends AppLocalizations {
   String get syncRepairAction => '修复';
 
   @override
+  String get syncRepairClockTitle => '检查本地时间';
+
+  @override
+  String get syncRepairClockBody => 'WebDAV 证书尚未生效。请检查此设备的时间和时区，然后等待自动同步重试。';
+
+  @override
+  String get syncRepairTrustCertificateTitle => '信任 WebDAV 证书？';
+
+  @override
+  String get syncRepairTrustCertificateBody =>
+      'WebDAV 服务器使用不受信任的证书。保存对此端点的信任前，请核对指纹。';
+
+  @override
+  String get syncRepairRemoteRebuildTitle => '修复远程同步？';
+
+  @override
+  String get syncRepairRemoteRebuildBody =>
+      '远程清单或记录对象不完整或已损坏。Serlink 可以用本地加密记录重建它们。';
+
+  @override
+  String get syncRepairInitializeRemoteTitle => '初始化远程同步？';
+
+  @override
+  String get syncRepairInitializeRemoteBody =>
+      '远程位置没有 Serlink 清单。Serlink 可以用此加密保险库创建一个。';
+
+  @override
+  String get syncRepairReplaceRemoteTitle => '替换远程保险库？';
+
+  @override
+  String get syncRepairReplaceRemoteBody =>
+      '远程位置属于另一个保险库。替换会用此加密保险库覆盖那个远程 Serlink 同步集。';
+
+  @override
+  String get syncRepairRestoreLocalTitle => '恢复本地同步数据？';
+
+  @override
+  String get syncRepairRestoreLocalBody =>
+      '本地保险库数据需要先恢复，才能重建远程同步。Serlink 可以从当前远程同步集恢复本地加密记录。';
+
+  @override
   String get syncRemoteRepaired => '远程同步已修复。';
 
   @override
@@ -1364,6 +1405,47 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vaultRecoveryKeySavedAction => '我已保存';
+
+  @override
+  String get vaultRecoveryTitle => '保险库恢复';
+
+  @override
+  String get vaultRecoveryBody => '可使用保险库恢复工具。';
+
+  @override
+  String get vaultRecoveryDatabaseTitle => '数据库恢复';
+
+  @override
+  String get vaultRecoveryDatabaseBody => 'Serlink 无法安全打开本地数据库。';
+
+  @override
+  String get vaultRecoveryHeaderTitle => '保险库头恢复';
+
+  @override
+  String get vaultRecoveryHeaderBody => '本地保险库头无效或不完整。';
+
+  @override
+  String get vaultRecoveryRecordsTitle => '记录恢复';
+
+  @override
+  String vaultRecoveryRecordsBody(num count) {
+    return '$count 条加密记录未通过认证。';
+  }
+
+  @override
+  String get vaultRecoveryRemoteTitle => '远程同步恢复';
+
+  @override
+  String get vaultRecoveryRemoteBody => '远程同步数据集需要修复后才能使用。';
+
+  @override
+  String get vaultRestoreLatestBackupAction => '恢复最新备份';
+
+  @override
+  String get vaultQuarantineRecordsAction => '隔离损坏记录';
+
+  @override
+  String get vaultCorruptRecordsQuarantinedSnack => '损坏记录已隔离。';
 
   @override
   String get vaultResetTitle => '重置保险库';

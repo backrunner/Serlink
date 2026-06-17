@@ -708,14 +708,11 @@ class SyncRunService {
     }
 
     if (pruneRemote) {
-      final remoteObjects = await provider.listRecordObjects(
-        prefix: 'records/',
+      await _prunePreviousRemoteRecords(
+        provider,
+        previousManifest: expectedRemoteManifest,
+        desiredRecordPaths: desiredRecordPaths,
       );
-      for (final ref in remoteObjects) {
-        if (!desiredRecordPaths.contains(ref.path)) {
-          await _deleteRemoteObjectIfExists(provider, ref);
-        }
-      }
     }
 
     return SyncRunResult(
@@ -724,6 +721,39 @@ class SyncRunService {
       completedAt: DateTime.now().toUtc(),
       writerDevice: writerDevice,
     );
+  }
+
+  Future<void> _prunePreviousRemoteRecords(
+    SyncProvider provider, {
+    required RemoteManifest? previousManifest,
+    required Set<String> desiredRecordPaths,
+  }) async {
+    if (previousManifest == null) {
+      return;
+    }
+    final previousRecordPaths = await _manifestRecordPathsForPrune(
+      previousManifest,
+    );
+    if (previousRecordPaths == null) {
+      return;
+    }
+    for (final path in previousRecordPaths.difference(desiredRecordPaths)) {
+      await _deleteRemoteObjectIfExists(provider, RemoteObjectRef(path));
+    }
+  }
+
+  Future<Set<String>?> _manifestRecordPathsForPrune(
+    RemoteManifest manifest,
+  ) async {
+    try {
+      final manifestData = await _decryptManifest(manifest);
+      return {
+        for (final entry in _manifestRecords(manifestData))
+          if (entry.ref.path.startsWith('records/')) entry.ref.path,
+      };
+    } on Object {
+      return null;
+    }
   }
 
   Future<void> _clearRemoteSnapshot(SyncProvider provider) async {

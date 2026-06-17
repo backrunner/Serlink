@@ -473,6 +473,7 @@
   "credentialNameLabel": "凭据名称",
   "credentialUsernameHintLabel": "用户名提示",
   "credentialPasswordLabel": "密码",
+  "vaultResetWarningSyncedDevices": "如果此保险库已同步，使用同一同步保险库的其他设备也会被重置并清空。",
   "credentialKeyboardResponsesLabel": "键盘交互响应",
   "credentialKeyboardResponsesHelper": "每行一个响应。",
   "credentialNoSecretMaterial": "此凭据没有保存的机密材料。",

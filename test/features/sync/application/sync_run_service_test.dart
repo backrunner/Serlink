@@ -149,6 +149,48 @@ void main() {
     );
   });
 
+  test(
+    'reset does not publish a CloudKit marker when the synced vault is absent',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+
+      await service.publishRemoteReset(provider);
+
+      await expectLater(
+        provider.readObject(resetMarkerRef),
+        throwsA(
+          isA<SyncProviderException>().having(
+            (error) => error.code,
+            'code',
+            'sync.provider.not_found',
+          ),
+        ),
+      );
+      expect(await provider.readManifest(), isNull);
+    },
+  );
+
+  test(
+    'reset publishes a CloudKit marker only after a synced vault exists',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final envelope = await vault.encryptRecord(
+        id: VaultRecordId('host:reset-target'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"reset.example.test"}'),
+      );
+      await records.upsert(envelope);
+      await service.pushEncryptedSnapshot(provider);
+
+      await service.publishRemoteReset(provider);
+
+      final marker = RemoteResetMarker.fromBytes(
+        await provider.readObject(resetMarkerRef),
+      );
+      expect(marker.vaultId, syncVaultId(vault.header!));
+    },
+  );
+
   test('rejects repair push when local data is unhealthy', () async {
     service = SyncRunService(
       vault: vault,

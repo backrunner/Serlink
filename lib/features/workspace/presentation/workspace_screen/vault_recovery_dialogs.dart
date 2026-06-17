@@ -225,7 +225,9 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
 
     return SerlinkDialog(
       maxWidth: dialogWidth,
-      title: Text(_resetMode ? l10n.vaultResetTitle : l10n.vaultRecoveryCodeTitle),
+      title: Text(
+        _resetMode ? l10n.vaultResetTitle : l10n.vaultRecoveryCodeTitle,
+      ),
       content: SizedBox(
         width: dialogWidth,
         child: ConstrainedBox(
@@ -440,17 +442,13 @@ class _VaultResetWarning extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _VaultResetWarningLine(
-            text: l10n.vaultResetWarningRecords,
-          ),
+          _VaultResetWarningLine(text: l10n.vaultResetWarningRecords),
           const SizedBox(height: 6),
-          _VaultResetWarningLine(
-            text: l10n.vaultResetWarningSecrets,
-          ),
+          _VaultResetWarningLine(text: l10n.vaultResetWarningSyncedDevices),
           const SizedBox(height: 6),
-          _VaultResetWarningLine(
-            text: l10n.vaultResetWarningBackup,
-          ),
+          _VaultResetWarningLine(text: l10n.vaultResetWarningSecrets),
+          const SizedBox(height: 6),
+          _VaultResetWarningLine(text: l10n.vaultResetWarningBackup),
         ],
       ),
     );

@@ -473,6 +473,7 @@
   "credentialNameLabel": "認証情報名",
   "credentialUsernameHintLabel": "ユーザー名ヒント",
   "credentialPasswordLabel": "パスワード",
+  "vaultResetWarningSyncedDevices": "このボールトが同期されている場合、同じ同期ボールトを使う他のデバイスもリセットされ、消去されます。",
   "credentialKeyboardResponsesLabel": "キーボード応答",
   "credentialKeyboardResponsesHelper": "1 行に 1 つの応答を入力します。",
   "credentialNoSecretMaterial": "この認証情報には保存済みのシークレットデータがありません。",

@@ -1691,14 +1691,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<void> _publishRemoteResetIfConfigured() async {
-    var published = false;
-    if (ref.read(platformCapabilitiesProvider).cloudKitSync &&
-        await ref.read(cloudKitAvailabilityCheckProvider)()) {
+    if (await _cloudKitResetTargetExists()) {
       await SyncRunService(
         vault: service,
         records: ref.read(vaultRecordRepositoryProvider),
       ).publishRemoteReset(ref.read(cloudKitSyncProviderFactoryProvider)());
-      published = true;
     }
     final webDav = await _webDavProviderOrNull();
     if (webDav != null) {
@@ -1706,11 +1703,22 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         vault: service,
         records: ref.read(vaultRecordRepositoryProvider),
       ).publishRemoteReset(webDav);
-      published = true;
     }
-    if (published) {
-      return;
+  }
+
+  Future<bool> _cloudKitResetTargetExists() async {
+    final header = service.header;
+    if (header == null ||
+        !ref.read(platformCapabilitiesProvider).cloudKitSync) {
+      return false;
     }
+    if (!await ref.read(cloudKitAvailabilityCheckProvider)()) {
+      return false;
+    }
+    final manifest = await ref
+        .read(cloudKitSyncProviderFactoryProvider)()
+        .readManifest();
+    return manifest?.vaultId == syncVaultId(header);
   }
 
   Future<SyncProvider?> _webDavProviderOrNull() async {

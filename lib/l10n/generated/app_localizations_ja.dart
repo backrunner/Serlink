@@ -1528,6 +1528,10 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get credentialPasswordLabel => 'パスワード';
 
+
+  @override
+  String get vaultResetWarningSyncedDevices =>
+      'このボールトが同期されている場合、同じ同期ボールトを使う他のデバイスもリセットされ、消去されます。';
   @override
   String get credentialKeyboardResponsesLabel => 'キーボード応答';
 

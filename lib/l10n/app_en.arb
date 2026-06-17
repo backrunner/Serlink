@@ -719,6 +719,7 @@
   "credentialNameLabel": "Credential name",
   "credentialUsernameHintLabel": "Username hint",
   "credentialPasswordLabel": "Password",
+  "vaultResetWarningSyncedDevices": "If this vault is synced, other devices using the same synced vault will also be reset and cleared.",
   "credentialKeyboardResponsesLabel": "Keyboard responses",
   "credentialKeyboardResponsesHelper": "One response per line.",
   "credentialNoSecretMaterial": "This credential has no stored secret material.",

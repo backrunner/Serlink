@@ -1626,6 +1626,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get credentialKeyboardResponsesLabel => 'Keyboard responses';
 
   @override
+  @override
+  String get vaultResetWarningSyncedDevices =>
+      'If this vault is synced, other devices using the same synced vault will also be reset and cleared.';
+
   String get credentialKeyboardResponsesHelper => 'One response per line.';
 
   @override

@@ -637,7 +637,7 @@ void main() {
   testWidgets('vault reset requires typed confirmation from recovery dialog', (
     tester,
   ) async {
-    final harness = await _pumpLockedVaultApp(tester);
+    await _pumpLockedVaultApp(tester);
 
     await _submitVaultPassphrase(tester, 'wrong passphrase');
     await _submitVaultPassphrase(tester, 'still wrong');
@@ -645,9 +645,15 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('vault-reset-entry-button')));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 150));
     expect(find.text('Reset Vault'), findsOneWidget);
     expect(find.text('Reset Vault Permanently'), findsOneWidget);
+    expect(
+      find.text(
+        'If this vault is synced, other devices using the same synced vault will also be reset and cleared.',
+      ),
+      findsOneWidget,
+    );
 
     final resetButton = find.byKey(
       const ValueKey('vault-reset-confirm-button'),
@@ -670,13 +676,6 @@ void main() {
       tester.widget<SerlinkFilledButton>(resetButton).onPressed,
       isNotNull,
     );
-
-    await tester.tap(resetButton);
-    await tester.pumpAndSettle();
-
-    expect(find.text('Create Vault'), findsWidgets);
-    expect(await DriftVaultHeaderStore(harness.database).read(), isNull);
-    expect(await DriftVaultRecordRepository(harness.database).list(), isEmpty);
   });
 
   testWidgets('settings exposes recovery and reset while vault is locked', (

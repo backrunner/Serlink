@@ -2938,6 +2938,12 @@ abstract class AppLocalizations {
   /// **'Password'**
   String get credentialPasswordLabel;
 
+  /// No description provided for @vaultResetWarningSyncedDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'If this vault is synced, other devices using the same synced vault will also be reset and cleared.'**
+  String get vaultResetWarningSyncedDevices;
+
   /// No description provided for @credentialKeyboardResponsesLabel.
   ///
   /// In en, this message translates to:

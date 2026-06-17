@@ -530,6 +530,58 @@ void main() {
     },
   );
 
+  test('reset clears a local vault when remote sync is unavailable', () async {
+    final database = SerlinkDatabase(NativeDatabase.memory());
+    final transferQueue = TransferQueueController();
+    final container = ProviderContainer(
+      overrides: [
+        serlinkDatabaseProvider.overrideWithValue(database),
+        vaultCryptoConfigProvider.overrideWithValue(
+          const VaultCryptoConfig.testing(),
+        ),
+        platformCapabilitiesProvider.overrideWithValue(
+          const PlatformCapabilities(
+            operatingSystem: 'ios',
+            targetPlatform: TargetPlatform.iOS,
+          ),
+        ),
+        cloudKitAvailabilityCheckProvider.overrideWithValue(() async => false),
+        secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+        transferQueueControllerProvider.overrideWithValue(transferQueue),
+      ],
+    );
+    addTearDown(container.dispose);
+    addTearDown(transferQueue.dispose);
+    addTearDown(database.close);
+
+    await container.read(vaultSessionControllerProvider.future);
+    await container
+        .read(vaultSessionControllerProvider.notifier)
+        .initialize(passphrase: 'passphrase');
+
+    final record = await container
+        .read(vaultSessionControllerProvider.notifier)
+        .service
+        .encryptRecord(
+          id: VaultRecordId('host:local-reset'),
+          type: 'host',
+          plaintext: utf8.encode('{"hostname":"local.example.test"}'),
+        );
+    await DriftVaultRecordRepository(database).upsert(record);
+
+    final error = await container
+        .read(vaultSessionControllerProvider.notifier)
+        .resetVault();
+
+    expect(error, isNull);
+    expect(
+      container.read(vaultSessionControllerProvider).requireValue.vaultState,
+      VaultState.uninitialized,
+    );
+    expect(await DriftVaultHeaderStore(database).read(), isNull);
+    expect(await DriftVaultRecordRepository(database).list(), isEmpty);
+  });
+
   test(
     'remote CloudKit reset clears an unlocked Apple device on next sync',
     () async {

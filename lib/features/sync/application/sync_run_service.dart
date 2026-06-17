@@ -190,7 +190,7 @@ class SyncRunService {
       );
     }
     final manifest = await provider.readManifest();
-    if (manifest != null && manifest.vaultId != syncVaultId(header)) {
+    if (manifest == null || manifest.vaultId != syncVaultId(header)) {
       return;
     }
     await provider.writeObject(

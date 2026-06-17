@@ -1515,6 +1515,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get credentialPasswordLabel => '密码';
 
   @override
+  String get vaultResetWarningSyncedDevices =>
+      '如果此保险库已同步，使用同一同步保险库的其他设备也会被重置并清空。';
+
+  @override
   String get credentialKeyboardResponsesLabel => '键盘交互响应';
 
   @override

@@ -1479,6 +1479,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultPassphraseRequired => 'Enter a vault passphrase to continue.';
 
   @override
+  String get vaultInvalidPassphraseError =>
+      'Passphrase did not unlock the vault.';
+
+  @override
+  String get vaultInvalidRecoveryKeyError =>
+      'Recovery key did not unlock the vault.';
+
+  @override
+  String get vaultInvalidRecoveryKeyFormatError =>
+      'Recovery key format is not supported.';
+
+  @override
+  String get vaultLocalUnlockNotEnabledError =>
+      'Local vault unlock is not enabled on this device.';
+
+  @override
+  String get vaultLocalUnlockFailedError =>
+      'Local vault unlock failed. Use the vault passphrase.';
+
+  @override
+  String get vaultLocalUnlockUnavailableError =>
+      'Local secure storage is not available on this device.';
+
+  @override
+  String get vaultEmptyPassphraseError => 'Vault passphrase cannot be empty.';
+
+  @override
   String get vaultRecoveryKeyTitle => 'Recovery Key';
 
   @override
@@ -1600,6 +1627,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Encrypted hosts, identities, snippets, transfer history, sync settings, and recovery data will be deleted.';
 
   @override
+  String get vaultResetWarningSyncedDevices =>
+      'If this vault is synced, other devices using the same synced vault will also be reset and cleared.';
+
+  @override
   String get vaultResetWarningSecrets =>
       'Reset does not recover your passphrase or reveal existing secrets.';
 
@@ -1626,10 +1657,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get credentialKeyboardResponsesLabel => 'Keyboard responses';
 
   @override
-  @override
-  String get vaultResetWarningSyncedDevices =>
-      'If this vault is synced, other devices using the same synced vault will also be reset and cleared.';
-
   String get credentialKeyboardResponsesHelper => 'One response per line.';
 
   @override

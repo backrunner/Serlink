@@ -579,6 +579,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
   }
 
   void markConflictResolution(SyncRunResult result) {
+    _invalidateSyncedMetadataProviders();
     state = AutoSyncStatus(
       phase: AutoSyncPhase.idle,
       lastCompletedAt: result.completedAt,
@@ -643,7 +644,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
           .read(syncRunServiceProvider)
           .syncEncryptedSnapshot(provider, reportConflicts: true);
       ref.read(syncConflictControllerProvider.notifier).clear();
-      ref.invalidate(syncKnownDevicesProvider);
+      _invalidateSyncedMetadataProviders();
       _failureCount = 0;
       state = AutoSyncStatus(
         phase: AutoSyncPhase.idle,
@@ -719,6 +720,12 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       return ref.read(syncSettingsServiceProvider).buildWebDavProvider();
     }
     return null;
+  }
+
+  void _invalidateSyncedMetadataProviders() {
+    ref.invalidate(webDavSyncSettingsProvider);
+    ref.invalidate(cloudKitSyncSettingsProvider);
+    ref.invalidate(syncKnownDevicesProvider);
   }
 }
 
@@ -1307,6 +1314,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       ).pullEncryptedSnapshot(provider);
     }
     _cloudKitHeaderDiscovered = false;
+    ref.invalidate(webDavSyncSettingsProvider);
     ref.invalidate(cloudKitSyncSettingsProvider);
     ref.invalidate(syncKnownDevicesProvider);
   }

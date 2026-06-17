@@ -16,6 +16,7 @@ final hostSummariesProvider = FutureProvider.autoDispose
         // list for a frame before the real records finish loading.
         return Completer<List<HostSummary>>().future;
       }
+      ref.watch(vaultRecordChangesProvider);
       final hosts = await ref.watch(hostRepositoryProvider).list();
       hosts.sort(
         (left, right) => left.displayName.compareTo(right.displayName),

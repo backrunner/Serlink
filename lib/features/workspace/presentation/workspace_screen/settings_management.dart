@@ -602,7 +602,7 @@ Future<void> _setLocalVaultUnlock(
 
 String _localUnlockErrorMessage(AppLocalizations l10n, Object error) {
   if (error is VaultException) {
-    return error.message;
+    return localizedVaultExceptionMessage(l10n, error);
   }
   return l10n.settingsLocalUnlockUpdateFailed;
 }

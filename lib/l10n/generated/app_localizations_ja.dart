@@ -1399,6 +1399,29 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultPassphraseRequired => '続行するにはボールトのパスフレーズを入力してください。';
 
   @override
+  String get vaultInvalidPassphraseError => 'パスフレーズではボールトを解除できませんでした。';
+
+  @override
+  String get vaultInvalidRecoveryKeyError => '復旧キーではボールトを解除できませんでした。';
+
+  @override
+  String get vaultInvalidRecoveryKeyFormatError => 'この復旧キー形式はサポートされていません。';
+
+  @override
+  String get vaultLocalUnlockNotEnabledError => 'このデバイスではローカル解除が有効ではありません。';
+
+  @override
+  String get vaultLocalUnlockFailedError =>
+      'ローカル解除に失敗しました。ボールトのパスフレーズを使用してください。';
+
+  @override
+  String get vaultLocalUnlockUnavailableError =>
+      'このデバイスではローカルな安全な保存領域を利用できません。';
+
+  @override
+  String get vaultEmptyPassphraseError => 'ボールトのパスフレーズは空にできません。';
+
+  @override
   String get vaultRecoveryKeyTitle => '復旧キー';
 
   @override
@@ -1507,6 +1530,10 @@ class AppLocalizationsJa extends AppLocalizations {
       '暗号化されたホスト、ID、スニペット、転送履歴、同期設定、復旧データが削除されます。';
 
   @override
+  String get vaultResetWarningSyncedDevices =>
+      'このボールトが同期されている場合、同じ同期ボールトを使う他のデバイスもリセットされ、消去されます。';
+
+  @override
   String get vaultResetWarningSecrets =>
       'リセットしてもパスフレーズは復元されず、既存のシークレットも表示されません。';
 
@@ -1528,10 +1555,6 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get credentialPasswordLabel => 'パスワード';
 
-
-  @override
-  String get vaultResetWarningSyncedDevices =>
-      'このボールトが同期されている場合、同じ同期ボールトを使う他のデバイスもリセットされ、消去されます。';
   @override
   String get credentialKeyboardResponsesLabel => 'キーボード応答';
 

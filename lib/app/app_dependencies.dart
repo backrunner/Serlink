@@ -48,6 +48,7 @@ import '../features/vault/application/vault_record_repository.dart';
 import '../features/vault/application/vault_record_health_service.dart';
 import '../features/vault/application/vault_service.dart';
 import '../features/vault/data/drift_vault_repository.dart';
+import '../l10n/l10n.dart';
 import '../platform/document_gateway.dart';
 import '../platform/flutter_secure_storage_secret_store.dart';
 import '../platform/platform_capabilities.dart';
@@ -1116,7 +1117,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     } on Object catch (error) {
       state = AsyncData(
         previous.copyWith(
-          failureMessage: _vaultFailureMessage(error),
+          failureMessage: _vaultFailureMessage(ref, error),
           clearRecoveryKey: true,
           isBusy: false,
         ),
@@ -1146,7 +1147,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       await _lockServiceIfUnlocked();
       state = AsyncData(
         previous.copyWith(
-          failureMessage: _vaultFailureMessage(error),
+          failureMessage: _vaultFailureMessage(ref, error),
           clearRecoveryKey: true,
           unlockFailureCount: previous.unlockFailureCount + 1,
           isBusy: false,
@@ -1176,7 +1177,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       return null;
     } on Object catch (error) {
       await _lockServiceIfUnlocked();
-      final message = _vaultFailureMessage(error);
+      final message = _vaultFailureMessage(ref, error);
       state = AsyncData(
         previous.copyWith(
           failureMessage: message,
@@ -1210,7 +1211,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       await _lockServiceIfUnlocked();
       state = AsyncData(
         previous.copyWith(
-          failureMessage: _vaultFailureMessage(error),
+          failureMessage: _vaultFailureMessage(ref, error),
           clearRecoveryKey: true,
           isBusy: false,
         ),
@@ -1491,7 +1492,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       await _clearLocalVaultAfterReset();
       return null;
     } on Object catch (error) {
-      final message = _vaultFailureMessage(error);
+      final message = _vaultFailureMessage(ref, error);
       state = AsyncData(
         previous.copyWith(
           failureMessage: message,
@@ -1521,7 +1522,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     } on Object catch (error) {
       state = AsyncData(
         previous.copyWith(
-          failureMessage: _vaultFailureMessage(error),
+          failureMessage: _vaultFailureMessage(ref, error),
           clearRecoveryKey: true,
           isBusy: false,
         ),
@@ -1547,7 +1548,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       await _reloadAfterDatabaseReplacement();
       return null;
     } on Object catch (error) {
-      final message = _recoveryFailureMessage(error);
+      final message = _recoveryFailureMessage(ref, error);
       state = AsyncData(
         previous.copyWith(failureMessage: message, isBusy: false),
       );
@@ -1567,7 +1568,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       await _reloadAfterDatabaseReplacement();
       return null;
     } on Object catch (error) {
-      final message = _recoveryFailureMessage(error);
+      final message = _recoveryFailureMessage(ref, error);
       state = AsyncData(
         previous.copyWith(failureMessage: message, isBusy: false),
       );
@@ -1611,7 +1612,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       );
       return null;
     } on Object catch (error) {
-      final message = _recoveryFailureMessage(error);
+      final message = _recoveryFailureMessage(ref, error);
       state = AsyncData(
         previous.copyWith(failureMessage: message, isBusy: false),
       );
@@ -1781,9 +1782,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 }
 
-String _vaultFailureMessage(Object error) {
+String _vaultFailureMessage(Ref ref, Object error) {
   if (error is VaultException) {
-    return error.message;
+    return localizedVaultExceptionMessage(_currentLocalizations(ref), error);
   }
   if (error is SyncRunException) {
     return error.message;
@@ -1804,12 +1805,12 @@ String _vaultStructuralFailureMessage(Object error) {
   return 'Vault metadata is invalid: ${Redactor.redact(error.toString())}';
 }
 
-String _recoveryFailureMessage(Object error) {
+String _recoveryFailureMessage(Ref ref, Object error) {
   if (error is DatabaseIntegrityException) {
     return error.message;
   }
   if (error is VaultException) {
-    return error.message;
+    return localizedVaultExceptionMessage(_currentLocalizations(ref), error);
   }
   return 'Vault recovery failed: ${Redactor.redact(error.toString())}';
 }
@@ -1825,6 +1826,12 @@ String _syncBootstrapFailureMessage(Object error) {
     return error.message;
   }
   return 'Initial iCloud sync failed.';
+}
+
+AppLocalizations _currentLocalizations(Ref ref) {
+  return lookupSerlinkLocalizations(
+    ref.read(appLanguageProvider).value ?? AppLanguage.system,
+  );
 }
 
 final encryptedConnectionProfileResolverProvider =

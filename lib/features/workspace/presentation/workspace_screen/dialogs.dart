@@ -91,7 +91,7 @@ Future<TransferConflictAction?> _showTransferConflictDialog(
 
 String _backupErrorMessage(AppLocalizations l10n, Object error) {
   if (error is VaultException) {
-    return error.message;
+    return localizedVaultExceptionMessage(l10n, error);
   }
   return l10n.backupOperationFailed;
 }
@@ -119,7 +119,7 @@ String _importErrorMessage(AppLocalizations l10n, Object error) {
     return error.message;
   }
   if (error is VaultException) {
-    return error.message;
+    return localizedVaultExceptionMessage(l10n, error);
   }
   return l10n.importFailed;
 }

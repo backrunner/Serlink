@@ -665,7 +665,7 @@ String _syncSettingsErrorMessage(AppLocalizations l10n, Object error) {
     return error.message;
   }
   if (error is VaultException) {
-    return error.message;
+    return localizedVaultExceptionMessage(l10n, error);
   }
   return l10n.syncSettingsLoadFailed;
 }

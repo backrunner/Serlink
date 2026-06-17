@@ -1389,6 +1389,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultPassphraseRequired => '请输入保险库密码短语以继续。';
 
   @override
+  String get vaultInvalidPassphraseError => '密码短语无法解锁保险库。';
+
+  @override
+  String get vaultInvalidRecoveryKeyError => '恢复密钥无法解锁保险库。';
+
+  @override
+  String get vaultInvalidRecoveryKeyFormatError => '不支持该恢复密钥格式。';
+
+  @override
+  String get vaultLocalUnlockNotEnabledError => '此设备尚未启用本地解锁。';
+
+  @override
+  String get vaultLocalUnlockFailedError => '本地解锁失败，请使用保险库密码短语。';
+
+  @override
+  String get vaultLocalUnlockUnavailableError => '此设备不可用本地安全存储。';
+
+  @override
+  String get vaultEmptyPassphraseError => '保险库密码短语不能为空。';
+
+  @override
   String get vaultRecoveryKeyTitle => '恢复密钥';
 
   @override
@@ -1494,6 +1515,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultResetWarningRecords => '加密主机、身份、片段、传输历史、同步设置和恢复数据将被删除。';
 
   @override
+  String get vaultResetWarningSyncedDevices =>
+      '如果此保险库已同步，使用同一同步保险库的其他设备也会被重置并清空。';
+
+  @override
   String get vaultResetWarningSecrets => '重置不会找回密码短语，也不会显示现有机密。';
 
   @override
@@ -1513,10 +1538,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get credentialPasswordLabel => '密码';
-
-  @override
-  String get vaultResetWarningSyncedDevices =>
-      '如果此保险库已同步，使用同一同步保险库的其他设备也会被重置并清空。';
 
   @override
   String get credentialKeyboardResponsesLabel => '键盘交互响应';

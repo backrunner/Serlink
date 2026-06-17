@@ -30,6 +30,8 @@ import 'package:serlink/features/vault/application/in_memory_vault_service.dart'
 import 'package:serlink/features/vault/application/vault_service.dart';
 import 'package:serlink/features/vault/data/drift_vault_repository.dart';
 import 'package:serlink/features/workspace/application/workspace_tab_controller.dart';
+import 'package:serlink/features/settings/application/app_language_settings.dart';
+import 'package:serlink/l10n/l10n.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
@@ -1466,10 +1468,11 @@ void main() {
     tester,
   ) async {
     await _pumpLockedVaultApp(tester);
+    final l10n = lookupSerlinkLocalizations(AppLanguage.english);
 
     await _submitVaultPassphrase(tester, 'wrong passphrase');
     await _submitVaultPassphrase(tester, 'still wrong');
-    expect(find.text('Passphrase did not unlock the vault.'), findsOneWidget);
+    expect(find.text(l10n.vaultInvalidPassphraseError), findsOneWidget);
     expect(
       find.byKey(const ValueKey('vault-recovery-code-button')),
       findsOneWidget,
@@ -1481,7 +1484,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Unlock Vault'), findsWidgets);
-    expect(find.text('Passphrase did not unlock the vault.'), findsNothing);
+    expect(find.text(l10n.vaultInvalidPassphraseError), findsNothing);
     expect(
       find.byKey(const ValueKey('vault-recovery-code-button')),
       findsNothing,

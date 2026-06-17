@@ -2698,6 +2698,48 @@ abstract class AppLocalizations {
   /// **'Enter a vault passphrase to continue.'**
   String get vaultPassphraseRequired;
 
+  /// No description provided for @vaultInvalidPassphraseError.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase did not unlock the vault.'**
+  String get vaultInvalidPassphraseError;
+
+  /// No description provided for @vaultInvalidRecoveryKeyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery key did not unlock the vault.'**
+  String get vaultInvalidRecoveryKeyError;
+
+  /// No description provided for @vaultInvalidRecoveryKeyFormatError.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery key format is not supported.'**
+  String get vaultInvalidRecoveryKeyFormatError;
+
+  /// No description provided for @vaultLocalUnlockNotEnabledError.
+  ///
+  /// In en, this message translates to:
+  /// **'Local vault unlock is not enabled on this device.'**
+  String get vaultLocalUnlockNotEnabledError;
+
+  /// No description provided for @vaultLocalUnlockFailedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Local vault unlock failed. Use the vault passphrase.'**
+  String get vaultLocalUnlockFailedError;
+
+  /// No description provided for @vaultLocalUnlockUnavailableError.
+  ///
+  /// In en, this message translates to:
+  /// **'Local secure storage is not available on this device.'**
+  String get vaultLocalUnlockUnavailableError;
+
+  /// No description provided for @vaultEmptyPassphraseError.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault passphrase cannot be empty.'**
+  String get vaultEmptyPassphraseError;
+
   /// No description provided for @vaultRecoveryKeyTitle.
   ///
   /// In en, this message translates to:
@@ -2896,6 +2938,12 @@ abstract class AppLocalizations {
   /// **'Encrypted hosts, identities, snippets, transfer history, sync settings, and recovery data will be deleted.'**
   String get vaultResetWarningRecords;
 
+  /// No description provided for @vaultResetWarningSyncedDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'If this vault is synced, other devices using the same synced vault will also be reset and cleared.'**
+  String get vaultResetWarningSyncedDevices;
+
   /// No description provided for @vaultResetWarningSecrets.
   ///
   /// In en, this message translates to:
@@ -2937,12 +2985,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Password'**
   String get credentialPasswordLabel;
-
-  /// No description provided for @vaultResetWarningSyncedDevices.
-  ///
-  /// In en, this message translates to:
-  /// **'If this vault is synced, other devices using the same synced vault will also be reset and cleared.'**
-  String get vaultResetWarningSyncedDevices;
 
   /// No description provided for @credentialKeyboardResponsesLabel.
   ///

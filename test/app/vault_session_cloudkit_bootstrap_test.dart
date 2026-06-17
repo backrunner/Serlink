@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -10,7 +11,9 @@ import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/database/database_recovery.dart';
 import 'package:serlink/database/serlink_database.dart';
+import 'package:serlink/features/sync/application/auto_sync_controller.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
+import 'package:serlink/features/sync/data/cloudkit_sync_provider.dart';
 import 'package:serlink/features/sync/data/local_sync_provider.dart';
 import 'package:serlink/features/sync/domain/sync_provider.dart';
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
@@ -674,6 +677,242 @@ void main() {
   );
 
   test(
+    'CloudKit change echoes settle without relocking an unlocked vault',
+    () async {
+      final sourceDatabase = SerlinkDatabase(NativeDatabase.memory());
+      final sourceTransferQueue = TransferQueueController();
+      final sourceContainer = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(sourceDatabase),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'ios',
+              targetPlatform: TargetPlatform.iOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => LocalDirectorySyncProvider(remoteDir),
+          ),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(
+            sourceTransferQueue,
+          ),
+        ],
+      );
+      addTearDown(sourceContainer.dispose);
+      addTearDown(sourceTransferQueue.dispose);
+      addTearDown(sourceDatabase.close);
+
+      await sourceContainer.read(vaultSessionControllerProvider.future);
+      await sourceContainer
+          .read(vaultSessionControllerProvider.notifier)
+          .initialize(passphrase: 'passphrase');
+
+      final cloudKitEvents = StreamController<CloudKitSyncChange>.broadcast(
+        sync: true,
+      );
+      addTearDown(cloudKitEvents.close);
+      final counters = _CountingSyncProviderCounters();
+      final targetDatabase = SerlinkDatabase(NativeDatabase.memory());
+      final targetTransferQueue = TransferQueueController();
+      final targetContainer = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(targetDatabase),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'macos',
+              targetPlatform: TargetPlatform.macOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => _CountingSyncProvider(
+              LocalDirectorySyncProvider(remoteDir),
+              counters,
+            ),
+          ),
+          cloudKitSyncChangesProvider.overrideWith(
+            (_) => cloudKitEvents.stream,
+          ),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(
+            targetTransferQueue,
+          ),
+          autoSyncDebounceDurationProvider.overrideWithValue(
+            const Duration(days: 1),
+          ),
+          autoSyncIntervalDurationProvider.overrideWithValue(
+            const Duration(days: 1),
+          ),
+        ],
+      );
+      addTearDown(targetContainer.dispose);
+      addTearDown(targetTransferQueue.dispose);
+      addTearDown(targetDatabase.close);
+      final autoSyncSubscription = targetContainer.listen(
+        autoSyncControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(autoSyncSubscription.close);
+
+      final discovered = await targetContainer.read(
+        vaultSessionControllerProvider.future,
+      );
+      expect(discovered.vaultState, VaultState.locked);
+      await targetContainer
+          .read(vaultSessionControllerProvider.notifier)
+          .unlock(passphrase: 'passphrase');
+      expect(
+        targetContainer
+            .read(vaultSessionControllerProvider)
+            .requireValue
+            .vaultState,
+        VaultState.unlocked,
+      );
+      expect(
+        targetContainer
+            .read(vaultSessionControllerProvider.notifier)
+            .service
+            .state,
+        VaultState.unlocked,
+      );
+      expect(
+        await targetContainer.read(cloudKitSyncSettingsProvider.future),
+        isNotNull,
+      );
+      counters.reset();
+      await Future<void>.delayed(Duration.zero);
+
+      final sourceVault = sourceContainer
+          .read(vaultSessionControllerProvider.notifier)
+          .service;
+      final host = await sourceVault.encryptRecord(
+        id: VaultRecordId('host:echo'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"echo.example.test"}'),
+      );
+      await sourceContainer.read(vaultRecordRepositoryProvider).upsert(host);
+      await sourceContainer
+          .read(syncRunServiceProvider)
+          .syncEncryptedSnapshot(LocalDirectorySyncProvider(remoteDir));
+
+      cloudKitEvents.add(
+        CloudKitSyncChange(
+          source: 'remote',
+          receivedAt: DateTime.now().toUtc(),
+        ),
+      );
+      await _waitForRecord(targetDatabase, VaultRecordId('host:echo'));
+      await _waitForAutoSyncIdle(targetContainer);
+      expect(counters.conditionalManifestWrites, 1);
+
+      cloudKitEvents.add(
+        CloudKitSyncChange(source: 'echo', receivedAt: DateTime.now().toUtc()),
+      );
+      await _waitForAutoSyncIdle(targetContainer);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      final status = targetContainer.read(autoSyncControllerProvider);
+      expect(status.phase, AutoSyncPhase.idle);
+      expect(status.recordsUploaded, 0);
+      expect(counters.conditionalManifestWrites, 1);
+      expect(
+        targetContainer
+            .read(vaultSessionControllerProvider)
+            .requireValue
+            .vaultState,
+        VaultState.unlocked,
+      );
+      expect(
+        targetContainer
+            .read(vaultSessionControllerProvider.notifier)
+            .service
+            .state,
+        VaultState.unlocked,
+      );
+    },
+  );
+
+  test(
+    'CloudKit sync failures back off without an immediate retry loop',
+    () async {
+      final provider = _FailingReadSyncProvider(
+        LocalDirectorySyncProvider(remoteDir),
+      );
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'macos',
+              targetPlatform: TargetPlatform.macOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(() => provider),
+          cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+          autoSyncDebounceDurationProvider.overrideWithValue(
+            const Duration(days: 1),
+          ),
+          autoSyncIntervalDurationProvider.overrideWithValue(
+            const Duration(days: 1),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      await container.read(vaultSessionControllerProvider.future);
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .initialize(passphrase: 'passphrase');
+      final autoSyncSubscription = container.listen(
+        autoSyncControllerProvider,
+        (_, _) {},
+      );
+      addTearDown(autoSyncSubscription.close);
+
+      provider.failReads = true;
+      provider.failedReads = 0;
+      container
+          .read(autoSyncControllerProvider.notifier)
+          .requestSync(delay: Duration.zero);
+
+      await _waitForFailedRead(provider);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(provider.failedReads, 1);
+      expect(
+        container.read(autoSyncControllerProvider).phase,
+        AutoSyncPhase.failed,
+      );
+      expect(
+        container.read(vaultSessionControllerProvider).requireValue.vaultState,
+        VaultState.unlocked,
+      );
+      expect(
+        container.read(vaultSessionControllerProvider.notifier).service.state,
+        VaultState.unlocked,
+      );
+    },
+  );
+
+  test(
     'CloudKit bootstrap failure does not block local vault creation',
     () async {
       final database = SerlinkDatabase(NativeDatabase.memory());
@@ -941,6 +1180,158 @@ Future<void> _waitForVaultState(
     'Expected vault state $expected but found ${state?.vaultState}. '
     'Auto-sync phase: ${autoSync.phase}, failure: ${autoSync.lastFailureMessage}.',
   );
+}
+
+Future<void> _waitForRecord(SerlinkDatabase database, VaultRecordId id) async {
+  for (var attempt = 0; attempt < 300; attempt += 1) {
+    if (await DriftVaultRecordRepository(database).read(id) != null) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  fail('Expected record ${id.value} to be synced locally.');
+}
+
+Future<void> _waitForAutoSyncIdle(ProviderContainer container) async {
+  for (var attempt = 0; attempt < 300; attempt += 1) {
+    final status = container.read(autoSyncControllerProvider);
+    if (status.phase == AutoSyncPhase.idle) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  final status = container.read(autoSyncControllerProvider);
+  fail(
+    'Expected auto-sync to become idle but found ${status.phase}. '
+    'Failure: ${status.lastFailureMessage}.',
+  );
+}
+
+Future<void> _waitForFailedRead(_FailingReadSyncProvider provider) async {
+  for (var attempt = 0; attempt < 300; attempt += 1) {
+    if (provider.failedReads > 0) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  fail('Expected CloudKit provider read to fail.');
+}
+
+class _CountingSyncProviderCounters {
+  int conditionalManifestWrites = 0;
+
+  void reset() {
+    conditionalManifestWrites = 0;
+  }
+}
+
+class _CountingSyncProvider implements SyncProvider {
+  _CountingSyncProvider(this.inner, this.counters);
+
+  final SyncProvider inner;
+  final _CountingSyncProviderCounters counters;
+
+  @override
+  Future<ProviderCapabilities> capabilities() {
+    return inner.capabilities();
+  }
+
+  @override
+  Future<RemoteManifest?> readManifest() {
+    return inner.readManifest();
+  }
+
+  @override
+  Future<void> writeManifest(RemoteManifest manifest) {
+    return inner.writeManifest(manifest);
+  }
+
+  @override
+  Future<void> writeManifestIfUnchanged(
+    RemoteManifest manifest,
+    RemoteManifest? expectedCurrent,
+  ) async {
+    await inner.writeManifestIfUnchanged(manifest, expectedCurrent);
+    counters.conditionalManifestWrites += 1;
+  }
+
+  @override
+  Future<List<RemoteObjectRef>> listRecordObjects({String? prefix}) {
+    return inner.listRecordObjects(prefix: prefix);
+  }
+
+  @override
+  Future<List<int>> readObject(RemoteObjectRef ref) {
+    return inner.readObject(ref);
+  }
+
+  @override
+  Future<void> writeObject(RemoteObjectRef ref, List<int> bytes) {
+    return inner.writeObject(ref, bytes);
+  }
+
+  @override
+  Future<void> deleteObject(RemoteObjectRef ref) {
+    return inner.deleteObject(ref);
+  }
+}
+
+class _FailingReadSyncProvider implements SyncProvider {
+  _FailingReadSyncProvider(this.inner);
+
+  final SyncProvider inner;
+  var failReads = false;
+  var failedReads = 0;
+
+  @override
+  Future<ProviderCapabilities> capabilities() {
+    return inner.capabilities();
+  }
+
+  @override
+  Future<RemoteManifest?> readManifest() {
+    return inner.readManifest();
+  }
+
+  @override
+  Future<void> writeManifest(RemoteManifest manifest) {
+    return inner.writeManifest(manifest);
+  }
+
+  @override
+  Future<void> writeManifestIfUnchanged(
+    RemoteManifest manifest,
+    RemoteManifest? expectedCurrent,
+  ) {
+    return inner.writeManifestIfUnchanged(manifest, expectedCurrent);
+  }
+
+  @override
+  Future<List<RemoteObjectRef>> listRecordObjects({String? prefix}) {
+    return inner.listRecordObjects(prefix: prefix);
+  }
+
+  @override
+  Future<List<int>> readObject(RemoteObjectRef ref) {
+    if (failReads) {
+      failedReads += 1;
+      throw const SyncProviderException(
+        'sync.cloudkit.failed',
+        'Temporary CloudKit failure.',
+      );
+    }
+    return inner.readObject(ref);
+  }
+
+  @override
+  Future<void> writeObject(RemoteObjectRef ref, List<int> bytes) {
+    return inner.writeObject(ref, bytes);
+  }
+
+  @override
+  Future<void> deleteObject(RemoteObjectRef ref) {
+    return inner.deleteObject(ref);
+  }
 }
 
 class _BootstrapRaceProvider implements SyncProvider {

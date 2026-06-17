@@ -21,6 +21,72 @@ void main() {
     }
   });
 
+  test(
+    'release channels share one production CloudKit container and schema',
+    () {
+      const containerId = 'iCloud.com.alkinum.serlink';
+      const recordType = 'SerlinkSyncObject';
+      const eventChannel = 'serlink/cloudkit/events';
+      const subscriptionId = 'serlink-sync-objects';
+
+      for (final entitlement in const [
+        'ios/Runner/Release.entitlements',
+        'macos/Runner/Release.entitlements',
+        'macos/Runner/Direct.entitlements',
+      ]) {
+        final services = _plistValue(
+          entitlement,
+          'com.apple.developer.icloud-services',
+        );
+        final containers = _plistValue(
+          entitlement,
+          'com.apple.developer.icloud-container-identifiers',
+        );
+        final environment = _plistValue(
+          entitlement,
+          'com.apple.developer.icloud-container-environment',
+        );
+        final apsEnvironment = _plistValue(
+          entitlement,
+          'com.apple.developer.aps-environment',
+        );
+
+        expect(services, contains('CloudKit'), reason: entitlement);
+        expect(containers, contains(containerId), reason: entitlement);
+        expect(
+          environment.isEmpty || environment.contains('Production'),
+          isTrue,
+          reason: '$entitlement must not point at CloudKit Development',
+        );
+        expect(apsEnvironment, contains('production'), reason: entitlement);
+      }
+
+      for (final bridge in const [
+        'ios/Runner/CloudKitSyncChannel.swift',
+        'macos/Runner/CloudKitSyncChannel.swift',
+      ]) {
+        final source = File(bridge).readAsStringSync();
+        expect(
+          source,
+          contains('containerIdentifier = "$containerId"'),
+          reason: bridge,
+        );
+        expect(source, contains('recordType = "$recordType"'), reason: bridge);
+        expect(
+          source,
+          contains('eventsChannelName = "$eventChannel"'),
+          reason: bridge,
+        );
+        expect(
+          source,
+          contains('subscriptionID = "$subscriptionId"'),
+          reason: bridge,
+        );
+        expect(source, contains('writeObjectIfUnchanged'), reason: bridge);
+      }
+    },
+  );
+
   test('macOS App Store build runs CloudKit production release gate', () {
     final script = File('tool/build_macos_app_store.sh').readAsStringSync();
     final releaseGate = File(
@@ -215,4 +281,16 @@ version: 2.3.4+8
       tempRoot.deleteSync(recursive: true);
     }
   });
+}
+
+String _plistValue(String plistPath, String key) {
+  final result = Process.runSync('/usr/libexec/PlistBuddy', [
+    '-c',
+    'Print :$key',
+    plistPath,
+  ]);
+  if (result.exitCode != 0) {
+    return '';
+  }
+  return result.stdout.toString();
 }

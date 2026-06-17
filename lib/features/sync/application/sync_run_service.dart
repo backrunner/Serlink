@@ -379,6 +379,20 @@ class SyncRunService {
         unchanged += 1;
         continue;
       }
+      if (_shouldAutoResolveMetadataConflict(remoteEnvelope.type)) {
+        if (await _remoteRecordWins(
+          localEnvelope: localEnvelope,
+          remoteEnvelope: remoteEnvelope,
+          provider: provider,
+          manifestEntriesById: recordEntriesById,
+        )) {
+          await _records.upsert(remoteEnvelope);
+          downloaded += 1;
+        } else {
+          unchanged += 1;
+        }
+        continue;
+      }
       if (conflictPolicy == _SyncConflictPolicy.useRemote) {
         await _records.upsert(remoteEnvelope);
         downloaded += 1;
@@ -1280,6 +1294,10 @@ class _ManifestRecordEntry {
 bool _isRemoteManifestWriteConflict(SyncProviderException error) {
   return error.code == 'sync.provider.conflict' ||
       error.code == 'sync.cloudkit.conflict';
+}
+
+bool _shouldAutoResolveMetadataConflict(String type) {
+  return type == EncryptedSyncDeviceRepository.recordType;
 }
 
 Future<T> _retryOnRemoteManifestConflict<T>(Future<T> Function() action) async {

@@ -512,6 +512,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
   bool _running = false;
   bool _rerunRequested = false;
   bool _configureQueued = false;
+  Duration? _retryDelayAfterRun;
   var _failureCount = 0;
 
   @override
@@ -553,6 +554,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       _rerunRequested = true;
       return;
     }
+    _retryDelayAfterRun = null;
     _debounceTimer?.cancel();
     state = state.copyWith(
       phase: AutoSyncPhase.scheduled,
@@ -597,6 +599,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       _intervalTimer?.cancel();
       _debounceTimer = null;
       _intervalTimer = null;
+      _retryDelayAfterRun = null;
       if (!_running) {
         state = const AutoSyncStatus.disabled();
       }
@@ -646,6 +649,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       ref.read(syncConflictControllerProvider.notifier).clear();
       _invalidateSyncedMetadataProviders();
       _failureCount = 0;
+      _retryDelayAfterRun = null;
       state = AutoSyncStatus(
         phase: AutoSyncPhase.idle,
         lastCompletedAt: result.completedAt,
@@ -654,6 +658,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       );
     } on SyncRunConflictException catch (error) {
       _failureCount = 0;
+      _retryDelayAfterRun = null;
       ref
           .read(syncConflictControllerProvider.notifier)
           .setConflicts(error.conflicts);
@@ -669,6 +674,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         _debounceTimer = null;
         _intervalTimer = null;
         _rerunRequested = false;
+        _retryDelayAfterRun = null;
         await ref
             .read(vaultSessionControllerProvider.notifier)
             .applyRemoteReset();
@@ -681,7 +687,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         lastFailureMessage: _autoSyncFailureMessage(error),
         lastFailure: error,
       );
-      requestSync(delay: _retryDelay(_failureCount));
+      _retryDelayAfterRun = _retryDelay(_failureCount);
     } on Object catch (error) {
       _failureCount += 1;
       state = state.copyWith(
@@ -689,16 +695,30 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         lastFailureMessage: _autoSyncFailureMessage(error),
         lastFailure: error,
       );
-      requestSync(delay: _retryDelay(_failureCount));
+      _retryDelayAfterRun = _retryDelay(_failureCount);
     } finally {
       _running = false;
-      if (_rerunRequested && _canAttemptSync) {
+      final retryDelay = _retryDelayAfterRun;
+      if (retryDelay != null && _canAttemptSync) {
+        _retryDelayAfterRun = null;
+        _rerunRequested = false;
+        _scheduleRetry(retryDelay);
+      } else if (_rerunRequested && _canAttemptSync) {
         _rerunRequested = false;
         requestSync(delay: Duration.zero);
       } else if (!_canAttemptSync) {
         _rerunRequested = false;
+        _retryDelayAfterRun = null;
       }
     }
+  }
+
+  void _scheduleRetry(Duration delay) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(delay, () {
+      _debounceTimer = null;
+      unawaited(_run());
+    });
   }
 
   bool get _canAttemptSync {

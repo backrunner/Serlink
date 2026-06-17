@@ -1081,6 +1081,57 @@ void main() {
   );
 
   test(
+    'push prunes only records referenced by the previous manifest',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final initialEnvelope = await vault.encryptRecord(
+        id: VaultRecordId('host:prune'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"initial.example.test"}'),
+      );
+      await records.upsert(initialEnvelope);
+      await service.pushEncryptedSnapshot(provider);
+
+      final staleRecordRef = await _manifestRecordRef(
+        provider: provider,
+        vault: vault,
+        id: initialEnvelope.id,
+      );
+      await provider.writeObject(
+        const RemoteObjectRef('records/host%3Aorphan-inflight.json'),
+        utf8.encode('{"orphan":true}'),
+      );
+
+      final updatedEnvelope = await vault.encryptRecord(
+        id: initialEnvelope.id,
+        type: initialEnvelope.type,
+        plaintext: utf8.encode('{"hostname":"updated.example.test"}'),
+      );
+      await records.upsert(updatedEnvelope);
+
+      final result = await service.pushEncryptedSnapshot(provider);
+
+      expect(result.recordsUploaded, 1);
+      await expectLater(
+        provider.readObject(staleRecordRef),
+        throwsA(
+          isA<SyncProviderException>().having(
+            (error) => error.code,
+            'code',
+            'sync.provider.not_found',
+          ),
+        ),
+      );
+      expect(
+        await provider.readObject(
+          const RemoteObjectRef('records/host%3Aorphan-inflight.json'),
+        ),
+        utf8.encode('{"orphan":true}'),
+      );
+    },
+  );
+
+  test(
     'resolving with keepLocal overwrites conflicting remote record',
     () async {
       final provider = LocalDirectorySyncProvider(tempDir);

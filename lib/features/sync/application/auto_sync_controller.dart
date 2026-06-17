@@ -67,10 +67,17 @@ class NotifyingVaultRecordRepository implements VaultRecordRepository {
 
   @override
   Future<void> delete(VaultRecordId id) async {
+    final existing = await inner.read(id);
     await inner.delete(id);
-    changes.notify(
-      VaultRecordChange(kind: VaultRecordChangeKind.delete, id: id),
-    );
+    if (existing != null && _shouldNotifyRecordChange(existing.type)) {
+      changes.notify(
+        VaultRecordChange(
+          kind: VaultRecordChangeKind.delete,
+          id: id,
+          type: existing.type,
+        ),
+      );
+    }
   }
 
   @override
@@ -78,13 +85,15 @@ class NotifyingVaultRecordRepository implements VaultRecordRepository {
     final records = await inner.list();
     await inner.clear();
     for (final record in records) {
-      changes.notify(
-        VaultRecordChange(
-          kind: VaultRecordChangeKind.delete,
-          id: record.id,
-          type: record.type,
-        ),
-      );
+      if (_shouldNotifyRecordChange(record.type)) {
+        changes.notify(
+          VaultRecordChange(
+            kind: VaultRecordChangeKind.delete,
+            id: record.id,
+            type: record.type,
+          ),
+        );
+      }
     }
   }
 }
@@ -140,5 +149,6 @@ class AutoSyncStatus {
 
 bool _shouldNotifyRecordChange(String type) {
   return type != EncryptedSyncDeviceRepository.recordType &&
+      type != 'sync_tombstone' &&
       type != 'sync_manifest';
 }

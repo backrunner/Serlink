@@ -379,6 +379,7 @@ class _SyncConflictRow extends ConsumerWidget {
               context,
               ref,
               SyncConflictResolution.useRemote,
+              conflicts,
             ),
             compactSize: SerlinkButtonSize.xs,
             child: Text(l10n.syncUseRemoteAction),
@@ -388,6 +389,7 @@ class _SyncConflictRow extends ConsumerWidget {
               context,
               ref,
               SyncConflictResolution.keepLocal,
+              conflicts,
             ),
             compactSize: SerlinkButtonSize.xs,
             child: Text(l10n.syncKeepLocalAction),
@@ -403,17 +405,24 @@ Future<void> _reviewSyncConflicts(
   WidgetRef ref,
   List<SyncRecordConflict> conflicts,
 ) async {
-  await showSerlinkDialog<void>(
+  final result = await showSerlinkDialog<SyncRunResult>(
     context: context,
     barrierDismissible: false,
     builder: (context) => _SyncConflictReviewDialog(conflicts: conflicts),
   );
+  if (result != null && context.mounted) {
+    _showSnackBar(
+      context,
+      context.l10n.syncConflictsResolvedSnack(result.recordsUploaded),
+    );
+  }
 }
 
 Future<void> _resolveSyncConflicts(
   BuildContext context,
   WidgetRef ref,
   SyncConflictResolution resolution,
+  List<SyncRecordConflict> conflicts,
 ) async {
   final useRemote = resolution == SyncConflictResolution.useRemote;
   final confirmed = await _confirmDialog(
@@ -432,6 +441,26 @@ Future<void> _resolveSyncConflicts(
   if (!confirmed || !context.mounted) {
     return;
   }
+  final resolved = await _applySyncConflictResolution(
+    context,
+    ref,
+    resolution,
+    conflicts,
+  );
+  if (resolved != null && context.mounted) {
+    _showSnackBar(
+      context,
+      context.l10n.syncConflictsResolvedSnack(resolved.recordsUploaded),
+    );
+  }
+}
+
+Future<SyncRunResult?> _applySyncConflictResolution(
+  BuildContext context,
+  WidgetRef ref,
+  SyncConflictResolution resolution,
+  List<SyncRecordConflict> acceptedConflicts,
+) async {
   final l10n = context.l10n;
   try {
     final provider = await ref
@@ -445,18 +474,17 @@ Future<void> _resolveSyncConflicts(
     }
     final result = await ref
         .read(syncRunServiceProvider)
-        .resolveConflicts(provider, resolution);
+        .resolveConflicts(
+          provider,
+          resolution,
+          acceptedConflicts: acceptedConflicts,
+        );
     ref.read(syncConflictControllerProvider.notifier).clear();
     ref
         .read(autoSyncControllerProvider.notifier)
         .markConflictResolution(result);
     ref.invalidate(syncKnownDevicesProvider);
-    if (context.mounted) {
-      _showSnackBar(
-        context,
-        l10n.syncConflictsResolvedSnack(result.recordsUploaded),
-      );
-    }
+    return result;
   } on SyncRunConflictException catch (error) {
     ref
         .read(syncConflictControllerProvider.notifier)
@@ -469,6 +497,47 @@ Future<void> _resolveSyncConflicts(
       _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
     }
   }
+  return null;
+}
+
+Future<SyncRunResult?> _applySyncConflictMerges(
+  BuildContext context,
+  WidgetRef ref,
+  List<SyncMergedConflict> merges,
+) async {
+  final l10n = context.l10n;
+  try {
+    final provider = await ref
+        .read(syncSettingsServiceProvider)
+        .activeSyncProvider();
+    if (provider == null) {
+      throw const SyncRunException(
+        'sync.provider_missing',
+        'No sync provider is enabled.',
+      );
+    }
+    final result = await ref
+        .read(syncRunServiceProvider)
+        .applyMergedConflicts(provider, merges: merges);
+    ref.read(syncConflictControllerProvider.notifier).clear();
+    ref
+        .read(autoSyncControllerProvider.notifier)
+        .markConflictResolution(result);
+    ref.invalidate(syncKnownDevicesProvider);
+    return result;
+  } on SyncRunConflictException catch (error) {
+    ref
+        .read(syncConflictControllerProvider.notifier)
+        .setConflicts(error.conflicts);
+    if (context.mounted) {
+      _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
+    }
+  } on Object catch (error) {
+    if (context.mounted) {
+      _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
+    }
+  }
+  return null;
 }
 
 Future<void> _setICloudSync(

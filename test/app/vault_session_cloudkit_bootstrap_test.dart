@@ -225,7 +225,8 @@ void main() {
         vault: sourceVault,
         records: sourceRecords,
       ).pushEncryptedSnapshot(provider);
-      await provider.deleteObject(const RemoteObjectRef('vault/header.json'));
+      final manifest = await provider.readManifest();
+      await provider.deleteObject(RemoteObjectRef(manifest!.headerPath!));
 
       final database = SerlinkDatabase(NativeDatabase.memory());
       final transferQueue = TransferQueueController();
@@ -338,9 +339,11 @@ void main() {
       expect(state.failureMessage, isNull);
 
       final provider = LocalDirectorySyncProvider(remoteDir);
-      expect(await provider.readManifest(), isNotNull);
+      final manifest = await provider.readManifest();
+      expect(manifest, isNotNull);
+      expect(manifest!.headerPath, startsWith('vault/headers/'));
       expect(
-        await provider.readObject(const RemoteObjectRef('vault/header.json')),
+        await provider.readObject(RemoteObjectRef(manifest.headerPath!)),
         isNotEmpty,
       );
 
@@ -777,6 +780,126 @@ void main() {
       expect(after?.vaultId, remoteManifest?.vaultId);
     },
   );
+
+  test(
+    'concurrent CloudKit bootstrap cannot corrupt the winning vault header',
+    () async {
+      final inner = LocalDirectorySyncProvider(remoteDir);
+      final provider = _BootstrapRaceProvider(inner);
+      final remoteVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await remoteVault.initialize(passphrase: 'remote passphrase');
+      provider.onFirstManifestWrite = () async {
+        await SyncRunService(
+          vault: remoteVault,
+          records: InMemoryVaultRecordRepository(),
+        ).pushEncryptedSnapshot(inner);
+      };
+
+      final localVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await localVault.initialize(passphrase: 'local passphrase');
+      final localService = SyncRunService(
+        vault: localVault,
+        records: InMemoryVaultRecordRepository(),
+      );
+
+      await expectLater(
+        localService.pushEncryptedSnapshot(provider),
+        throwsA(
+          isA<SyncProviderException>().having(
+            (error) => error.code,
+            'code',
+            'sync.provider.conflict',
+          ),
+        ),
+      );
+
+      final manifest = await inner.readManifest();
+      expect(manifest?.vaultId, syncVaultId(remoteVault.header!));
+      expect(manifest?.headerPath, startsWith('vault/headers/'));
+      final header = VaultHeader.fromJson(
+        jsonDecode(
+              utf8.decode(
+                await inner.readObject(RemoteObjectRef(manifest!.headerPath!)),
+              ),
+            )
+            as Map<String, Object?>,
+      );
+      expect(syncVaultId(header), manifest.vaultId);
+    },
+  );
+
+  test(
+    'new Apple vault bootstrap does not overwrite a concurrently created CloudKit vault',
+    () async {
+      final inner = LocalDirectorySyncProvider(remoteDir);
+      final provider = _BootstrapRaceProvider(inner);
+      final remoteVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await remoteVault.initialize(passphrase: 'remote passphrase');
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'ios',
+              targetPlatform: TargetPlatform.iOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(() => provider),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      await container.read(vaultSessionControllerProvider.future);
+      provider.onFirstManifestRead = () async {
+        await SyncRunService(
+          vault: remoteVault,
+          records: InMemoryVaultRecordRepository(),
+        ).publishInitialEncryptedSnapshot(inner);
+      };
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .initialize(passphrase: 'local passphrase');
+
+      final state = container.read(vaultSessionControllerProvider).requireValue;
+      expect(state.vaultState, VaultState.unlocked);
+      expect(state.failureMessage, 'Remote sync data changed while syncing.');
+      expect(await container.read(cloudKitSyncSettingsProvider.future), isNull);
+      final manifest = await inner.readManifest();
+      expect(manifest?.vaultId, syncVaultId(remoteVault.header!));
+      final header = VaultHeader.fromJson(
+        jsonDecode(
+              utf8.decode(
+                await inner.readObject(RemoteObjectRef(manifest!.headerPath!)),
+              ),
+            )
+            as Map<String, Object?>,
+      );
+      expect(syncVaultId(header), manifest.vaultId);
+      expect(
+        [
+          for (final ref in await inner.listRecordObjects(prefix: 'vault/'))
+            ref.path,
+        ],
+        [manifest.headerPath],
+      );
+    },
+  );
 }
 
 Future<RemoteObjectRef> _manifestRecordRef({
@@ -818,4 +941,96 @@ Future<void> _waitForVaultState(
     'Expected vault state $expected but found ${state?.vaultState}. '
     'Auto-sync phase: ${autoSync.phase}, failure: ${autoSync.lastFailureMessage}.',
   );
+}
+
+class _BootstrapRaceProvider implements SyncProvider {
+  _BootstrapRaceProvider(this.inner);
+
+  final LocalDirectorySyncProvider inner;
+  Future<void> Function()? onFirstManifestRead;
+  Future<void> Function()? onFirstManifestWrite;
+  var _readRaced = false;
+  var _raced = false;
+
+  @override
+  Future<ProviderCapabilities> capabilities() {
+    return inner.capabilities();
+  }
+
+  @override
+  Future<RemoteManifest?> readManifest() async {
+    if (!_readRaced && onFirstManifestRead != null) {
+      _readRaced = true;
+      final current = await inner.readManifest();
+      await onFirstManifestRead!();
+      return current;
+    }
+    return inner.readManifest();
+  }
+
+  @override
+  Future<void> writeManifest(RemoteManifest manifest) {
+    return inner.writeManifest(manifest);
+  }
+
+  @override
+  Future<void> writeManifestIfUnchanged(
+    RemoteManifest manifest,
+    RemoteManifest? expectedCurrent,
+  ) async {
+    if (!_raced && onFirstManifestWrite != null) {
+      _raced = true;
+      await onFirstManifestWrite!();
+    }
+    final current = await inner.readManifest();
+    if (!_sameManifest(current, expectedCurrent)) {
+      throw const SyncProviderException(
+        'sync.provider.conflict',
+        'Remote sync data changed while syncing.',
+      );
+    }
+    await inner.writeManifest(manifest);
+  }
+
+  @override
+  Future<List<RemoteObjectRef>> listRecordObjects({String? prefix}) {
+    return inner.listRecordObjects(prefix: prefix);
+  }
+
+  @override
+  Future<List<int>> readObject(RemoteObjectRef ref) {
+    return inner.readObject(ref);
+  }
+
+  @override
+  Future<void> writeObject(RemoteObjectRef ref, List<int> bytes) {
+    return inner.writeObject(ref, bytes);
+  }
+
+  @override
+  Future<void> deleteObject(RemoteObjectRef ref) {
+    return inner.deleteObject(ref);
+  }
+}
+
+bool _sameManifest(RemoteManifest? a, RemoteManifest? b) {
+  if (a == null || b == null) {
+    return a == b;
+  }
+  return a.vaultId == b.vaultId &&
+      a.protocolVersion == b.protocolVersion &&
+      a.headerPath == b.headerPath &&
+      _sameBytes(a.encryptedPayload, b.encryptedPayload);
+}
+
+bool _sameBytes(List<int> a, List<int> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var i = 0; i < a.length; i += 1) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
 }

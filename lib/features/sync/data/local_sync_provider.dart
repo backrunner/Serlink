@@ -40,8 +40,15 @@ class LocalDirectorySyncProvider implements SyncProvider {
   Future<void> writeManifestIfUnchanged(
     RemoteManifest manifest,
     RemoteManifest? expectedCurrent,
-  ) {
-    return writeManifest(manifest);
+  ) async {
+    final current = await readManifest();
+    if (!_sameManifest(current, expectedCurrent)) {
+      throw const SyncProviderException(
+        'sync.provider.conflict',
+        'Remote sync data changed while syncing.',
+      );
+    }
+    await writeManifest(manifest);
   }
 
   @override
@@ -116,4 +123,26 @@ String _safeRemoteObjectPath(String path) {
     );
   }
   return path;
+}
+
+bool _sameManifest(RemoteManifest? a, RemoteManifest? b) {
+  if (a == null || b == null) {
+    return a == b;
+  }
+  return a.vaultId == b.vaultId &&
+      a.protocolVersion == b.protocolVersion &&
+      a.headerPath == b.headerPath &&
+      _sameBytes(a.encryptedPayload, b.encryptedPayload);
+}
+
+bool _sameBytes(List<int> a, List<int> b) {
+  if (a.length != b.length) {
+    return false;
+  }
+  for (var i = 0; i < a.length; i += 1) {
+    if (a[i] != b[i]) {
+      return false;
+    }
+  }
+  return true;
 }

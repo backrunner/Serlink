@@ -83,34 +83,50 @@ class _SyncConflictReviewDialogState
 
   Future<void> _apply() async {
     final l10n = context.l10n;
+    if (widget.conflicts.any((conflict) {
+      final fieldSet = conflict.fieldSet;
+      return fieldSet == null || !fieldSet.supportsFieldMerge;
+    })) {
+      _showSnackBar(context, l10n.syncConflictUnsupportedBody);
+      return;
+    }
+    final confirmed = await _confirmDialog(
+      context,
+      title: l10n.syncKeepLocalTitle,
+      body: l10n.syncKeepLocalBody,
+      confirmLabel: l10n.syncConflictApplyMergeAction,
+      destructive: true,
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
     setState(() {
       _saving = true;
     });
     try {
+      final merges = <SyncMergedConflict>[];
       for (final conflict in widget.conflicts) {
-        final fieldSet = conflict.fieldSet;
-        if (fieldSet == null || !fieldSet.supportsFieldMerge) {
-          continue;
-        }
+        final fieldSet = conflict.fieldSet!;
         final merged = ref
             .read(syncFieldMergeServiceProvider)
             .merge(
               fieldSet: fieldSet,
               useRemoteByField: _choices[conflict.id.value] ?? const {},
             );
-        await ref
-            .read(syncRunServiceProvider)
-            .applyMergedRecord(recordId: conflict.id, mergedJson: merged);
+        merges.add(SyncMergedConflict(conflict: conflict, mergedJson: merged));
       }
       if (!mounted) {
         return;
       }
-      Navigator.of(context).pop();
-      await _resolveSyncConflicts(
-        context,
-        ref,
-        SyncConflictResolution.keepLocal,
-      );
+      final result = await _applySyncConflictMerges(context, ref, merges);
+      if (!mounted) {
+        return;
+      }
+      if (result != null) {
+        Navigator.of(context).pop(result);
+      } else {
+        Navigator.of(context).pop();
+      }
     } on Object catch (error) {
       if (!mounted) {
         return;

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/sync/application/auto_sync_controller.dart';
+import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
 import 'package:serlink/features/sync/application/sync_device_service.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_record_repository.dart';
@@ -57,10 +58,60 @@ void main() {
   });
 
   test('emits change events for record deletes', () async {
-    await repository.delete(VaultRecordId('host:prod'));
+    final envelope = await vault.encryptRecord(
+      id: VaultRecordId('host:prod'),
+      type: 'host',
+      plaintext: utf8.encode('encrypted host payload'),
+    );
+    await inner.upsert(envelope);
+
+    await repository.delete(envelope.id);
 
     expect(emitted, hasLength(1));
     expect(emitted.single.kind, VaultRecordChangeKind.delete);
-    expect(emitted.single.id, VaultRecordId('host:prod'));
+    expect(emitted.single.id, envelope.id);
+    expect(emitted.single.type, 'host');
+  });
+
+  test('does not emit change events for sync metadata deletes', () async {
+    final device = await vault.encryptRecord(
+      id: VaultRecordId('sync:device:local'),
+      type: EncryptedSyncDeviceRepository.recordType,
+      plaintext: utf8.encode('device metadata'),
+    );
+    final tombstone = await vault.encryptRecord(
+      id: VaultRecordId('sync:tombstone:host%3Aprod'),
+      type: EncryptedSyncDeleteTombstoneRepository.recordType,
+      plaintext: utf8.encode('delete tombstone'),
+    );
+    await inner.upsert(device);
+    await inner.upsert(tombstone);
+
+    await repository.delete(device.id);
+    await repository.delete(tombstone.id);
+
+    expect(emitted, isEmpty);
+  });
+
+  test('clear emits deletes only for syncable records', () async {
+    final host = await vault.encryptRecord(
+      id: VaultRecordId('host:prod'),
+      type: 'host',
+      plaintext: utf8.encode('encrypted host payload'),
+    );
+    final device = await vault.encryptRecord(
+      id: VaultRecordId('sync:device:local'),
+      type: EncryptedSyncDeviceRepository.recordType,
+      plaintext: utf8.encode('device metadata'),
+    );
+    await inner.upsert(host);
+    await inner.upsert(device);
+
+    await repository.clear();
+
+    expect(emitted, hasLength(1));
+    expect(emitted.single.kind, VaultRecordChangeKind.delete);
+    expect(emitted.single.id, host.id);
+    expect(emitted.single.type, 'host');
   });
 }

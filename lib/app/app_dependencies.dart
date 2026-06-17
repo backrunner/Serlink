@@ -1353,13 +1353,34 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         vault: service,
         records: records,
         devices: devices,
-      ).pushEncryptedSnapshot(provider);
+      ).publishInitialEncryptedSnapshot(provider);
       ref.invalidate(cloudKitSyncSettingsProvider);
       ref.invalidate(syncKnownDevicesProvider);
       return null;
     } on Object catch (error) {
+      await _clearCloudKitSyncSettingAfterBootstrapFailure();
       ref.invalidate(cloudKitSyncSettingsProvider);
       return _syncBootstrapFailureMessage(error);
+    }
+  }
+
+  Future<void> _clearCloudKitSyncSettingAfterBootstrapFailure() async {
+    if (service.state != VaultState.unlocked) {
+      return;
+    }
+    try {
+      await SyncSettingsService(
+        settings: EncryptedSyncSettingsRepository(
+          vault: service,
+          records: ref.read(vaultRecordRepositoryProvider),
+        ),
+        secrets: ref.read(secretStoreProvider),
+        cloudKitAvailable: true,
+      ).deleteCloudKit();
+    } on Object {
+      // The user-facing bootstrap failure is more useful than a secondary
+      // cleanup error. Automatic sync will be reconfigured on the next state
+      // refresh regardless.
     }
   }
 

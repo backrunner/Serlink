@@ -13,17 +13,20 @@ class RemoteManifest {
     required this.vaultId,
     required this.protocolVersion,
     required this.encryptedPayload,
+    this.headerPath,
   });
 
   final String vaultId;
   final int protocolVersion;
   final List<int> encryptedPayload;
+  final String? headerPath;
 
   Map<String, Object?> toJson() {
     return {
       'vaultId': vaultId,
       'protocolVersion': protocolVersion,
       'encryptedPayload': base64Encode(encryptedPayload),
+      if (headerPath != null) 'headerPath': headerPath,
     };
   }
 
@@ -32,6 +35,7 @@ class RemoteManifest {
       vaultId: json['vaultId'] as String,
       protocolVersion: json['protocolVersion'] as int,
       encryptedPayload: base64Decode(json['encryptedPayload'] as String),
+      headerPath: json['headerPath'] as String?,
     );
   }
 

@@ -595,6 +595,53 @@ void main() {
     expect(remoteObject.revision, localEnvelope.revision);
   });
 
+  test('sync auto-resolves sync device metadata conflicts', () async {
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final remoteEnvelope = await vault.encryptRecord(
+      id: syncDeviceRecordId('device-1'),
+      type: EncryptedSyncDeviceRepository.recordType,
+      plaintext: utf8.encode(
+        jsonEncode({
+          'id': 'device-1',
+          'displayName': 'Remote Mac',
+          'platform': 'macos',
+          'createdAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+          'lastSeenAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+        }),
+      ),
+    );
+    await records.upsert(remoteEnvelope);
+    await service.pushEncryptedSnapshot(provider);
+
+    final localEnvelope = await vault.encryptRecord(
+      id: remoteEnvelope.id,
+      type: remoteEnvelope.type,
+      plaintext: utf8.encode(
+        jsonEncode({
+          'id': 'device-1',
+          'displayName': 'Local Mac',
+          'platform': 'macos',
+          'createdAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+          'lastSeenAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+        }),
+      ),
+    );
+    await records.upsert(localEnvelope);
+
+    final result = await service.syncEncryptedSnapshot(
+      provider,
+      reportConflicts: true,
+    );
+
+    expect(result.recordsDownloaded, 1);
+    final restored = await records.read(remoteEnvelope.id);
+    expect(restored!.revision, remoteEnvelope.revision);
+    final restoredJson =
+        jsonDecode(utf8.decode(await vault.decryptRecord(restored)))
+            as Map<String, Object?>;
+    expect(restoredJson['displayName'], 'Remote Mac');
+  });
+
   test(
     'sync keeps newest local identity secret using related identity timestamp',
     () async {

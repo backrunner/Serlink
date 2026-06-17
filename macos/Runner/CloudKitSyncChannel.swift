@@ -18,7 +18,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   private static let subscriptionID = "serlink-sync-objects"
 
   private static weak var activeChannel: CloudKitSyncChannel?
-  private static var pendingRemoteChanges = 0
+  private static var hasPendingRemoteChange = false
   private static let timestampFormatter = ISO8601DateFormatter()
 
   private lazy var container = CKContainer(identifier: Self.containerIdentifier)
@@ -81,7 +81,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
       if let channel = activeChannel {
         channel.emitRemoteChange(source: "push")
       } else {
-        pendingRemoteChanges += 1
+        hasPendingRemoteChange = true
       }
     }
     return true
@@ -375,9 +375,11 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
       subscriptionsToSave: [subscription],
       subscriptionIDsToDelete: nil
     )
-    operation.modifySubscriptionsCompletionBlock = { [weak self] _, _, error in
-      if error != nil {
-        self?.subscriptionRequested = false
+    operation.modifySubscriptionsResultBlock = { [weak self] result in
+      if case .failure = result {
+        DispatchQueue.main.async {
+          self?.subscriptionRequested = false
+        }
       }
     }
     database.add(operation)
@@ -386,7 +388,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   private func emitRemoteChange(source: String) {
     DispatchQueue.main.async {
       guard let eventSink = self.eventSink else {
-        Self.pendingRemoteChanges += 1
+        Self.hasPendingRemoteChange = true
         return
       }
       eventSink(Self.remoteChangeEvent(source: source))
@@ -395,10 +397,10 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
 
   private func flushPendingRemoteChanges() {
     DispatchQueue.main.async {
-      guard Self.pendingRemoteChanges > 0, let eventSink = self.eventSink else {
+      guard Self.hasPendingRemoteChange, let eventSink = self.eventSink else {
         return
       }
-      Self.pendingRemoteChanges = 0
+      Self.hasPendingRemoteChange = false
       eventSink(Self.remoteChangeEvent(source: "pending"))
     }
   }

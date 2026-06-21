@@ -20,6 +20,7 @@ class SerlinkApp extends ConsumerWidget {
     final language = ref.watch(appLanguageProvider).value ?? AppLanguage.system;
     final capabilities = ref.watch(platformCapabilitiesProvider);
     ref.watch(cloudKitVaultDiscoveryControllerProvider);
+    ref.watch(cloudKitEncryptedSnapshotPrefetchControllerProvider);
     ref.watch(autoSyncControllerProvider);
 
     final foruiTheme = capabilities.prefersTouchUi
@@ -111,6 +112,9 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
     } else if (!hidden) {
       _suspendedForBackground = false;
       ref.read(cloudKitVaultDiscoveryControllerProvider.notifier).refreshNow();
+      ref
+          .read(cloudKitEncryptedSnapshotPrefetchControllerProvider.notifier)
+          .refreshNow();
       ref
           .read(autoSyncControllerProvider.notifier)
           .requestSync(delay: Duration.zero);

@@ -81,17 +81,28 @@ class SerlinkDatabase extends _$SerlinkDatabase {
   SerlinkDatabase([QueryExecutor? executor]) : super(executor ?? _open());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (migrator) => migrator.createAll(),
+    onCreate: (migrator) async {
+      await migrator.createAll();
+      await _createSyncAuxiliaryTables();
+    },
     onUpgrade: (migrator, from, to) async {
-      if (from == 1 && to == 2) {
+      var current = from;
+      if (current == 1 && to >= 2) {
         await transaction(() async {
           await migrator.createTable(vaultBackupEntries);
           await migrator.createTable(quarantinedRecords);
         });
+        current = 2;
+      }
+      if (current == 2 && to >= 3) {
+        await _createSyncAuxiliaryTables();
+        current = 3;
+      }
+      if (current == to) {
         return;
       }
       throw DatabaseIntegrityException(
@@ -104,6 +115,52 @@ class SerlinkDatabase extends _$SerlinkDatabase {
       await customStatement('PRAGMA foreign_keys = ON');
     },
   );
+
+  Future<void> _createSyncAuxiliaryTables() async {
+    await transaction(() async {
+      await customStatement('''
+CREATE TABLE IF NOT EXISTS sync_staged_snapshots (
+  provider_kind TEXT NOT NULL,
+  vault_id TEXT NOT NULL,
+  manifest BLOB NOT NULL,
+  manifest_fingerprint TEXT NOT NULL,
+  protocol_version INTEGER NOT NULL,
+  header_path TEXT,
+  completed_at TEXT NOT NULL,
+  PRIMARY KEY (provider_kind, vault_id)
+)
+''');
+      await customStatement('''
+CREATE TABLE IF NOT EXISTS sync_staged_objects (
+  provider_kind TEXT NOT NULL,
+  vault_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  bytes BLOB NOT NULL,
+  PRIMARY KEY (provider_kind, vault_id, path),
+  FOREIGN KEY (provider_kind, vault_id)
+    REFERENCES sync_staged_snapshots(provider_kind, vault_id)
+    ON DELETE CASCADE
+)
+''');
+      await customStatement('''
+CREATE TABLE IF NOT EXISTS sync_pending_resets (
+  provider_kind TEXT NOT NULL,
+  vault_id TEXT NOT NULL,
+  marker BLOB NOT NULL,
+  reset_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (provider_kind, vault_id)
+)
+''');
+      await customStatement('''
+CREATE TABLE IF NOT EXISTS cloudkit_sync_shadow_settings (
+  vault_id TEXT NOT NULL PRIMARY KEY,
+  enabled INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)
+''');
+    });
+  }
 }
 
 class SerlinkDatabasePaths {
@@ -145,7 +202,7 @@ LazyDatabase _open() {
     await DatabaseMigrationPreflight(
       databaseFile: paths.databaseFile,
       automaticBackupDirectory: paths.automaticBackupDirectory,
-    ).run(targetSchemaVersion: 2);
+    ).run(targetSchemaVersion: 3);
     final database = NativeDatabase.createInBackground(
       paths.databaseFile,
     ).interceptWith(_CloseCallbackQueryInterceptor(profileLock.release));

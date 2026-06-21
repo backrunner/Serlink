@@ -27,6 +27,8 @@ import '../features/snippets/application/snippet_repository.dart';
 import '../features/snippets/application/snippet_write_service.dart';
 import '../features/snippets/domain/snippet.dart';
 import '../features/sync/application/auto_sync_controller.dart';
+import '../features/sync/application/cloudkit_encrypted_snapshot_prefetch_controller.dart';
+import '../features/sync/application/encrypted_snapshot_staging.dart';
 import '../features/sync/application/remote_vault_discovery_service.dart';
 import '../features/sync/application/sync_delete_tombstone_repository.dart';
 import '../features/sync/application/sync_device_service.dart';
@@ -35,6 +37,7 @@ import '../features/sync/application/sync_repair_service.dart';
 import '../features/sync/application/sync_run_service.dart';
 import '../features/sync/application/sync_settings_service.dart';
 import '../features/sync/data/cloudkit_sync_provider.dart';
+import '../features/sync/data/encrypted_snapshot_staging_repository.dart';
 import '../features/sync/domain/sync_provider.dart';
 import '../features/ssh/application/connection_profile_resolver.dart';
 import '../features/ssh/application/encrypted_connection_profile_resolver.dart';
@@ -118,6 +121,25 @@ final cloudKitSyncProviderFactoryProvider = Provider<SyncProviderFactory>((
 final cloudKitSyncChangesProvider = StreamProvider<CloudKitSyncChange>((ref) {
   return CloudKitSyncProvider.watchRemoteChanges();
 });
+
+final encryptedSnapshotStagingRepositoryProvider =
+    Provider<EncryptedSnapshotStagingRepository>((ref) {
+      return EncryptedSnapshotStagingRepository(
+        ref.watch(serlinkDatabaseProvider),
+      );
+    });
+
+final pendingRemoteResetRepositoryProvider =
+    Provider<PendingRemoteResetRepository>((ref) {
+      return PendingRemoteResetRepository(ref.watch(serlinkDatabaseProvider));
+    });
+
+final cloudKitSyncShadowSettingsStoreProvider =
+    Provider<CloudKitSyncShadowSettingsStore>((ref) {
+      return CloudKitSyncShadowSettingsStore(
+        ref.watch(serlinkDatabaseProvider),
+      );
+    });
 
 final appPackageInfoProvider = FutureProvider<PackageInfo>((ref) {
   return PackageInfo.fromPlatform();
@@ -435,6 +457,19 @@ final cloudKitVaultDiscoveryControllerProvider =
       CloudKitVaultDiscoveryController.new,
     );
 
+final cloudKitEncryptedSnapshotPrefetchIntervalProvider = Provider<Duration>((
+  ref,
+) {
+  return const Duration(minutes: 5);
+});
+
+final cloudKitEncryptedSnapshotPrefetchControllerProvider =
+    NotifierProvider<CloudKitEncryptedSnapshotPrefetchNotifier, void>(
+      CloudKitEncryptedSnapshotPrefetchNotifier.new,
+    );
+
+enum _CloudKitUnlockSyncOutcome { skipped, synced, remoteReset }
+
 class CloudKitVaultDiscoveryController extends Notifier<void> {
   Timer? _timer;
   bool _running = false;
@@ -504,6 +539,101 @@ class CloudKitVaultDiscoveryController extends Notifier<void> {
     }
     final session = ref.read(vaultSessionControllerProvider).value;
     return session?.vaultState == VaultState.uninitialized && !session!.isBusy;
+  }
+}
+
+class CloudKitEncryptedSnapshotPrefetchNotifier extends Notifier<void> {
+  Timer? _timer;
+  CloudKitEncryptedSnapshotPrefetchController? _controller;
+
+  @override
+  void build() {
+    ref.onDispose(() {
+      _timer?.cancel();
+    });
+    ref.listen<AsyncValue<VaultSessionState>>(
+      vaultSessionControllerProvider,
+      (_, _) => _configure(),
+    );
+    ref.listen<AsyncValue<CloudKitSyncChange>>(cloudKitSyncChangesProvider, (
+      _,
+      change,
+    ) {
+      if (change.hasValue) {
+        requestPrefetch();
+      }
+    });
+    unawaited(Future<void>.microtask(_configure));
+  }
+
+  void refreshNow() {
+    requestPrefetch();
+  }
+
+  void _configure() {
+    if (!ref.mounted) {
+      return;
+    }
+    if (!_shouldRun) {
+      _timer?.cancel();
+      _timer = null;
+      return;
+    }
+    _timer ??= Timer.periodic(
+      ref.read(cloudKitEncryptedSnapshotPrefetchIntervalProvider),
+      (_) => requestPrefetch(),
+    );
+    requestPrefetch();
+  }
+
+  void requestPrefetch() {
+    if (!_shouldRun) {
+      return;
+    }
+    final session = ref.read(vaultSessionControllerProvider).value;
+    final controller = _controller?.isRunning == true
+        ? _controller!
+        : _createController();
+    _controller = controller;
+    controller.request(
+      header: ref.read(vaultSessionControllerProvider.notifier).service.header,
+      vaultState: session?.vaultState ?? VaultState.uninitialized,
+    );
+  }
+
+  CloudKitEncryptedSnapshotPrefetchController _createController() {
+    return CloudKitEncryptedSnapshotPrefetchController(
+      capabilities: ref.read(platformCapabilitiesProvider),
+      cloudKitAvailable: ref.read(cloudKitAvailabilityCheckProvider),
+      providerFactory: ref.read(cloudKitSyncProviderFactoryProvider),
+      staging: ref.read(encryptedSnapshotStagingRepositoryProvider),
+      pendingResets: ref.read(pendingRemoteResetRepositoryProvider),
+      shadowSettings: ref.read(cloudKitSyncShadowSettingsStoreProvider),
+      shouldAcceptSnapshot: _shouldAcceptSnapshot,
+    );
+  }
+
+  bool _shouldAcceptSnapshot(String vaultId) {
+    final session = ref.read(vaultSessionControllerProvider).value;
+    final header = ref
+        .read(vaultSessionControllerProvider.notifier)
+        .service
+        .header;
+    return session?.vaultState == VaultState.locked &&
+        session?.isBusy == false &&
+        header != null &&
+        syncVaultId(header) == vaultId;
+  }
+
+  bool get _shouldRun {
+    if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
+      return false;
+    }
+    final session = ref.read(vaultSessionControllerProvider).value;
+    return session?.vaultState == VaultState.locked &&
+        session?.isBusy == false &&
+        ref.read(vaultSessionControllerProvider.notifier).service.header !=
+            null;
   }
 }
 
@@ -1137,7 +1267,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlock(passphrase: passphrase);
-      await _pullCloudKitSnapshotAfterUnlockIfNeeded();
+      final cloudKitSync = await _pullCloudKitSnapshotAfterUnlockIfNeeded();
+      if (cloudKitSync == _CloudKitUnlockSyncOutcome.remoteReset) {
+        return;
+      }
       state = AsyncData(await _unlockedState(previous));
       _invalidateSyncStateProviders();
       unawaited(
@@ -1168,7 +1301,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlockWithRecoveryKey(VaultRecoveryKey(recoveryCode));
-      await _pullCloudKitSnapshotAfterUnlockIfNeeded();
+      final cloudKitSync = await _pullCloudKitSnapshotAfterUnlockIfNeeded();
+      if (cloudKitSync == _CloudKitUnlockSyncOutcome.remoteReset) {
+        return null;
+      }
       state = AsyncData(await _unlockedState(previous));
       _invalidateSyncStateProviders();
       unawaited(
@@ -1201,7 +1337,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlockWithLocalKey(secrets: ref.read(secretStoreProvider));
-      await _pullCloudKitSnapshotAfterUnlockIfNeeded();
+      final cloudKitSync = await _pullCloudKitSnapshotAfterUnlockIfNeeded();
+      if (cloudKitSync == _CloudKitUnlockSyncOutcome.remoteReset) {
+        return;
+      }
       state = AsyncData(await _unlockedState(previous));
       _invalidateSyncStateProviders();
       unawaited(
@@ -1266,21 +1405,42 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     }
   }
 
-  Future<void> _pullCloudKitSnapshotAfterUnlockIfNeeded() async {
+  Future<_CloudKitUnlockSyncOutcome>
+  _pullCloudKitSnapshotAfterUnlockIfNeeded() async {
     if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
-      return;
+      return _CloudKitUnlockSyncOutcome.skipped;
     }
     final records = ref.read(vaultRecordRepositoryProvider);
     final requireInitialPull = _cloudKitHeaderDiscovered;
-    if (!requireInitialPull && (await records.list()).isNotEmpty) {
-      return;
-    }
     final header = service.header;
     if (header == null) {
-      return;
+      return _CloudKitUnlockSyncOutcome.skipped;
     }
 
     final provider = ref.read(cloudKitSyncProviderFactoryProvider)();
+    final vaultId = syncVaultId(header);
+    if (!requireInitialPull) {
+      if (await _cloudKitSyncExplicitlyDisabledForUnlockedVault(records)) {
+        await _clearCloudKitLockedCache(vaultId);
+        return _CloudKitUnlockSyncOutcome.skipped;
+      }
+    }
+    final pendingReset = await _pendingCloudKitRemoteReset();
+    if (pendingReset == _CloudKitUnlockSyncOutcome.remoteReset) {
+      return pendingReset;
+    }
+    final reset = await _existingCloudKitRemoteReset(provider);
+    if (reset == _CloudKitUnlockSyncOutcome.remoteReset) {
+      return reset;
+    }
+    final staged = await _pullStagedCloudKitSnapshotAfterUnlock(
+      header: header,
+      records: records,
+      requireInitialPull: requireInitialPull,
+    );
+    if (staged != _CloudKitUnlockSyncOutcome.skipped) {
+      return staged;
+    }
     final RemoteManifest? manifest;
     try {
       manifest = await provider.readManifest();
@@ -1291,7 +1451,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           'Remote sync manifest could not be read.',
         );
       }
-      return;
+      return _CloudKitUnlockSyncOutcome.skipped;
     }
     if (manifest == null) {
       if (requireInitialPull) {
@@ -1300,7 +1460,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           'Remote sync manifest is missing.',
         );
       }
-      return;
+      return _CloudKitUnlockSyncOutcome.skipped;
     }
     if (manifest.vaultId != syncVaultId(header)) {
       if (requireInitialPull) {
@@ -1309,9 +1469,12 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           'Remote sync data belongs to another vault.',
         );
       }
-      return;
+      return _CloudKitUnlockSyncOutcome.skipped;
     }
     if (manifest.protocolVersion > 1) {
+      if (!requireInitialPull) {
+        return _CloudKitUnlockSyncOutcome.skipped;
+      }
       throw const SyncRunException(
         'sync.remote_protocol_unsupported',
         'Remote sync data was written by a newer Serlink version.',
@@ -1329,15 +1492,244 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         records: await restoredRecords.list(),
       );
     } else {
-      await SyncRunService(
-        vault: service,
-        records: records,
-      ).pullEncryptedSnapshot(provider);
+      final outcome = await _pullExistingCloudKitSnapshotAfterUnlock(
+        records,
+        provider,
+      );
+      if (outcome != _CloudKitUnlockSyncOutcome.synced) {
+        return outcome;
+      }
     }
     _cloudKitHeaderDiscovered = false;
     ref.invalidate(webDavSyncSettingsProvider);
     ref.invalidate(cloudKitSyncSettingsProvider);
     ref.invalidate(syncKnownDevicesProvider);
+    return _CloudKitUnlockSyncOutcome.synced;
+  }
+
+  Future<bool> _cloudKitSyncExplicitlyDisabledForUnlockedVault(
+    VaultRecordRepository records,
+  ) async {
+    try {
+      final settings = await SyncSettingsService(
+        settings: EncryptedSyncSettingsRepository(
+          vault: service,
+          records: records,
+        ),
+        secrets: ref.read(secretStoreProvider),
+        cloudKitAvailable: true,
+      ).readCloudKit();
+      return settings?.enabled == false;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<_CloudKitUnlockSyncOutcome> _pendingCloudKitRemoteReset() async {
+    final header = service.header;
+    if (header == null) {
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
+    final vaultId = syncVaultId(header);
+    final pendingResets = ref.read(pendingRemoteResetRepositoryProvider);
+    final PendingRemoteReset? pending;
+    try {
+      pending = await pendingResets.read(
+        providerKind: SyncProviderKind.cloudKit,
+        vaultId: vaultId,
+      );
+    } on Object {
+      await _tryClearCloudKitLockedCache(vaultId);
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
+    if (pending == null) {
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
+    await _handleCloudKitRemoteReset(vaultId: vaultId);
+    return _CloudKitUnlockSyncOutcome.remoteReset;
+  }
+
+  Future<_CloudKitUnlockSyncOutcome> _pullStagedCloudKitSnapshotAfterUnlock({
+    required VaultHeader header,
+    required VaultRecordRepository records,
+    required bool requireInitialPull,
+  }) async {
+    final vaultId = syncVaultId(header);
+    final staging = ref.read(encryptedSnapshotStagingRepositoryProvider);
+    final StagedEncryptedSnapshot? staged;
+    try {
+      staged = await staging.read(
+        providerKind: SyncProviderKind.cloudKit,
+        vaultId: vaultId,
+      );
+    } on Object {
+      await _tryClearCloudKitLockedCache(vaultId);
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
+    if (staged == null || staged.manifest.vaultId != vaultId) {
+      if (staged != null) {
+        await _tryClearCloudKitLockedCache(vaultId);
+      }
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
+    try {
+      final liveManifest = await ref
+          .read(cloudKitSyncProviderFactoryProvider)()
+          .readManifest();
+      final liveManifestMatches =
+          liveManifest != null &&
+          liveManifest.vaultId == vaultId &&
+          liveManifest.protocolVersion <= 1 &&
+          liveManifest.headerPath == staged.manifest.headerPath &&
+          manifestFingerprint(liveManifest) == staged.manifestFingerprint;
+      if (!liveManifestMatches) {
+        await staging.clear(
+          providerKind: SyncProviderKind.cloudKit,
+          vaultId: vaultId,
+        );
+        return _CloudKitUnlockSyncOutcome.skipped;
+      }
+    } on Object {
+      // A completed staging snapshot can still unblock unlock while CloudKit is
+      // temporarily unreachable. Auto-sync will reconcile after unlock.
+    }
+    final stagedProvider = StagedSnapshotSyncProvider(staged);
+    final outcome = requireInitialPull
+        ? await _pullInitialStagedCloudKitSnapshotAfterUnlock(
+            header: header,
+            provider: stagedProvider,
+          )
+        : await _pullExistingCloudKitSnapshotAfterUnlock(
+            records,
+            stagedProvider,
+          );
+    if (outcome == _CloudKitUnlockSyncOutcome.synced) {
+      await staging.clear(
+        providerKind: SyncProviderKind.cloudKit,
+        vaultId: vaultId,
+      );
+      await ref
+          .read(pendingRemoteResetRepositoryProvider)
+          .clear(providerKind: SyncProviderKind.cloudKit, vaultId: vaultId);
+    } else if (outcome == _CloudKitUnlockSyncOutcome.skipped) {
+      await _tryClearCloudKitLockedCache(vaultId);
+    }
+    return outcome;
+  }
+
+  Future<_CloudKitUnlockSyncOutcome>
+  _pullInitialStagedCloudKitSnapshotAfterUnlock({
+    required VaultHeader header,
+    required SyncProvider provider,
+  }) async {
+    final restoredRecords = InMemoryVaultRecordRepository();
+    try {
+      await SyncRunService(
+        vault: service,
+        records: restoredRecords,
+      ).pullEncryptedSnapshot(provider);
+      await _commitCloudKitBootstrapSnapshot(
+        header: header,
+        records: await restoredRecords.list(),
+      );
+      _cloudKitHeaderDiscovered = false;
+      ref.invalidate(webDavSyncSettingsProvider);
+      ref.invalidate(cloudKitSyncSettingsProvider);
+      ref.invalidate(syncKnownDevicesProvider);
+      return _CloudKitUnlockSyncOutcome.synced;
+    } on SyncRunException catch (error) {
+      if (error.code == 'sync.remote_vault_reset') {
+        await _handleCloudKitRemoteReset(vaultId: syncVaultId(header));
+        return _CloudKitUnlockSyncOutcome.remoteReset;
+      }
+      return _CloudKitUnlockSyncOutcome.skipped;
+    } on Object {
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
+  }
+
+  Future<_CloudKitUnlockSyncOutcome> _existingCloudKitRemoteReset(
+    SyncProvider provider,
+  ) async {
+    try {
+      if (await SyncRunService(
+        vault: service,
+        records: ref.read(vaultRecordRepositoryProvider),
+      ).isRemoteReset(provider)) {
+        final header = service.header;
+        await _handleCloudKitRemoteReset(
+          vaultId: header == null ? null : syncVaultId(header),
+        );
+        return _CloudKitUnlockSyncOutcome.remoteReset;
+      }
+    } on Object {
+      // A transient marker read failure should not block unlocking. The
+      // follow-up pull/auto-sync path will retry and surface persistent errors.
+    }
+    return _CloudKitUnlockSyncOutcome.skipped;
+  }
+
+  Future<_CloudKitUnlockSyncOutcome> _pullExistingCloudKitSnapshotAfterUnlock(
+    VaultRecordRepository records,
+    SyncProvider provider,
+  ) async {
+    try {
+      final pull = await SyncRunService(vault: service, records: records)
+          .pullEncryptedSnapshot(
+            provider,
+            missingManifestOk: true,
+            reportConflicts: true,
+          );
+      if (pull.hasConflicts) {
+        ref
+            .read(syncConflictControllerProvider.notifier)
+            .setConflicts(pull.conflicts);
+      } else {
+        ref.read(syncConflictControllerProvider.notifier).clear();
+      }
+      ref.invalidate(webDavSyncSettingsProvider);
+      ref.invalidate(cloudKitSyncSettingsProvider);
+      ref.invalidate(syncKnownDevicesProvider);
+      return _CloudKitUnlockSyncOutcome.synced;
+    } on SyncRunException catch (error) {
+      if (error.code == 'sync.remote_vault_reset') {
+        final header = service.header;
+        await _handleCloudKitRemoteReset(
+          vaultId: header == null ? null : syncVaultId(header),
+        );
+        return _CloudKitUnlockSyncOutcome.remoteReset;
+      }
+      return _CloudKitUnlockSyncOutcome.skipped;
+    } on Object {
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
+  }
+
+  Future<void> _handleCloudKitRemoteReset({String? vaultId}) async {
+    await _tryQuarantineCurrentDatabase(reason: 'before-remote-reset');
+    if (vaultId != null) {
+      await _clearCloudKitLockedCache(vaultId);
+      await ref.read(cloudKitSyncShadowSettingsStoreProvider).delete(vaultId);
+    }
+    await _clearLocalVaultAfterReset();
+  }
+
+  Future<void> _clearCloudKitLockedCache(String vaultId) async {
+    await ref
+        .read(encryptedSnapshotStagingRepositoryProvider)
+        .clear(providerKind: SyncProviderKind.cloudKit, vaultId: vaultId);
+    await ref
+        .read(pendingRemoteResetRepositoryProvider)
+        .clear(providerKind: SyncProviderKind.cloudKit, vaultId: vaultId);
+  }
+
+  Future<void> _tryClearCloudKitLockedCache(String vaultId) async {
+    try {
+      await _clearCloudKitLockedCache(vaultId);
+    } on Object {
+      // Locked prefetch cache is auxiliary. A cleanup failure should not make
+      // unlock worse; the normal CloudKit pull path can still proceed.
+    }
   }
 
   Future<String?> _bootstrapCloudKitSnapshotAfterInitialize() async {
@@ -1383,6 +1775,12 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         records: records,
         devices: devices,
       ).publishInitialEncryptedSnapshot(provider);
+      final header = service.header;
+      if (header != null) {
+        await ref
+            .read(cloudKitSyncShadowSettingsStoreProvider)
+            .save(vaultId: syncVaultId(header), enabled: true);
+      }
       ref.invalidate(cloudKitSyncSettingsProvider);
       ref.invalidate(syncKnownDevicesProvider);
       return null;
@@ -1435,6 +1833,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<VaultSessionState> _unlockedState(VaultSessionState previous) async {
+    await _refreshCloudKitShadowSetting();
     final health = VaultRecordHealthService(
       vault: service,
       records: ref.read(vaultRecordRepositoryProvider),
@@ -1452,6 +1851,33 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       unlockGeneration: previous.unlockGeneration + 1,
       isBusy: false,
     );
+  }
+
+  Future<void> _refreshCloudKitShadowSetting() async {
+    if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
+      return;
+    }
+    final header = service.header;
+    if (header == null || service.state != VaultState.unlocked) {
+      return;
+    }
+    try {
+      final settings = await ref
+          .read(syncSettingsServiceProvider)
+          .readCloudKit();
+      if (settings == null) {
+        return;
+      }
+      final vaultId = syncVaultId(header);
+      await ref
+          .read(cloudKitSyncShadowSettingsStoreProvider)
+          .save(vaultId: vaultId, enabled: settings.enabled);
+      if (!settings.enabled) {
+        await _clearCloudKitLockedCache(vaultId);
+      }
+    } on Object {
+      // Shadow settings are only a locked-state optimization hint.
+    }
   }
 
   Future<void> lock() async {
@@ -1735,7 +2161,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<void> _clearLocalVaultAfterReset() async {
+    final header = service.header;
+    final vaultId = header == null ? null : syncVaultId(header);
     await _clearLocalUnlockSecrets();
+    if (vaultId != null) {
+      await _clearCloudKitLockedCache(vaultId);
+      await ref.read(cloudKitSyncShadowSettingsStoreProvider).delete(vaultId);
+    }
     await ref.read(vaultRecordRepositoryProvider).clear();
     await ref.read(vaultHeaderStoreProvider).clear();
     await service.lock();

@@ -548,6 +548,24 @@ Future<void> _setICloudSync(
   final l10n = context.l10n;
   try {
     await ref.read(syncSettingsServiceProvider).saveCloudKit(enabled);
+    final header = ref
+        .read(vaultSessionControllerProvider.notifier)
+        .service
+        .header;
+    if (header != null) {
+      final vaultId = syncVaultId(header);
+      await ref
+          .read(cloudKitSyncShadowSettingsStoreProvider)
+          .save(vaultId: vaultId, enabled: enabled);
+      if (!enabled) {
+        await ref
+            .read(encryptedSnapshotStagingRepositoryProvider)
+            .clear(providerKind: SyncProviderKind.cloudKit, vaultId: vaultId);
+        await ref
+            .read(pendingRemoteResetRepositoryProvider)
+            .clear(providerKind: SyncProviderKind.cloudKit, vaultId: vaultId);
+      }
+    }
     ref.invalidate(cloudKitSyncSettingsProvider);
     if (enabled) {
       ref.read(autoSyncControllerProvider.notifier).requestSync();

@@ -50,6 +50,10 @@ void main() {
     final manifest = await provider.readManifest();
     expect(manifest, isNotNull);
     expect(manifest!.headerPath, startsWith('vault/headers/'));
+    expect(
+      manifest.snapshotObjectPaths,
+      containsAll([startsWith('records/host%3A1-'), manifest.headerPath!]),
+    );
 
     final refs = await provider.listRecordObjects();
     expect([

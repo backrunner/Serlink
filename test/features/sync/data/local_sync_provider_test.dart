@@ -48,6 +48,7 @@ void main() {
       final restored = await provider.readManifest();
       expect(restored, isNotNull);
       expect(restored!.encryptedPayload, manifest.encryptedPayload);
+      expect(restored.snapshotObjectPaths, isEmpty);
       expect(
         await provider.readObject(const RemoteObjectRef('records/a.bin')),
         [4, 5],
@@ -91,6 +92,71 @@ void main() {
       isFalse,
     );
   });
+
+  test('remote manifest round trips snapshot object paths', () async {
+    final manifest = RemoteManifest(
+      vaultId: 'vault-1',
+      protocolVersion: 1,
+      headerPath: 'vault/headers/vault-1.json',
+      encryptedPayload: [1, 2, 3],
+      snapshotObjectPaths: const [
+        'records/host%3A1-rev.json',
+        'vault/headers/vault-1.json',
+      ],
+    );
+
+    final restored = RemoteManifest.fromBytes(manifest.toBytes());
+
+    expect(restored.vaultId, manifest.vaultId);
+    expect(restored.headerPath, manifest.headerPath);
+    expect(restored.encryptedPayload, manifest.encryptedPayload);
+    expect(restored.snapshotObjectPaths, manifest.snapshotObjectPaths);
+  });
+
+  test(
+    'conditional manifest writes include snapshot object paths in conflict checks',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final current = RemoteManifest(
+        vaultId: 'vault-1',
+        protocolVersion: 1,
+        headerPath: 'vault/headers/vault-1.json',
+        encryptedPayload: [1, 2, 3],
+        snapshotObjectPaths: const ['records/current.bin'],
+      );
+      final staleExpected = RemoteManifest(
+        vaultId: 'vault-1',
+        protocolVersion: 1,
+        headerPath: 'vault/headers/vault-1.json',
+        encryptedPayload: [1, 2, 3],
+        snapshotObjectPaths: const ['records/stale.bin'],
+      );
+      final next = RemoteManifest(
+        vaultId: 'vault-1',
+        protocolVersion: 1,
+        headerPath: 'vault/headers/vault-1.json',
+        encryptedPayload: [4, 5, 6],
+        snapshotObjectPaths: const ['records/next.bin'],
+      );
+
+      await provider.writeManifest(current);
+
+      await expectLater(
+        provider.writeManifestIfUnchanged(next, staleExpected),
+        throwsA(
+          isA<SyncProviderException>().having(
+            (error) => error.code,
+            'code',
+            'sync.provider.conflict',
+          ),
+        ),
+      );
+      expect(
+        (await provider.readManifest())?.snapshotObjectPaths,
+        current.snapshotObjectPaths,
+      );
+    },
+  );
 
   test('webdav provider rejects insecure HTTP unless explicitly allowed', () {
     expect(

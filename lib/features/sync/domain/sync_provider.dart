@@ -14,12 +14,14 @@ class RemoteManifest {
     required this.protocolVersion,
     required this.encryptedPayload,
     this.headerPath,
+    this.snapshotObjectPaths = const [],
   });
 
   final String vaultId;
   final int protocolVersion;
   final List<int> encryptedPayload;
   final String? headerPath;
+  final List<String> snapshotObjectPaths;
 
   Map<String, Object?> toJson() {
     return {
@@ -27,15 +29,21 @@ class RemoteManifest {
       'protocolVersion': protocolVersion,
       'encryptedPayload': base64Encode(encryptedPayload),
       if (headerPath != null) 'headerPath': headerPath,
+      if (snapshotObjectPaths.isNotEmpty)
+        'snapshotObjectPaths': snapshotObjectPaths,
     };
   }
 
   factory RemoteManifest.fromJson(Map<String, Object?> json) {
+    final snapshotObjectPaths = json['snapshotObjectPaths'];
     return RemoteManifest(
       vaultId: json['vaultId'] as String,
       protocolVersion: json['protocolVersion'] as int,
       encryptedPayload: base64Decode(json['encryptedPayload'] as String),
       headerPath: json['headerPath'] as String?,
+      snapshotObjectPaths: snapshotObjectPaths is List<Object?>
+          ? List<String>.unmodifiable(snapshotObjectPaths.whereType<String>())
+          : const [],
     );
   }
 

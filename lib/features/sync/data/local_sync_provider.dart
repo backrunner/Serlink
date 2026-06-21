@@ -129,10 +129,7 @@ bool _sameManifest(RemoteManifest? a, RemoteManifest? b) {
   if (a == null || b == null) {
     return a == b;
   }
-  return a.vaultId == b.vaultId &&
-      a.protocolVersion == b.protocolVersion &&
-      a.headerPath == b.headerPath &&
-      _sameBytes(a.encryptedPayload, b.encryptedPayload);
+  return _sameBytes(a.toBytes(), b.toBytes());
 }
 
 bool _sameBytes(List<int> a, List<int> b) {

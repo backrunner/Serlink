@@ -697,6 +697,10 @@ class SyncRunService {
           protocolVersion: 1,
           headerPath: headerRef.path,
           encryptedPayload: utf8.encode(jsonEncode(manifestEnvelope.toJson())),
+          snapshotObjectPaths: [
+            headerRef.path,
+            ...desiredRecordPaths.toList()..sort(),
+          ],
         ),
         expectedRemoteManifest,
       );

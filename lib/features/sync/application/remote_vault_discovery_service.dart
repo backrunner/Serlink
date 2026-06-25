@@ -50,7 +50,7 @@ class RemoteVaultDiscoveryService {
       return VaultHeader.fromJson(
         jsonDecode(utf8.decode(await _provider.readObject(headerRef)))
             as Map<String, Object?>,
-      );
+      ).copyWith(localUnlockProtectors: const []);
     } on SyncRunException {
       rethrow;
     } on SyncProviderException catch (error) {

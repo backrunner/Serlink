@@ -12,6 +12,7 @@ import 'package:serlink/features/import_export/application/vault_backup_service.
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_service.dart';
 import 'package:serlink/features/vault/data/drift_vault_repository.dart';
+import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
 
 void main() {
   late SerlinkDatabase sourceDatabase;
@@ -47,6 +48,7 @@ void main() {
         config: const VaultCryptoConfig.testing(),
       );
       await sourceVault.initialize(passphrase: 'good passphrase');
+      await sourceVault.enableLocalUnlock(secrets: InMemorySecretStore());
 
       final sourceHeaders = DriftVaultHeaderStore(sourceDatabase);
       final sourceRecords = DriftVaultRecordRepository(sourceDatabase);
@@ -84,15 +86,31 @@ void main() {
       expect(backupJson, isNot(contains('bastion.internal')));
       expect(backupJson, isNot(contains('ops-user-sensitive')));
       expect(backupJson, isNot(contains('prod-sensitive-tag')));
+      expect(bundle.header.localUnlockProtectors, isEmpty);
+      expect(backupJson, isNot(contains('localUnlockProtectors')));
+      expect(backupJson, isNot(contains('biometric-unlock')));
 
       final targetHeaders = DriftVaultHeaderStore(targetDatabase);
       final targetRecords = DriftVaultRecordRepository(targetDatabase);
+      final importedBundle = VaultBackupBundle.fromBytes(bundle.toBytes());
+      final injectedLocalProtectorBundle = VaultBackupBundle(
+        formatVersion: importedBundle.formatVersion,
+        exportedAt: importedBundle.exportedAt,
+        header: sourceVault.header!,
+        records: importedBundle.records,
+      );
+      expect(
+        injectedLocalProtectorBundle.header.localUnlockProtectors,
+        isNotEmpty,
+      );
+
       await VaultBackupService(
         headers: targetHeaders,
         records: targetRecords,
-      ).importBackup(VaultBackupBundle.fromBytes(bundle.toBytes()));
+      ).importBackup(injectedLocalProtectorBundle);
 
       final restoredHeader = await targetHeaders.read();
+      expect(restoredHeader!.localUnlockProtectors, isEmpty);
       final targetVault = InMemoryVaultService(
         config: const VaultCryptoConfig.testing(),
         header: restoredHeader,

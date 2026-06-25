@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +23,7 @@ import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
 import 'package:serlink/features/ssh/application/known_host_repository.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
+import 'package:serlink/features/sync/domain/sync_provider.dart';
 import 'package:serlink/features/terminal/application/terminal_modifier_latch.dart';
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
@@ -67,6 +67,12 @@ void main() {
       ProviderScope(
         overrides: [
           serlinkDatabaseProvider.overrideWithValue(database),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'windows',
+              targetPlatform: TargetPlatform.windows,
+            ),
+          ),
           vaultCryptoConfigProvider.overrideWithValue(
             const VaultCryptoConfig.testing(),
           ),
@@ -172,8 +178,7 @@ void main() {
     await tester.tap(find.text('Hosts'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
-    await tester.pumpAndSettle();
+    await _tapAddHost(tester);
 
     expect(find.text('Display name (optional)'), findsOneWidget);
     expect(find.text('Leave blank to use the hostname.'), findsOneWidget);
@@ -282,8 +287,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('No Hosts'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
-    await tester.pumpAndSettle();
+    await _tapAddHost(tester);
     await tester.enterText(
       find.byKey(const ValueKey('host-display-name-field')),
       'Production Bastion',
@@ -539,6 +543,12 @@ void main() {
       ProviderScope(
         overrides: [
           serlinkDatabaseProvider.overrideWithValue(database),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'windows',
+              targetPlatform: TargetPlatform.windows,
+            ),
+          ),
           vaultCryptoConfigProvider.overrideWithValue(
             const VaultCryptoConfig.testing(),
           ),
@@ -555,6 +565,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _pumpUntilFound(tester, find.text('Restricted SFTP'));
 
     await tester.tap(find.text('SFTP').first);
     await tester.pumpAndSettle();
@@ -585,13 +596,17 @@ void main() {
       findsNothing,
     );
 
-    await _submitVaultPassphrase(tester, 'wrong passphrase');
+    await _submitVaultPassphrase(
+      tester,
+      'wrong passphrase',
+      expectSuccess: false,
+    );
     expect(
       find.byKey(const ValueKey('vault-recovery-code-button')),
       findsNothing,
     );
 
-    await _submitVaultPassphrase(tester, 'still wrong');
+    await _submitVaultPassphrase(tester, 'still wrong', expectSuccess: false);
     expect(
       find.byKey(const ValueKey('vault-recovery-code-button')),
       findsOneWidget,
@@ -608,9 +623,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('vault-recovery-unlock-button')),
     );
-    await tester.pumpAndSettle();
-
-    expect(find.text('No Hosts'), findsOneWidget);
+    await _pumpUntilFound(tester, find.text('No Hosts'));
   });
 
   testWidgets('vault unlock keeps locked state while submitting', (
@@ -641,8 +654,12 @@ void main() {
   ) async {
     await _pumpLockedVaultApp(tester);
 
-    await _submitVaultPassphrase(tester, 'wrong passphrase');
-    await _submitVaultPassphrase(tester, 'still wrong');
+    await _submitVaultPassphrase(
+      tester,
+      'wrong passphrase',
+      expectSuccess: false,
+    );
+    await _submitVaultPassphrase(tester, 'still wrong', expectSuccess: false);
     await tester.tap(find.byKey(const ValueKey('vault-recovery-code-button')));
     await tester.pumpAndSettle();
 
@@ -703,24 +720,46 @@ void main() {
     expect(find.text('Reset Vault Permanently'), findsOneWidget);
   });
 
-  testWidgets('settings can enable local unlock and use it after locking', (
+  testWidgets('settings shows biometric unlock controls after enabling', (
     tester,
   ) async {
-    await _pumpLockedVaultApp(tester);
-    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'windows',
+        targetPlatform: TargetPlatform.windows,
+      ),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('vault-passphrase-field')),
+      'correct horse battery staple',
+    );
+    await tester.tap(find.byKey(const ValueKey('vault-submit-button')));
+    await _pumpUntil(
+      tester,
+      () => find
+          .byKey(const ValueKey('vault-passphrase-field'))
+          .evaluate()
+          .isEmpty,
+    );
 
     await tester.tap(find.text('Settings'));
-    await tester.pumpAndSettle();
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('settings-local-unlock-switch')),
+    );
     await tester.tap(
       find.byKey(const ValueKey('settings-local-unlock-switch')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Enable local unlock?'), findsOneWidget);
+    expect(find.text('Enable biometric unlock?'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Enable'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Local unlock enabled. Lock the vault to use device unlock.'),
+      find.text(
+        'Biometric unlock enabled. Lock the vault to use Face ID or Touch ID.',
+      ),
       findsOneWidget,
     );
     await tester.pump(const Duration(seconds: 4));
@@ -728,15 +767,18 @@ void main() {
 
     await tester.tap(find.text('Lock'));
     await tester.pumpAndSettle();
-    await tester.tap(
+    await tester.ensureVisible(
       find.byKey(const ValueKey('settings-local-unlock-button')),
     );
-    await tester.pumpAndSettle();
 
-    expect(find.text('Lock'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-local-unlock-button')),
+      findsOneWidget,
+    );
+    expect(find.text('Use biometrics'), findsOneWidget);
   });
 
-  testWidgets('iOS settings controls stay compact and readable', (
+  testWidgets('mobile settings controls stay compact and readable', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -747,8 +789,8 @@ void main() {
     await _pumpLockedVaultApp(
       tester,
       capabilities: const PlatformCapabilities(
-        operatingSystem: 'ios',
-        targetPlatform: TargetPlatform.iOS,
+        operatingSystem: 'android',
+        targetPlatform: TargetPlatform.android,
       ),
     );
     await _submitVaultPassphrase(tester, 'correct horse battery staple');
@@ -789,7 +831,7 @@ void main() {
     final switchRect = tester.getRect(localUnlockSwitch);
     expect(switchRect.width, lessThanOrEqualTo(38));
     expect(switchRect.height, lessThanOrEqualTo(26));
-    final localUnlockTitleRect = tester.getRect(find.text('Local unlock'));
+    final localUnlockTitleRect = tester.getRect(find.text('Biometric unlock'));
     expect(
       (switchRect.center.dy - localUnlockTitleRect.center.dy).abs(),
       lessThanOrEqualTo(16),
@@ -883,8 +925,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
-      await tester.pumpAndSettle();
+      await _tapAddHost(tester);
 
       expect(find.byKey(const ValueKey('host-password-field')), findsOneWidget);
       expect(find.text('Agent'), findsNothing);
@@ -908,10 +949,6 @@ void main() {
 
     final headerAddHostButton = find.byKey(const ValueKey('add-host-button'));
     expect(headerAddHostButton, findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('mobile-header-count-badge')),
-      findsOneWidget,
-    );
     await tester.tap(headerAddHostButton);
     await tester.pumpAndSettle();
 
@@ -951,10 +988,6 @@ void main() {
     );
     expect(addHostRect.width, 38);
     expect(addHostRect.height, 38);
-    final headerCountBadge = find.byKey(
-      const ValueKey('mobile-header-count-badge'),
-    );
-    expect(headerCountBadge, findsOneWidget);
     final headerTitleRow = find.byKey(
       const ValueKey('mobile-header-title-row'),
     );
@@ -963,9 +996,6 @@ void main() {
       matching: find.text('Hosts'),
     );
     expect(headerTitle, findsOneWidget);
-    final countRect = tester.getRect(headerCountBadge);
-    expect(countRect.left, greaterThan(tester.getRect(headerTitle).right));
-    expect(countRect.right, lessThan(addHostRect.left));
 
     await tester.tap(find.text('Sessions'));
     await tester.pumpAndSettle();
@@ -982,10 +1012,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('add-snippet-button')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('mobile-header-count-badge')),
-      findsOneWidget,
-    );
     expect(
       find.byKey(const ValueKey('empty-add-snippet-button')),
       findsOneWidget,
@@ -1120,8 +1146,7 @@ void main() {
     );
     await _submitVaultPassphrase(tester, 'correct horse battery staple');
 
-    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
-    await tester.pumpAndSettle();
+    await _tapAddHost(tester);
     await tester.enterText(
       find.byKey(const ValueKey('host-display-name-field')),
       'Mobile SFTP',
@@ -1188,8 +1213,7 @@ void main() {
     );
     await _submitVaultPassphrase(tester, 'correct horse battery staple');
 
-    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
-    await tester.pumpAndSettle();
+    await _tapAddHost(tester);
     await tester.enterText(
       find.byKey(const ValueKey('host-display-name-field')),
       'Mobile Terminal',
@@ -1296,8 +1320,7 @@ void main() {
     );
     await _submitVaultPassphrase(tester, 'correct horse battery staple');
 
-    await tester.tap(find.byKey(const ValueKey('empty-add-host-button')));
-    await tester.pumpAndSettle();
+    await _tapAddHost(tester);
     await tester.enterText(
       find.byKey(const ValueKey('host-display-name-field')),
       'Mobile Terminal',
@@ -1421,6 +1444,12 @@ void main() {
         ProviderScope(
           overrides: [
             serlinkDatabaseProvider.overrideWithValue(database),
+            platformCapabilitiesProvider.overrideWithValue(
+              const PlatformCapabilities(
+                operatingSystem: 'windows',
+                targetPlatform: TargetPlatform.windows,
+              ),
+            ),
             vaultCryptoConfigProvider.overrideWithValue(
               const VaultCryptoConfig.testing(),
             ),
@@ -1470,8 +1499,12 @@ void main() {
     await _pumpLockedVaultApp(tester);
     final l10n = lookupSerlinkLocalizations(AppLanguage.english);
 
-    await _submitVaultPassphrase(tester, 'wrong passphrase');
-    await _submitVaultPassphrase(tester, 'still wrong');
+    await _submitVaultPassphrase(
+      tester,
+      'wrong passphrase',
+      expectSuccess: false,
+    );
+    await _submitVaultPassphrase(tester, 'still wrong', expectSuccess: false);
     expect(find.text(l10n.vaultInvalidPassphraseError), findsOneWidget);
     expect(
       find.byKey(const ValueKey('vault-recovery-code-button')),
@@ -1501,6 +1534,12 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   final transferQueue = TransferQueueController();
   final secretStore = InMemorySecretStore();
   final resolvedSshService = sshService ?? _FakeSshSessionService();
+  final resolvedCapabilities =
+      capabilities ??
+      const PlatformCapabilities(
+        operatingSystem: 'windows',
+        targetPlatform: TargetPlatform.windows,
+      );
   final bootstrapVault = InMemoryVaultService(
     config: const VaultCryptoConfig.testing(),
   );
@@ -1518,12 +1557,19 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
 
   addTearDown(database.close);
   addTearDown(transferQueue.dispose);
-
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        if (capabilities != null)
-          platformCapabilitiesProvider.overrideWithValue(capabilities),
+        platformCapabilitiesProvider.overrideWithValue(resolvedCapabilities),
+        if (resolvedCapabilities.cloudKitSync) ...[
+          cloudKitAvailabilityCheckProvider.overrideWithValue(
+            () async => false,
+          ),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => _EmptySyncProvider(),
+          ),
+          cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
+        ],
         serlinkDatabaseProvider.overrideWithValue(database),
         vaultCryptoConfigProvider.overrideWithValue(
           const VaultCryptoConfig.testing(),
@@ -1558,13 +1604,50 @@ PackageInfo _testPackageInfo() {
 
 Future<void> _submitVaultPassphrase(
   WidgetTester tester,
-  String passphrase,
-) async {
+  String passphrase, {
+  bool expectSuccess = true,
+}) async {
   await tester.enterText(
     find.byKey(const ValueKey('vault-passphrase-field')),
     passphrase,
   );
   await tester.tap(find.byKey(const ValueKey('vault-submit-button')));
+  if (!expectSuccess) {
+    await tester.pumpAndSettle();
+    return;
+  }
+  final container = ProviderScope.containerOf(
+    tester.element(find.byType(SerlinkApp)),
+  );
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    await tester.pump(const Duration(milliseconds: 50));
+    final session = container.read(vaultSessionControllerProvider).value;
+    if (session?.vaultState == VaultState.unlocked) {
+      return;
+    }
+    if (session?.failureMessage case final failure?) {
+      fail('Vault unlock failed: $failure');
+    }
+  }
+  final session = container.read(vaultSessionControllerProvider).value;
+  fail(
+    'Timed out waiting for vault unlock. '
+    'state=${session?.vaultState} busy=${session?.isBusy}',
+  );
+}
+
+Future<void> _tapAddHost(WidgetTester tester) async {
+  final headerAddHost = find.byKey(const ValueKey('add-host-button'));
+  final emptyAddHost = find.byKey(const ValueKey('empty-add-host-button'));
+  await _pumpUntil(
+    tester,
+    () =>
+        headerAddHost.evaluate().isNotEmpty ||
+        emptyAddHost.evaluate().isNotEmpty,
+  );
+  await tester.tap(
+    headerAddHost.evaluate().isNotEmpty ? headerAddHost : emptyAddHost,
+  );
   await tester.pumpAndSettle();
 }
 

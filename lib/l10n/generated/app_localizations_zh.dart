@@ -211,22 +211,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsRecoverResetAction => '恢复 / 重置';
 
   @override
-  String get settingsLocalUnlockTitle => '本地解锁';
+  String get settingsLocalUnlockTitle => '生物解锁';
 
   @override
-  String get settingsLocalUnlockSemantics => '启用本地解锁';
+  String get settingsLocalUnlockSemantics => '启用生物解锁';
 
   @override
-  String get settingsLocalUnlockNeedsVault => '请先创建保险库，再启用设备保护的本地解锁。';
+  String get settingsLocalUnlockNeedsVault => '请先创建保险库，再启用生物解锁。';
 
   @override
-  String get settingsLocalUnlockEnabled => '已启用。锁定保险库后可用此设备解锁。';
+  String get settingsLocalUnlockEnabled =>
+      '已启用。锁定保险库后可使用 Face ID 或 Touch ID 解锁。';
+
+  @override
+  String get settingsLocalUnlockUnavailable => '此设备不可用 Face ID 或 Touch ID。';
 
   @override
   String get settingsLocalUnlockDisabled => '已停用。锁定后需要密码短语或恢复密钥。';
 
   @override
-  String get settingsUnlockWithDeviceAction => '用设备解锁';
+  String get settingsUnlockWithDeviceAction => '使用生物认证';
 
   @override
   String get settingsHostKeyConfirmationTitle => '主机密钥确认';
@@ -291,17 +295,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAppVersionUnavailable => '版本信息不可用';
 
   @override
-  String get settingsEnableLocalUnlockTitle => '启用本地解锁？';
+  String get settingsEnableLocalUnlockTitle => '启用生物解锁？';
 
   @override
-  String get settingsDisableLocalUnlockTitle => '停用本地解锁？';
+  String get settingsDisableLocalUnlockTitle => '停用生物解锁？';
 
   @override
   String get settingsEnableLocalUnlockBody =>
-      'Serlink 会在系统安全存储中保存一个随机设备密钥。不会保存你的保险库密码短语。';
+      'Serlink 会保存一个由 Face ID 或 Touch ID 保护的随机设备密钥。不会保存你的保险库密码短语。';
 
   @override
-  String get settingsDisableLocalUnlockBody => '这会移除此设备密钥。现有连接会继续运行。';
+  String get settingsDisableLocalUnlockBody => '这会移除受生物认证保护的设备密钥。现有连接会继续运行。';
 
   @override
   String get settingsEnableAction => '启用';
@@ -310,19 +314,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDisableAction => '停用';
 
   @override
-  String get settingsLocalUnlockEnabledSnack => '本地解锁已启用。锁定保险库后即可使用设备解锁。';
+  String get settingsLocalUnlockEnabledSnack =>
+      '生物解锁已启用。锁定保险库后即可使用 Face ID 或 Touch ID。';
 
   @override
-  String get settingsLocalUnlockVerifyFailedSnack => '无法验证本地解锁。';
+  String get settingsLocalUnlockVerifyFailedSnack => '无法验证生物解锁。';
 
   @override
-  String get settingsLocalUnlockDisabledSnack => '本地解锁已停用。';
+  String get settingsLocalUnlockDisabledSnack => '生物解锁已停用。';
 
   @override
-  String get settingsLocalUnlockStillAvailableSnack => '此设备上仍可使用本地解锁。';
+  String get settingsLocalUnlockStillAvailableSnack => '此设备上仍可使用生物解锁。';
 
   @override
-  String get settingsLocalUnlockUpdateFailed => '无法更新本地解锁。';
+  String get settingsLocalUnlockUpdateFailed => '无法更新生物解锁。';
 
   @override
   String get syncSectionTitle => '同步';
@@ -1380,7 +1385,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultUnlockAction => '解锁';
 
   @override
-  String get vaultUnlockWithDeviceAction => '用设备解锁';
+  String get vaultUnlockWithDeviceAction => '使用生物认证';
 
   @override
   String get vaultUseRecoveryCodeAction => '使用恢复码';
@@ -1398,13 +1403,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultInvalidRecoveryKeyFormatError => '不支持该恢复密钥格式。';
 
   @override
-  String get vaultLocalUnlockNotEnabledError => '此设备尚未启用本地解锁。';
+  String get vaultLocalUnlockNotEnabledError => '此设备尚未启用生物解锁。';
 
   @override
-  String get vaultLocalUnlockFailedError => '本地解锁失败，请使用保险库密码短语。';
+  String get vaultLocalUnlockFailedError => '生物解锁失败，请使用保险库密码短语。';
 
   @override
-  String get vaultLocalUnlockUnavailableError => '此设备不可用本地安全存储。';
+  String get vaultLocalUnlockUnavailableError => '此设备不可用 Face ID 或 Touch ID。';
 
   @override
   String get vaultEmptyPassphraseError => '保险库密码短语不能为空。';

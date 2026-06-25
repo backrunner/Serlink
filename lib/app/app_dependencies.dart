@@ -96,7 +96,7 @@ final vaultRecordRepositoryProvider = Provider<VaultRecordRepository>((ref) {
 });
 
 final secretStoreProvider = Provider<SecretStore>((ref) {
-  return const FlutterSecureStorageSecretStore();
+  return FlutterSecureStorageSecretStore();
 });
 
 final platformCapabilitiesProvider = Provider<PlatformCapabilities>((ref) {
@@ -1072,6 +1072,7 @@ class VaultSessionState {
   const VaultSessionState({
     required this.vaultState,
     this.localUnlockAvailable = false,
+    this.biometricUnlockSupported = false,
     this.recoveryStatus = VaultRecoveryStatus.healthy,
     this.recordHealthReport,
     this.recoveryKey,
@@ -1083,6 +1084,7 @@ class VaultSessionState {
 
   final VaultState vaultState;
   final bool localUnlockAvailable;
+  final bool biometricUnlockSupported;
   final VaultRecoveryStatus recoveryStatus;
   final VaultRecordHealthReport? recordHealthReport;
   final VaultRecoveryKey? recoveryKey;
@@ -1098,6 +1100,7 @@ class VaultSessionState {
   VaultSessionState copyWith({
     VaultState? vaultState,
     bool? localUnlockAvailable,
+    bool? biometricUnlockSupported,
     VaultRecoveryKey? recoveryKey,
     bool clearRecoveryKey = false,
     VaultRecoveryStatus? recoveryStatus,
@@ -1113,6 +1116,8 @@ class VaultSessionState {
     return VaultSessionState(
       vaultState: vaultState ?? this.vaultState,
       localUnlockAvailable: localUnlockAvailable ?? this.localUnlockAvailable,
+      biometricUnlockSupported:
+          biometricUnlockSupported ?? this.biometricUnlockSupported,
       recoveryStatus: recoveryStatus ?? this.recoveryStatus,
       recordHealthReport: clearRecordHealthReport
           ? null
@@ -1146,8 +1151,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   Future<VaultSessionState> _loadInitialState() async {
     _cloudKitHeaderDiscovered = false;
     VaultHeader? header;
+    bool loadedFromLocalStore;
     try {
       header = await ref.watch(vaultHeaderStoreProvider).read();
+      loadedFromLocalStore = header != null;
     } on DatabaseIntegrityException catch (error) {
       return VaultSessionState(
         vaultState: VaultState.locked,
@@ -1181,13 +1188,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         );
       }
     }
+    header = await _sanitizeLoadedHeader(header, persist: loadedFromLocalStore);
     _service = _createService(header: header);
-    final localUnlockAvailable = await service.hasLocalUnlock(
-      secrets: ref.read(secretStoreProvider),
-    );
+    final localUnlockStatus = await _localUnlockStatus();
     return VaultSessionState(
       vaultState: header == null ? VaultState.uninitialized : VaultState.locked,
-      localUnlockAvailable: localUnlockAvailable,
+      localUnlockAvailable: localUnlockStatus.available,
+      biometricUnlockSupported: localUnlockStatus.supported,
     );
   }
 
@@ -1232,9 +1239,12 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       final result = await service.initialize(passphrase: passphrase);
       await ref.read(vaultHeaderStoreProvider).save(result.header);
       final syncFailure = await _bootstrapCloudKitSnapshotAfterInitialize();
+      final localUnlockStatus = await _localUnlockStatus();
       state = AsyncData(
         VaultSessionState(
           vaultState: VaultState.unlocked,
+          localUnlockAvailable: localUnlockStatus.available,
+          biometricUnlockSupported: localUnlockStatus.supported,
           recoveryKey: result.recoveryKey,
           failureMessage: syncFailure,
           unlockGeneration: previous.unlockGeneration + 1,
@@ -1376,14 +1386,14 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         return;
       }
       _cloudKitHeaderDiscovered = true;
-      _service = _createService(header: header);
-      final localUnlockAvailable = await service.hasLocalUnlock(
-        secrets: ref.read(secretStoreProvider),
-      );
+      final sanitized = await _sanitizeLoadedHeader(header, persist: false);
+      _service = _createService(header: sanitized);
+      final localUnlockStatus = await _localUnlockStatus();
       state = AsyncData(
         VaultSessionState(
           vaultState: VaultState.locked,
-          localUnlockAvailable: localUnlockAvailable,
+          localUnlockAvailable: localUnlockStatus.available,
+          biometricUnlockSupported: localUnlockStatus.supported,
         ),
       );
     } on SyncRunException catch (error) {
@@ -1840,8 +1850,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       quarantine: ref.read(vaultRecordQuarantineRepositoryProvider),
     );
     final report = await health.inspect();
+    final localUnlockStatus = await _localUnlockStatus();
     return previous.copyWith(
       vaultState: VaultState.unlocked,
+      localUnlockAvailable: localUnlockStatus.available,
+      biometricUnlockSupported: localUnlockStatus.supported,
       recoveryStatus: report.hasCorruptRecords
           ? VaultRecoveryStatus.recordsCorrupt
           : VaultRecoveryStatus.healthy,
@@ -1851,6 +1864,57 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       unlockGeneration: previous.unlockGeneration + 1,
       isBusy: false,
     );
+  }
+
+  Future<({bool supported, bool available})> _localUnlockStatus() async {
+    final secrets = ref.read(secretStoreProvider);
+    final capabilities = await secrets.capabilities();
+    final supported =
+        capabilities.available &&
+        capabilities.deviceLocal &&
+        capabilities.biometricGate;
+    return (
+      supported: supported,
+      available: supported && await service.hasLocalUnlock(secrets: secrets),
+    );
+  }
+
+  Future<VaultHeader?> _sanitizeLoadedHeader(
+    VaultHeader? header, {
+    required bool persist,
+  }) async {
+    if (header == null) {
+      return null;
+    }
+    final supportedProtectors = <VaultLocalUnlockProtector>[
+      for (final protector in header.localUnlockProtectors)
+        if (protector.protection ==
+            VaultLocalUnlockProtection.biometricCurrentSet)
+          protector,
+    ];
+    if (supportedProtectors.length == header.localUnlockProtectors.length) {
+      return header;
+    }
+    final secrets = ref.read(secretStoreProvider);
+    for (final protector in header.localUnlockProtectors) {
+      if (protector.protection ==
+          VaultLocalUnlockProtection.biometricCurrentSet) {
+        continue;
+      }
+      try {
+        await secrets.delete(protector.secretRef);
+      } on Object {
+        // Cleanup is best effort. The sanitized header will no longer point at
+        // the stale secret even if the device store fails to delete it.
+      }
+    }
+    final sanitized = header.copyWith(
+      localUnlockProtectors: supportedProtectors,
+    );
+    if (persist) {
+      await ref.read(vaultHeaderStoreProvider).save(sanitized);
+    }
+    return sanitized;
   }
 
   Future<void> _refreshCloudKitShadowSetting() async {
@@ -1882,13 +1946,12 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
 
   Future<void> lock() async {
     await service.lock();
-    final localUnlockAvailable = await service.hasLocalUnlock(
-      secrets: ref.read(secretStoreProvider),
-    );
+    final localUnlockStatus = await _localUnlockStatus();
     state = AsyncData(
       VaultSessionState(
         vaultState: VaultState.locked,
-        localUnlockAvailable: localUnlockAvailable,
+        localUnlockAvailable: localUnlockStatus.available,
+        biometricUnlockSupported: localUnlockStatus.supported,
       ),
     );
   }
@@ -2050,32 +2113,34 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     final secrets = ref.read(secretStoreProvider);
     final header = await service.enableLocalUnlock(secrets: secrets);
     await ref.read(vaultHeaderStoreProvider).save(header);
-    final localUnlockAvailable = await service.hasLocalUnlock(secrets: secrets);
+    final localUnlockStatus = await _localUnlockStatus();
     final current =
         state.value ?? const VaultSessionState(vaultState: VaultState.unlocked);
     state = AsyncData(
       current.copyWith(
-        localUnlockAvailable: localUnlockAvailable,
+        localUnlockAvailable: localUnlockStatus.available,
+        biometricUnlockSupported: localUnlockStatus.supported,
         clearFailure: true,
       ),
     );
-    return localUnlockAvailable;
+    return localUnlockStatus.available;
   }
 
   Future<bool> disableLocalUnlock() async {
     final secrets = ref.read(secretStoreProvider);
     final header = await service.disableLocalUnlock(secrets: secrets);
     await ref.read(vaultHeaderStoreProvider).save(header);
-    final localUnlockAvailable = await service.hasLocalUnlock(secrets: secrets);
+    final localUnlockStatus = await _localUnlockStatus();
     final current =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
     state = AsyncData(
       current.copyWith(
-        localUnlockAvailable: localUnlockAvailable,
+        localUnlockAvailable: localUnlockStatus.available,
+        biometricUnlockSupported: localUnlockStatus.supported,
         clearFailure: true,
       ),
     );
-    return !localUnlockAvailable;
+    return !localUnlockStatus.available;
   }
 
   void dismissRecoveryKey() {
@@ -2106,7 +2171,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     try {
       await service.disableLocalUnlock(secrets: ref.read(secretStoreProvider));
     } on Object {
-      // The persisted header is about to be removed. A stale local unlock
+      // The persisted header is about to be removed. A stale biometric unlock
       // secret cannot unlock anything once its matching header protector is gone.
     }
   }

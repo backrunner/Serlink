@@ -72,43 +72,277 @@ void main() {
       );
     });
 
-    test('enables device-local unlock without storing passphrase', () async {
-      final store = InMemorySecretStore();
+    test(
+      'unlocks with passphrase and biometric protector independently',
+      () async {
+        final store = InMemorySecretStore();
+        await service.initialize(passphrase: 'good passphrase');
+        final envelope = await service.encryptRecord(
+          id: VaultRecordId('record-1'),
+          type: 'identity.password',
+          plaintext: utf8.encode('secret'),
+        );
+
+        final protectedHeader = await service.enableLocalUnlock(secrets: store);
+
+        expect(protectedHeader.localUnlockProtectors, hasLength(1));
+        expect(
+          protectedHeader.localUnlockProtectors.single.protection,
+          VaultLocalUnlockProtection.biometricCurrentSet,
+        );
+        expect(await service.hasLocalUnlock(secrets: store), isTrue);
+        expect(
+          jsonEncode(protectedHeader.toJson()),
+          isNot(contains('good passphrase')),
+        );
+
+        await service.lock();
+        await service.unlockWithLocalKey(secrets: store);
+
+        expect(utf8.decode(await service.decryptRecord(envelope)), 'secret');
+
+        await service.lock();
+        await service.unlock(passphrase: 'good passphrase');
+
+        expect(utf8.decode(await service.decryptRecord(envelope)), 'secret');
+      },
+    );
+
+    test(
+      'disables biometric unlock without breaking passphrase unlock',
+      () async {
+        final store = InMemorySecretStore();
+        await service.initialize(passphrase: 'good passphrase');
+        final protectedHeader = await service.enableLocalUnlock(secrets: store);
+        final secretRef =
+            protectedHeader.localUnlockProtectors.single.secretRef;
+
+        final unprotectedHeader = await service.disableLocalUnlock(
+          secrets: store,
+        );
+
+        expect(unprotectedHeader.localUnlockProtectors, isEmpty);
+        expect(await store.read(secretRef), isNull);
+        expect(await service.hasLocalUnlock(secrets: store), isFalse);
+
+        await service.lock();
+        await expectLater(
+          service.unlockWithLocalKey(secrets: store),
+          throwsA(
+            isA<VaultException>().having(
+              (error) => error.code,
+              'code',
+              'vault.local_unlock_not_enabled',
+            ),
+          ),
+        );
+
+        await service.unlock(passphrase: 'good passphrase');
+
+        expect(service.state, VaultState.unlocked);
+      },
+    );
+
+    test('maps biometric secret read failures to unlock failure', () async {
+      final store = _ReadFailingSecretStore();
       await service.initialize(passphrase: 'good passphrase');
-      final envelope = await service.encryptRecord(
-        id: VaultRecordId('record-1'),
-        type: 'identity.password',
-        plaintext: utf8.encode('secret'),
-      );
-
-      final protectedHeader = await service.enableLocalUnlock(secrets: store);
-
-      expect(protectedHeader.localUnlockProtectors, hasLength(1));
-      expect(await service.hasLocalUnlock(secrets: store), isTrue);
-      expect(
-        jsonEncode(protectedHeader.toJson()),
-        isNot(contains('good passphrase')),
-      );
-
+      await service.enableLocalUnlock(secrets: store);
       await service.lock();
-      await service.unlockWithLocalKey(secrets: store);
 
-      expect(utf8.decode(await service.decryptRecord(envelope)), 'secret');
+      await expectLater(
+        service.unlockWithLocalKey(secrets: store),
+        throwsA(
+          isA<VaultException>().having(
+            (error) => error.code,
+            'code',
+            'vault.local_unlock_failed',
+          ),
+        ),
+      );
+      expect(service.state, VaultState.locked);
+
+      await service.unlock(passphrase: 'good passphrase');
+
+      expect(service.state, VaultState.unlocked);
     });
 
-    test('disables device-local unlock and deletes protector secret', () async {
-      final store = InMemorySecretStore();
+    test(
+      'ignores biometric secret lookup failures when checking status',
+      () async {
+        final store = _ContainsFailingSecretStore();
+        await service.initialize(passphrase: 'good passphrase');
+        await service.enableLocalUnlock(secrets: InMemorySecretStore());
+
+        expect(await service.hasLocalUnlock(secrets: store), isFalse);
+      },
+    );
+
+    test('replaces existing protector when biometric lookup fails', () async {
+      final store = _ContainsFailingSecretStore();
+      await service.initialize(passphrase: 'good passphrase');
+      await service.enableLocalUnlock(secrets: InMemorySecretStore());
+
+      final nextHeader = await service.enableLocalUnlock(secrets: store);
+
+      expect(nextHeader.localUnlockProtectors, hasLength(1));
+      expect(
+        nextHeader.localUnlockProtectors.single.protection,
+        VaultLocalUnlockProtection.biometricCurrentSet,
+      );
+      expect(await service.hasLocalUnlock(secrets: store), isFalse);
+      await service.lock();
+      await service.unlock(passphrase: 'good passphrase');
+      expect(service.state, VaultState.unlocked);
+    });
+
+    test('disables biometric unlock even when cleanup fails', () async {
+      final store = _DeleteFailingSecretStore();
       await service.initialize(passphrase: 'good passphrase');
       final protectedHeader = await service.enableLocalUnlock(secrets: store);
-      final secretRef = protectedHeader.localUnlockProtectors.single.secretRef;
+      store.ref = protectedHeader.localUnlockProtectors.single.secretRef;
 
       final unprotectedHeader = await service.disableLocalUnlock(
         secrets: store,
       );
 
       expect(unprotectedHeader.localUnlockProtectors, isEmpty);
-      expect(await store.read(secretRef), isNull);
+      expect(service.header!.localUnlockProtectors, isEmpty);
       expect(await service.hasLocalUnlock(secrets: store), isFalse);
+
+      await service.lock();
+      await expectLater(
+        service.unlockWithLocalKey(secrets: store),
+        throwsA(
+          isA<VaultException>().having(
+            (error) => error.code,
+            'code',
+            'vault.local_unlock_not_enabled',
+          ),
+        ),
+      );
+
+      await service.unlock(passphrase: 'good passphrase');
+
+      expect(service.state, VaultState.unlocked);
+    });
+
+    test(
+      'rejects enabling biometric unlock when biometrics are unavailable',
+      () async {
+        final store = InMemorySecretStore(
+          capabilities: const SecretStoreCapabilities(
+            available: true,
+            deviceLocal: true,
+            syncable: false,
+            biometricGate: false,
+          ),
+        );
+        await service.initialize(passphrase: 'good passphrase');
+
+        await expectLater(
+          service.enableLocalUnlock(secrets: store),
+          throwsA(
+            isA<VaultException>().having(
+              (error) => error.code,
+              'code',
+              'vault.local_unlock_unavailable',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'ignores old local unlock protectors without biometric protection',
+      () async {
+        await service.initialize(passphrase: 'good passphrase');
+        final header = service.header!;
+        final legacyHeader = VaultHeader.fromJson({
+          ...header.toJson(),
+          'localUnlockProtectors': [
+            {
+              'id': 'legacy-protector',
+              'secretRef': 'vault/local-unlock/legacy',
+              'nonce': base64Encode(List<int>.filled(12, 1)),
+              'mac': base64Encode(List<int>.filled(16, 2)),
+              'ciphertext': base64Encode(List<int>.filled(32, 3)),
+              'createdAt': DateTime.utc(2026, 1, 1).toIso8601String(),
+            },
+          ],
+        });
+        final legacyService = InMemoryVaultService(
+          config: const VaultCryptoConfig.testing(),
+          header: legacyHeader,
+        );
+        final store = InMemorySecretStore();
+        await store.write(const SecretRef('vault/local-unlock/legacy'), [
+          1,
+          2,
+          3,
+        ]);
+
+        expect(
+          legacyHeader.localUnlockProtectors.single.protection,
+          VaultLocalUnlockProtection.unsupported,
+        );
+        expect(await legacyService.hasLocalUnlock(secrets: store), isFalse);
+        await expectLater(
+          legacyService.unlockWithLocalKey(secrets: store),
+          throwsA(
+            isA<VaultException>().having(
+              (error) => error.code,
+              'code',
+              'vault.local_unlock_not_enabled',
+            ),
+          ),
+        );
+      },
+    );
+
+    test('replaces stale protectors even when cleanup fails', () async {
+      await service.initialize(passphrase: 'good passphrase');
+      final header = service.header!;
+      final legacyRef = const SecretRef('vault/local-unlock/stale');
+      final legacyHeader = VaultHeader.fromJson({
+        ...header.toJson(),
+        'localUnlockProtectors': [
+          {
+            'id': 'legacy-protector',
+            'secretRef': legacyRef.value,
+            'nonce': base64Encode(List<int>.filled(12, 1)),
+            'mac': base64Encode(List<int>.filled(16, 2)),
+            'ciphertext': base64Encode(List<int>.filled(32, 3)),
+            'createdAt': DateTime.utc(2026, 1, 1).toIso8601String(),
+          },
+        ],
+      });
+      final legacyService = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+        header: legacyHeader,
+      );
+      final store = _DeleteFailingSecretStore(legacyRef);
+      await store.write(legacyRef, [1, 2, 3]);
+
+      await legacyService.unlock(passphrase: 'good passphrase');
+      final protectedHeader = await legacyService.enableLocalUnlock(
+        secrets: store,
+      );
+
+      expect(protectedHeader.localUnlockProtectors, hasLength(1));
+      expect(
+        protectedHeader.localUnlockProtectors.single.secretRef,
+        isNot(legacyRef),
+      );
+      expect(
+        protectedHeader.localUnlockProtectors.single.protection,
+        VaultLocalUnlockProtection.biometricCurrentSet,
+      );
+
+      await legacyService.lock();
+      await legacyService.unlockWithLocalKey(secrets: store);
+
+      expect(legacyService.state, VaultState.unlocked);
+      expect(await store.read(legacyRef), isNotNull);
     });
 
     test('blocks record access while locked', () async {
@@ -249,4 +483,41 @@ VaultRecordEnvelope _copyEnvelope(
     associatedData: associatedData ?? envelope.associatedData,
     ciphertext: ciphertext ?? envelope.ciphertext,
   );
+}
+
+class _DeleteFailingSecretStore extends InMemorySecretStore {
+  _DeleteFailingSecretStore([this.ref]);
+
+  SecretRef? ref;
+
+  @override
+  Future<void> delete(SecretRef ref) async {
+    if (ref == this.ref) {
+      throw StateError('delete failed');
+    }
+    await super.delete(ref);
+  }
+}
+
+class _ReadFailingSecretStore extends InMemorySecretStore {
+  @override
+  Future<List<int>?> read(
+    SecretRef ref, {
+    SecretProtection protection = SecretProtection.deviceLocal,
+  }) async {
+    if (protection == SecretProtection.biometricCurrentSet) {
+      throw StateError('biometric read failed');
+    }
+    return super.read(ref, protection: protection);
+  }
+}
+
+class _ContainsFailingSecretStore extends InMemorySecretStore {
+  @override
+  Future<bool> contains(
+    SecretRef ref, {
+    SecretProtection protection = SecretProtection.deviceLocal,
+  }) async {
+    throw StateError('secret lookup failed');
+  }
 }

@@ -134,10 +134,12 @@ class _SettingsSurface extends ConsumerWidget {
                       },
                     ),
                     _SettingsActionRow(
-                      icon: Icons.key_outlined,
+                      icon: Icons.fingerprint,
                       title: l10n.settingsLocalUnlockTitle,
                       subtitle: _localUnlockLabel(l10n, vault, mobile),
-                      action: vaultState == VaultState.unlocked
+                      action:
+                          vaultState == VaultState.unlocked &&
+                              vault?.biometricUnlockSupported == true
                           ? _SettingsSwitch(
                               key: const ValueKey(
                                 'settings-local-unlock-switch',

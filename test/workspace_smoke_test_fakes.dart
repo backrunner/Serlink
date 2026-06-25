@@ -10,6 +10,50 @@ class _LockedVaultHarness {
   final VaultRecoveryKey recoveryKey;
 }
 
+class _EmptySyncProvider implements SyncProvider {
+  @override
+  Future<ProviderCapabilities> capabilities() async {
+    return const ProviderCapabilities(
+      kind: SyncProviderKind.cloudKit,
+      supportsConditionalWrites: true,
+      requiresTls: true,
+    );
+  }
+
+  @override
+  Future<void> deleteObject(RemoteObjectRef ref) async {}
+
+  @override
+  Future<List<RemoteObjectRef>> listRecordObjects({String? prefix}) async {
+    return const [];
+  }
+
+  @override
+  Future<RemoteManifest?> readManifest() async {
+    return null;
+  }
+
+  @override
+  Future<List<int>> readObject(RemoteObjectRef ref) async {
+    throw const SyncProviderException(
+      'sync.provider.object_missing',
+      'Remote object is missing.',
+    );
+  }
+
+  @override
+  Future<void> writeManifest(RemoteManifest manifest) async {}
+
+  @override
+  Future<void> writeManifestIfUnchanged(
+    RemoteManifest manifest,
+    RemoteManifest? expectedCurrent,
+  ) async {}
+
+  @override
+  Future<void> writeObject(RemoteObjectRef ref, List<int> bytes) async {}
+}
+
 class _FakeSshSessionService implements SshSessionService {
   final _MutableFakeSftpConnection sftp = _MutableFakeSftpConnection();
   final _FakeShellSession shell = _FakeShellSession();

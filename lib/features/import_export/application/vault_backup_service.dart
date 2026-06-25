@@ -69,7 +69,7 @@ class VaultBackupService {
     return VaultBackupBundle(
       formatVersion: 1,
       exportedAt: DateTime.now().toUtc(),
-      header: header,
+      header: header.copyWith(localUnlockProtectors: const []),
       records: await _records.list(),
     );
   }
@@ -81,7 +81,9 @@ class VaultBackupService {
         'Unsupported vault backup version: ${bundle.formatVersion}.',
       );
     }
-    await _headers.save(bundle.header);
+    await _headers.save(
+      bundle.header.copyWith(localUnlockProtectors: const []),
+    );
     for (final record in bundle.records) {
       await _records.upsert(record);
     }

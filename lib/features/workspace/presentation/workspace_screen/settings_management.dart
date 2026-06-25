@@ -481,10 +481,13 @@ String _localUnlockLabel(
     if (session?.localUnlockAvailable == true) {
       return _mobileText(
         l10n,
-        zh: '可用设备解锁',
-        en: 'Device unlock ready',
-        ja: '端末解除可',
+        zh: '可用生物解锁',
+        en: 'Biometric ready',
+        ja: '生体認証可',
       );
+    }
+    if (session?.biometricUnlockSupported != true) {
+      return _mobileText(l10n, zh: '此设备不可用', en: 'Not available', ja: '利用不可');
     }
     return _mobileText(
       l10n,
@@ -498,6 +501,9 @@ String _localUnlockLabel(
   }
   if (session?.localUnlockAvailable == true) {
     return l10n.settingsLocalUnlockEnabled;
+  }
+  if (session?.biometricUnlockSupported != true) {
+    return l10n.settingsLocalUnlockUnavailable;
   }
   return l10n.settingsLocalUnlockDisabled;
 }

@@ -215,6 +215,7 @@ class VaultLocalUnlockProtector {
     required this.mac,
     required this.ciphertext,
     required this.createdAt,
+    required this.protection,
   });
 
   final String id;
@@ -223,6 +224,7 @@ class VaultLocalUnlockProtector {
   final List<int> mac;
   final List<int> ciphertext;
   final DateTime createdAt;
+  final VaultLocalUnlockProtection protection;
 
   Map<String, Object?> toJson() {
     return {
@@ -232,6 +234,8 @@ class VaultLocalUnlockProtector {
       'mac': base64Encode(mac),
       'ciphertext': base64Encode(ciphertext),
       'createdAt': createdAt.toUtc().toIso8601String(),
+      if (protection == VaultLocalUnlockProtection.biometricCurrentSet)
+        'protection': protection.name,
     };
   }
 
@@ -243,8 +247,18 @@ class VaultLocalUnlockProtector {
       mac: base64Decode(json['mac'] as String),
       ciphertext: base64Decode(json['ciphertext'] as String),
       createdAt: DateTime.parse(json['createdAt'] as String),
+      protection: _localUnlockProtectionFromJson(json['protection']),
     );
   }
+}
+
+enum VaultLocalUnlockProtection { biometricCurrentSet, unsupported }
+
+VaultLocalUnlockProtection _localUnlockProtectionFromJson(Object? value) {
+  return switch (value) {
+    'biometricCurrentSet' => VaultLocalUnlockProtection.biometricCurrentSet,
+    _ => VaultLocalUnlockProtection.unsupported,
+  };
 }
 
 class VaultInitializationResult {

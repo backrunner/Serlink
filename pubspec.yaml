@@ -62,6 +62,7 @@ dependencies:
   forui: ^0.22.3
   desktop_drop: ^0.7.1
   url_launcher: ^6.3.2
+  local_auth: ^3.0.1
 
 dependency_overrides:
   xterm:

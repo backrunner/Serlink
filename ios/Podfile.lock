@@ -7,6 +7,9 @@ PODS:
   - flutter_secure_storage_darwin (10.0.0):
     - Flutter
     - FlutterMacOS
+  - local_auth_darwin (0.0.1):
+    - Flutter
+    - FlutterMacOS
   - package_info_plus (0.4.5):
     - Flutter
   - Sentry/HybridSDK (8.58.3)
@@ -22,6 +25,7 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - flutter_pty (from `.symlinks/plugins/flutter_pty/ios`)
   - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
+  - local_auth_darwin (from `.symlinks/plugins/local_auth_darwin/darwin`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - sentry_flutter (from `.symlinks/plugins/sentry_flutter/ios`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
@@ -39,6 +43,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_pty/ios"
   flutter_secure_storage_darwin:
     :path: ".symlinks/plugins/flutter_secure_storage_darwin/darwin"
+  local_auth_darwin:
+    :path: ".symlinks/plugins/local_auth_darwin/darwin"
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
   sentry_flutter:
@@ -51,6 +57,7 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_pty: 206742da6092b413cb683de17436c16d1f3c7997
   flutter_secure_storage_darwin: acdb3f316ed05a3e68f856e0353b133eec373a23
+  local_auth_darwin: c3ee6cce0a8d56be34c8ccb66ba31f7f180aaebb
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   Sentry: 108fdbb76299c4189af12246bf0308c09c278922
   sentry_flutter: 32e67cb4756ce3de42bbd56581fa935922ff328f

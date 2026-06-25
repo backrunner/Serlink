@@ -250,6 +250,45 @@ void main() {
     },
   );
 
+  test(
+    'sync ignores remote local unlock protectors when snapshots match',
+    () async {
+      await vault.enableLocalUnlock(secrets: InMemorySecretStore());
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final envelope = await vault.encryptRecord(
+        id: VaultRecordId('host:biometric-local'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"local.example.test"}'),
+      );
+      await records.upsert(envelope);
+      await service.pushEncryptedSnapshot(provider);
+      final manifest = await provider.readManifest();
+      expect(manifest, isNotNull);
+      expect(vault.header!.localUnlockProtectors, isNotEmpty);
+      await provider.writeObject(
+        RemoteObjectRef(manifest!.headerPath!),
+        utf8.encode(jsonEncode(vault.header!.toJson())),
+      );
+
+      final result = await service.syncEncryptedSnapshot(provider);
+
+      expect(result.headerUploaded, isFalse);
+      expect(result.recordsUploaded, 0);
+      expect(result.recordsDownloaded, 0);
+      final dirtyRemoteHeader = VaultHeader.fromJson(
+        jsonDecode(
+              utf8.decode(
+                await provider.readObject(
+                  RemoteObjectRef(manifest.headerPath!),
+                ),
+              ),
+            )
+            as Map<String, Object?>,
+      );
+      expect(dirtyRemoteHeader.localUnlockProtectors, isNotEmpty);
+    },
+  );
+
   test('pull imports missing encrypted records from remote manifest', () async {
     final remoteVault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),

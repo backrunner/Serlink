@@ -234,25 +234,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsRecoverResetAction => 'Recover / Reset';
 
   @override
-  String get settingsLocalUnlockTitle => 'Local unlock';
+  String get settingsLocalUnlockTitle => 'Biometric unlock';
 
   @override
-  String get settingsLocalUnlockSemantics => 'Enable local unlock';
+  String get settingsLocalUnlockSemantics => 'Enable biometric unlock';
 
   @override
   String get settingsLocalUnlockNeedsVault =>
-      'Create the vault before enabling device-protected unlock.';
+      'Create the vault before enabling biometric unlock.';
 
   @override
   String get settingsLocalUnlockEnabled =>
-      'Enabled. Lock the vault to unlock with this device.';
+      'Enabled. Lock the vault to unlock with Face ID or Touch ID.';
+
+  @override
+  String get settingsLocalUnlockUnavailable =>
+      'Face ID or Touch ID is not available on this device.';
 
   @override
   String get settingsLocalUnlockDisabled =>
       'Disabled. Passphrase or recovery key is required after lock.';
 
   @override
-  String get settingsUnlockWithDeviceAction => 'Unlock with device';
+  String get settingsUnlockWithDeviceAction => 'Use biometrics';
 
   @override
   String get settingsHostKeyConfirmationTitle => 'Host key confirmation';
@@ -320,18 +324,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAppVersionUnavailable => 'Version unavailable';
 
   @override
-  String get settingsEnableLocalUnlockTitle => 'Enable local unlock?';
+  String get settingsEnableLocalUnlockTitle => 'Enable biometric unlock?';
 
   @override
-  String get settingsDisableLocalUnlockTitle => 'Disable local unlock?';
+  String get settingsDisableLocalUnlockTitle => 'Disable biometric unlock?';
 
   @override
   String get settingsEnableLocalUnlockBody =>
-      'Serlink will store a random device key in OS secure storage. Your vault passphrase is not stored.';
+      'Serlink will store a random device key protected by Face ID or Touch ID. Your vault passphrase is not stored.';
 
   @override
   String get settingsDisableLocalUnlockBody =>
-      'This removes this device key from OS secure storage. Existing connections keep running.';
+      'This removes this device key from biometric protection. Existing connections keep running.';
 
   @override
   String get settingsEnableAction => 'Enable';
@@ -341,22 +345,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLocalUnlockEnabledSnack =>
-      'Local unlock enabled. Lock the vault to use device unlock.';
+      'Biometric unlock enabled. Lock the vault to use Face ID or Touch ID.';
 
   @override
   String get settingsLocalUnlockVerifyFailedSnack =>
-      'Local unlock could not be verified.';
+      'Biometric unlock could not be verified.';
 
   @override
-  String get settingsLocalUnlockDisabledSnack => 'Local unlock disabled.';
+  String get settingsLocalUnlockDisabledSnack => 'Biometric unlock disabled.';
 
   @override
   String get settingsLocalUnlockStillAvailableSnack =>
-      'Local unlock is still available on this device.';
+      'Biometric unlock is still available on this device.';
 
   @override
   String get settingsLocalUnlockUpdateFailed =>
-      'Local unlock could not be updated.';
+      'Biometric unlock could not be updated.';
 
   @override
   String get syncSectionTitle => 'Sync';
@@ -1470,7 +1474,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultUnlockAction => 'Unlock';
 
   @override
-  String get vaultUnlockWithDeviceAction => 'Unlock with device';
+  String get vaultUnlockWithDeviceAction => 'Use biometrics';
 
   @override
   String get vaultUseRecoveryCodeAction => 'Use recovery code';
@@ -1492,15 +1496,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultLocalUnlockNotEnabledError =>
-      'Local vault unlock is not enabled on this device.';
+      'Biometric vault unlock is not enabled on this device.';
 
   @override
   String get vaultLocalUnlockFailedError =>
-      'Local vault unlock failed. Use the vault passphrase.';
+      'Biometric unlock failed. Use the vault passphrase.';
 
   @override
   String get vaultLocalUnlockUnavailableError =>
-      'Local secure storage is not available on this device.';
+      'Face ID or Touch ID is not available on this device.';
 
   @override
   String get vaultEmptyPassphraseError => 'Vault passphrase cannot be empty.';

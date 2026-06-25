@@ -9,6 +9,7 @@ import 'package:serlink/features/sync/domain/sync_provider.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_record_repository.dart';
 import 'package:serlink/features/vault/application/vault_service.dart';
+import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
 
 void main() {
   late Directory tempDir;
@@ -60,6 +61,23 @@ void main() {
       expect(syncVaultId(discovery!.header), manifest.vaultId);
     },
   );
+
+  test('drops remote local unlock protectors during discovery', () async {
+    await vault.enableLocalUnlock(secrets: InMemorySecretStore());
+    final manifest = await provider.readManifest();
+    expect(manifest, isNotNull);
+    expect(vault.header!.localUnlockProtectors, isNotEmpty);
+    await provider.writeObject(
+      RemoteObjectRef(manifest!.headerPath!),
+      utf8.encode(jsonEncode(vault.header!.toJson())),
+    );
+
+    final discovery = await RemoteVaultDiscoveryService(provider).discover();
+
+    expect(discovery, isNotNull);
+    expect(discovery!.header.localUnlockProtectors, isEmpty);
+    expect(syncVaultId(discovery.header), manifest.vaultId);
+  });
 
   test(
     'rejects manifest header paths outside the sync header directory',

@@ -1104,6 +1104,9 @@ void main() {
       await sourceContainer
           .read(syncRunServiceProvider)
           .syncEncryptedSnapshot(LocalDirectorySyncProvider(remoteDir));
+      final latestFingerprint = manifestFingerprint(
+        (await LocalDirectorySyncProvider(remoteDir).readManifest())!,
+      );
       expect([
         for (final ref in await LocalDirectorySyncProvider(
           remoteDir,
@@ -1118,7 +1121,16 @@ void main() {
       targetContainer
           .read(cloudKitEncryptedSnapshotPrefetchControllerProvider.notifier)
           .refreshNow();
-      await _waitForObjectRead(counters);
+      await _waitForStagedSnapshot(
+        targetContainer,
+        syncVaultId(
+          targetContainer
+              .read(vaultSessionControllerProvider.notifier)
+              .service
+              .header!,
+        ),
+        expectedFingerprint: latestFingerprint,
+      );
 
       counters.reset();
       await targetContainer

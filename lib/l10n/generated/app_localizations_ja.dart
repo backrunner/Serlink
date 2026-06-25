@@ -211,23 +211,27 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsRecoverResetAction => '復旧 / リセット';
 
   @override
-  String get settingsLocalUnlockTitle => 'ローカル解除';
+  String get settingsLocalUnlockTitle => '生体認証解除';
 
   @override
-  String get settingsLocalUnlockSemantics => 'ローカル解除を有効にする';
+  String get settingsLocalUnlockSemantics => '生体認証解除を有効にする';
 
   @override
-  String get settingsLocalUnlockNeedsVault =>
-      'デバイス保護のローカル解除を有効にする前にボールトを作成してください。';
+  String get settingsLocalUnlockNeedsVault => '生体認証解除を有効にする前にボールトを作成してください。';
 
   @override
-  String get settingsLocalUnlockEnabled => '有効です。ボールトをロックすると、このデバイスで解除できます。';
+  String get settingsLocalUnlockEnabled =>
+      '有効です。ボールトをロックすると Face ID または Touch ID で解除できます。';
+
+  @override
+  String get settingsLocalUnlockUnavailable =>
+      'このデバイスでは Face ID または Touch ID を利用できません。';
 
   @override
   String get settingsLocalUnlockDisabled => '無効です。ロック後はパスフレーズまたは復旧キーが必要です。';
 
   @override
-  String get settingsUnlockWithDeviceAction => 'デバイスで解除';
+  String get settingsUnlockWithDeviceAction => '生体認証を使用';
 
   @override
   String get settingsHostKeyConfirmationTitle => 'ホストキー確認';
@@ -292,17 +296,18 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAppVersionUnavailable => 'バージョン情報を取得できません';
 
   @override
-  String get settingsEnableLocalUnlockTitle => 'ローカル解除を有効にしますか？';
+  String get settingsEnableLocalUnlockTitle => '生体認証解除を有効にしますか？';
 
   @override
-  String get settingsDisableLocalUnlockTitle => 'ローカル解除を無効にしますか？';
+  String get settingsDisableLocalUnlockTitle => '生体認証解除を無効にしますか？';
 
   @override
   String get settingsEnableLocalUnlockBody =>
-      'Serlink は OS の安全なストレージにランダムなデバイスキーを保存します。ボールトのパスフレーズは保存されません。';
+      'Serlink は Face ID または Touch ID で保護されたランダムなデバイスキーを保存します。ボールトのパスフレーズは保存されません。';
 
   @override
-  String get settingsDisableLocalUnlockBody => 'このデバイスキーを削除します。既存の接続は動作を続けます。';
+  String get settingsDisableLocalUnlockBody =>
+      '生体認証で保護されたデバイスキーを削除します。既存の接続は動作を続けます。';
 
   @override
   String get settingsEnableAction => '有効にする';
@@ -312,20 +317,20 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsLocalUnlockEnabledSnack =>
-      'ローカル解除を有効にしました。ボールトをロックするとデバイス解除を使用できます。';
+      '生体認証解除を有効にしました。ボールトをロックすると Face ID または Touch ID を使用できます。';
 
   @override
-  String get settingsLocalUnlockVerifyFailedSnack => 'ローカル解除を確認できませんでした。';
+  String get settingsLocalUnlockVerifyFailedSnack => '生体認証解除を確認できませんでした。';
 
   @override
-  String get settingsLocalUnlockDisabledSnack => 'ローカル解除を無効にしました。';
+  String get settingsLocalUnlockDisabledSnack => '生体認証解除を無効にしました。';
 
   @override
   String get settingsLocalUnlockStillAvailableSnack =>
-      'このデバイスではローカル解除がまだ利用できます。';
+      'このデバイスでは生体認証解除がまだ利用できます。';
 
   @override
-  String get settingsLocalUnlockUpdateFailed => 'ローカル解除を更新できませんでした。';
+  String get settingsLocalUnlockUpdateFailed => '生体認証解除を更新できませんでした。';
 
   @override
   String get syncSectionTitle => '同期';
@@ -1390,7 +1395,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultUnlockAction => '解除';
 
   @override
-  String get vaultUnlockWithDeviceAction => 'デバイスで解除';
+  String get vaultUnlockWithDeviceAction => '生体認証を使用';
 
   @override
   String get vaultUseRecoveryCodeAction => '復旧コードを使用';
@@ -1408,15 +1413,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultInvalidRecoveryKeyFormatError => 'この復旧キー形式はサポートされていません。';
 
   @override
-  String get vaultLocalUnlockNotEnabledError => 'このデバイスではローカル解除が有効ではありません。';
+  String get vaultLocalUnlockNotEnabledError => 'このデバイスでは生体認証解除が有効ではありません。';
 
   @override
   String get vaultLocalUnlockFailedError =>
-      'ローカル解除に失敗しました。ボールトのパスフレーズを使用してください。';
+      '生体認証解除に失敗しました。ボールトのパスフレーズを使用してください。';
 
   @override
   String get vaultLocalUnlockUnavailableError =>
-      'このデバイスではローカルな安全な保存領域を利用できません。';
+      'このデバイスでは Face ID または Touch ID を利用できません。';
 
   @override
   String get vaultEmptyPassphraseError => 'ボールトのパスフレーズは空にできません。';

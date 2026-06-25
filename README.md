@@ -23,7 +23,7 @@ Desktop remains the primary production target. The iOS code path is present for 
 
 - Encrypted vault with lock/unlock flows
 - Recovery key support
-- Device-local unlock protector via OS secure storage
+- Biometric vault unlock protector via OS secure storage
 - Encrypted Drift/SQLite record storage
 - Encrypted backup export/import
 - Encrypted known-host storage

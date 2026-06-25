@@ -161,14 +161,23 @@ class InMemoryVaultService implements VaultService {
   @override
   Future<void> unlockWithLocalKey({required SecretStore secrets}) async {
     final header = _requireHeader();
-    if (header.localUnlockProtectors.isEmpty) {
+    final protectors = _biometricProtectors(header);
+    if (protectors.isEmpty) {
       throw const VaultException(
         'vault.local_unlock_not_enabled',
-        'Local vault unlock is not enabled on this device.',
+        'Biometric vault unlock is not enabled on this device.',
       );
     }
-    for (final protector in header.localUnlockProtectors) {
-      final secretBytes = await secrets.read(protector.secretRef);
+    for (final protector in protectors) {
+      final List<int>? secretBytes;
+      try {
+        secretBytes = await secrets.read(
+          protector.secretRef,
+          protection: SecretProtection.biometricCurrentSet,
+        );
+      } on Object {
+        continue;
+      }
       if (secretBytes == null) {
         continue;
       }
@@ -194,7 +203,7 @@ class InMemoryVaultService implements VaultService {
     }
     throw const VaultException(
       'vault.local_unlock_failed',
-      'Local vault unlock failed. Use the vault passphrase.',
+      'Biometric unlock failed. Use the vault passphrase.',
     );
   }
 
@@ -212,11 +221,17 @@ class InMemoryVaultService implements VaultService {
       return false;
     }
     final capabilities = await secrets.capabilities();
-    if (!capabilities.available) {
+    if (!capabilities.available ||
+        !capabilities.deviceLocal ||
+        !capabilities.biometricGate) {
       return false;
     }
-    for (final protector in header.localUnlockProtectors) {
-      if (await secrets.read(protector.secretRef) != null) {
+    for (final protector in _biometricProtectors(header)) {
+      if (await _containsSecret(
+        secrets,
+        protector.secretRef,
+        protection: SecretProtection.biometricCurrentSet,
+      )) {
         return true;
       }
     }
@@ -227,22 +242,40 @@ class InMemoryVaultService implements VaultService {
   Future<VaultHeader> enableLocalUnlock({required SecretStore secrets}) async {
     final rootKey = _requireRootKey();
     final capabilities = await secrets.capabilities();
-    if (!capabilities.available || !capabilities.deviceLocal) {
+    if (!capabilities.available ||
+        !capabilities.deviceLocal ||
+        !capabilities.biometricGate) {
       throw const VaultException(
         'vault.local_unlock_unavailable',
-        'Local secure storage is not available on this device.',
+        'Biometric secure storage is not available on this device.',
       );
     }
     final header = _requireHeader();
+    for (final protector in _biometricProtectors(header)) {
+      if (await _containsSecret(
+        secrets,
+        protector.secretRef,
+        protection: SecretProtection.biometricCurrentSet,
+      )) {
+        final nextHeader = header.localUnlockProtectors.length == 1
+            ? header
+            : header.copyWith(localUnlockProtectors: [protector]);
+        _header = nextHeader;
+        return nextHeader;
+      }
+    }
     for (final protector in header.localUnlockProtectors) {
-      if (await secrets.read(protector.secretRef) != null) {
-        return header;
+      try {
+        await secrets.delete(protector.secretRef);
+      } on Object {
+        // The next header will stop referencing this stale local secret. Do not
+        // block re-enabling biometric unlock on best-effort cleanup.
       }
     }
 
     final deviceSecretBytes = _randomBytes(config.rootKeyLength);
     final secretRef = SecretRef(
-      'vault/local-unlock/${_base64UrlNoPadding(_randomBytes(16))}',
+      'vault/biometric-unlock/${_base64UrlNoPadding(_randomBytes(16))}',
     );
     final deviceSecret = SecretKey(deviceSecretBytes);
     try {
@@ -253,10 +286,13 @@ class InMemoryVaultService implements VaultService {
         nonce: _cipher.newNonce(),
         aad: _localUnlockRootKeyAad,
       );
-      await secrets.write(secretRef, deviceSecretBytes);
+      await secrets.write(
+        secretRef,
+        deviceSecretBytes,
+        protection: SecretProtection.biometricCurrentSet,
+      );
       final nextHeader = header.copyWith(
         localUnlockProtectors: [
-          ...header.localUnlockProtectors,
           VaultLocalUnlockProtector(
             id: _base64UrlNoPadding(_randomBytes(16)),
             secretRef: secretRef,
@@ -264,6 +300,7 @@ class InMemoryVaultService implements VaultService {
             mac: List<int>.unmodifiable(box.mac.bytes),
             ciphertext: List<int>.unmodifiable(box.cipherText),
             createdAt: DateTime.now().toUtc(),
+            protection: VaultLocalUnlockProtection.biometricCurrentSet,
           ),
         ],
       );
@@ -277,11 +314,17 @@ class InMemoryVaultService implements VaultService {
   @override
   Future<VaultHeader> disableLocalUnlock({required SecretStore secrets}) async {
     final header = _requireHeader();
-    for (final protector in header.localUnlockProtectors) {
-      await secrets.delete(protector.secretRef);
-    }
     final nextHeader = header.copyWith(localUnlockProtectors: const []);
     _header = nextHeader;
+    for (final protector in header.localUnlockProtectors) {
+      try {
+        await secrets.delete(protector.secretRef);
+      } on Object {
+        // The header no longer references this local secret. Cleanup remains
+        // best effort so disabling biometric unlock cannot be blocked by a
+        // transient Keychain failure.
+      }
+    }
     return nextHeader;
   }
 
@@ -439,6 +482,27 @@ class InMemoryVaultService implements VaultService {
     }
     _state = nextState;
     _stateController.add(nextState);
+  }
+}
+
+List<VaultLocalUnlockProtector> _biometricProtectors(VaultHeader header) {
+  return [
+    for (final protector in header.localUnlockProtectors)
+      if (protector.protection ==
+          VaultLocalUnlockProtection.biometricCurrentSet)
+        protector,
+  ];
+}
+
+Future<bool> _containsSecret(
+  SecretStore secrets,
+  SecretRef ref, {
+  required SecretProtection protection,
+}) async {
+  try {
+    return await secrets.contains(ref, protection: protection);
+  } on Object {
+    return false;
   }
 }
 

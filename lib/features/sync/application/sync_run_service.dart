@@ -929,7 +929,7 @@ class SyncRunService {
               ),
             )
             as Map<String, Object?>,
-      );
+      ).copyWith(localUnlockProtectors: const []);
     } on Object {
       return null;
     }

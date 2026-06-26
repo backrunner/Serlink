@@ -376,6 +376,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get syncSectionTitle => 'Sync';
 
   @override
+  String get syncLoadingSettings => 'Loading sync settings.';
+
+  @override
   String get syncLoadingEncryptedSettings => 'Loading encrypted sync settings.';
 
   @override

@@ -742,6 +742,12 @@ abstract class AppLocalizations {
   /// **'Sync'**
   String get syncSectionTitle;
 
+  /// No description provided for @syncLoadingSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading sync settings.'**
+  String get syncLoadingSettings;
+
   /// No description provided for @syncLoadingEncryptedSettings.
   ///
   /// In en, this message translates to:

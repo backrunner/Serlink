@@ -76,6 +76,28 @@ void main() {
     expect(emitted, isEmpty);
   });
 
+  test('does not emit change events for local WebDAV sync setting', () async {
+    final envelope = await vault.encryptRecord(
+      id: webDavSyncSettingsRecordId,
+      type: EncryptedSyncSettingsRepository.recordType,
+      plaintext: utf8.encode(
+        jsonEncode({
+          'endpoint': 'https://dav.example.test',
+          'username': 'ops',
+          'basePath': '/serlink',
+          'passwordRef': 'sync:webdav:password',
+          'allowInsecureHttp': false,
+          'enabled': true,
+          'updatedAt': DateTime.utc(2026, 6, 25).toIso8601String(),
+        }),
+      ),
+    );
+
+    await repository.upsert(envelope);
+
+    expect(emitted, isEmpty);
+  });
+
   test('emits change events for record deletes', () async {
     final envelope = await vault.encryptRecord(
       id: VaultRecordId('host:prod'),

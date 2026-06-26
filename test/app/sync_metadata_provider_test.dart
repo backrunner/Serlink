@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/database/serlink_database.dart';
+import 'package:serlink/features/sync/application/sync_settings_service.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
 import 'package:serlink/features/sync/data/local_sync_provider.dart';
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
@@ -151,6 +152,103 @@ void main() {
 
     final settings = await container.read(cloudKitSyncSettingsProvider.future);
     expect(settings?.enabled, isFalse);
+    expect(
+      container.read(vaultSessionControllerProvider).requireValue.vaultState,
+      VaultState.locked,
+    );
+  });
+
+  test('WebDAV sync setting can change before local vault exists', () async {
+    final database = SerlinkDatabase(NativeDatabase.memory());
+    final transferQueue = TransferQueueController();
+    final container = ProviderContainer(
+      overrides: [
+        serlinkDatabaseProvider.overrideWithValue(database),
+        vaultCryptoConfigProvider.overrideWithValue(
+          const VaultCryptoConfig.testing(),
+        ),
+        platformCapabilitiesProvider.overrideWithValue(
+          const PlatformCapabilities(
+            operatingSystem: 'macos',
+            targetPlatform: TargetPlatform.macOS,
+          ),
+        ),
+        cloudKitAvailabilityCheckProvider.overrideWithValue(() async => false),
+        secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+        transferQueueControllerProvider.overrideWithValue(transferQueue),
+        autoSyncEnabledProvider.overrideWithValue(false),
+        cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
+      ],
+    );
+    addTearDown(container.dispose);
+    addTearDown(transferQueue.dispose);
+    addTearDown(database.close);
+
+    await container.read(vaultSessionControllerProvider.future);
+    await container
+        .read(syncSettingsServiceProvider)
+        .saveWebDav(
+          const WebDavSyncSettingsDraft(
+            endpoint: 'https://dav.example.test',
+            username: 'ops',
+            password: 'server-password',
+            enabled: false,
+          ),
+        );
+
+    final settings = await container.read(webDavSyncSettingsProvider.future);
+    expect(settings?.endpoint.host, 'dav.example.test');
+    expect(settings?.enabled, isFalse);
+    expect(
+      container.read(vaultSessionControllerProvider).requireValue.vaultState,
+      VaultState.uninitialized,
+    );
+  });
+
+  test('WebDAV sync setting remains readable while vault is locked', () async {
+    final database = SerlinkDatabase(NativeDatabase.memory());
+    final transferQueue = TransferQueueController();
+    final container = ProviderContainer(
+      overrides: [
+        serlinkDatabaseProvider.overrideWithValue(database),
+        vaultCryptoConfigProvider.overrideWithValue(
+          const VaultCryptoConfig.testing(),
+        ),
+        platformCapabilitiesProvider.overrideWithValue(
+          const PlatformCapabilities(
+            operatingSystem: 'macos',
+            targetPlatform: TargetPlatform.macOS,
+          ),
+        ),
+        cloudKitAvailabilityCheckProvider.overrideWithValue(() async => false),
+        secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+        transferQueueControllerProvider.overrideWithValue(transferQueue),
+        autoSyncEnabledProvider.overrideWithValue(false),
+        cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
+      ],
+    );
+    addTearDown(container.dispose);
+    addTearDown(transferQueue.dispose);
+    addTearDown(database.close);
+
+    await container.read(vaultSessionControllerProvider.future);
+    await container
+        .read(syncSettingsServiceProvider)
+        .saveWebDav(
+          const WebDavSyncSettingsDraft(
+            endpoint: 'https://dav.example.test',
+            username: 'ops',
+            password: 'server-password',
+          ),
+        );
+    await container
+        .read(vaultSessionControllerProvider.notifier)
+        .initialize(passphrase: 'good passphrase');
+    await container.read(vaultSessionControllerProvider.notifier).lock();
+
+    final settings = await container.read(webDavSyncSettingsProvider.future);
+    expect(settings?.endpoint.host, 'dav.example.test');
+    expect(settings?.enabled, isTrue);
     expect(
       container.read(vaultSessionControllerProvider).requireValue.vaultState,
       VaultState.locked,

@@ -107,6 +107,7 @@
   "settingsLocalUnlockUpdateFailed": "生体認証解除を更新できませんでした。",
   "copyAction": "コピー",
   "syncSectionTitle": "同期",
+  "syncLoadingSettings": "同期設定を読み込んでいます。",
   "syncLoadingEncryptedSettings": "暗号化された同期設定を読み込んでいます。",
   "syncConfigureAction": "構成",
   "syncEditAction": "編集",

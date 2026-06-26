@@ -1390,7 +1390,8 @@ bool _isLocalOnlySnapshotRecord({
   required String type,
 }) {
   return isLocalOnlySyncRecord(id: id, type: type) ||
-      id == tombstoneRecordId(cloudKitSyncSettingsRecordId);
+      id == tombstoneRecordId(cloudKitSyncSettingsRecordId) ||
+      id == tombstoneRecordId(webDavSyncSettingsRecordId);
 }
 
 bool _isRemoteManifestWriteConflict(SyncProviderException error) {

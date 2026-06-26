@@ -346,6 +346,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get syncSectionTitle => '同期';
 
   @override
+  String get syncLoadingSettings => '同期設定を読み込んでいます。';
+
+  @override
   String get syncLoadingEncryptedSettings => '暗号化された同期設定を読み込んでいます。';
 
   @override

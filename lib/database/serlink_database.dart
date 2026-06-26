@@ -80,8 +80,10 @@ class QuarantinedRecords extends Table {
 class SerlinkDatabase extends _$SerlinkDatabase {
   SerlinkDatabase([QueryExecutor? executor]) : super(executor ?? _open());
 
+  static const currentSchemaVersion = 5;
+
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => currentSchemaVersion;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -105,6 +107,10 @@ class SerlinkDatabase extends _$SerlinkDatabase {
       if (current == 3 && to >= 4) {
         await _createLocalPreferenceTables();
         current = 4;
+      }
+      if (current == 4 && to >= 5) {
+        await _createLocalWebDavSyncSettingsTable();
+        current = 5;
       }
       if (current == to) {
         return;
@@ -175,8 +181,19 @@ CREATE TABLE IF NOT EXISTS local_cloudkit_sync_settings (
   updated_at TEXT NOT NULL
 )
 ''');
+    await _createLocalWebDavSyncSettingsTable();
     await customStatement('''
 CREATE TABLE IF NOT EXISTS local_terminal_display_settings (
+  id TEXT NOT NULL PRIMARY KEY,
+  json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)
+''');
+  }
+
+  Future<void> _createLocalWebDavSyncSettingsTable() async {
+    await customStatement('''
+CREATE TABLE IF NOT EXISTS local_webdav_sync_settings (
   id TEXT NOT NULL PRIMARY KEY,
   json TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -224,7 +241,7 @@ LazyDatabase _open() {
     await DatabaseMigrationPreflight(
       databaseFile: paths.databaseFile,
       automaticBackupDirectory: paths.automaticBackupDirectory,
-    ).run(targetSchemaVersion: 3);
+    ).run(targetSchemaVersion: SerlinkDatabase.currentSchemaVersion);
     final database = NativeDatabase.createInBackground(
       paths.databaseFile,
     ).interceptWith(_CloseCallbackQueryInterceptor(profileLock.release));

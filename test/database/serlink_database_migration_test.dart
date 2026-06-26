@@ -7,7 +7,7 @@ import 'package:serlink/database/serlink_database.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 void main() {
-  test('migrates v2 databases to v4 auxiliary and preference tables', () async {
+  test('migrates v2 databases to v5 auxiliary and preference tables', () async {
     final tempDir = await Directory.systemTemp.createTemp(
       'serlink-database-migration-test-',
     );
@@ -23,7 +23,7 @@ void main() {
     addTearDown(database.close);
     await database.customSelect('SELECT 1').get();
 
-    expect(await _userVersion(file), 4);
+    expect(await _userVersion(file), 5);
     expect(
       await _tableNames(file),
       containsAll(<String>[
@@ -32,12 +32,13 @@ void main() {
         'sync_pending_resets',
         'cloudkit_sync_shadow_settings',
         'local_cloudkit_sync_settings',
+        'local_webdav_sync_settings',
         'local_terminal_display_settings',
       ]),
     );
   });
 
-  test('migrates v3 databases to v4 local preference tables', () async {
+  test('migrates v3 databases to v5 local preference tables', () async {
     final tempDir = await Directory.systemTemp.createTemp(
       'serlink-database-migration-test-',
     );
@@ -53,13 +54,37 @@ void main() {
     addTearDown(database.close);
     await database.customSelect('SELECT 1').get();
 
-    expect(await _userVersion(file), 4);
+    expect(await _userVersion(file), 5);
     expect(
       await _tableNames(file),
       containsAll([
         'local_cloudkit_sync_settings',
+        'local_webdav_sync_settings',
         'local_terminal_display_settings',
       ]),
+    );
+  });
+
+  test('migrates v4 databases to v5 local WebDAV settings table', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'serlink-database-migration-test-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final file = File(p.join(tempDir.path, 'serlink.sqlite'));
+    _createV4Database(file);
+
+    final database = SerlinkDatabase(NativeDatabase(file));
+    addTearDown(database.close);
+    await database.customSelect('SELECT 1').get();
+
+    expect(await _userVersion(file), 5);
+    expect(
+      await _tableNames(file),
+      containsAll(['local_webdav_sync_settings']),
     );
   });
 }
@@ -167,6 +192,31 @@ CREATE TABLE cloudkit_sync_shadow_settings (
 )
 ''')
       ..execute('PRAGMA user_version = 3');
+  } finally {
+    database.close();
+  }
+}
+
+void _createV4Database(File file) {
+  _createV3Database(file);
+  final database = sqlite3.open(file.path);
+  try {
+    database
+      ..execute('''
+CREATE TABLE local_cloudkit_sync_settings (
+  id TEXT NOT NULL PRIMARY KEY,
+  enabled INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)
+''')
+      ..execute('''
+CREATE TABLE local_terminal_display_settings (
+  id TEXT NOT NULL PRIMARY KEY,
+  json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)
+''')
+      ..execute('PRAGMA user_version = 4');
   } finally {
     database.close();
   }

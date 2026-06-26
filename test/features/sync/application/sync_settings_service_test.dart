@@ -9,6 +9,7 @@ import 'package:serlink/features/vault/application/in_memory_vault_service.dart'
 import 'package:serlink/features/vault/application/vault_record_repository.dart';
 import 'package:serlink/features/vault/application/vault_service.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
+import 'package:serlink/platform/secret_store.dart';
 
 void main() {
   late InMemoryVaultService vault;
@@ -21,47 +22,121 @@ void main() {
     await vault.initialize(passphrase: 'passphrase');
     records = InMemoryVaultRecordRepository();
     secrets = InMemorySecretStore();
-    final encryptedSettings = EncryptedSyncSettingsRepository(
-      vault: vault,
-      records: records,
-    );
     service = SyncSettingsService(
-      settings: encryptedSettings,
+      settings: _InMemorySyncSettingsRepository(),
       cloudKitSettings: _InMemoryCloudKitSyncSettingsRepository(),
       secrets: secrets,
     );
   });
 
+  test('saves WebDAV settings outside the encrypted vault', () async {
+    final settings = await service.saveWebDav(
+      const WebDavSyncSettingsDraft(
+        endpoint: 'https://dav.example.test/remote.php/dav',
+        username: 'ops',
+        password: 'server-password',
+        basePath: 'serlink-sync',
+      ),
+    );
+
+    expect(settings.endpoint.scheme, 'https');
+    expect(settings.basePath, '/serlink-sync');
+
+    final storedPassword = await secrets.read(settings.passwordRef);
+    expect(utf8.decode(storedPassword!), 'server-password');
+
+    expect(await records.read(webDavSyncSettingsRecordId), isNull);
+
+    final restored = await service.readWebDav();
+    expect(restored!.endpoint.host, 'dav.example.test');
+    expect(restored.username, 'ops');
+    expect(restored.pinnedCertificateFingerprint, isNull);
+  });
+
   test(
-    'saves WebDAV settings encrypted and stores password in secret store',
+    'saves WebDAV setting without an initialized or unlocked vault',
     () async {
-      final settings = await service.saveWebDav(
+      final lockedVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await lockedVault.initialize(passphrase: 'passphrase');
+      await lockedVault.lock();
+      final lockedService = SyncSettingsService(
+        settings: _InMemorySyncSettingsRepository(),
+        cloudKitSettings: _InMemoryCloudKitSyncSettingsRepository(),
+        secrets: secrets,
+      );
+
+      await lockedService.saveWebDav(
         const WebDavSyncSettingsDraft(
-          endpoint: 'https://dav.example.test/remote.php/dav',
+          endpoint: 'https://dav.example.test',
           username: 'ops',
           password: 'server-password',
-          basePath: 'serlink-sync',
+          enabled: false,
         ),
       );
 
-      expect(settings.endpoint.scheme, 'https');
-      expect(settings.basePath, '/serlink-sync');
+      expect((await lockedService.readWebDav())!.enabled, isFalse);
+      expect(lockedVault.state, VaultState.locked);
 
-      final storedPassword = await secrets.read(settings.passwordRef);
-      expect(utf8.decode(storedPassword!), 'server-password');
-
-      final envelopes = await records.list(
-        type: EncryptedSyncSettingsRepository.recordType,
+      final uninitializedVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
       );
-      expect(envelopes, hasLength(1));
-      final serializedEnvelope = jsonEncode(envelopes.single.toJson());
-      expect(serializedEnvelope, isNot(contains('server-password')));
-      expect(serializedEnvelope, isNot(contains('dav.example.test')));
+      final uninitializedService = SyncSettingsService(
+        settings: _InMemorySyncSettingsRepository(),
+        cloudKitSettings: _InMemoryCloudKitSyncSettingsRepository(),
+        secrets: secrets,
+      );
 
-      final restored = await service.readWebDav();
-      expect(restored!.endpoint.host, 'dav.example.test');
-      expect(restored.username, 'ops');
-      expect(restored.pinnedCertificateFingerprint, isNull);
+      await uninitializedService.saveWebDav(
+        const WebDavSyncSettingsDraft(
+          endpoint: 'https://dav2.example.test',
+          username: 'deploy',
+          password: 'server-password',
+        ),
+      );
+
+      expect(
+        (await uninitializedService.readWebDav())!.endpoint.host,
+        'dav2.example.test',
+      );
+      expect(uninitializedVault.state, VaultState.uninitialized);
+    },
+  );
+
+  test(
+    'migrates legacy encrypted WebDAV setting into local settings',
+    () async {
+      final legacy = EncryptedSyncSettingsRepository(
+        vault: vault,
+        records: records,
+      );
+      final local = _InMemorySyncSettingsRepository();
+      await legacy.saveWebDav(
+        WebDavSyncSettings(
+          endpoint: Uri.parse('https://dav.example.test'),
+          username: 'ops',
+          basePath: '/serlink',
+          passwordRef: const SecretRef('sync:webdav:password'),
+          allowInsecureHttp: false,
+          enabled: true,
+          updatedAt: DateTime.utc(2026, 6, 26, 12),
+        ),
+      );
+      final migratingService = SyncSettingsService(
+        settings: MigratingWebDavSyncSettingsRepository(
+          primary: local,
+          legacy: legacy,
+        ),
+        cloudKitSettings: _InMemoryCloudKitSyncSettingsRepository(),
+        secrets: secrets,
+      );
+
+      final migrated = await migratingService.readWebDav();
+
+      expect(migrated!.endpoint.host, 'dav.example.test');
+      expect((await local.readWebDav())!.enabled, isTrue);
+      expect(await records.read(webDavSyncSettingsRecordId), isNull);
     },
   );
 
@@ -381,5 +456,22 @@ class _InMemoryCloudKitSyncSettingsRepository
   @override
   Future<void> deleteCloudKit() async {
     _settings = null;
+  }
+}
+
+class _InMemorySyncSettingsRepository implements SyncSettingsRepository {
+  WebDavSyncSettings? _webDav;
+
+  @override
+  Future<WebDavSyncSettings?> readWebDav() async => _webDav;
+
+  @override
+  Future<void> saveWebDav(WebDavSyncSettings settings) async {
+    _webDav = settings;
+  }
+
+  @override
+  Future<void> deleteWebDav() async {
+    _webDav = null;
   }
 }

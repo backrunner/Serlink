@@ -176,6 +176,93 @@ void main() {
     );
   });
 
+  test('push does not publish local WebDAV sync setting', () async {
+    final localWebDavSetting = await vault.encryptRecord(
+      id: webDavSyncSettingsRecordId,
+      type: EncryptedSyncSettingsRepository.recordType,
+      plaintext: utf8.encode(
+        jsonEncode({
+          'endpoint': 'https://dav.example.test',
+          'username': 'ops',
+          'basePath': '/serlink',
+          'passwordRef': 'sync:webdav:password',
+          'allowInsecureHttp': false,
+          'enabled': true,
+          'updatedAt': DateTime.utc(2026, 6, 25).toIso8601String(),
+        }),
+      ),
+    );
+    await records.upsert(localWebDavSetting);
+    final envelope = await vault.encryptRecord(
+      id: VaultRecordId('host:webdav-local-setting'),
+      type: 'host',
+      plaintext: utf8.encode('{"hostname":"webdav-local.example.test"}'),
+    );
+    await records.upsert(envelope);
+
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final result = await service.pushEncryptedSnapshot(provider);
+
+    expect(result.recordsUploaded, 1);
+    final manifestIds = await _manifestRecordIds(
+      provider: provider,
+      vault: vault,
+    );
+    expect(manifestIds, contains(envelope.id.value));
+    expect(manifestIds, isNot(contains(webDavSyncSettingsRecordValue)));
+  });
+
+  test('push does not publish local sync setting tombstones', () async {
+    final tombstones = EncryptedSyncDeleteTombstoneRepository(
+      vault: vault,
+      records: records,
+    );
+    await tombstones.save(
+      SyncDeleteTombstone(
+        targetRecordId: cloudKitSyncSettingsRecordId,
+        targetRecordType: EncryptedSyncSettingsRepository.recordType,
+        deletedAt: DateTime.utc(2026, 6, 25),
+      ),
+    );
+    await tombstones.save(
+      SyncDeleteTombstone(
+        targetRecordId: webDavSyncSettingsRecordId,
+        targetRecordType: EncryptedSyncSettingsRepository.recordType,
+        deletedAt: DateTime.utc(2026, 6, 25),
+      ),
+    );
+    final envelope = await vault.encryptRecord(
+      id: VaultRecordId('host:with-local-settings-tombstones'),
+      type: 'host',
+      plaintext: utf8.encode('{"hostname":"tombstone.example.test"}'),
+    );
+    await records.upsert(envelope);
+
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final result = await service.pushEncryptedSnapshot(provider);
+
+    expect(result.recordsUploaded, 1);
+    final manifestIds = await _manifestRecordIds(
+      provider: provider,
+      vault: vault,
+    );
+    expect(manifestIds, contains(envelope.id.value));
+    expect(
+      manifestIds,
+      isNot(contains(tombstoneRecordId(cloudKitSyncSettingsRecordId).value)),
+    );
+    expect(
+      manifestIds,
+      isNot(contains(tombstoneRecordId(webDavSyncSettingsRecordId).value)),
+    );
+    expect(
+      (await provider.listRecordObjects(
+        prefix: 'records/',
+      )).map((ref) => ref.path),
+      isNot(contains(startsWith('records/sync%3Atombstone%3Async'))),
+    );
+  });
+
   test('sync uploads local changes after iCloud sync is re-enabled', () async {
     final provider = LocalDirectorySyncProvider(tempDir);
     final remoteRecords = InMemoryVaultRecordRepository();

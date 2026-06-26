@@ -107,6 +107,7 @@
   "settingsLocalUnlockUpdateFailed": "无法更新生物解锁。",
   "copyAction": "复制",
   "syncSectionTitle": "同步",
+  "syncLoadingSettings": "正在加载同步设置。",
   "syncLoadingEncryptedSettings": "正在加载加密同步设置。",
   "syncConfigureAction": "配置",
   "syncEditAction": "编辑",

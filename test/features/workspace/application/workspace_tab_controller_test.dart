@@ -66,6 +66,62 @@ void main() {
   );
 
   test(
+    'reuses failed terminal tab when host is opened again from hosts',
+    () async {
+      final service = _FakeSshSessionService()
+        ..shellFailures.add(StateError('network down'));
+      final container = _container(service: service);
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openTerminal(_host);
+      await _drainMicrotasks();
+
+      var state = container.read(workspaceTabControllerProvider);
+      final failedTab = state.activeTab!;
+      final failedContent = failedTab.content as TerminalTabContent;
+      final failedSessionId = failedContent.primaryPane.sessionId;
+      final failedTerminal = container
+          .read(workspaceRuntimeRegistryProvider)
+          .terminalFor(failedSessionId)!;
+
+      expect(failedTab.lifecycle, SessionLifecycleState.failed);
+      expect(failedTerminal.buffer.getText(), contains('Connection failed'));
+      expect(service.openShellCount, 1);
+
+      controller.openTerminal(_host);
+      await _drainMicrotasks();
+
+      state = container.read(workspaceTabControllerProvider);
+      final retriedTab = state.activeTab!;
+      final retriedContent = retriedTab.content as TerminalTabContent;
+      final retriedSessionId = retriedContent.primaryPane.sessionId;
+      final retriedTerminal = container
+          .read(workspaceRuntimeRegistryProvider)
+          .terminalFor(retriedSessionId)!;
+
+      expect(state.tabs, hasLength(1));
+      expect(retriedTab.id, failedTab.id);
+      expect(retriedTab.lifecycle, SessionLifecycleState.connected);
+      expect(retriedSessionId, isNot(failedSessionId));
+      expect(
+        container
+            .read(workspaceRuntimeRegistryProvider)
+            .terminalFor(failedSessionId),
+        isNull,
+      );
+      expect(
+        retriedTerminal.buffer.getText(),
+        isNot(contains('Connection failed')),
+      );
+      expect(service.openShellCount, 2);
+      expect(service.shells, hasLength(1));
+    },
+  );
+
+  test(
     'suspends remote terminal sessions when iOS enters background',
     () async {
       final service = _FakeSshSessionService();

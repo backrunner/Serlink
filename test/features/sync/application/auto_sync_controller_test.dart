@@ -5,6 +5,8 @@ import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/sync/application/auto_sync_controller.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
 import 'package:serlink/features/sync/application/sync_device_service.dart';
+import 'package:serlink/features/sync/application/sync_record_scope.dart';
+import 'package:serlink/features/sync/application/sync_settings_service.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_record_repository.dart';
 import 'package:serlink/features/vault/application/vault_service.dart';
@@ -50,6 +52,23 @@ void main() {
       id: VaultRecordId('sync:device:local'),
       type: EncryptedSyncDeviceRepository.recordType,
       plaintext: utf8.encode('device metadata'),
+    );
+
+    await repository.upsert(envelope);
+
+    expect(emitted, isEmpty);
+  });
+
+  test('does not emit change events for local iCloud sync setting', () async {
+    final envelope = await vault.encryptRecord(
+      id: cloudKitSyncSettingsRecordId,
+      type: EncryptedSyncSettingsRepository.recordType,
+      plaintext: utf8.encode(
+        jsonEncode({
+          'enabled': false,
+          'updatedAt': DateTime.utc(2026, 6, 25).toIso8601String(),
+        }),
+      ),
     );
 
     await repository.upsert(envelope);

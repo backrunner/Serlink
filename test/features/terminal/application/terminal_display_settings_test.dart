@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/core/ids/entity_id.dart';
+import 'package:serlink/database/serlink_database.dart';
 import 'package:serlink/features/terminal/application/terminal_display_settings.dart';
+import 'package:serlink/features/terminal/data/local_terminal_display_settings_repository.dart';
 import 'package:serlink/features/terminal/application/terminal_font_discovery.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_record_repository.dart';
@@ -200,17 +203,11 @@ void main() {
   );
 
   test(
-    'encrypted repository stores terminal settings without plaintext',
+    'local repository stores global terminal settings without vault',
     () async {
-      final vault = InMemoryVaultService(
-        config: const VaultCryptoConfig.testing(),
-      );
-      await vault.initialize(passphrase: 'passphrase');
-      final records = InMemoryVaultRecordRepository();
-      final repository = EncryptedTerminalDisplaySettingsRepository(
-        vault: vault,
-        records: records,
-      );
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = LocalTerminalDisplaySettingsRepository(database);
       const settings = TerminalDisplaySettings(
         themeId: SerlinkTerminalThemeId.highContrast,
         fontFamily: 'JetBrains Mono',
@@ -222,21 +219,71 @@ void main() {
       await repository.save(settings);
 
       final restored = await repository.read();
-      expect(restored!.themeId, SerlinkTerminalThemeId.highContrast);
-      expect(restored.fontFamily, 'JetBrains Mono');
-      expect(restored.fontSize, 18);
-      expect(restored.lineHeight, 1.4);
-      expect(restored.scrollbackLines, 50000);
+      expect(restored, settings);
 
-      final envelopes = await records.list(
-        type: EncryptedTerminalDisplaySettingsRepository.recordType,
-      );
-      expect(envelopes, hasLength(1));
-      final serialized = jsonEncode(envelopes.single.toJson());
-      expect(serialized, isNot(contains('JetBrains Mono')));
-      expect(serialized, isNot(contains('highContrast')));
+      await repository.delete();
+
+      expect(await repository.read(), isNull);
     },
   );
+
+  test('global terminal settings save while vault is uninitialized', () async {
+    final database = SerlinkDatabase(NativeDatabase.memory());
+    final container = ProviderContainer(
+      overrides: [
+        serlinkDatabaseProvider.overrideWithValue(database),
+        terminalFontDiscoveryProvider.overrideWithValue(
+          const TerminalFontDiscovery(fontDirectories: []),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    addTearDown(database.close);
+
+    await container.read(terminalDisplaySettingsProvider.future);
+    container
+        .read(terminalDisplaySettingsProvider.notifier)
+        .setTheme(SerlinkTerminalThemeId.serlinkLight);
+    await Future<void>.delayed(Duration.zero);
+
+    final settings = await container.read(
+      terminalDisplaySettingsProvider.future,
+    );
+    expect(settings.themeId, SerlinkTerminalThemeId.serlinkLight);
+  });
+
+  test('migrates legacy encrypted global terminal settings', () async {
+    final vault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    await vault.initialize(passphrase: 'passphrase');
+    final records = InMemoryVaultRecordRepository();
+    final legacy = EncryptedTerminalDisplaySettingsRepository(
+      vault: vault,
+      records: records,
+    );
+    final database = SerlinkDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final local = LocalTerminalDisplaySettingsRepository(database);
+    final repository = MigratingTerminalDisplaySettingsRepository(
+      primary: local,
+      legacy: legacy,
+    );
+    const settings = TerminalDisplaySettings(
+      themeId: SerlinkTerminalThemeId.highContrast,
+      fontFamily: 'JetBrains Mono',
+      fontSize: 18,
+      lineHeight: 1.4,
+      scrollbackLines: 50000,
+    );
+    await legacy.save(settings);
+
+    final restored = await repository.read();
+
+    expect(restored, settings);
+    expect(await local.read(), settings);
+    expect(await records.read(terminalDisplaySettingsRecordId), isNull);
+  });
 
   test(
     'encrypted repository stores per-host profiles without plaintext',

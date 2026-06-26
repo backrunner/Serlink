@@ -29,6 +29,7 @@ void main() {
   late Directory remoteDir;
 
   setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
     driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
   });
 
@@ -125,6 +126,63 @@ void main() {
         ),
         '{"hostname":"prod.example.test"}',
       );
+    },
+  );
+
+  test(
+    'new Apple device reports when CloudKit vault requires a newer app',
+    () async {
+      final sourceVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await sourceVault.initialize(passphrase: 'passphrase');
+      final provider = LocalDirectorySyncProvider(remoteDir);
+      await SyncRunService(
+        vault: sourceVault,
+        records: InMemoryVaultRecordRepository(),
+      ).pushEncryptedSnapshot(provider);
+      final manifest = (await provider.readManifest())!;
+      await provider.writeObject(
+        RemoteObjectRef(manifest.headerPath!),
+        utf8.encode(
+          jsonEncode(sourceVault.header!.copyWith(schemaVersion: 2).toJson()),
+        ),
+      );
+
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'ios',
+              targetPlatform: TargetPlatform.iOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => LocalDirectorySyncProvider(remoteDir),
+          ),
+          cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      final initial = await container.read(
+        vaultSessionControllerProvider.future,
+      );
+
+      expect(initial.vaultState, VaultState.locked);
+      expect(initial.failureMessage, contains('Update Serlink before syncing'));
+      expect(await DriftVaultHeaderStore(database).read(), isNull);
     },
   );
 
@@ -1137,7 +1195,7 @@ void main() {
           .read(vaultSessionControllerProvider.notifier)
           .unlock(passphrase: 'passphrase');
       expect(counters.manifestReads, isPositive);
-      expect(counters.objectReads, 0);
+      expect(counters.objectReadPaths, isNot(contains(startsWith('records/'))));
 
       final restored = await DriftVaultRecordRepository(
         targetDatabase,
@@ -2616,7 +2674,10 @@ void main() {
       final state = container.read(vaultSessionControllerProvider).requireValue;
       expect(state.vaultState, VaultState.unlocked);
       expect(state.failureMessage, 'Remote sync data changed while syncing.');
-      expect(await container.read(cloudKitSyncSettingsProvider.future), isNull);
+      expect(
+        (await container.read(cloudKitSyncSettingsProvider.future))?.enabled,
+        isTrue,
+      );
       final manifest = await inner.readManifest();
       expect(manifest?.vaultId, syncVaultId(remoteVault.header!));
       final header = VaultHeader.fromJson(
@@ -2817,11 +2878,13 @@ class _CountingSyncProviderCounters {
   int conditionalManifestWrites = 0;
   int manifestReads = 0;
   int objectReads = 0;
+  final List<String> objectReadPaths = [];
 
   void reset() {
     conditionalManifestWrites = 0;
     manifestReads = 0;
     objectReads = 0;
+    objectReadPaths.clear();
   }
 }
 
@@ -2866,6 +2929,7 @@ class _CountingSyncProvider implements SyncProvider {
   Future<List<int>> readObject(RemoteObjectRef ref) async {
     final bytes = await inner.readObject(ref);
     counters.objectReads += 1;
+    counters.objectReadPaths.add(ref.path);
     return bytes;
   }
 

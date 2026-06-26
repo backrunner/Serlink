@@ -53,7 +53,7 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
     required SessionId sessionId,
   }) async {
     final host = await _readHost(hostId);
-    final authMethods = await _authMethodsFor(host);
+    final credentials = await _credentialsFor(host);
     final jumpHosts = await _jumpChainFor(
       host,
       visitingHostIds: {host.id.value},
@@ -65,8 +65,8 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
       hostId: host.id,
       hostname: host.hostname,
       port: host.port,
-      username: host.username,
-      authMethods: authMethods,
+      username: credentials.username,
+      authMethods: credentials.authMethods,
       startupCommands: host.startupCommands,
       jumpHosts: jumpHosts,
       connectTimeout: host.connectionSettings.connectTimeout,
@@ -89,8 +89,9 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
     return host;
   }
 
-  Future<List<SshAuthMethod>> _authMethodsFor(HostConfig host) async {
+  Future<_ResolvedSshCredentials> _credentialsFor(HostConfig host) async {
     final authMethods = <SshAuthMethod>[];
+    String? passwordUsername;
     for (final identityId in host.identityIds) {
       final identity = await _identities.read(identityId);
       if (identity == null) {
@@ -99,6 +100,7 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
           'Identity ${identityId.value} does not exist.',
         );
       }
+      passwordUsername ??= _passwordUsernameFor(identity);
       authMethods.add(await _authMethodFor(identity));
     }
 
@@ -109,7 +111,10 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
       );
     }
 
-    return authMethods;
+    return _ResolvedSshCredentials(
+      username: passwordUsername ?? host.username,
+      authMethods: List<SshAuthMethod>.unmodifiable(authMethods),
+    );
   }
 
   Future<List<SshJumpHostSnapshot>> _jumpChainFor(
@@ -145,19 +150,22 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
           depth: depth + 1,
         ),
       );
-      chain.add(
-        SshJumpHostSnapshot(
-          hostId: jumpHost.id,
-          hostname: jumpHost.hostname,
-          port: jumpHost.port,
-          username: jumpHost.username,
-          authMethods: await _authMethodsFor(jumpHost),
-          connectTimeout: jumpHost.connectionSettings.connectTimeout,
-          keepAliveInterval: jumpHost.connectionSettings.keepAliveInterval,
-        ),
-      );
+      chain.add(await _jumpSnapshotFor(jumpHost));
     }
     return chain;
+  }
+
+  Future<SshJumpHostSnapshot> _jumpSnapshotFor(HostConfig jumpHost) async {
+    final credentials = await _credentialsFor(jumpHost);
+    return SshJumpHostSnapshot(
+      hostId: jumpHost.id,
+      hostname: jumpHost.hostname,
+      port: jumpHost.port,
+      username: credentials.username,
+      authMethods: credentials.authMethods,
+      connectTimeout: jumpHost.connectionSettings.connectTimeout,
+      keepAliveInterval: jumpHost.connectionSettings.keepAliveInterval,
+    );
   }
 
   Future<SshAuthMethod> _authMethodFor(IdentityConfig identity) async {
@@ -246,6 +254,27 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
       await _vault.decryptRecord(envelope),
     );
   }
+}
+
+class _ResolvedSshCredentials {
+  const _ResolvedSshCredentials({
+    required this.username,
+    required this.authMethods,
+  });
+
+  final String username;
+  final List<SshAuthMethod> authMethods;
+}
+
+String? _passwordUsernameFor(IdentityConfig identity) {
+  if (identity.kind != IdentityKind.password) {
+    return null;
+  }
+  final username = identity.usernameHint?.trim();
+  if (username == null || username.isEmpty) {
+    return null;
+  }
+  return username;
 }
 
 extension on IdentitySecretMaterial {

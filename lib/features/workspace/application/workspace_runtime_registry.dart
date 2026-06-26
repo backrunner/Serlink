@@ -41,6 +41,10 @@ class WorkspaceRuntimeRegistry {
     return _terminals[sessionId];
   }
 
+  bool hasAttachedTerminal(SessionId sessionId) {
+    return _terminalAdapters.containsKey(sessionId);
+  }
+
   void writeTerminal(SessionId sessionId, String text) {
     _terminals[sessionId]?.write(text);
   }
@@ -86,6 +90,11 @@ class WorkspaceRuntimeRegistry {
   Future<void> closeSession(SessionId sessionId) async {
     await _terminalAdapters.remove(sessionId)?.close();
     await _sftpConnections.remove(sessionId)?.close();
+  }
+
+  Future<void> discardSession(SessionId sessionId) async {
+    await closeSession(sessionId);
+    _terminals.remove(sessionId);
   }
 
   Future<void> dispose() async {

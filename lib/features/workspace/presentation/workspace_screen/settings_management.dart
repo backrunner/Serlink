@@ -559,15 +559,35 @@ Future<void> _setLocalVaultUnlock(
   WidgetRef ref,
   bool enabled,
 ) async {
+  await _setLocalVaultUnlockWithPrompt(
+    context,
+    ref,
+    enabled,
+    title: null,
+    body: null,
+  );
+}
+
+Future<void> _setLocalVaultUnlockWithPrompt(
+  BuildContext context,
+  WidgetRef ref,
+  bool enabled, {
+  String? title,
+  String? body,
+}) async {
   final l10n = context.l10n;
   final confirmed = await _confirmDialog(
     context,
-    title: enabled
-        ? l10n.settingsEnableLocalUnlockTitle
-        : l10n.settingsDisableLocalUnlockTitle,
-    body: enabled
-        ? l10n.settingsEnableLocalUnlockBody
-        : l10n.settingsDisableLocalUnlockBody,
+    title:
+        title ??
+        (enabled
+            ? l10n.settingsEnableLocalUnlockTitle
+            : l10n.settingsDisableLocalUnlockTitle),
+    body:
+        body ??
+        (enabled
+            ? l10n.settingsEnableLocalUnlockBody
+            : l10n.settingsDisableLocalUnlockBody),
     confirmLabel: enabled
         ? l10n.settingsEnableAction
         : l10n.settingsDisableAction,

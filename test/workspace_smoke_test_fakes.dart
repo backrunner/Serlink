@@ -10,6 +10,14 @@ class _LockedVaultHarness {
   final VaultRecoveryKey recoveryKey;
 }
 
+class _IOSWithoutCloudKitCapabilities extends PlatformCapabilities {
+  const _IOSWithoutCloudKitCapabilities()
+    : super(operatingSystem: 'ios', targetPlatform: TargetPlatform.iOS);
+
+  @override
+  bool get cloudKitSync => false;
+}
+
 class _EmptySyncProvider implements SyncProvider {
   @override
   Future<ProviderCapabilities> capabilities() async {

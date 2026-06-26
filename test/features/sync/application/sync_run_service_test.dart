@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/sync/application/sync_device_service.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
+import 'package:serlink/features/sync/application/sync_record_scope.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
+import 'package:serlink/features/sync/application/sync_settings_service.dart';
 import 'package:serlink/features/sync/data/local_sync_provider.dart';
 import 'package:serlink/features/sync/domain/sync_provider.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
@@ -138,6 +140,260 @@ void main() {
     );
   });
 
+  test('push does not publish local iCloud sync setting', () async {
+    await _saveLegacyCloudKitSettings(
+      vault: vault,
+      records: records,
+      enabled: false,
+    );
+    final envelope = await vault.encryptRecord(
+      id: VaultRecordId('host:cloudkit-local-setting'),
+      type: 'host',
+      plaintext: utf8.encode('{"hostname":"local-setting.example.test"}'),
+    );
+    await records.upsert(envelope);
+
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final result = await service.pushEncryptedSnapshot(provider);
+
+    expect(result.recordsUploaded, 1);
+    final manifest = await provider.readManifest();
+    final manifestEnvelope = VaultRecordEnvelope.fromJson(
+      jsonDecode(utf8.decode(manifest!.encryptedPayload))
+          as Map<String, Object?>,
+    );
+    final manifestData =
+        jsonDecode(utf8.decode(await vault.decryptRecord(manifestEnvelope)))
+            as Map<String, Object?>;
+    final entries = manifestData['records'] as List<Object?>;
+    expect(
+      entries.map((raw) => (raw as Map<String, Object?>)['id']),
+      contains(envelope.id.value),
+    );
+    expect(
+      entries.map((raw) => (raw as Map<String, Object?>)['id']),
+      isNot(contains('sync:cloudkit')),
+    );
+  });
+
+  test('sync uploads local changes after iCloud sync is re-enabled', () async {
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final remoteRecords = InMemoryVaultRecordRepository();
+    await _saveLegacyCloudKitSettings(
+      vault: vault,
+      records: remoteRecords,
+      enabled: true,
+    );
+    final remoteCloudKitSettings = await remoteRecords.read(
+      cloudKitSyncSettingsRecordId,
+    );
+    final remoteHost = await vault.encryptRecord(
+      id: VaultRecordId('host:already-remote'),
+      type: 'host',
+      plaintext: utf8.encode('{"hostname":"remote.example.test"}'),
+    );
+    await remoteRecords.upsert(remoteHost);
+    final legacyRefs = await _writeLegacySnapshot(
+      provider: provider,
+      vault: vault,
+      records: await remoteRecords.list(),
+    );
+
+    await records.upsert(remoteHost);
+    await _saveLegacyCloudKitSettings(
+      vault: vault,
+      records: records,
+      enabled: false,
+    );
+    await _saveLegacyCloudKitSettings(
+      vault: vault,
+      records: records,
+      enabled: true,
+    );
+    final localHost = await vault.encryptRecord(
+      id: VaultRecordId('host:created-while-paused'),
+      type: 'host',
+      plaintext: utf8.encode('{"hostname":"local.example.test"}'),
+    );
+    await records.upsert(localHost);
+
+    final result = await service.syncEncryptedSnapshot(
+      provider,
+      reportConflicts: true,
+    );
+
+    expect(result.recordsUploaded, 2);
+    final manifestIds = await _manifestRecordIds(
+      provider: provider,
+      vault: vault,
+    );
+    expect(manifestIds, contains(remoteHost.id.value));
+    expect(manifestIds, contains(localHost.id.value));
+    expect(manifestIds, isNot(contains(cloudKitSyncSettingsRecordValue)));
+    await provider.readObject(
+      await _manifestRecordRef(
+        provider: provider,
+        vault: vault,
+        id: localHost.id,
+      ),
+    );
+    await expectLater(
+      provider.readObject(legacyRefs[remoteCloudKitSettings!.id]!),
+      throwsA(
+        isA<SyncProviderException>().having(
+          (error) => error.code,
+          'code',
+          'sync.provider.not_found',
+        ),
+      ),
+    );
+  });
+
+  test(
+    're-enabled iCloud sync pushes local additions after conflicts are resolved',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await _saveLegacyCloudKitSettings(
+        vault: vault,
+        records: remoteRecords,
+        enabled: true,
+      );
+      final remoteCloudKitSettings = await remoteRecords.read(
+        cloudKitSyncSettingsRecordId,
+      );
+      final remoteConflict = await vault.encryptRecord(
+        id: VaultRecordId('host:re-enabled-conflict'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'remote-conflict.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+          }),
+        ),
+      );
+      final remoteOnly = await vault.encryptRecord(
+        id: VaultRecordId('host:remote-while-paused'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'remote-while-paused.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 30).toIso8601String(),
+          }),
+        ),
+      );
+      await remoteRecords.upsert(remoteConflict);
+      await remoteRecords.upsert(remoteOnly);
+      final legacyRefs = await _writeLegacySnapshot(
+        provider: provider,
+        vault: vault,
+        records: await remoteRecords.list(),
+      );
+
+      await _saveLegacyCloudKitSettings(
+        vault: vault,
+        records: records,
+        enabled: false,
+      );
+      await _saveLegacyCloudKitSettings(
+        vault: vault,
+        records: records,
+        enabled: true,
+      );
+      final localConflict = await vault.encryptRecord(
+        id: remoteConflict.id,
+        type: remoteConflict.type,
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'local-conflict.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 31).toIso8601String(),
+          }),
+        ),
+      );
+      final localOnly = await vault.encryptRecord(
+        id: VaultRecordId('host:local-while-paused'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'local-while-paused.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 31).toIso8601String(),
+          }),
+        ),
+      );
+      await records.upsert(localConflict);
+      await records.upsert(localOnly);
+
+      late final SyncRunConflictException reported;
+      try {
+        await service.syncEncryptedSnapshot(provider, reportConflicts: true);
+        fail('Expected re-enabled sync to report the real host conflict.');
+      } on SyncRunConflictException catch (error) {
+        reported = error;
+      }
+
+      expect(reported.conflicts, hasLength(1));
+      expect(reported.conflicts.single.id, localConflict.id);
+      expect(await records.read(remoteOnly.id), isNotNull);
+      expect(
+        (await records.read(localConflict.id))!.revision,
+        localConflict.revision,
+      );
+      expect(
+        await _manifestRecordIds(provider: provider, vault: vault),
+        isNot(contains(localOnly.id.value)),
+      );
+
+      final result = await service.resolveConflicts(
+        provider,
+        SyncConflictResolution.keepLocal,
+        acceptedConflicts: reported.conflicts,
+      );
+
+      expect(result.recordsUploaded, 3);
+      final manifestIds = await _manifestRecordIds(
+        provider: provider,
+        vault: vault,
+      );
+      expect(manifestIds, contains(remoteOnly.id.value));
+      expect(manifestIds, contains(localConflict.id.value));
+      expect(manifestIds, contains(localOnly.id.value));
+      expect(manifestIds, isNot(contains(cloudKitSyncSettingsRecordValue)));
+
+      final remoteConflictObject = VaultRecordEnvelope.fromJson(
+        jsonDecode(
+              utf8.decode(
+                await provider.readObject(
+                  await _manifestRecordRef(
+                    provider: provider,
+                    vault: vault,
+                    id: localConflict.id,
+                  ),
+                ),
+              ),
+            )
+            as Map<String, Object?>,
+      );
+      expect(remoteConflictObject.revision, localConflict.revision);
+      await provider.readObject(
+        await _manifestRecordRef(
+          provider: provider,
+          vault: vault,
+          id: localOnly.id,
+        ),
+      );
+      await expectLater(
+        provider.readObject(legacyRefs[remoteCloudKitSettings!.id]!),
+        throwsA(
+          isA<SyncProviderException>().having(
+            (error) => error.code,
+            'code',
+            'sync.provider.not_found',
+          ),
+        ),
+      );
+    },
+  );
+
   test('requires unlocked vault before pushing', () async {
     await vault.lock();
 
@@ -175,6 +431,65 @@ void main() {
   );
 
   test(
+    'sync ignores missing legacy remote iCloud sync setting object',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await _saveLegacyCloudKitSettings(
+        vault: vault,
+        records: remoteRecords,
+        enabled: true,
+      );
+      final remoteCloudKitSettings = await remoteRecords.read(
+        cloudKitSyncSettingsRecordId,
+      );
+      final remoteHost = await vault.encryptRecord(
+        id: VaultRecordId('host:legacy-remote'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"legacy.example.test"}'),
+      );
+      await remoteRecords.upsert(remoteHost);
+      final legacyRefs = await _writeLegacySnapshot(
+        provider: provider,
+        vault: vault,
+        records: await remoteRecords.list(),
+      );
+      await provider.deleteObject(legacyRefs[remoteCloudKitSettings!.id]!);
+
+      await records.upsert(remoteHost);
+      await _saveLegacyCloudKitSettings(
+        vault: vault,
+        records: records,
+        enabled: false,
+      );
+      await _saveLegacyCloudKitSettings(
+        vault: vault,
+        records: records,
+        enabled: true,
+      );
+      final localHost = await vault.encryptRecord(
+        id: VaultRecordId('host:local-after-missing-setting'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"local-missing.example.test"}'),
+      );
+      await records.upsert(localHost);
+
+      final result = await service.syncEncryptedSnapshot(
+        provider,
+        reportConflicts: true,
+      );
+
+      expect(result.recordsUploaded, 2);
+      final manifestIds = await _manifestRecordIds(
+        provider: provider,
+        vault: vault,
+      );
+      expect(manifestIds, contains(localHost.id.value));
+      expect(manifestIds, isNot(contains(cloudKitSyncSettingsRecordValue)));
+    },
+  );
+
+  test(
     'reset publishes a CloudKit marker only after a synced vault exists',
     () async {
       final provider = LocalDirectorySyncProvider(tempDir);
@@ -195,6 +510,31 @@ void main() {
     },
   );
 
+  test('reset rejects remote vault schema from a newer app', () async {
+    final provider = LocalDirectorySyncProvider(tempDir);
+    await service.pushEncryptedSnapshot(provider);
+    final manifest = (await provider.readManifest())!;
+    await provider.writeObject(
+      RemoteObjectRef(manifest.headerPath!),
+      utf8.encode(
+        jsonEncode(vault.header!.copyWith(schemaVersion: 2).toJson()),
+      ),
+    );
+
+    await expectLater(
+      service.publishRemoteReset(provider),
+      throwsA(
+        isA<SyncRunException>().having(
+          (error) => error.code,
+          'code',
+          'sync.remote_vault_schema_unsupported',
+        ),
+      ),
+    );
+
+    expect(await provider.readManifest(), isNotNull);
+  });
+
   test('rejects repair push when local data is unhealthy', () async {
     service = SyncRunService(
       vault: vault,
@@ -211,6 +551,58 @@ void main() {
           (error) => error.code,
           'code',
           'sync.local_unhealthy',
+        ),
+      ),
+    );
+  });
+
+  test('repair push rebuilds remote when header is missing', () async {
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final envelope = await vault.encryptRecord(
+      id: VaultRecordId('host:repair-missing-header'),
+      type: 'host',
+      plaintext: utf8.encode('{"hostname":"repair.example.test"}'),
+    );
+    await records.upsert(envelope);
+    await service.pushEncryptedSnapshot(provider);
+    final before = (await provider.readManifest())!;
+    await provider.deleteObject(RemoteObjectRef(before.headerPath!));
+
+    final result = await service.pushEncryptedSnapshotForRepair(provider);
+
+    expect(result.headerUploaded, isTrue);
+    expect(result.recordsUploaded, 1);
+    final after = (await provider.readManifest())!;
+    final remoteHeader = VaultHeader.fromJson(
+      jsonDecode(
+            utf8.decode(
+              await provider.readObject(RemoteObjectRef(after.headerPath!)),
+            ),
+          )
+          as Map<String, Object?>,
+    );
+    expect(remoteHeader.schemaVersion, vault.header!.schemaVersion);
+  });
+
+  test('repair push rejects remote vault schema from a newer app', () async {
+    final provider = LocalDirectorySyncProvider(tempDir);
+    await service.pushEncryptedSnapshot(provider);
+    final manifest = (await provider.readManifest())!;
+    final headerRef = RemoteObjectRef(manifest.headerPath!);
+    await provider.writeObject(
+      headerRef,
+      utf8.encode(
+        jsonEncode(vault.header!.copyWith(schemaVersion: 2).toJson()),
+      ),
+    );
+
+    await expectLater(
+      service.pushEncryptedSnapshotForRepair(provider),
+      throwsA(
+        isA<SyncRunException>().having(
+          (error) => error.code,
+          'code',
+          'sync.remote_vault_schema_unsupported',
         ),
       ),
     );
@@ -356,10 +748,101 @@ void main() {
     );
   });
 
+  test('pull rejects remote vault schema from a newer app', () async {
+    final remoteEnvelope = await vault.encryptRecord(
+      id: VaultRecordId('host:newer-schema'),
+      type: 'host',
+      plaintext: utf8.encode('{"hostname":"newer.example.test"}'),
+    );
+    await records.upsert(remoteEnvelope);
+
+    final provider = LocalDirectorySyncProvider(tempDir);
+    await service.pushEncryptedSnapshot(provider);
+    final manifest = (await provider.readManifest())!;
+    final headerRef = RemoteObjectRef(manifest.headerPath!);
+    await provider.writeObject(
+      headerRef,
+      utf8.encode(
+        jsonEncode(vault.header!.copyWith(schemaVersion: 2).toJson()),
+      ),
+    );
+
+    final localRecords = InMemoryVaultRecordRepository();
+    final localService = SyncRunService(vault: vault, records: localRecords);
+
+    await expectLater(
+      localService.pullEncryptedSnapshot(provider),
+      throwsA(
+        isA<SyncRunException>()
+            .having(
+              (error) => error.code,
+              'code',
+              'sync.remote_vault_schema_unsupported',
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              contains('Update Serlink before syncing'),
+            ),
+      ),
+    );
+    expect(await localRecords.read(remoteEnvelope.id), isNull);
+  });
+
+  test('push rejects remote vault schema from a newer app', () async {
+    final provider = LocalDirectorySyncProvider(tempDir);
+    await service.pushEncryptedSnapshot(provider);
+    final manifest = (await provider.readManifest())!;
+    final headerRef = RemoteObjectRef(manifest.headerPath!);
+    await provider.writeObject(
+      headerRef,
+      utf8.encode(
+        jsonEncode(vault.header!.copyWith(schemaVersion: 2).toJson()),
+      ),
+    );
+
+    final localEnvelope = await vault.encryptRecord(
+      id: VaultRecordId('host:local-after-newer-remote'),
+      type: 'host',
+      plaintext: utf8.encode('{"hostname":"local.example.test"}'),
+    );
+    await records.upsert(localEnvelope);
+
+    await expectLater(
+      service.pushEncryptedSnapshot(provider),
+      throwsA(
+        isA<SyncRunException>().having(
+          (error) => error.code,
+          'code',
+          'sync.remote_vault_schema_unsupported',
+        ),
+      ),
+    );
+
+    final after = await provider.readManifest();
+    expect(after?.headerPath, manifest.headerPath);
+    await expectLater(
+      provider.readObject(
+        RemoteObjectRef(
+          'records/${Uri.encodeComponent(localEnvelope.id.value)}-'
+          '${Uri.encodeComponent(localEnvelope.revision)}.json',
+        ),
+      ),
+      throwsA(
+        isA<SyncProviderException>().having(
+          (error) => error.code,
+          'code',
+          'sync.provider.not_found',
+        ),
+      ),
+    );
+  });
+
   test(
     'pull reports corrupted remote manifest as repairable invalid state',
     () async {
       final provider = LocalDirectorySyncProvider(tempDir);
+      await _writeLegacyHeader(provider: provider, vault: vault);
       await provider.writeManifest(
         RemoteManifest(
           vaultId: base64Url
@@ -387,6 +870,7 @@ void main() {
     'pull maps malformed manifest record entries to remote corruption',
     () async {
       final provider = LocalDirectorySyncProvider(tempDir);
+      await _writeLegacyHeader(provider: provider, vault: vault);
       final manifestEnvelope = await vault.encryptRecord(
         id: VaultRecordId('sync:manifest'),
         type: 'sync_manifest',
@@ -1756,6 +2240,113 @@ Future<RemoteObjectRef> _manifestRecordRef({
     }
   }
   fail('Manifest did not contain ${id.value}');
+}
+
+Future<void> _saveLegacyCloudKitSettings({
+  required InMemoryVaultService vault,
+  required VaultRecordRepository records,
+  required bool enabled,
+}) {
+  return EncryptedSyncSettingsRepository(
+    vault: vault,
+    records: records,
+  ).saveCloudKit(
+    CloudKitSyncSettings(enabled: enabled, updatedAt: DateTime.now().toUtc()),
+  );
+}
+
+Future<List<String>> _manifestRecordIds({
+  required LocalDirectorySyncProvider provider,
+  required InMemoryVaultService vault,
+}) async {
+  final manifest = await provider.readManifest();
+  expect(manifest, isNotNull);
+  final manifestEnvelope = VaultRecordEnvelope.fromJson(
+    jsonDecode(utf8.decode(manifest!.encryptedPayload)) as Map<String, Object?>,
+  );
+  final manifestData =
+      jsonDecode(utf8.decode(await vault.decryptRecord(manifestEnvelope)))
+          as Map<String, Object?>;
+  final entries = manifestData['records'] as List<Object?>;
+  return [
+    for (final raw in entries) (raw as Map<String, Object?>)['id'] as String,
+  ];
+}
+
+Future<void> _writeLegacyHeader({
+  required LocalDirectorySyncProvider provider,
+  required InMemoryVaultService vault,
+}) async {
+  await provider.writeObject(
+    const RemoteObjectRef('vault/header.json'),
+    utf8.encode(
+      jsonEncode(
+        vault.header!.copyWith(localUnlockProtectors: const []).toJson(),
+      ),
+    ),
+  );
+}
+
+Future<Map<VaultRecordId, RemoteObjectRef>> _writeLegacySnapshot({
+  required LocalDirectorySyncProvider provider,
+  required InMemoryVaultService vault,
+  required List<VaultRecordEnvelope> records,
+}) async {
+  final header = vault.header!;
+  final vaultId = syncVaultId(header);
+  final headerRef = RemoteObjectRef(
+    'vault/headers/${Uri.encodeComponent(vaultId)}.json',
+  );
+  await provider.writeObject(
+    headerRef,
+    utf8.encode(
+      jsonEncode(header.copyWith(localUnlockProtectors: const []).toJson()),
+    ),
+  );
+
+  final refs = <VaultRecordId, RemoteObjectRef>{};
+  final manifestRecords = <Map<String, Object?>>[];
+  for (final envelope in records) {
+    final ref = RemoteObjectRef(
+      'records/${Uri.encodeComponent(envelope.id.value)}-'
+      '${Uri.encodeComponent(envelope.revision)}.json',
+    );
+    await provider.writeObject(ref, utf8.encode(jsonEncode(envelope.toJson())));
+    refs[envelope.id] = ref;
+    manifestRecords.add({
+      'id': envelope.id.value,
+      'type': envelope.type,
+      'revision': envelope.revision,
+      'path': ref.path,
+    });
+  }
+
+  final manifestPlaintext = utf8.encode(
+    jsonEncode({
+      'schemaVersion': 1,
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+      'headerPath': headerRef.path,
+      'records': manifestRecords,
+    }),
+  );
+  final manifestEnvelope = await vault.encryptRecord(
+    id: VaultRecordId('sync:manifest'),
+    type: 'sync_manifest',
+    plaintext: manifestPlaintext,
+  );
+  await provider.writeManifest(
+    RemoteManifest(
+      vaultId: vaultId,
+      protocolVersion: 1,
+      headerPath: headerRef.path,
+      encryptedPayload: utf8.encode(jsonEncode(manifestEnvelope.toJson())),
+      snapshotObjectPaths: [
+        headerRef.path,
+        for (final ref in refs.values) ref.path,
+      ],
+    ),
+  );
+  return refs;
 }
 
 class _ManifestConflictProvider implements SyncProvider {

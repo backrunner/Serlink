@@ -38,12 +38,14 @@ import '../features/sync/application/sync_run_service.dart';
 import '../features/sync/application/sync_settings_service.dart';
 import '../features/sync/data/cloudkit_sync_provider.dart';
 import '../features/sync/data/encrypted_snapshot_staging_repository.dart';
+import '../features/sync/data/local_cloudkit_sync_settings_repository.dart';
 import '../features/sync/domain/sync_provider.dart';
 import '../features/ssh/application/connection_profile_resolver.dart';
 import '../features/ssh/application/encrypted_connection_profile_resolver.dart';
 import '../features/ssh/application/host_key_verification_service.dart';
 import '../features/ssh/application/known_host_repository.dart';
 import '../features/terminal/application/terminal_display_settings.dart';
+import '../features/terminal/data/local_terminal_display_settings_repository.dart';
 import '../features/terminal/application/terminal_font_discovery.dart';
 import '../features/transfers/application/transfer_queue_controller.dart';
 import '../features/vault/application/in_memory_vault_service.dart';
@@ -346,9 +348,33 @@ final syncSettingsRepositoryProvider = Provider<SyncSettingsRepository>((ref) {
   );
 });
 
+final _localCloudKitSyncSettingsRepositoryProvider =
+    Provider<CloudKitSyncSettingsRepository>((ref) {
+      return LocalCloudKitSyncSettingsRepository(
+        ref.watch(serlinkDatabaseProvider),
+      );
+    });
+
+final cloudKitSyncSettingsRepositoryProvider =
+    Provider<CloudKitSyncSettingsRepository>((ref) {
+      final primary = ref.watch(_localCloudKitSyncSettingsRepositoryProvider);
+      final vaultSession = ref.watch(vaultSessionControllerProvider).value;
+      if (vaultSession?.vaultState != VaultState.unlocked) {
+        return primary;
+      }
+      return MigratingCloudKitSyncSettingsRepository(
+        primary: primary,
+        legacy: EncryptedSyncSettingsRepository(
+          vault: ref.watch(vaultSessionControllerProvider.notifier).service,
+          records: ref.watch(vaultRecordRepositoryProvider),
+        ),
+      );
+    });
+
 final syncSettingsServiceProvider = Provider<SyncSettingsService>((ref) {
   return SyncSettingsService(
     settings: ref.watch(syncSettingsRepositoryProvider),
+    cloudKitSettings: ref.watch(cloudKitSyncSettingsRepositoryProvider),
     secrets: ref.watch(secretStoreProvider),
     cloudKitAvailable: ref.watch(platformCapabilitiesProvider).cloudKitSync,
   );
@@ -373,10 +399,6 @@ final cloudKitSyncSettingsProvider = FutureProvider<CloudKitSyncSettings?>((
   ref,
 ) {
   if (!ref.watch(platformCapabilitiesProvider).cloudKitSync) {
-    return null;
-  }
-  final vaultSession = ref.watch(vaultSessionControllerProvider).value;
-  if (vaultSession?.vaultState != VaultState.unlocked) {
     return null;
   }
   return ref.watch(syncSettingsServiceProvider).readCloudKit();
@@ -915,9 +937,26 @@ final encryptedTerminalDisplaySettingsRepositoryProvider =
       );
     });
 
+final _localTerminalDisplaySettingsRepositoryProvider =
+    Provider<TerminalDisplaySettingsRepository>((ref) {
+      return LocalTerminalDisplaySettingsRepository(
+        ref.watch(serlinkDatabaseProvider),
+      );
+    });
+
 final terminalDisplaySettingsRepositoryProvider =
     Provider<TerminalDisplaySettingsRepository>((ref) {
-      return ref.watch(encryptedTerminalDisplaySettingsRepositoryProvider);
+      final primary = ref.watch(
+        _localTerminalDisplaySettingsRepositoryProvider,
+      );
+      final vaultSession = ref.watch(vaultSessionControllerProvider).value;
+      if (vaultSession?.vaultState != VaultState.unlocked) {
+        return primary;
+      }
+      return MigratingTerminalDisplaySettingsRepository(
+        primary: primary,
+        legacy: ref.watch(encryptedTerminalDisplaySettingsRepositoryProvider),
+      );
     });
 
 final terminalHostDisplaySettingsRepositoryProvider =
@@ -1202,6 +1241,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
       return null;
     }
+    if (await _cloudKitSyncDisabledLocally()) {
+      return null;
+    }
     final available = await ref.read(cloudKitAvailabilityCheckProvider)();
     if (!available) {
       return null;
@@ -1221,6 +1263,48 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       config: ref.read(vaultCryptoConfigProvider),
       header: header,
     );
+  }
+
+  Future<bool> _cloudKitSyncDisabledLocally() async {
+    try {
+      final settings = await _readLocalCloudKitSyncSettings();
+      return settings?.enabled == false;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<CloudKitSyncSettings?> _readLocalCloudKitSyncSettings() {
+    return ref
+        .read(_localCloudKitSyncSettingsRepositoryProvider)
+        .readCloudKit();
+  }
+
+  Future<CloudKitSyncSettings?> _readCloudKitSyncSettingsForUnlockedVault() {
+    return MigratingCloudKitSyncSettingsRepository(
+      primary: ref.read(_localCloudKitSyncSettingsRepositoryProvider),
+      legacy: EncryptedSyncSettingsRepository(
+        vault: service,
+        records: ref.read(vaultRecordRepositoryProvider),
+      ),
+    ).readCloudKit();
+  }
+
+  Future<void> _saveLocalCloudKitSyncSetting(bool enabled) {
+    return ref
+        .read(_localCloudKitSyncSettingsRepositoryProvider)
+        .saveCloudKit(
+          CloudKitSyncSettings(
+            enabled: enabled,
+            updatedAt: DateTime.now().toUtc(),
+          ),
+        );
+  }
+
+  Future<void> _deleteLocalCloudKitSyncSetting() {
+    return ref
+        .read(_localCloudKitSyncSettingsRepositoryProvider)
+        .deleteCloudKit();
   }
 
   Future<void> initialize({required String passphrase}) async {
@@ -1430,7 +1514,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     final provider = ref.read(cloudKitSyncProviderFactoryProvider)();
     final vaultId = syncVaultId(header);
     if (!requireInitialPull) {
-      if (await _cloudKitSyncExplicitlyDisabledForUnlockedVault(records)) {
+      if (await _cloudKitSyncExplicitlyDisabledForUnlockedVault()) {
         await _clearCloudKitLockedCache(vaultId);
         return _CloudKitUnlockSyncOutcome.skipped;
       }
@@ -1517,18 +1601,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     return _CloudKitUnlockSyncOutcome.synced;
   }
 
-  Future<bool> _cloudKitSyncExplicitlyDisabledForUnlockedVault(
-    VaultRecordRepository records,
-  ) async {
+  Future<bool> _cloudKitSyncExplicitlyDisabledForUnlockedVault() async {
     try {
-      final settings = await SyncSettingsService(
-        settings: EncryptedSyncSettingsRepository(
-          vault: service,
-          records: records,
-        ),
-        secrets: ref.read(secretStoreProvider),
-        cloudKitAvailable: true,
-      ).readCloudKit();
+      final settings = await _readCloudKitSyncSettingsForUnlockedVault();
       return settings?.enabled == false;
     } on Object {
       return false;
@@ -1582,6 +1657,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       }
       return _CloudKitUnlockSyncOutcome.skipped;
     }
+    if (!_stagedSnapshotContainsManifestObjects(staged)) {
+      await _tryClearCloudKitLockedCache(vaultId);
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
     try {
       final liveManifest = await ref
           .read(cloudKitSyncProviderFactoryProvider)()
@@ -1625,6 +1704,16 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       await _tryClearCloudKitLockedCache(vaultId);
     }
     return outcome;
+  }
+
+  bool _stagedSnapshotContainsManifestObjects(StagedEncryptedSnapshot staged) {
+    final requiredPaths = <String>{};
+    final manifest = staged.manifest;
+    if (manifest.headerPath case final headerPath?) {
+      requiredPaths.add(headerPath);
+    }
+    requiredPaths.addAll(manifest.snapshotObjectPaths);
+    return requiredPaths.every(staged.objects.containsKey);
   }
 
   Future<_CloudKitUnlockSyncOutcome>
@@ -1746,6 +1835,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
       return null;
     }
+    if (await _cloudKitSyncDisabledLocally()) {
+      return null;
+    }
     final available = await ref.read(cloudKitAvailabilityCheckProvider)();
     if (!available) {
       return 'iCloud sync is not available.';
@@ -1759,15 +1851,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           'iCloud already has a Serlink vault. Reset this local vault and restore the iCloud vault.',
         );
       }
-      final syncSettings = SyncSettingsService(
-        settings: EncryptedSyncSettingsRepository(
-          vault: service,
-          records: records,
-        ),
-        secrets: ref.read(secretStoreProvider),
-        cloudKitAvailable: true,
-      );
-      await syncSettings.saveCloudKit(true);
+      await _saveLocalCloudKitSyncSetting(true);
       final tombstones = EncryptedSyncDeleteTombstoneRepository(
         vault: service,
         records: records,
@@ -1802,18 +1886,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<void> _clearCloudKitSyncSettingAfterBootstrapFailure() async {
-    if (service.state != VaultState.unlocked) {
-      return;
-    }
     try {
-      await SyncSettingsService(
-        settings: EncryptedSyncSettingsRepository(
-          vault: service,
-          records: ref.read(vaultRecordRepositoryProvider),
-        ),
-        secrets: ref.read(secretStoreProvider),
-        cloudKitAvailable: true,
-      ).deleteCloudKit();
+      await _deleteLocalCloudKitSyncSetting();
     } on Object {
       // The user-facing bootstrap failure is more useful than a secondary
       // cleanup error. Automatic sync will be reconfigured on the next state
@@ -1926,9 +2000,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       return;
     }
     try {
-      final settings = await ref
-          .read(syncSettingsServiceProvider)
-          .readCloudKit();
+      final settings = await _readCloudKitSyncSettingsForUnlockedVault();
       if (settings == null) {
         return;
       }

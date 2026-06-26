@@ -32,12 +32,16 @@ Future<void> _drainMicrotasks() async {
 
 class _FakeSshSessionService implements SshSessionService {
   final List<_FakeShellSession> shells = [];
+  final List<Object> shellFailures = [];
   var openShellCount = 0;
   var openSftpCount = 0;
 
   @override
   Future<SshShellSession> openShell(ConnectionProfileSnapshot profile) async {
     openShellCount += 1;
+    if (shellFailures.isNotEmpty) {
+      throw shellFailures.removeAt(0);
+    }
     final shell = _FakeShellSession();
     shells.add(shell);
     return shell;

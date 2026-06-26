@@ -99,6 +99,18 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
   }
 
   Future<void> openTerminal(HostSummary host) async {
+    final reusableTab = state.tabs
+        .where(
+          (tab) =>
+              tab.hostId == host.id &&
+              tab.content is TerminalTabContent &&
+              _canReuseFailedTerminalTab(tab),
+        )
+        .firstOrNull;
+    if (reusableTab != null) {
+      await _reuseFailedTerminalTab(reusableTab, host);
+      return;
+    }
     final hostSettings = await _readTerminalDisplaySettingsForHost(host.id);
     final effectiveSettings =
         hostSettings ?? await _readGlobalTerminalDisplaySettings();
@@ -127,6 +139,66 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       switchArea: WorkspaceArea.sessions,
     );
     unawaited(_connect(tab, _nextConnectionToken(tab.id)));
+  }
+
+  bool _canReuseFailedTerminalTab(WorkspaceTabState tab) {
+    final content = tab.content;
+    if (tab.lifecycle != SessionLifecycleState.failed ||
+        content is! TerminalTabContent ||
+        content.panes.length != 1) {
+      return false;
+    }
+    return !ref
+        .read(workspaceRuntimeRegistryProvider)
+        .hasAttachedTerminal(content.primaryPane.sessionId);
+  }
+
+  Future<void> _reuseFailedTerminalTab(
+    WorkspaceTabState tab,
+    HostSummary host,
+  ) async {
+    final hostSettings = await _readTerminalDisplaySettingsForHost(host.id);
+    final effectiveSettings =
+        hostSettings ?? await _readGlobalTerminalDisplaySettings();
+    final current = state.tabs
+        .where((candidate) => candidate.id == tab.id)
+        .firstOrNull;
+    if (current == null || !_canReuseFailedTerminalTab(current)) {
+      return;
+    }
+    final content = current.content as TerminalTabContent;
+    final pane = content.primaryPane;
+    final sessionId = _newSessionId();
+    final runtime = ref.read(workspaceRuntimeRegistryProvider);
+    runtime.createTerminal(
+      sessionId: sessionId,
+      maxLines: effectiveSettings.scrollbackLines,
+    );
+
+    final retrying = current.copyWith(
+      title: host.displayName,
+      sftpDefaultDirectory: _normalizeRemotePath(host.sftpDefaultDirectory),
+      content: TerminalTabContent(
+        panes: [
+          TerminalPaneState(
+            sessionId: sessionId,
+            title: host.displayName,
+            lifecycle: SessionLifecycleState.resolvingProfile,
+            displaySettings: hostSettings,
+          ),
+        ],
+      ),
+      lifecycle: SessionLifecycleState.resolvingProfile,
+      clearFailure: true,
+      lastActivityAt: DateTime.now(),
+    );
+    _replaceTab(retrying);
+    unawaited(runtime.discardSession(pane.sessionId));
+    state = state.copyWith(
+      area: WorkspaceArea.sessions,
+      activeTabId: retrying.id,
+    );
+    unawaited(_connect(retrying, _nextConnectionToken(retrying.id)));
   }
 
   Future<void> openTerminalFromTab(WorkspaceTabId tabId) async {

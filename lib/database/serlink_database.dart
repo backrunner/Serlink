@@ -81,7 +81,7 @@ class SerlinkDatabase extends _$SerlinkDatabase {
   SerlinkDatabase([QueryExecutor? executor]) : super(executor ?? _open());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -101,6 +101,10 @@ class SerlinkDatabase extends _$SerlinkDatabase {
       if (current == 2 && to >= 3) {
         await _createSyncAuxiliaryTables();
         current = 3;
+      }
+      if (current == 3 && to >= 4) {
+        await _createLocalPreferenceTables();
+        current = 4;
       }
       if (current == to) {
         return;
@@ -159,7 +163,25 @@ CREATE TABLE IF NOT EXISTS cloudkit_sync_shadow_settings (
   updated_at TEXT NOT NULL
 )
 ''');
+      await _createLocalPreferenceTables();
     });
+  }
+
+  Future<void> _createLocalPreferenceTables() async {
+    await customStatement('''
+CREATE TABLE IF NOT EXISTS local_cloudkit_sync_settings (
+  id TEXT NOT NULL PRIMARY KEY,
+  enabled INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)
+''');
+    await customStatement('''
+CREATE TABLE IF NOT EXISTS local_terminal_display_settings (
+  id TEXT NOT NULL PRIMARY KEY,
+  json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)
+''');
   }
 }
 

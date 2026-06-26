@@ -478,20 +478,27 @@ class SyncSettingsService {
     return _cloudKitSettings.deleteCloudKit();
   }
 
-  /// Resolves the sync provider to use for an auto-sync run. iCloud takes
-  /// priority over WebDAV when both are enabled; returns null when neither is.
+  /// Resolves the primary sync provider. iCloud takes priority over WebDAV when
+  /// both are enabled.
   Future<SyncProvider?> activeSyncProvider() async {
-    if (cloudKitAvailable) {
-      final cloudKit = await readCloudKit();
-      if (cloudKit?.enabled ?? false) {
-        return CloudKitSyncProvider();
-      }
+    final providers = await activeSyncProviders();
+    return providers.isEmpty ? null : providers.first;
+  }
+
+  /// Resolves all enabled sync providers in deterministic priority order.
+  ///
+  /// Automatic sync uses this as a fan-out list: each provider is pulled into
+  /// the local vault and the merged local snapshot is pushed back out.
+  Future<List<SyncProvider>> activeSyncProviders() async {
+    final providers = <SyncProvider>[];
+    if (cloudKitAvailable && (await readCloudKit())?.enabled == true) {
+      providers.add(CloudKitSyncProvider());
     }
     final webDav = await _settings.readWebDav();
     if (webDav?.enabled ?? false) {
-      return buildWebDavProvider();
+      providers.add(await buildWebDavProvider());
     }
-    return null;
+    return providers;
   }
 }
 

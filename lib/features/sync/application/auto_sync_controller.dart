@@ -3,6 +3,7 @@ import 'dart:async';
 import '../../../core/ids/entity_id.dart';
 import '../../vault/application/vault_record_repository.dart';
 import '../../vault/application/vault_service.dart';
+import '../domain/sync_provider.dart';
 import 'sync_device_service.dart';
 import 'sync_record_scope.dart';
 
@@ -107,6 +108,7 @@ class AutoSyncStatus {
     this.lastCompletedAt,
     this.lastFailureMessage,
     this.lastFailure,
+    this.lastProviderKind,
     this.conflictCount = 0,
     this.recordsUploaded = 0,
     this.recordsDownloaded = 0,
@@ -118,6 +120,7 @@ class AutoSyncStatus {
   final DateTime? lastCompletedAt;
   final String? lastFailureMessage;
   final Object? lastFailure;
+  final SyncProviderKind? lastProviderKind;
   final int conflictCount;
   final int recordsUploaded;
   final int recordsDownloaded;
@@ -129,6 +132,7 @@ class AutoSyncStatus {
     DateTime? lastCompletedAt,
     String? lastFailureMessage,
     Object? lastFailure,
+    SyncProviderKind? lastProviderKind,
     bool clearFailure = false,
     int? conflictCount,
     int? recordsUploaded,
@@ -141,6 +145,9 @@ class AutoSyncStatus {
           ? null
           : lastFailureMessage ?? this.lastFailureMessage,
       lastFailure: clearFailure ? null : lastFailure ?? this.lastFailure,
+      lastProviderKind: clearFailure
+          ? null
+          : lastProviderKind ?? this.lastProviderKind,
       conflictCount: conflictCount ?? this.conflictCount,
       recordsUploaded: recordsUploaded ?? this.recordsUploaded,
       recordsDownloaded: recordsDownloaded ?? this.recordsDownloaded,

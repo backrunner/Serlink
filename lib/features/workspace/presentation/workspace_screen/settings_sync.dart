@@ -214,9 +214,8 @@ Future<void> _repairWebDavSync(
   }
   final l10n = context.l10n;
   try {
-    final provider = await ref
-        .read(syncSettingsServiceProvider)
-        .activeSyncProvider();
+    final target = await _targetSyncProvider(ref);
+    final provider = target?.provider;
     if (provider == null) {
       throw const SyncRunException(
         'sync.provider_missing',
@@ -233,7 +232,10 @@ Future<void> _repairWebDavSync(
         .runRepair(provider, plan.action);
     ref
         .read(autoSyncControllerProvider.notifier)
-        .markConflictResolution(result);
+        .markConflictResolution(result, providerKind: target?.kind);
+    ref
+        .read(autoSyncControllerProvider.notifier)
+        .requestSync(delay: Duration.zero);
     ref.invalidate(syncKnownDevicesProvider);
     if (context.mounted) {
       _showSnackBar(context, l10n.syncRemoteRepaired);
@@ -452,10 +454,10 @@ Future<SyncRunResult?> _applySyncConflictResolution(
   List<SyncRecordConflict> acceptedConflicts,
 ) async {
   final l10n = context.l10n;
+  ({SyncProvider provider, SyncProviderKind kind})? target;
   try {
-    final provider = await ref
-        .read(syncSettingsServiceProvider)
-        .activeSyncProvider();
+    target = await _targetSyncProvider(ref);
+    final provider = target?.provider;
     if (provider == null) {
       throw const SyncRunException(
         'sync.provider_missing',
@@ -472,13 +474,16 @@ Future<SyncRunResult?> _applySyncConflictResolution(
     ref.read(syncConflictControllerProvider.notifier).clear();
     ref
         .read(autoSyncControllerProvider.notifier)
-        .markConflictResolution(result);
+        .markConflictResolution(result, providerKind: target?.kind);
+    ref
+        .read(autoSyncControllerProvider.notifier)
+        .requestSync(delay: Duration.zero);
     ref.invalidate(syncKnownDevicesProvider);
     return result;
   } on SyncRunConflictException catch (error) {
     ref
         .read(syncConflictControllerProvider.notifier)
-        .setConflicts(error.conflicts);
+        .setConflicts(error.conflicts, providerKind: target?.kind);
     if (context.mounted) {
       _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
     }
@@ -496,10 +501,10 @@ Future<SyncRunResult?> _applySyncConflictMerges(
   List<SyncMergedConflict> merges,
 ) async {
   final l10n = context.l10n;
+  ({SyncProvider provider, SyncProviderKind kind})? target;
   try {
-    final provider = await ref
-        .read(syncSettingsServiceProvider)
-        .activeSyncProvider();
+    target = await _targetSyncProvider(ref);
+    final provider = target?.provider;
     if (provider == null) {
       throw const SyncRunException(
         'sync.provider_missing',
@@ -512,13 +517,16 @@ Future<SyncRunResult?> _applySyncConflictMerges(
     ref.read(syncConflictControllerProvider.notifier).clear();
     ref
         .read(autoSyncControllerProvider.notifier)
-        .markConflictResolution(result);
+        .markConflictResolution(result, providerKind: target?.kind);
+    ref
+        .read(autoSyncControllerProvider.notifier)
+        .requestSync(delay: Duration.zero);
     ref.invalidate(syncKnownDevicesProvider);
     return result;
   } on SyncRunConflictException catch (error) {
     ref
         .read(syncConflictControllerProvider.notifier)
-        .setConflicts(error.conflicts);
+        .setConflicts(error.conflicts, providerKind: target?.kind);
     if (context.mounted) {
       _showSnackBar(context, _syncSettingsErrorMessage(l10n, error));
     }
@@ -528,6 +536,60 @@ Future<SyncRunResult?> _applySyncConflictMerges(
     }
   }
   return null;
+}
+
+Future<({SyncProvider provider, SyncProviderKind kind})?> _targetSyncProvider(
+  WidgetRef ref,
+) async {
+  final conflictProviderKind = ref
+      .read(syncConflictControllerProvider.notifier)
+      .providerKind;
+  final failedProviderKind = ref
+      .read(autoSyncControllerProvider)
+      .lastProviderKind;
+  final preferred = await _syncProviderForKind(
+    ref,
+    conflictProviderKind ?? failedProviderKind,
+  );
+  if (preferred != null) {
+    return preferred;
+  }
+  final provider = await ref
+      .read(syncSettingsServiceProvider)
+      .activeSyncProvider();
+  if (provider == null) {
+    return null;
+  }
+  return (provider: provider, kind: (await provider.capabilities()).kind);
+}
+
+Future<({SyncProvider provider, SyncProviderKind kind})?> _syncProviderForKind(
+  WidgetRef ref,
+  SyncProviderKind? kind,
+) async {
+  return switch (kind) {
+    SyncProviderKind.cloudKit =>
+      ref.read(platformCapabilitiesProvider).cloudKitSync &&
+              (await ref.read(syncSettingsServiceProvider).readCloudKit())
+                      ?.enabled ==
+                  true
+          ? (
+              provider: ref.read(cloudKitSyncProviderFactoryProvider)(),
+              kind: SyncProviderKind.cloudKit,
+            )
+          : null,
+    SyncProviderKind.webDav =>
+      (await ref.read(syncSettingsServiceProvider).readWebDav())?.enabled ==
+              true
+          ? (
+              provider: await ref.read(webDavSyncProviderFactoryProvider)(
+                ref.read(syncSettingsServiceProvider),
+              ),
+              kind: SyncProviderKind.webDav,
+            )
+          : null,
+    _ => null,
+  };
 }
 
 Future<void> _setICloudSync(

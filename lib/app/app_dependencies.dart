@@ -39,6 +39,7 @@ import '../features/sync/application/sync_settings_service.dart';
 import '../features/sync/data/cloudkit_sync_provider.dart';
 import '../features/sync/data/encrypted_snapshot_staging_repository.dart';
 import '../features/sync/data/local_cloudkit_sync_settings_repository.dart';
+import '../features/sync/data/local_webdav_sync_settings_repository.dart';
 import '../features/sync/domain/sync_provider.dart';
 import '../features/ssh/application/connection_profile_resolver.dart';
 import '../features/ssh/application/encrypted_connection_profile_resolver.dart';
@@ -336,15 +337,25 @@ final snippetsProvider = FutureProvider.autoDispose
       return snippets;
     });
 
+final _localWebDavSyncSettingsRepositoryProvider =
+    Provider<SyncSettingsRepository>((ref) {
+      return LocalWebDavSyncSettingsRepository(
+        ref.watch(serlinkDatabaseProvider),
+      );
+    });
+
 final syncSettingsRepositoryProvider = Provider<SyncSettingsRepository>((ref) {
-  ref.watch(
-    vaultSessionControllerProvider.select(
-      (state) => state.value?.unlockGeneration,
+  final primary = ref.watch(_localWebDavSyncSettingsRepositoryProvider);
+  final vaultSession = ref.watch(vaultSessionControllerProvider).value;
+  if (vaultSession?.vaultState != VaultState.unlocked) {
+    return primary;
+  }
+  return MigratingWebDavSyncSettingsRepository(
+    primary: primary,
+    legacy: EncryptedSyncSettingsRepository(
+      vault: ref.watch(vaultSessionControllerProvider.notifier).service,
+      records: ref.watch(vaultRecordRepositoryProvider),
     ),
-  );
-  return EncryptedSyncSettingsRepository(
-    vault: ref.watch(vaultSessionControllerProvider.notifier).service,
-    records: ref.watch(vaultRecordRepositoryProvider),
   );
 });
 
@@ -381,10 +392,6 @@ final syncSettingsServiceProvider = Provider<SyncSettingsService>((ref) {
 });
 
 final webDavSyncSettingsProvider = FutureProvider<WebDavSyncSettings?>((ref) {
-  final vaultSession = ref.watch(vaultSessionControllerProvider).value;
-  if (vaultSession?.vaultState != VaultState.unlocked) {
-    return null;
-  }
   return ref.watch(syncSettingsServiceProvider).readWebDav();
 });
 

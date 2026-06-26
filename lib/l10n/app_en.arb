@@ -141,6 +141,7 @@
   "settingsLocalUnlockUpdateFailed": "Biometric unlock could not be updated.",
   "copyAction": "Copy",
   "syncSectionTitle": "Sync",
+  "syncLoadingSettings": "Loading sync settings.",
   "syncLoadingEncryptedSettings": "Loading encrypted sync settings.",
   "syncConfigureAction": "Configure",
   "syncEditAction": "Edit",

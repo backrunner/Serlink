@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import '../../../core/ids/entity_id.dart';
 import '../../../platform/secret_store.dart';
 import '../../vault/application/vault_record_repository.dart';
 import '../../vault/application/vault_service.dart';
@@ -259,6 +258,52 @@ class MigratingCloudKitSyncSettingsRepository
   }
 }
 
+class MigratingWebDavSyncSettingsRepository implements SyncSettingsRepository {
+  const MigratingWebDavSyncSettingsRepository({
+    required this.primary,
+    required this.legacy,
+  });
+
+  final SyncSettingsRepository primary;
+  final SyncSettingsRepository legacy;
+
+  @override
+  Future<WebDavSyncSettings?> readWebDav() async {
+    final settings = await primary.readWebDav();
+    if (settings != null) {
+      return settings;
+    }
+    final legacySettings = await legacy.readWebDav();
+    if (legacySettings == null) {
+      return null;
+    }
+    await primary.saveWebDav(legacySettings);
+    await legacy.deleteWebDav();
+    return legacySettings;
+  }
+
+  @override
+  Future<void> saveWebDav(WebDavSyncSettings settings) async {
+    await primary.saveWebDav(settings);
+    try {
+      await legacy.deleteWebDav();
+    } on Object {
+      // Local WebDAV settings are authoritative. Legacy encrypted cleanup can
+      // be retried on a later unlocked read.
+    }
+  }
+
+  @override
+  Future<void> deleteWebDav() async {
+    await primary.deleteWebDav();
+    try {
+      await legacy.deleteWebDav();
+    } on Object {
+      // Best effort cleanup for pre-local-preference WebDAV settings.
+    }
+  }
+}
+
 class SyncSettingsService {
   const SyncSettingsService({
     required SyncSettingsRepository settings,
@@ -505,7 +550,7 @@ String _normalizeBasePath(String value) {
       : withLeadingSlash;
 }
 
-final _webDavRecordId = VaultRecordId('sync:webdav');
+final _webDavRecordId = webDavSyncSettingsRecordId;
 
 String? _preservedCertificatePin({
   required WebDavSyncSettings? existing,

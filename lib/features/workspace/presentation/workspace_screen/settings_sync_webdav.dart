@@ -211,6 +211,9 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
       }
       await ref.read(syncSettingsServiceProvider).saveWebDav(draft);
       ref.invalidate(webDavSyncSettingsProvider);
+      if (_enabled) {
+        ref.read(autoSyncControllerProvider.notifier).requestSync();
+      }
       if (mounted) {
         Navigator.of(context).pop();
         _showSnackBar(context, l10n.webDavSavedSnack);

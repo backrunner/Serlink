@@ -9,7 +9,7 @@ class _SyncSettingsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final canEdit = vaultState == VaultState.unlocked;
-    final webDav = canEdit ? ref.watch(webDavSyncSettingsProvider) : null;
+    final webDav = ref.watch(webDavSyncSettingsProvider);
     final iCloudAvailable = ref.watch(iCloudAvailableProvider);
     final knownDevices = canEdit ? ref.watch(syncKnownDevicesProvider) : null;
     final mobile = ref.watch(
@@ -23,41 +23,33 @@ class _SyncSettingsSection extends ConsumerWidget {
     final repairPlan = lastFailure == null
         ? null
         : ref.watch(syncRepairServiceProvider).planFor(lastFailure);
-    final webDavRow =
-        webDav?.when(
-          loading: () => _SettingsInfoRow(
-            icon: Icons.cloud_queue,
-            title: 'WebDAV',
-            subtitle: l10n.syncLoadingEncryptedSettings,
+    final webDavRow = webDav.when(
+      loading: () => _SettingsInfoRow(
+        icon: Icons.cloud_queue,
+        title: 'WebDAV',
+        subtitle: l10n.syncLoadingSettings,
+      ),
+      error: (error, stackTrace) => _SettingsActionRow(
+        icon: Icons.cloud_queue,
+        title: 'WebDAV',
+        subtitle: _syncSettingsErrorMessage(l10n, error),
+        action: _SettingsTextButton(
+          onPressed: () => _showWebDavSyncDialog(context, ref, null),
+          child: Text(l10n.syncConfigureAction),
+        ),
+      ),
+      data: (settings) => _SettingsActionRow(
+        icon: Icons.cloud_queue,
+        title: 'WebDAV',
+        subtitle: _webDavSettingsSubtitle(l10n, settings, autoSync),
+        action: _SettingsTextButton(
+          onPressed: () => _showWebDavSyncDialog(context, ref, settings),
+          child: Text(
+            settings == null ? l10n.syncConfigureAction : l10n.syncEditAction,
           ),
-          error: (error, stackTrace) => _SettingsActionRow(
-            icon: Icons.cloud_queue,
-            title: 'WebDAV',
-            subtitle: _syncSettingsErrorMessage(l10n, error),
-            action: _SettingsTextButton(
-              onPressed: () => _showWebDavSyncDialog(context, ref, null),
-              child: Text(l10n.syncConfigureAction),
-            ),
-          ),
-          data: (settings) => _SettingsActionRow(
-            icon: Icons.cloud_queue,
-            title: 'WebDAV',
-            subtitle: _webDavSettingsSubtitle(l10n, settings, autoSync),
-            action: _SettingsTextButton(
-              onPressed: () => _showWebDavSyncDialog(context, ref, settings),
-              child: Text(
-                settings == null
-                    ? l10n.syncConfigureAction
-                    : l10n.syncEditAction,
-              ),
-            ),
-          ),
-        ) ??
-        _SettingsInfoRow(
-          icon: Icons.cloud_queue,
-          title: 'WebDAV',
-          subtitle: l10n.syncWebDavLocked,
-        );
+        ),
+      ),
+    );
 
     final iCloudRow = iCloudAvailable.when<Widget?>(
       loading: () => _SettingsInfoRow(

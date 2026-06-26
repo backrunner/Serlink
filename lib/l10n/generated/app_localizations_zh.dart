@@ -343,6 +343,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get syncSectionTitle => '同步';
 
   @override
+  String get syncLoadingSettings => '正在加载同步设置。';
+
+  @override
   String get syncLoadingEncryptedSettings => '正在加载加密同步设置。';
 
   @override

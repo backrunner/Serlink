@@ -71,6 +71,68 @@ void main() {
     },
   );
 
+  test('uses password credential username before host username', () async {
+    await _saveSecret(
+      vault: vault,
+      records: records,
+      id: VaultRecordId('secret:ops-password'),
+      material: const IdentitySecretMaterial(password: 'server-password'),
+    );
+    await identities.save(
+      IdentityConfig(
+        id: IdentityId('ops-password'),
+        displayName: 'Ops Password',
+        kind: IdentityKind.password,
+        usernameHint: 'credential-user',
+        secretRecordId: VaultRecordId('secret:ops-password'),
+        createdAt: DateTime.utc(2026, 5, 27),
+        updatedAt: DateTime.utc(2026, 5, 27),
+      ),
+    );
+    await hosts.save(
+      _host(username: 'host-user', identityIds: [IdentityId('ops-password')]),
+    );
+
+    final profile = await resolver.resolve(
+      hostId: HostId('production'),
+      sessionId: SessionId('session-1'),
+    );
+
+    expect(profile.username, 'credential-user');
+  });
+
+  test('keeps host username for non-password credentials', () async {
+    await _saveSecret(
+      vault: vault,
+      records: records,
+      id: VaultRecordId('secret:ops-key'),
+      material: const IdentitySecretMaterial(
+        privateKeyPem: '-----BEGIN OPENSSH PRIVATE KEY-----',
+      ),
+    );
+    await identities.save(
+      IdentityConfig(
+        id: IdentityId('ops-key'),
+        displayName: 'Ops Key',
+        kind: IdentityKind.privateKey,
+        usernameHint: 'key-user',
+        secretRecordId: VaultRecordId('secret:ops-key'),
+        createdAt: DateTime.utc(2026, 5, 27),
+        updatedAt: DateTime.utc(2026, 5, 27),
+      ),
+    );
+    await hosts.save(
+      _host(username: 'host-user', identityIds: [IdentityId('ops-key')]),
+    );
+
+    final profile = await resolver.resolve(
+      hostId: HostId('production'),
+      sessionId: SessionId('session-1'),
+    );
+
+    expect(profile.username, 'host-user');
+  });
+
   test('resolves encrypted private key identity', () async {
     await _saveSecret(
       vault: vault,
@@ -165,6 +227,51 @@ void main() {
     expect(profile.jumpHosts[1].hostId, HostId('jump-2'));
     expect(profile.jumpHosts[1].hostname, 'jump-2.internal');
     expect(profile.jumpHosts[0].authMethods.single, isA<SshPasswordAuth>());
+  });
+
+  test('uses password credential username for jump hosts', () async {
+    await _saveSecret(
+      vault: vault,
+      records: records,
+      id: VaultRecordId('secret:ops-password'),
+      material: const IdentitySecretMaterial(password: 'server-password'),
+    );
+    await identities.save(
+      IdentityConfig(
+        id: IdentityId('ops-password'),
+        displayName: 'Ops Password',
+        kind: IdentityKind.password,
+        usernameHint: 'jump-credential-user',
+        secretRecordId: VaultRecordId('secret:ops-password'),
+        createdAt: DateTime.utc(2026, 5, 27),
+        updatedAt: DateTime.utc(2026, 5, 27),
+      ),
+    );
+    await hosts.save(
+      _host(
+        id: HostId('jump-1'),
+        displayName: 'Jump 1',
+        hostname: 'jump-1.internal',
+        username: 'jump-host-user',
+        identityIds: [IdentityId('ops-password')],
+      ),
+    );
+    await hosts.save(
+      _host(
+        id: HostId('production'),
+        displayName: 'Production',
+        hostname: 'prod.internal',
+        identityIds: [IdentityId('ops-password')],
+        jumpHostIds: [HostId('jump-1')],
+      ),
+    );
+
+    final profile = await resolver.resolve(
+      hostId: HostId('production'),
+      sessionId: SessionId('session-1'),
+    );
+
+    expect(profile.jumpHosts.single.username, 'jump-credential-user');
   });
 
   test('rejects cyclic jump host chains', () async {
@@ -308,6 +415,7 @@ HostConfig _host({
   HostId? id,
   String displayName = 'Production Bastion',
   String hostname = 'bastion.internal',
+  String username = 'ops',
   required List<IdentityId> identityIds,
   List<String> startupCommands = const ['tmux attach || tmux'],
   List<HostId> jumpHostIds = const [],
@@ -316,7 +424,7 @@ HostConfig _host({
     id: id ?? HostId('production'),
     displayName: displayName,
     hostname: hostname,
-    username: 'ops',
+    username: username,
     port: 22,
     authKinds: const {HostAuthKind.privateKey},
     tags: const {'prod'},

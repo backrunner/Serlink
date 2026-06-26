@@ -58,7 +58,34 @@ class _RecoveryKeyDialogGateState
     if (!mounted) {
       return;
     }
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) {
+      return;
+    }
+    await _maybeOfferLocalUnlockAfterVaultCreation();
+    if (!mounted) {
+      return;
+    }
     ref.read(vaultSessionControllerProvider.notifier).dismissRecoveryKey();
+  }
+
+  Future<void> _maybeOfferLocalUnlockAfterVaultCreation() async {
+    final platform = ref.read(platformCapabilitiesProvider);
+    final session = ref.read(vaultSessionControllerProvider).value;
+    if (!platform.isIOS ||
+        session == null ||
+        session.vaultState != VaultState.unlocked ||
+        session.localUnlockAvailable ||
+        !session.biometricUnlockSupported) {
+      return;
+    }
+    await _setLocalVaultUnlockWithPrompt(
+      context,
+      ref,
+      true,
+      title: context.l10n.vaultEnableFaceIdUnlockTitle,
+      body: context.l10n.vaultEnableFaceIdUnlockBody,
+    );
   }
 }
 
@@ -78,6 +105,8 @@ class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
+    final t = context.tokens;
+    final compactActions = MediaQuery.sizeOf(context).width < 420;
 
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
@@ -125,8 +154,28 @@ class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
             const SizedBox(height: 14),
             SerlinkAlert.warning(
               key: ValueKey('recovery-key-warning'),
-              title: l10n.vaultRecoveryKeyWarningTitle,
-              message: l10n.vaultRecoveryKeyWarningBody,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.vaultRecoveryKeyWarningTitle,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: t.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.vaultRecoveryKeyWarningBody,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: t.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
             DecoratedBox(
@@ -155,12 +204,18 @@ class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
           key: const ValueKey('recovery-key-copy-button'),
           onPressed: _copyRecoveryKey,
           icon: Icon(_copied ? Icons.check_rounded : Icons.copy_rounded),
+          size: SerlinkButtonSize.sm,
           label: Text(
-            _copied ? l10n.copiedAction : l10n.vaultCopyRecoveryKeyAction,
+            _copied
+                ? l10n.copiedAction
+                : compactActions
+                ? l10n.copyAction
+                : l10n.vaultCopyRecoveryKeyAction,
           ),
         ),
         SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(),
+          size: SerlinkButtonSize.md,
           child: Text(l10n.vaultRecoveryKeySavedAction),
         ),
       ],

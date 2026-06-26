@@ -676,6 +676,18 @@ abstract class AppLocalizations {
   /// **'This removes this device key from biometric protection. Existing connections keep running.'**
   String get settingsDisableLocalUnlockBody;
 
+  /// No description provided for @vaultEnableFaceIdUnlockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Face ID unlock?'**
+  String get vaultEnableFaceIdUnlockTitle;
+
+  /// No description provided for @vaultEnableFaceIdUnlockBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Face ID or Touch ID to unlock this vault on this device. Serlink stores a random device key protected by biometrics, not your vault passphrase.'**
+  String get vaultEnableFaceIdUnlockBody;
+
   /// No description provided for @settingsEnableAction.
   ///
   /// In en, this message translates to:
@@ -717,6 +729,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Biometric unlock could not be updated.'**
   String get settingsLocalUnlockUpdateFailed;
+
+  /// No description provided for @copyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copyAction;
 
   /// No description provided for @syncSectionTitle.
   ///

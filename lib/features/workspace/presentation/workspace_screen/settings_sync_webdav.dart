@@ -66,74 +66,85 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
       title: Text(l10n.webDavSyncTitle),
       content: SizedBox(
         width: 560,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SerlinkTextField(
-              key: const ValueKey('webdav-endpoint-field'),
-              controller: _endpointController,
-              decoration: InputDecoration(
-                labelText: l10n.webDavEndpointLabel,
-                hintText: l10n.webDavEndpointHint,
-              ),
-              textInputAction: TextInputAction.next,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SerlinkTextField(
+                  key: const ValueKey('webdav-endpoint-field'),
+                  controller: _endpointController,
+                  decoration: InputDecoration(
+                    labelText: l10n.webDavEndpointLabel,
+                    hintText: l10n.webDavEndpointHint,
+                  ),
+                  textInputAction: TextInputAction.next,
+                ),
+                const SizedBox(height: 12),
+                SerlinkTextField(
+                  key: const ValueKey('webdav-username-field'),
+                  controller: _usernameController,
+                  decoration: InputDecoration(
+                    labelText: l10n.webDavUsernameLabel,
+                  ),
+                  textInputAction: TextInputAction.next,
+                ),
+                const SizedBox(height: 12),
+                SerlinkTextField(
+                  key: const ValueKey('webdav-password-field'),
+                  controller: _passwordController,
+                  decoration: InputDecoration(
+                    labelText: _isEditing
+                        ? l10n.webDavPasswordKeepLabel
+                        : l10n.webDavPasswordLabel,
+                  ),
+                  obscureText: true,
+                  textInputAction: TextInputAction.next,
+                ),
+                const SizedBox(height: 12),
+                SerlinkTextField(
+                  key: const ValueKey('webdav-base-path-field'),
+                  controller: _basePathController,
+                  decoration: InputDecoration(
+                    labelText: l10n.webDavBasePathLabel,
+                  ),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _save(),
+                ),
+                const SizedBox(height: 8),
+                _WebDavOptionRow(
+                  key: const ValueKey('webdav-enabled-row'),
+                  value: _enabled,
+                  label: l10n.webDavEnableTitle,
+                  kind: _WebDavOptionKind.switchControl,
+                  onChanged: (value) {
+                    setState(() {
+                      _enabled = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                _WebDavOptionRow(
+                  key: const ValueKey('webdav-allow-http-row'),
+                  value: _allowInsecureHttp,
+                  label: l10n.webDavAllowHttpTitle,
+                  kind: _WebDavOptionKind.checkbox,
+                  onChanged: (value) {
+                    setState(() {
+                      _allowInsecureHttp = value;
+                    });
+                  },
+                ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 8),
+                  SerlinkAlert.danger(message: _errorMessage!, compact: true),
+                ],
+              ],
             ),
-            const SizedBox(height: 12),
-            SerlinkTextField(
-              key: const ValueKey('webdav-username-field'),
-              controller: _usernameController,
-              decoration: InputDecoration(labelText: l10n.webDavUsernameLabel),
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 12),
-            SerlinkTextField(
-              key: const ValueKey('webdav-password-field'),
-              controller: _passwordController,
-              decoration: InputDecoration(
-                labelText: _isEditing
-                    ? l10n.webDavPasswordKeepLabel
-                    : l10n.webDavPasswordLabel,
-              ),
-              obscureText: true,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 12),
-            SerlinkTextField(
-              key: const ValueKey('webdav-base-path-field'),
-              controller: _basePathController,
-              decoration: InputDecoration(labelText: l10n.webDavBasePathLabel),
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _save(),
-            ),
-            const SizedBox(height: 8),
-            _WebDavOptionRow(
-              key: const ValueKey('webdav-enabled-row'),
-              value: _enabled,
-              label: l10n.webDavEnableTitle,
-              kind: _WebDavOptionKind.switchControl,
-              onChanged: (value) {
-                setState(() {
-                  _enabled = value;
-                });
-              },
-            ),
-            const SizedBox(height: 8),
-            _WebDavOptionRow(
-              key: const ValueKey('webdav-allow-http-row'),
-              value: _allowInsecureHttp,
-              label: l10n.webDavAllowHttpTitle,
-              kind: _WebDavOptionKind.checkbox,
-              onChanged: (value) {
-                setState(() {
-                  _allowInsecureHttp = value;
-                });
-              },
-            ),
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 8),
-              SerlinkAlert.danger(message: _errorMessage!, compact: true),
-            ],
-          ],
+          ),
         ),
       ),
       actions: [
@@ -183,18 +194,22 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
       _errorMessage = null;
     });
     try {
-      await ref
-          .read(syncSettingsServiceProvider)
-          .saveWebDav(
-            WebDavSyncSettingsDraft(
-              endpoint: _endpointController.text,
-              username: _usernameController.text,
-              password: _passwordController.text,
-              basePath: _basePathController.text,
-              allowInsecureHttp: allowInsecureHttp,
-              enabled: _enabled,
-            ),
-          );
+      final draft = WebDavSyncSettingsDraft(
+        endpoint: _endpointController.text,
+        username: _usernameController.text,
+        password: _passwordController.text,
+        basePath: _basePathController.text,
+        allowInsecureHttp: allowInsecureHttp,
+        enabled: _enabled,
+      );
+      if (_enabled) {
+        await ensureRemoteSyncCompatibleForEnable(
+          await ref
+              .read(syncSettingsServiceProvider)
+              .buildWebDavProviderFromDraft(draft),
+        );
+      }
+      await ref.read(syncSettingsServiceProvider).saveWebDav(draft);
       ref.invalidate(webDavSyncSettingsProvider);
       if (mounted) {
         Navigator.of(context).pop();

@@ -202,7 +202,7 @@ class EncryptedTerminalDisplaySettingsRepository
 
   @override
   Future<TerminalDisplaySettings?> read() async {
-    final envelope = await _records.read(_terminalDisplaySettingsRecordId);
+    final envelope = await _records.read(terminalDisplaySettingsRecordId);
     if (envelope == null) {
       return null;
     }
@@ -212,7 +212,7 @@ class EncryptedTerminalDisplaySettingsRepository
   @override
   Future<void> save(TerminalDisplaySettings settings) async {
     final envelope = await _vault.encryptRecord(
-      id: _terminalDisplaySettingsRecordId,
+      id: terminalDisplaySettingsRecordId,
       type: recordType,
       plaintext: utf8.encode(jsonEncode(settings.toJson())),
     );
@@ -221,7 +221,7 @@ class EncryptedTerminalDisplaySettingsRepository
 
   @override
   Future<void> delete() async {
-    await _records.delete(_terminalDisplaySettingsRecordId);
+    await _records.delete(terminalDisplaySettingsRecordId);
   }
 
   @override
@@ -259,7 +259,54 @@ class EncryptedTerminalDisplaySettingsRepository
   }
 }
 
-final _terminalDisplaySettingsRecordId = VaultRecordId(
+class MigratingTerminalDisplaySettingsRepository
+    implements TerminalDisplaySettingsRepository {
+  const MigratingTerminalDisplaySettingsRepository({
+    required this.primary,
+    required this.legacy,
+  });
+
+  final TerminalDisplaySettingsRepository primary;
+  final TerminalDisplaySettingsRepository legacy;
+
+  @override
+  Future<TerminalDisplaySettings?> read() async {
+    final settings = await primary.read();
+    if (settings != null) {
+      return settings;
+    }
+    final legacySettings = await legacy.read();
+    if (legacySettings == null) {
+      return null;
+    }
+    await primary.save(legacySettings);
+    await legacy.delete();
+    return legacySettings;
+  }
+
+  @override
+  Future<void> save(TerminalDisplaySettings settings) async {
+    await primary.save(settings);
+    try {
+      await legacy.delete();
+    } on Object {
+      // The local terminal preference is authoritative. Legacy encrypted
+      // cleanup can be retried on a later unlocked read.
+    }
+  }
+
+  @override
+  Future<void> delete() async {
+    await primary.delete();
+    try {
+      await legacy.delete();
+    } on Object {
+      // Best effort cleanup for pre-local-preference terminal settings.
+    }
+  }
+}
+
+final terminalDisplaySettingsRecordId = VaultRecordId(
   'terminal:display_settings',
 );
 

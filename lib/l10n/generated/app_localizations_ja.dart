@@ -310,6 +310,13 @@ class AppLocalizationsJa extends AppLocalizations {
       '生体認証で保護されたデバイスキーを削除します。既存の接続は動作を続けます。';
 
   @override
+  String get vaultEnableFaceIdUnlockTitle => 'Face ID での解除を有効にしますか？';
+
+  @override
+  String get vaultEnableFaceIdUnlockBody =>
+      'このデバイスで Face ID または Touch ID を使ってボールトを解除できます。Serlink は生体認証で保護されたランダムなデバイスキーのみを保存し、ボールトのパスフレーズは保存しません。';
+
+  @override
   String get settingsEnableAction => '有効にする';
 
   @override
@@ -331,6 +338,9 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsLocalUnlockUpdateFailed => '生体認証解除を更新できませんでした。';
+
+  @override
+  String get copyAction => 'コピー';
 
   @override
   String get syncSectionTitle => '同期';

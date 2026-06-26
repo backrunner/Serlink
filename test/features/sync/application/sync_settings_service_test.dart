@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/features/sync/application/sync_settings_service.dart';
+import 'package:serlink/features/sync/application/sync_record_scope.dart';
 import 'package:serlink/features/sync/domain/sync_provider.dart';
 import 'package:serlink/features/sync/domain/webdav_tls_certificate_details.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
@@ -20,8 +21,13 @@ void main() {
     await vault.initialize(passphrase: 'passphrase');
     records = InMemoryVaultRecordRepository();
     secrets = InMemorySecretStore();
+    final encryptedSettings = EncryptedSyncSettingsRepository(
+      vault: vault,
+      records: records,
+    );
     service = SyncSettingsService(
-      settings: EncryptedSyncSettingsRepository(vault: vault, records: records),
+      settings: encryptedSettings,
+      cloudKitSettings: _InMemoryCloudKitSyncSettingsRepository(),
       secrets: secrets,
     );
   });
@@ -202,15 +208,110 @@ void main() {
     expect(await secrets.read(settings.passwordRef), isNull);
   });
 
-  test('saves and reads CloudKit settings encrypted', () async {
-    final saved = await service.saveCloudKit(true);
-    expect(saved.enabled, isTrue);
+  test(
+    'saves and reads CloudKit settings outside the encrypted vault',
+    () async {
+      final saved = await service.saveCloudKit(true);
+      expect(saved.enabled, isTrue);
 
-    final restored = await service.readCloudKit();
-    expect(restored!.enabled, isTrue);
+      final restored = await service.readCloudKit();
+      expect(restored!.enabled, isTrue);
 
-    await service.deleteCloudKit();
-    expect(await service.readCloudKit(), isNull);
+      expect(await records.read(cloudKitSyncSettingsRecordId), isNull);
+
+      await service.deleteCloudKit();
+      expect((await service.readCloudKit())!.enabled, isTrue);
+    },
+  );
+
+  test(
+    'saves CloudKit setting without an initialized or unlocked vault',
+    () async {
+      final lockedVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      final settings = await lockedVault.initialize(passphrase: 'passphrase');
+      await lockedVault.lock();
+      final cloudKitSettings = _InMemoryCloudKitSyncSettingsRepository();
+      final lockedService = SyncSettingsService(
+        settings: EncryptedSyncSettingsRepository(
+          vault: lockedVault,
+          records: InMemoryVaultRecordRepository(),
+        ),
+        cloudKitSettings: cloudKitSettings,
+        secrets: secrets,
+      );
+
+      await lockedService.saveCloudKit(false);
+
+      expect((await lockedService.readCloudKit())!.enabled, isFalse);
+      expect(lockedVault.state, VaultState.locked);
+
+      final uninitializedVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      final uninitializedService = SyncSettingsService(
+        settings: EncryptedSyncSettingsRepository(
+          vault: uninitializedVault,
+          records: InMemoryVaultRecordRepository(),
+        ),
+        cloudKitSettings: _InMemoryCloudKitSyncSettingsRepository(),
+        secrets: secrets,
+      );
+
+      await uninitializedService.saveCloudKit(false);
+
+      expect((await uninitializedService.readCloudKit())!.enabled, isFalse);
+      expect(uninitializedVault.state, VaultState.uninitialized);
+      expect(settings.header, isNotNull);
+    },
+  );
+
+  test(
+    'migrates legacy encrypted CloudKit setting into local settings',
+    () async {
+      final legacy = EncryptedSyncSettingsRepository(
+        vault: vault,
+        records: records,
+      );
+      final cloudKitSettings = _InMemoryCloudKitSyncSettingsRepository();
+      await legacy.saveCloudKit(
+        CloudKitSyncSettings(
+          enabled: false,
+          updatedAt: DateTime.utc(2026, 6, 25, 12),
+        ),
+      );
+      final migratingService = SyncSettingsService(
+        settings: legacy,
+        cloudKitSettings: MigratingCloudKitSyncSettingsRepository(
+          primary: cloudKitSettings,
+          legacy: legacy,
+        ),
+        secrets: secrets,
+      );
+
+      final migrated = await migratingService.readCloudKit();
+
+      expect(migrated!.enabled, isFalse);
+      expect((await cloudKitSettings.readCloudKit())!.enabled, isFalse);
+      expect(await records.read(cloudKitSyncSettingsRecordId), isNull);
+    },
+  );
+
+  test('defaults CloudKit sync to enabled when available', () async {
+    final settings = await service.readCloudKit();
+    expect(settings!.enabled, isTrue);
+  });
+
+  test('CloudKit sync default is absent when unavailable', () async {
+    final unavailableService = SyncSettingsService(
+      settings: EncryptedSyncSettingsRepository(vault: vault, records: records),
+      cloudKitSettings: _InMemoryCloudKitSyncSettingsRepository(),
+      secrets: secrets,
+      cloudKitAvailable: false,
+    );
+
+    expect(await unavailableService.readCloudKit(), isNull);
   });
 
   test('CloudKitSyncSettings round-trips through JSON', () {
@@ -223,6 +324,13 @@ void main() {
     expect(restored.updatedAt, original.updatedAt);
   });
 
+  test('activeSyncProvider defaults to CloudKit when available', () async {
+    expect(
+      (await (await service.activeSyncProvider())!.capabilities()).kind,
+      SyncProviderKind.cloudKit,
+    );
+  });
+
   test('activeSyncProvider prefers CloudKit over WebDAV', () async {
     await service.saveWebDav(
       const WebDavSyncSettingsDraft(
@@ -233,12 +341,6 @@ void main() {
     );
     expect(
       (await (await service.activeSyncProvider())!.capabilities()).kind,
-      SyncProviderKind.webDav,
-    );
-
-    await service.saveCloudKit(true);
-    expect(
-      (await (await service.activeSyncProvider())!.capabilities()).kind,
       SyncProviderKind.cloudKit,
     );
 
@@ -247,9 +349,37 @@ void main() {
       (await (await service.activeSyncProvider())!.capabilities()).kind,
       SyncProviderKind.webDav,
     );
+
+    await service.saveCloudKit(true);
+    expect(
+      (await (await service.activeSyncProvider())!.capabilities()).kind,
+      SyncProviderKind.cloudKit,
+    );
   });
 
-  test('activeSyncProvider is null when nothing is enabled', () async {
-    expect(await service.activeSyncProvider(), isNull);
-  });
+  test(
+    'activeSyncProvider is null when providers are explicitly disabled',
+    () async {
+      await service.saveCloudKit(false);
+      expect(await service.activeSyncProvider(), isNull);
+    },
+  );
+}
+
+class _InMemoryCloudKitSyncSettingsRepository
+    implements CloudKitSyncSettingsRepository {
+  CloudKitSyncSettings? _settings;
+
+  @override
+  Future<CloudKitSyncSettings?> readCloudKit() async => _settings;
+
+  @override
+  Future<void> saveCloudKit(CloudKitSyncSettings settings) async {
+    _settings = settings;
+  }
+
+  @override
+  Future<void> deleteCloudKit() async {
+    _settings = null;
+  }
 }

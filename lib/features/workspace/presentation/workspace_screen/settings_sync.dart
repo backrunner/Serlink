@@ -74,14 +74,12 @@ class _SyncSettingsSection extends ConsumerWidget {
         if (!available) {
           return null;
         }
-        final cloudKit = canEdit
-            ? ref.watch(cloudKitSyncSettingsProvider)
-            : null;
-        return cloudKit?.when(
+        final cloudKit = ref.watch(cloudKitSyncSettingsProvider);
+        return cloudKit.when(
               loading: () => _SettingsInfoRow(
                 icon: Icons.cloud_outlined,
                 title: 'iCloud',
-                subtitle: l10n.syncLoadingEncryptedSettings,
+                subtitle: l10n.syncICloudChecking,
               ),
               error: (error, stackTrace) => _SettingsInfoRow(
                 icon: Icons.cloud_outlined,
@@ -104,7 +102,7 @@ class _SyncSettingsSection extends ConsumerWidget {
             _SettingsInfoRow(
               icon: Icons.cloud_outlined,
               title: 'iCloud',
-              subtitle: l10n.syncICloudLocked,
+              subtitle: l10n.syncICloudChecking,
             );
       },
     );
@@ -547,6 +545,11 @@ Future<void> _setICloudSync(
 ) async {
   final l10n = context.l10n;
   try {
+    if (enabled) {
+      await ensureRemoteSyncCompatibleForEnable(
+        ref.read(cloudKitSyncProviderFactoryProvider)(),
+      );
+    }
     await ref.read(syncSettingsServiceProvider).saveCloudKit(enabled);
     final header = ref
         .read(vaultSessionControllerProvider.notifier)

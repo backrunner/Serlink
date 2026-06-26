@@ -167,6 +167,8 @@ As of 2026-06-04:
 
 Common local verification, build-number, and TestFlight upload commands are in
 [docs/development_release_commands.md](docs/development_release_commands.md).
+Schema/version bump rules are in
+[docs/development_schema_versioning.md](docs/development_schema_versioning.md).
 Full platform release runbooks are in [docs/ios_release.md](docs/ios_release.md)
 and [docs/macos_release.md](docs/macos_release.md).
 

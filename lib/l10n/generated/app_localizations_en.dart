@@ -338,6 +338,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'This removes this device key from biometric protection. Existing connections keep running.';
 
   @override
+  String get vaultEnableFaceIdUnlockTitle => 'Enable Face ID unlock?';
+
+  @override
+  String get vaultEnableFaceIdUnlockBody =>
+      'Use Face ID or Touch ID to unlock this vault on this device. Serlink stores a random device key protected by biometrics, not your vault passphrase.';
+
+  @override
   String get settingsEnableAction => 'Enable';
 
   @override
@@ -361,6 +368,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsLocalUnlockUpdateFailed =>
       'Biometric unlock could not be updated.';
+
+  @override
+  String get copyAction => 'Copy';
 
   @override
   String get syncSectionTitle => 'Sync';

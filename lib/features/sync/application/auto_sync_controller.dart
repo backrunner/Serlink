@@ -4,6 +4,7 @@ import '../../../core/ids/entity_id.dart';
 import '../../vault/application/vault_record_repository.dart';
 import '../../vault/application/vault_service.dart';
 import 'sync_device_service.dart';
+import 'sync_record_scope.dart';
 
 enum VaultRecordChangeKind { upsert, delete }
 
@@ -44,7 +45,7 @@ class NotifyingVaultRecordRepository implements VaultRecordRepository {
   @override
   Future<void> upsert(VaultRecordEnvelope envelope) async {
     await inner.upsert(envelope);
-    if (_shouldNotifyRecordChange(envelope.type)) {
+    if (_shouldNotifyRecordChange(envelope.id, envelope.type)) {
       changes.notify(
         VaultRecordChange(
           kind: VaultRecordChangeKind.upsert,
@@ -69,7 +70,7 @@ class NotifyingVaultRecordRepository implements VaultRecordRepository {
   Future<void> delete(VaultRecordId id) async {
     final existing = await inner.read(id);
     await inner.delete(id);
-    if (existing != null && _shouldNotifyRecordChange(existing.type)) {
+    if (existing != null && _shouldNotifyRecordChange(id, existing.type)) {
       changes.notify(
         VaultRecordChange(
           kind: VaultRecordChangeKind.delete,
@@ -85,7 +86,7 @@ class NotifyingVaultRecordRepository implements VaultRecordRepository {
     final records = await inner.list();
     await inner.clear();
     for (final record in records) {
-      if (_shouldNotifyRecordChange(record.type)) {
+      if (_shouldNotifyRecordChange(record.id, record.type)) {
         changes.notify(
           VaultRecordChange(
             kind: VaultRecordChangeKind.delete,
@@ -147,8 +148,9 @@ class AutoSyncStatus {
   }
 }
 
-bool _shouldNotifyRecordChange(String type) {
-  return type != EncryptedSyncDeviceRepository.recordType &&
+bool _shouldNotifyRecordChange(VaultRecordId id, String type) {
+  return !isLocalOnlySyncRecord(id: id, type: type) &&
+      type != EncryptedSyncDeviceRepository.recordType &&
       type != 'sync_tombstone' &&
       type != 'sync_manifest';
 }

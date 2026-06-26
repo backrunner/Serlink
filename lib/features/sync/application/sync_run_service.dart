@@ -6,7 +6,12 @@ import '../../vault/application/vault_service.dart';
 import '../domain/sync_provider.dart';
 import 'sync_delete_tombstone_repository.dart';
 import 'sync_device_service.dart';
+import 'sync_exceptions.dart';
 import 'sync_field_merge_service.dart';
+import 'sync_compatibility.dart';
+import 'sync_record_scope.dart';
+
+export 'sync_exceptions.dart';
 
 class SyncRunResult {
   const SyncRunResult({
@@ -73,6 +78,8 @@ enum SyncConflictResolution { keepLocal, useRemote }
 
 enum _SyncConflictPolicy { report, useRemote, useLatest }
 
+enum _RemoteCompatibilityPolicy { strict, repairHeader }
+
 enum _RecordSource { local, remote }
 
 class RemoteResetMarker {
@@ -116,16 +123,6 @@ class RemoteResetMarker {
       );
     }
   }
-}
-
-class SyncRunException implements Exception {
-  const SyncRunException(this.code, this.message);
-
-  final String code;
-  final String message;
-
-  @override
-  String toString() => 'SyncRunException($code): $message';
 }
 
 class SyncRunService {
@@ -193,6 +190,7 @@ class SyncRunService {
     if (manifest == null || manifest.vaultId != syncVaultId(header)) {
       return;
     }
+    await _ensureExpectedRemoteCompatible(provider, manifest);
     await provider.writeObject(
       resetMarkerRef,
       RemoteResetMarker(
@@ -314,6 +312,7 @@ class SyncRunService {
       );
     }
     _validateRemoteManifestIdentity(manifest);
+    await readRemoteVaultHeader(provider, manifest);
 
     final manifestData = await _decryptManifest(manifest);
     final recordEntries = _manifestRecords(manifestData);
@@ -329,6 +328,9 @@ class SyncRunService {
     var unchanged = 0;
 
     for (final entry in recordEntries) {
+      if (_isLocalOnlySnapshotRecord(id: entry.id, type: entry.type)) {
+        continue;
+      }
       final remoteEnvelope = await _readRemoteEnvelope(provider, entry.ref);
       _validateRemoteEnvelopeEntry(remoteEnvelope, entry);
 
@@ -338,6 +340,13 @@ class SyncRunService {
           remoteEnvelope,
           source: _RecordSource.remote,
         );
+        if (isLocalOnlySyncRecord(
+          id: tombstone.targetRecordId,
+          type: tombstone.targetRecordType,
+        )) {
+          unchanged += 1;
+          continue;
+        }
         remoteTombstones.add(tombstone);
         final localEnvelope = await _records.read(remoteEnvelope.id);
         if (localEnvelope == null ||
@@ -604,10 +613,12 @@ class SyncRunService {
   }
 
   Future<SyncRunResult> pushEncryptedSnapshot(SyncProvider provider) async {
+    final manifest = await provider.readManifest();
+    await _ensureExpectedRemoteCompatible(provider, manifest);
     return _pushEncryptedSnapshot(
       provider,
       pruneRemote: true,
-      expectedRemoteManifest: await provider.readManifest(),
+      expectedRemoteManifest: manifest,
     );
   }
 
@@ -627,6 +638,8 @@ class SyncRunService {
     required bool pruneRemote,
     RemoteManifest? expectedRemoteManifest,
     bool cleanupPartialRemoteObjectsOnFailure = false,
+    _RemoteCompatibilityPolicy compatibilityPolicy =
+        _RemoteCompatibilityPolicy.strict,
   }) async {
     final header = _vault.header;
     if (header == null) {
@@ -642,9 +655,18 @@ class SyncRunService {
         'Remote vault was reset.',
       );
     }
+    switch (compatibilityPolicy) {
+      case _RemoteCompatibilityPolicy.strict:
+        await _ensureExpectedRemoteCompatible(provider, expectedRemoteManifest);
+      case _RemoteCompatibilityPolicy.repairHeader:
+        await _ensureExpectedRemoteCompatibleForRepair(
+          provider,
+          expectedRemoteManifest,
+        );
+    }
 
     final writerDevice = await _devices?.touchLocalDevice();
-    final envelopes = await _records.list();
+    final envelopes = await _syncableLocalRecords();
     final manifestRecords = <Map<String, Object?>>[];
     final desiredRecordPaths = <String>{};
     final uploadedRefs = <RemoteObjectRef>[];
@@ -821,10 +843,12 @@ class SyncRunService {
   ) async {
     await _ensureLocalDataHealthyForRepair();
     return _retryOnRemoteManifestConflict(() async {
+      final manifest = await provider.readManifest();
       return _pushEncryptedSnapshot(
         provider,
         pruneRemote: true,
-        expectedRemoteManifest: await provider.readManifest(),
+        expectedRemoteManifest: manifest,
+        compatibilityPolicy: _RemoteCompatibilityPolicy.repairHeader,
       );
     });
   }
@@ -880,11 +904,7 @@ class SyncRunService {
     if (header == null) {
       return false;
     }
-    final headerPath = manifest.headerPath;
-    if (headerPath == null) {
-      return false;
-    }
-    final remoteHeader = await _readRemoteHeader(provider, headerPath);
+    final remoteHeader = await _tryReadRemoteHeader(provider, manifest);
     if (remoteHeader == null) {
       return false;
     }
@@ -892,8 +912,11 @@ class SyncRunService {
       return false;
     }
     final manifestData = await _decryptManifest(manifest);
-    final remoteRecords = _manifestRecords(manifestData);
-    final localRecords = await _records.list();
+    final remoteRecords = [
+      for (final entry in _manifestRecords(manifestData))
+        if (!_isLocalOnlySnapshotRecord(id: entry.id, type: entry.type)) entry,
+    ];
+    final localRecords = await _syncableLocalRecords();
     if (remoteRecords.length != localRecords.length) {
       return false;
     }
@@ -917,31 +940,24 @@ class SyncRunService {
     return await devices.readLocalDevice() != null;
   }
 
-  Future<VaultHeader?> _readRemoteHeader(
+  Future<VaultHeader?> _tryReadRemoteHeader(
     SyncProvider provider,
-    String headerPath,
+    RemoteManifest manifest,
   ) async {
     try {
-      return VaultHeader.fromJson(
-        jsonDecode(
-              utf8.decode(
-                await provider.readObject(RemoteObjectRef(headerPath)),
-              ),
-            )
-            as Map<String, Object?>,
-      ).copyWith(localUnlockProtectors: const []);
+      return await readRemoteVaultHeader(provider, manifest);
+    } on SyncRunException catch (error) {
+      if (error.code == 'sync.remote_vault_schema_unsupported') {
+        rethrow;
+      }
+      return null;
     } on Object {
       return null;
     }
   }
 
   void _validateRemoteManifestIdentity(RemoteManifest manifest) {
-    if (manifest.protocolVersion > 1) {
-      throw const SyncRunException(
-        'sync.remote_protocol_unsupported',
-        'Remote sync data was written by a newer Serlink version.',
-      );
-    }
+    validateRemoteManifestProtocol(manifest);
     final header = _vault.header;
     if (header == null) {
       throw const SyncRunException(
@@ -954,6 +970,36 @@ class SyncRunService {
         'sync.remote_manifest_wrong_vault',
         'Remote sync data belongs to another vault.',
       );
+    }
+  }
+
+  Future<void> _ensureExpectedRemoteCompatible(
+    SyncProvider provider,
+    RemoteManifest? manifest,
+  ) async {
+    if (manifest == null) {
+      return;
+    }
+    validateRemoteManifestProtocol(manifest);
+    await readRemoteVaultHeader(provider, manifest);
+  }
+
+  Future<void> _ensureExpectedRemoteCompatibleForRepair(
+    SyncProvider provider,
+    RemoteManifest? manifest,
+  ) async {
+    if (manifest == null) {
+      return;
+    }
+    validateRemoteManifestProtocol(manifest);
+    try {
+      await readRemoteVaultHeader(provider, manifest);
+    } on SyncRunException catch (error) {
+      if (error.code == 'sync.remote_header_missing' ||
+          error.code == 'sync.remote_header_invalid') {
+        return;
+      }
+      rethrow;
     }
   }
 
@@ -1031,9 +1077,23 @@ class SyncRunService {
         envelope,
         source: _RecordSource.local,
       );
+      if (isLocalOnlySyncRecord(
+        id: tombstone.targetRecordId,
+        type: tombstone.targetRecordType,
+      )) {
+        continue;
+      }
       tombstones[tombstone.targetRecordId] = tombstone;
     }
     return tombstones;
+  }
+
+  Future<List<VaultRecordEnvelope>> _syncableLocalRecords() async {
+    return [
+      for (final envelope in await _records.list())
+        if (!_isLocalOnlySnapshotRecord(id: envelope.id, type: envelope.type))
+          envelope,
+    ];
   }
 
   Future<VaultRecordEnvelope> _readRemoteEnvelope(
@@ -1323,6 +1383,14 @@ class _ManifestRecordEntry {
       ref: RemoteObjectRef(json['path'] as String),
     );
   }
+}
+
+bool _isLocalOnlySnapshotRecord({
+  required VaultRecordId id,
+  required String type,
+}) {
+  return isLocalOnlySyncRecord(id: id, type: type) ||
+      id == tombstoneRecordId(cloudKitSyncSettingsRecordId);
 }
 
 bool _isRemoteManifestWriteConflict(SyncProviderException error) {

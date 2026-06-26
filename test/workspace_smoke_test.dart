@@ -81,7 +81,7 @@ void main() {
           secretStoreProvider.overrideWithValue(secretStore),
           autoSyncEnabledProvider.overrideWithValue(false),
           cloudKitAvailabilityCheckProvider.overrideWithValue(
-            () async => false,
+            () => Future.value(false),
           ),
           appPackageInfoProvider.overrideWith((ref) async {
             return _testPackageInfo();
@@ -153,6 +153,14 @@ void main() {
     await tester.enterText(
       find.byKey(const ValueKey('webdav-password-field')),
       'sync-password',
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('webdav-enabled-row')),
+    );
+    await tester.tap(find.byKey(const ValueKey('webdav-enabled-row')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('webdav-save-button')),
     );
     await tester.tap(find.byKey(const ValueKey('webdav-save-button')));
     await tester.pumpAndSettle();
@@ -486,6 +494,79 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Unlock Vault'), findsWidgets);
+  });
+
+  testWidgets('iOS offers Face ID unlock after vault creation', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final database = SerlinkDatabase(NativeDatabase.memory());
+    final transferQueue = TransferQueueController();
+    final secretStore = InMemorySecretStore();
+    addTearDown(database.close);
+    addTearDown(transferQueue.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          platformCapabilitiesProvider.overrideWithValue(
+            const _IOSWithoutCloudKitCapabilities(),
+          ),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+          secretStoreProvider.overrideWithValue(secretStore),
+          autoSyncEnabledProvider.overrideWithValue(false),
+        ],
+        child: const SerlinkApp(),
+      ),
+    );
+    await _pumpUntilFound(tester, find.text('Create Vault'));
+
+    await tester.enterText(
+      find.byKey(const ValueKey('vault-passphrase-field')),
+      'correct horse battery staple',
+    );
+    await tester.tap(find.byKey(const ValueKey('vault-submit-button')));
+    await _pumpUntilFound(tester, find.text('Recovery Key'));
+    expect(tester.takeException(), isNull);
+
+    expect(find.text('Recovery Key'), findsOneWidget);
+    expect(find.text('Enable Face ID unlock?'), findsNothing);
+
+    await tester.tap(find.text('I have saved it'));
+    await _pumpUntilFound(tester, find.text('Enable Face ID unlock?'));
+    expect(tester.takeException(), isNull);
+
+    expect(find.text('Enable Face ID unlock?'), findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SerlinkApp)),
+    );
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Enable'));
+    await _pumpUntil(
+      tester,
+      () =>
+          container
+              .read(vaultSessionControllerProvider)
+              .value
+              ?.localUnlockAvailable ==
+          true,
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    expect(
+      find.text(
+        'Biometric unlock enabled. Lock the vault to use Face ID or Touch ID.',
+      ),
+      findsOneWidget,
+    );
+    final session = container.read(vaultSessionControllerProvider).value;
+    expect(session?.localUnlockAvailable, isTrue);
   });
 
   testWidgets('sftp prompts for a default folder when root is unavailable', (
@@ -1018,9 +1099,7 @@ void main() {
     );
   });
 
-  testWidgets('iOS host rows reveal delete action after swiping left', (
-    tester,
-  ) async {
+  testWidgets('iOS host rows reveal edit/delete on swipe', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
     addTearDown(tester.view.resetPhysicalSize);
@@ -1078,6 +1157,14 @@ void main() {
     expect(find.text('Swipe Delete Host'), findsOneWidget);
     await tester.pumpAndSettle();
 
+    await tester.tap(
+      find.text('Swipe Delete Host'),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Edit host'), findsNothing);
+    expect(find.text('Delete host'), findsNothing);
+
     for (final keyPrefix in ['terminal', 'sftp']) {
       final buttonRect = tester.getRect(
         find.byKey(ValueKey('mobile-host-$keyPrefix-button')),
@@ -1099,20 +1186,41 @@ void main() {
 
     await tester.drag(find.text('Swipe Delete Host'), const Offset(-130, 0));
     await tester.pumpAndSettle();
+    final editButton = find.byKey(const ValueKey('mobile-host-edit-button'));
+    final editIcon = find.byKey(const ValueKey('mobile-host-edit-icon'));
     final deleteButton = find.byKey(
       const ValueKey('mobile-host-delete-button'),
     );
     final deleteIcon = find.byKey(const ValueKey('mobile-host-delete-icon'));
+    expect(editButton, findsOneWidget);
+    expect(editIcon, findsOneWidget);
     expect(deleteButton, findsOneWidget);
     expect(deleteIcon, findsOneWidget);
+    expect(
+      find.descendant(of: editButton, matching: find.text('Edit host')),
+      findsNothing,
+    );
     expect(
       find.descendant(of: deleteButton, matching: find.text('Delete')),
       findsNothing,
     );
+    final editButtonRect = tester.getRect(editButton);
+    final editIconRect = tester.getRect(editIcon);
     final deleteButtonRect = tester.getRect(deleteButton);
     final deleteIconRect = tester.getRect(deleteIcon);
+    expect(editButtonRect.width, 44);
+    expect(editButtonRect.height, 44);
     expect(deleteButtonRect.width, 44);
     expect(deleteButtonRect.height, 44);
+    expect(editButtonRect.center.dx, lessThan(deleteButtonRect.center.dx));
+    expect(
+      (editButtonRect.center.dx - editIconRect.center.dx).abs(),
+      lessThanOrEqualTo(0.5),
+    );
+    expect(
+      (editButtonRect.center.dy - editIconRect.center.dy).abs(),
+      lessThanOrEqualTo(0.5),
+    );
     expect(
       (deleteButtonRect.center.dx - deleteIconRect.center.dx).abs(),
       lessThanOrEqualTo(0.5),
@@ -1121,6 +1229,17 @@ void main() {
       (deleteButtonRect.center.dy - deleteIconRect.center.dy).abs(),
       lessThanOrEqualTo(0.5),
     );
+
+    await tester.tap(editButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Host'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(SerlinkTextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.text('Swipe Delete Host'), const Offset(-130, 0));
+    await tester.pumpAndSettle();
 
     await tester.tap(deleteButton);
     await tester.pumpAndSettle();

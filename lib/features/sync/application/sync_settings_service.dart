@@ -8,6 +8,7 @@ import '../data/cloudkit_sync_provider.dart';
 import '../data/webdav_sync_provider.dart';
 import '../domain/sync_provider.dart';
 import '../domain/webdav_tls_certificate_details.dart';
+import 'sync_record_scope.dart';
 
 class WebDavSyncSettings {
   const WebDavSyncSettings({
@@ -80,6 +81,10 @@ class WebDavSyncSettings {
 class CloudKitSyncSettings {
   const CloudKitSyncSettings({required this.enabled, required this.updatedAt});
 
+  factory CloudKitSyncSettings.defaultEnabled() {
+    return CloudKitSyncSettings(enabled: true, updatedAt: DateTime.utc(1970));
+  }
+
   final bool enabled;
   final DateTime updatedAt;
 
@@ -130,12 +135,16 @@ abstract interface class SyncSettingsRepository {
   Future<WebDavSyncSettings?> readWebDav();
   Future<void> saveWebDav(WebDavSyncSettings settings);
   Future<void> deleteWebDav();
+}
+
+abstract interface class CloudKitSyncSettingsRepository {
   Future<CloudKitSyncSettings?> readCloudKit();
   Future<void> saveCloudKit(CloudKitSyncSettings settings);
   Future<void> deleteCloudKit();
 }
 
-class EncryptedSyncSettingsRepository implements SyncSettingsRepository {
+class EncryptedSyncSettingsRepository
+    implements SyncSettingsRepository, CloudKitSyncSettingsRepository {
   EncryptedSyncSettingsRepository({
     required VaultService vault,
     required VaultRecordRepository records,
@@ -143,7 +152,7 @@ class EncryptedSyncSettingsRepository implements SyncSettingsRepository {
 
   EncryptedSyncSettingsRepository._(this._vault, this._records);
 
-  static const recordType = 'sync_settings';
+  static const recordType = syncSettingsRecordType;
 
   final VaultService _vault;
   final VaultRecordRepository _records;
@@ -177,7 +186,7 @@ class EncryptedSyncSettingsRepository implements SyncSettingsRepository {
 
   @override
   Future<CloudKitSyncSettings?> readCloudKit() async {
-    final envelope = await _records.read(_cloudKitRecordId);
+    final envelope = await _records.read(cloudKitSyncSettingsRecordId);
     if (envelope == null) {
       return null;
     }
@@ -190,7 +199,7 @@ class EncryptedSyncSettingsRepository implements SyncSettingsRepository {
   @override
   Future<void> saveCloudKit(CloudKitSyncSettings settings) async {
     final envelope = await _vault.encryptRecord(
-      id: _cloudKitRecordId,
+      id: cloudKitSyncSettingsRecordId,
       type: recordType,
       plaintext: utf8.encode(jsonEncode(settings.toJson())),
     );
@@ -199,19 +208,73 @@ class EncryptedSyncSettingsRepository implements SyncSettingsRepository {
 
   @override
   Future<void> deleteCloudKit() async {
-    await _records.delete(_cloudKitRecordId);
+    await _records.delete(cloudKitSyncSettingsRecordId);
+  }
+}
+
+class MigratingCloudKitSyncSettingsRepository
+    implements CloudKitSyncSettingsRepository {
+  const MigratingCloudKitSyncSettingsRepository({
+    required this.primary,
+    required this.legacy,
+  });
+
+  final CloudKitSyncSettingsRepository primary;
+  final CloudKitSyncSettingsRepository legacy;
+
+  @override
+  Future<CloudKitSyncSettings?> readCloudKit() async {
+    final settings = await primary.readCloudKit();
+    if (settings != null) {
+      return settings;
+    }
+    final legacySettings = await legacy.readCloudKit();
+    if (legacySettings == null) {
+      return null;
+    }
+    await primary.saveCloudKit(legacySettings);
+    await legacy.deleteCloudKit();
+    return legacySettings;
+  }
+
+  @override
+  Future<void> saveCloudKit(CloudKitSyncSettings settings) async {
+    await primary.saveCloudKit(settings);
+    try {
+      await legacy.deleteCloudKit();
+    } on Object {
+      // A stale encrypted iCloud marker must not block changing the local
+      // preference. The next unlocked read can try the legacy cleanup again.
+    }
+  }
+
+  @override
+  Future<void> deleteCloudKit() async {
+    await primary.deleteCloudKit();
+    try {
+      await legacy.deleteCloudKit();
+    } on Object {
+      // Best effort cleanup for pre-local-preference iCloud settings.
+    }
   }
 }
 
 class SyncSettingsService {
   const SyncSettingsService({
     required SyncSettingsRepository settings,
+    required CloudKitSyncSettingsRepository cloudKitSettings,
     required SecretStore secrets,
     bool cloudKitAvailable = true,
-  }) : this._(settings, secrets, cloudKitAvailable: cloudKitAvailable);
+  }) : this._(
+         settings,
+         cloudKitSettings,
+         secrets,
+         cloudKitAvailable: cloudKitAvailable,
+       );
 
   const SyncSettingsService._(
     this._settings,
+    this._cloudKitSettings,
     this._secrets, {
     this.cloudKitAvailable = true,
   });
@@ -219,6 +282,7 @@ class SyncSettingsService {
   static const _webDavPasswordRef = SecretRef('sync:webdav:password');
 
   final SyncSettingsRepository _settings;
+  final CloudKitSyncSettingsRepository _cloudKitSettings;
   final SecretStore _secrets;
   final bool cloudKitAvailable;
 
@@ -227,50 +291,55 @@ class SyncSettingsService {
   }
 
   Future<WebDavSyncSettings> saveWebDav(WebDavSyncSettingsDraft draft) async {
-    final endpoint = _parseEndpoint(draft.endpoint);
-    if (endpoint.scheme == 'http' && !draft.allowInsecureHttp) {
-      throw const SyncSettingsException(
-        'sync.webdav.insecure_http',
-        'HTTP WebDAV requires explicit confirmation.',
-      );
-    }
-    final username = draft.username.trim();
-    if (username.isEmpty) {
-      throw const SyncSettingsException(
-        'sync.webdav.username_required',
-        'Username is required.',
-      );
-    }
-
     final existing = await _settings.readWebDav();
-    final password = utf8.encode(draft.password);
-    final hasNewPassword = draft.password.isNotEmpty;
-    if (!hasNewPassword && existing == null) {
-      throw const SyncSettingsException(
-        'sync.webdav.password_required',
-        'Password is required for a new WebDAV account.',
-      );
+    final parsed = _parseWebDavDraft(draft, existing: existing);
+    if (draft.password.isNotEmpty) {
+      await _secrets.write(_webDavPasswordRef, utf8.encode(draft.password));
     }
-    if (hasNewPassword) {
-      await _secrets.write(_webDavPasswordRef, password);
-    }
-
     final settings = WebDavSyncSettings(
-      endpoint: endpoint,
-      username: username,
-      basePath: _normalizeBasePath(draft.basePath),
+      endpoint: parsed.endpoint,
+      username: parsed.username,
+      basePath: parsed.basePath,
       passwordRef: existing?.passwordRef ?? _webDavPasswordRef,
       allowInsecureHttp: draft.allowInsecureHttp,
       enabled: draft.enabled,
       updatedAt: DateTime.now().toUtc(),
       pinnedCertificateFingerprint: _preservedCertificatePin(
         existing: existing,
-        endpoint: endpoint,
+        endpoint: parsed.endpoint,
         allowInsecureHttp: draft.allowInsecureHttp,
       ),
     );
     await _settings.saveWebDav(settings);
     return settings;
+  }
+
+  Future<WebDavSyncProvider> buildWebDavProviderFromDraft(
+    WebDavSyncSettingsDraft draft,
+  ) async {
+    final existing = await _settings.readWebDav();
+    final parsed = _parseWebDavDraft(draft, existing: existing);
+    final password = draft.password.isNotEmpty
+        ? draft.password
+        : utf8.decode(
+            (await _secrets.read(existing!.passwordRef)) ??
+                (throw const SyncSettingsException(
+                  'sync.webdav.password_missing',
+                  'Stored WebDAV password is missing.',
+                )),
+          );
+    return WebDavSyncProvider(
+      endpoint: parsed.endpoint,
+      username: parsed.username,
+      password: password,
+      basePath: parsed.basePath,
+      allowInsecureHttp: draft.allowInsecureHttp,
+      pinnedCertificateFingerprint: _preservedCertificatePin(
+        existing: existing,
+        endpoint: parsed.endpoint,
+        allowInsecureHttp: draft.allowInsecureHttp,
+      ),
+    );
   }
 
   Future<WebDavSyncSettings> trustWebDavCertificate(
@@ -340,7 +409,9 @@ class SyncSettingsService {
     if (!cloudKitAvailable) {
       return Future<CloudKitSyncSettings?>.value();
     }
-    return _settings.readCloudKit();
+    return _cloudKitSettings.readCloudKit().then(
+      (settings) => settings ?? CloudKitSyncSettings.defaultEnabled(),
+    );
   }
 
   Future<CloudKitSyncSettings> saveCloudKit(bool enabled) async {
@@ -354,19 +425,19 @@ class SyncSettingsService {
       enabled: enabled,
       updatedAt: DateTime.now().toUtc(),
     );
-    await _settings.saveCloudKit(settings);
+    await _cloudKitSettings.saveCloudKit(settings);
     return settings;
   }
 
   Future<void> deleteCloudKit() {
-    return _settings.deleteCloudKit();
+    return _cloudKitSettings.deleteCloudKit();
   }
 
   /// Resolves the sync provider to use for an auto-sync run. iCloud takes
   /// priority over WebDAV when both are enabled; returns null when neither is.
   Future<SyncProvider?> activeSyncProvider() async {
     if (cloudKitAvailable) {
-      final cloudKit = await _settings.readCloudKit();
+      final cloudKit = await readCloudKit();
       if (cloudKit?.enabled ?? false) {
         return CloudKitSyncProvider();
       }
@@ -377,6 +448,37 @@ class SyncSettingsService {
     }
     return null;
   }
+}
+
+({Uri endpoint, String username, String basePath}) _parseWebDavDraft(
+  WebDavSyncSettingsDraft draft, {
+  required WebDavSyncSettings? existing,
+}) {
+  final endpoint = _parseEndpoint(draft.endpoint);
+  if (endpoint.scheme == 'http' && !draft.allowInsecureHttp) {
+    throw const SyncSettingsException(
+      'sync.webdav.insecure_http',
+      'HTTP WebDAV requires explicit confirmation.',
+    );
+  }
+  final username = draft.username.trim();
+  if (username.isEmpty) {
+    throw const SyncSettingsException(
+      'sync.webdav.username_required',
+      'Username is required.',
+    );
+  }
+  if (!draft.password.isNotEmpty && existing == null) {
+    throw const SyncSettingsException(
+      'sync.webdav.password_required',
+      'Password is required for a new WebDAV account.',
+    );
+  }
+  return (
+    endpoint: endpoint,
+    username: username,
+    basePath: _normalizeBasePath(draft.basePath),
+  );
 }
 
 Uri _parseEndpoint(String value) {
@@ -404,7 +506,6 @@ String _normalizeBasePath(String value) {
 }
 
 final _webDavRecordId = VaultRecordId('sync:webdav');
-final _cloudKitRecordId = VaultRecordId('sync:cloudkit');
 
 String? _preservedCertificatePin({
   required WebDavSyncSettings? existing,

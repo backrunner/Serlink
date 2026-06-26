@@ -308,6 +308,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDisableLocalUnlockBody => '这会移除受生物认证保护的设备密钥。现有连接会继续运行。';
 
   @override
+  String get vaultEnableFaceIdUnlockTitle => '启用 Face ID 解锁？';
+
+  @override
+  String get vaultEnableFaceIdUnlockBody =>
+      '之后可在这台设备上用 Face ID 或 Touch ID 解锁此保险库。Serlink 只会保存一个受生物认证保护的随机设备密钥，不会保存你的保险库密码短语。';
+
+  @override
   String get settingsEnableAction => '启用';
 
   @override
@@ -328,6 +335,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsLocalUnlockUpdateFailed => '无法更新生物解锁。';
+
+  @override
+  String get copyAction => '复制';
 
   @override
   String get syncSectionTitle => '同步';

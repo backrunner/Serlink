@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/features/sync/application/remote_vault_discovery_service.dart';
+import 'package:serlink/features/sync/application/sync_compatibility.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
 import 'package:serlink/features/sync/data/local_sync_provider.dart';
 import 'package:serlink/features/sync/domain/sync_provider.dart';
@@ -77,6 +78,56 @@ void main() {
     expect(discovery, isNotNull);
     expect(discovery!.header.localUnlockProtectors, isEmpty);
     expect(syncVaultId(discovery.header), manifest.vaultId);
+  });
+
+  test('rejects remote vault header from a newer schema', () async {
+    final manifest = await provider.readManifest();
+    expect(manifest, isNotNull);
+    await provider.writeObject(
+      RemoteObjectRef(manifest!.headerPath!),
+      utf8.encode(
+        jsonEncode(vault.header!.copyWith(schemaVersion: 2).toJson()),
+      ),
+    );
+
+    await expectLater(
+      RemoteVaultDiscoveryService(provider).discover(),
+      throwsA(
+        isA<SyncRunException>()
+            .having(
+              (error) => error.code,
+              'code',
+              'sync.remote_vault_schema_unsupported',
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              contains('turn sync off'),
+            ),
+      ),
+    );
+  });
+
+  test('enable-sync compatibility check rejects newer remote vaults', () async {
+    final manifest = await provider.readManifest();
+    expect(manifest, isNotNull);
+    await provider.writeObject(
+      RemoteObjectRef(manifest!.headerPath!),
+      utf8.encode(
+        jsonEncode(vault.header!.copyWith(schemaVersion: 2).toJson()),
+      ),
+    );
+
+    await expectLater(
+      ensureRemoteSyncCompatibleForEnable(provider),
+      throwsA(
+        isA<SyncRunException>().having(
+          (error) => error.code,
+          'code',
+          'sync.remote_vault_schema_unsupported',
+        ),
+      ),
+    );
   });
 
   test(

@@ -46,6 +46,48 @@ Run the macOS App Store release surface check:
 ./tool/check_cloudkit_release_ready.sh --distribution app_store
 ```
 
+## iOS dev device install
+
+For the fastest physical-device debug loop, run a Debug build directly on the
+iPhone. This stays attached to Flutter, so hot reload and hot restart are
+available:
+
+```sh
+./tool/ios_dev_install.sh
+```
+
+Force USB/attached discovery:
+
+```sh
+./tool/ios_dev_install.sh --attached
+```
+
+Install the build without keeping a Flutter debug session attached:
+
+```sh
+./tool/ios_dev_install.sh --install-only
+```
+
+Wireless deploy works after the iPhone has been paired for network debugging in
+Xcode:
+
+```sh
+./tool/ios_dev_install.sh --wireless
+```
+
+If more than one physical iOS device is visible, pass the Flutter device id or
+name:
+
+```sh
+./tool/ios_dev_install.sh --device 00008110-0000000000000000
+```
+
+First-time setup is still Apple/Xcode controlled: connect the iPhone by USB,
+unlock it, trust the Mac, enable Developer Mode if iOS asks, then open
+Xcode > Window > Devices and Simulators and enable "Connect via network" for
+wireless runs. If the wireless device disappears, fall back to `--attached`
+first and re-check the Xcode device pairing.
+
 ## Build numbers
 
 Preview the next shared Flutter build number without changing files:

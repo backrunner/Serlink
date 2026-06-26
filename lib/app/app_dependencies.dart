@@ -108,6 +108,8 @@ final platformCapabilitiesProvider = Provider<PlatformCapabilities>((ref) {
 
 typedef CloudKitAvailabilityCheck = Future<bool> Function();
 typedef SyncProviderFactory = SyncProvider Function();
+typedef WebDavSyncProviderFactory =
+    Future<SyncProvider> Function(SyncSettingsService service);
 
 final cloudKitAvailabilityCheckProvider = Provider<CloudKitAvailabilityCheck>((
   ref,
@@ -119,6 +121,12 @@ final cloudKitSyncProviderFactoryProvider = Provider<SyncProviderFactory>((
   ref,
 ) {
   return () => CloudKitSyncProvider();
+});
+
+final webDavSyncProviderFactoryProvider = Provider<WebDavSyncProviderFactory>((
+  ref,
+) {
+  return (service) => service.buildWebDavProvider();
 });
 
 final cloudKitSyncChangesProvider = StreamProvider<CloudKitSyncChange>((ref) {
@@ -740,11 +748,15 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     );
   }
 
-  void markConflictResolution(SyncRunResult result) {
+  void markConflictResolution(
+    SyncRunResult result, {
+    SyncProviderKind? providerKind,
+  }) {
     _invalidateSyncedMetadataProviders();
     state = AutoSyncStatus(
       phase: AutoSyncPhase.idle,
       lastCompletedAt: result.completedAt,
+      lastProviderKind: providerKind,
       recordsUploaded: result.recordsUploaded,
       recordsDownloaded: result.recordsDownloaded,
     );
@@ -797,15 +809,17 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     }
     _running = true;
     state = state.copyWith(phase: AutoSyncPhase.syncing, clearFailure: true);
+    SyncProviderKind? providerKind;
+    var providers = <SyncProvider>[];
     try {
-      final provider = await _activeSyncProvider();
-      if (provider == null) {
+      providers = await _activeSyncProviders();
+      if (providers.isEmpty) {
         state = const AutoSyncStatus(phase: AutoSyncPhase.idle);
         return;
       }
-      final result = await ref
-          .read(syncRunServiceProvider)
-          .syncEncryptedSnapshot(provider, reportConflicts: true);
+      final result = await _syncAllEnabledProviders(providers, (kind) {
+        providerKind = kind;
+      });
       ref.read(syncConflictControllerProvider.notifier).clear();
       _invalidateSyncedMetadataProviders();
       _failureCount = 0;
@@ -813,6 +827,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       state = AutoSyncStatus(
         phase: AutoSyncPhase.idle,
         lastCompletedAt: result.completedAt,
+        lastProviderKind: providerKind,
         recordsUploaded: result.recordsUploaded,
         recordsDownloaded: result.recordsDownloaded,
       );
@@ -821,9 +836,10 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       _retryDelayAfterRun = null;
       ref
           .read(syncConflictControllerProvider.notifier)
-          .setConflicts(error.conflicts);
+          .setConflicts(error.conflicts, providerKind: providerKind);
       state = state.copyWith(
         phase: AutoSyncPhase.conflicts,
+        lastProviderKind: providerKind,
         conflictCount: error.conflicts.length,
       );
     } on SyncRunException catch (error) {
@@ -835,6 +851,22 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         _intervalTimer = null;
         _rerunRequested = false;
         _retryDelayAfterRun = null;
+        try {
+          await _publishRemoteResetToOtherProviders(
+            providers,
+            resetProviderKind: providerKind,
+          );
+        } on Object catch (resetError) {
+          _failureCount += 1;
+          state = state.copyWith(
+            phase: AutoSyncPhase.failed,
+            lastFailureMessage: _autoSyncFailureMessage(resetError),
+            lastFailure: resetError,
+            lastProviderKind: providerKind,
+          );
+          _retryDelayAfterRun = _retryDelay(_failureCount);
+          return;
+        }
         await ref
             .read(vaultSessionControllerProvider.notifier)
             .applyRemoteReset();
@@ -846,6 +878,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         phase: AutoSyncPhase.failed,
         lastFailureMessage: _autoSyncFailureMessage(error),
         lastFailure: error,
+        lastProviderKind: providerKind,
       );
       _retryDelayAfterRun = _retryDelay(_failureCount);
     } on Object catch (error) {
@@ -854,6 +887,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         phase: AutoSyncPhase.failed,
         lastFailureMessage: _autoSyncFailureMessage(error),
         lastFailure: error,
+        lastProviderKind: providerKind,
       );
       _retryDelayAfterRun = _retryDelay(_failureCount);
     } finally {
@@ -890,16 +924,88 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         vaultSession?.isBusy == false;
   }
 
-  Future<SyncProvider?> _activeSyncProvider() async {
+  Future<SyncRunResult> _syncAllEnabledProviders(
+    List<SyncProvider> providers,
+    void Function(SyncProviderKind kind) onProvider,
+  ) async {
+    var totalUploaded = 0;
+    var totalDownloaded = 0;
+    var totalUnchanged = 0;
+    SyncRunResult? latest;
+    final syncedProviders = <SyncProvider>[];
+    var localChangedAfterEarlierProvider = false;
+    for (final provider in providers) {
+      final kind = (await provider.capabilities()).kind;
+      onProvider(kind);
+      final result = await ref
+          .read(syncRunServiceProvider)
+          .syncEncryptedSnapshot(provider, reportConflicts: true);
+      totalUploaded += result.recordsUploaded;
+      totalDownloaded += result.recordsDownloaded;
+      totalUnchanged += result.recordsUnchanged;
+      latest = result;
+      if (result.recordsDownloaded > 0 && syncedProviders.isNotEmpty) {
+        localChangedAfterEarlierProvider = true;
+      }
+      syncedProviders.add(provider);
+    }
+    if (localChangedAfterEarlierProvider) {
+      for (final provider in syncedProviders) {
+        final kind = (await provider.capabilities()).kind;
+        onProvider(kind);
+        final result = await ref
+            .read(syncRunServiceProvider)
+            .syncEncryptedSnapshot(provider, reportConflicts: true);
+        totalUploaded += result.recordsUploaded;
+        totalDownloaded += result.recordsDownloaded;
+        totalUnchanged += result.recordsUnchanged;
+        latest = result;
+      }
+    }
+    final completedAt = latest?.completedAt ?? DateTime.now().toUtc();
+    return SyncRunResult(
+      recordsUploaded: totalUploaded,
+      recordsDownloaded: totalDownloaded,
+      recordsUnchanged: totalUnchanged,
+      headerUploaded: latest?.headerUploaded ?? false,
+      completedAt: completedAt,
+      writerDevice: latest?.writerDevice,
+      remoteDevice: latest?.remoteDevice,
+    );
+  }
+
+  Future<void> _publishRemoteResetToOtherProviders(
+    List<SyncProvider> providers, {
+    required SyncProviderKind? resetProviderKind,
+  }) async {
+    if (resetProviderKind == null) {
+      return;
+    }
+    final service = ref.read(syncRunServiceProvider);
+    for (final provider in providers) {
+      final kind = (await provider.capabilities()).kind;
+      if (kind == resetProviderKind) {
+        continue;
+      }
+      await service.publishRemoteReset(provider);
+    }
+  }
+
+  Future<List<SyncProvider>> _activeSyncProviders() async {
+    final providers = <SyncProvider>[];
     final cloudKit = await ref.read(cloudKitSyncSettingsProvider.future);
     if (cloudKit?.enabled ?? false) {
-      return ref.read(cloudKitSyncProviderFactoryProvider)();
+      providers.add(ref.read(cloudKitSyncProviderFactoryProvider)());
     }
     final webDav = await ref.read(webDavSyncSettingsProvider.future);
     if (webDav?.enabled ?? false) {
-      return ref.read(syncSettingsServiceProvider).buildWebDavProvider();
+      providers.add(
+        await ref.read(webDavSyncProviderFactoryProvider)(
+          ref.read(syncSettingsServiceProvider),
+        ),
+      );
     }
-    return null;
+    return providers;
   }
 
   void _invalidateSyncedMetadataProviders() {
@@ -1065,16 +1171,26 @@ final syncConflictControllerProvider =
     );
 
 class SyncConflictController extends Notifier<List<SyncRecordConflict>> {
+  SyncProviderKind? _providerKind;
+
+  SyncProviderKind? get providerKind => _providerKind;
+
   @override
   List<SyncRecordConflict> build() {
+    _providerKind = null;
     return const [];
   }
 
-  void setConflicts(List<SyncRecordConflict> conflicts) {
+  void setConflicts(
+    List<SyncRecordConflict> conflicts, {
+    SyncProviderKind? providerKind,
+  }) {
+    _providerKind = providerKind;
     state = List<SyncRecordConflict>.unmodifiable(conflicts);
   }
 
   void clear() {
+    _providerKind = null;
     state = const [];
   }
 }
@@ -2298,7 +2414,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       if (settings?.enabled != true) {
         return null;
       }
-      return await ref.read(syncSettingsServiceProvider).buildWebDavProvider();
+      return await ref.read(webDavSyncProviderFactoryProvider)(
+        ref.read(syncSettingsServiceProvider),
+      );
     } on Object {
       return null;
     }

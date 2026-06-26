@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -5,27 +6,40 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/app/app_dependencies.dart';
+import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/database/serlink_database.dart';
+import 'package:serlink/features/sync/application/auto_sync_controller.dart';
 import 'package:serlink/features/sync/application/sync_settings_service.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
 import 'package:serlink/features/sync/data/local_sync_provider.dart';
+import 'package:serlink/features/sync/domain/sync_provider.dart';
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
+import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
+import 'package:serlink/features/vault/application/vault_record_repository.dart';
 import 'package:serlink/features/vault/application/vault_service.dart';
+import 'package:serlink/features/vault/data/drift_vault_repository.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
 void main() {
   late Directory cloudKitDir;
+  late Directory webDavDir;
 
   setUp(() async {
     cloudKitDir = await Directory.systemTemp.createTemp(
       'serlink-sync-metadata-cloudkit-test-',
+    );
+    webDavDir = await Directory.systemTemp.createTemp(
+      'serlink-sync-metadata-webdav-test-',
     );
   });
 
   tearDown(() async {
     if (await cloudKitDir.exists()) {
       await cloudKitDir.delete(recursive: true);
+    }
+    if (await webDavDir.exists()) {
+      await webDavDir.delete(recursive: true);
     }
   });
 
@@ -326,4 +340,422 @@ void main() {
       );
     },
   );
+
+  test(
+    'auto sync merges CloudKit and WebDAV changes when both are enabled',
+    () async {
+      final sourceVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await sourceVault.initialize(passphrase: 'good passphrase');
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(cloudKitDir),
+        id: VaultRecordId('host:cloudkit-only'),
+        hostname: 'cloudkit-only.example.test',
+      );
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(webDavDir),
+        id: VaultRecordId('host:webdav-only'),
+        hostname: 'webdav-only.example.test',
+      );
+
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = _createDualSyncContainer(
+        database: database,
+        transferQueue: transferQueue,
+        cloudKitDir: cloudKitDir,
+        webDavDir: webDavDir,
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      await container.read(vaultSessionControllerProvider.future);
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .unlock(passphrase: 'good passphrase');
+      await container
+          .read(syncSettingsServiceProvider)
+          .saveWebDav(
+            const WebDavSyncSettingsDraft(
+              endpoint: 'https://dav.example.test',
+              username: 'ops',
+              password: 'server-password',
+            ),
+          );
+      container.read(autoSyncControllerProvider);
+      container
+          .read(autoSyncControllerProvider.notifier)
+          .requestSync(delay: Duration.zero);
+
+      await _waitForAutoSyncIdle(container);
+      await _waitForLocalRecords(database, [
+        VaultRecordId('host:cloudkit-only'),
+        VaultRecordId('host:webdav-only'),
+      ]);
+
+      final localVault =
+          container.read(vaultSessionControllerProvider.notifier).service
+              as InMemoryVaultService;
+      expect(
+        await _manifestRecordIds(
+          provider: LocalDirectorySyncProvider(cloudKitDir),
+          vault: localVault,
+        ),
+        containsAll(['host:cloudkit-only', 'host:webdav-only']),
+      );
+      expect(
+        await _manifestRecordIds(
+          provider: LocalDirectorySyncProvider(webDavDir),
+          vault: localVault,
+        ),
+        containsAll(['host:cloudkit-only', 'host:webdav-only']),
+      );
+
+      final status = container.read(autoSyncControllerProvider);
+      expect(status.phase, AutoSyncPhase.idle);
+      expect(status.recordsDownloaded, 1);
+      expect(status.recordsUploaded, greaterThanOrEqualTo(2));
+      expect(status.lastProviderKind, SyncProviderKind.webDav);
+    },
+  );
+
+  test('auto sync propagates a WebDAV remote reset to CloudKit', () async {
+    final sourceVault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    await sourceVault.initialize(passphrase: 'good passphrase');
+    final records = InMemoryVaultRecordRepository();
+    await records.upsert(
+      await sourceVault.encryptRecord(
+        id: VaultRecordId('host:reset-shared'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"reset-shared.example.test"}'),
+      ),
+    );
+    final cloudKitProvider = LocalDirectorySyncProvider(cloudKitDir);
+    final webDavProvider = LocalDirectorySyncProvider(webDavDir);
+    final sourceService = SyncRunService(vault: sourceVault, records: records);
+    await sourceService.pushEncryptedSnapshot(cloudKitProvider);
+    await sourceService.pushEncryptedSnapshot(webDavProvider);
+    await sourceService.publishRemoteReset(webDavProvider);
+
+    final database = SerlinkDatabase(NativeDatabase.memory());
+    final transferQueue = TransferQueueController();
+    final container = _createDualSyncContainer(
+      database: database,
+      transferQueue: transferQueue,
+      cloudKitDir: cloudKitDir,
+      webDavDir: webDavDir,
+    );
+    addTearDown(container.dispose);
+    addTearDown(transferQueue.dispose);
+    addTearDown(database.close);
+
+    await container.read(vaultSessionControllerProvider.future);
+    await container
+        .read(vaultSessionControllerProvider.notifier)
+        .unlock(passphrase: 'good passphrase');
+    await container
+        .read(syncSettingsServiceProvider)
+        .saveWebDav(
+          const WebDavSyncSettingsDraft(
+            endpoint: 'https://dav.example.test',
+            username: 'ops',
+            password: 'server-password',
+          ),
+        );
+    container.read(autoSyncControllerProvider);
+    container
+        .read(autoSyncControllerProvider.notifier)
+        .requestSync(delay: Duration.zero);
+
+    await _waitForVaultState(container, VaultState.uninitialized);
+    expect(
+      RemoteResetMarker.fromBytes(
+        await cloudKitProvider.readObject(resetMarkerRef),
+      ).vaultId,
+      syncVaultId(sourceVault.header!),
+    );
+    expect(await DriftVaultRecordRepository(database).list(), isEmpty);
+  });
+
+  test(
+    'auto sync keeps local vault when remote reset cannot fan out',
+    () async {
+      final sourceVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await sourceVault.initialize(passphrase: 'good passphrase');
+      final records = InMemoryVaultRecordRepository();
+      await records.upsert(
+        await sourceVault.encryptRecord(
+          id: VaultRecordId('host:reset-shared'),
+          type: 'host',
+          plaintext: utf8.encode('{"hostname":"reset-shared.example.test"}'),
+        ),
+      );
+      final cloudKitProvider = LocalDirectorySyncProvider(cloudKitDir);
+      final webDavProvider = LocalDirectorySyncProvider(webDavDir);
+      final sourceService = SyncRunService(
+        vault: sourceVault,
+        records: records,
+      );
+      await sourceService.pushEncryptedSnapshot(cloudKitProvider);
+      await sourceService.pushEncryptedSnapshot(webDavProvider);
+      await sourceService.publishRemoteReset(webDavProvider);
+
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = _createDualSyncContainer(
+        database: database,
+        transferQueue: transferQueue,
+        cloudKitDir: cloudKitDir,
+        webDavDir: webDavDir,
+        failCloudKitResetMarkerWrites: true,
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      await container.read(vaultSessionControllerProvider.future);
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .unlock(passphrase: 'good passphrase');
+      await container
+          .read(syncSettingsServiceProvider)
+          .saveWebDav(
+            const WebDavSyncSettingsDraft(
+              endpoint: 'https://dav.example.test',
+              username: 'ops',
+              password: 'server-password',
+            ),
+          );
+      container.read(autoSyncControllerProvider);
+      container
+          .read(autoSyncControllerProvider.notifier)
+          .requestSync(delay: Duration.zero);
+
+      await _waitForAutoSyncPhase(container, AutoSyncPhase.failed);
+      expect(
+        container.read(vaultSessionControllerProvider).requireValue.vaultState,
+        VaultState.unlocked,
+      );
+      expect(await DriftVaultRecordRepository(database).list(), isNotEmpty);
+      expect(
+        () async => cloudKitProvider.readObject(resetMarkerRef),
+        throwsA(isA<SyncProviderException>()),
+      );
+    },
+  );
+}
+
+ProviderContainer _createDualSyncContainer({
+  required SerlinkDatabase database,
+  required TransferQueueController transferQueue,
+  required Directory cloudKitDir,
+  required Directory webDavDir,
+  bool failCloudKitResetMarkerWrites = false,
+}) {
+  return ProviderContainer(
+    overrides: [
+      serlinkDatabaseProvider.overrideWithValue(database),
+      vaultCryptoConfigProvider.overrideWithValue(
+        const VaultCryptoConfig.testing(),
+      ),
+      platformCapabilitiesProvider.overrideWithValue(
+        const PlatformCapabilities(
+          operatingSystem: 'macos',
+          targetPlatform: TargetPlatform.macOS,
+        ),
+      ),
+      cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+      cloudKitSyncProviderFactoryProvider.overrideWithValue(
+        () => _KindOverrideSyncProvider(
+          LocalDirectorySyncProvider(cloudKitDir),
+          SyncProviderKind.cloudKit,
+          failResetMarkerWrites: failCloudKitResetMarkerWrites,
+        ),
+      ),
+      webDavSyncProviderFactoryProvider.overrideWithValue(
+        (_) async => _KindOverrideSyncProvider(
+          LocalDirectorySyncProvider(webDavDir),
+          SyncProviderKind.webDav,
+        ),
+      ),
+      secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+      transferQueueControllerProvider.overrideWithValue(transferQueue),
+      autoSyncDebounceDurationProvider.overrideWithValue(
+        const Duration(days: 1),
+      ),
+      autoSyncIntervalDurationProvider.overrideWithValue(
+        const Duration(days: 1),
+      ),
+      cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
+    ],
+  );
+}
+
+Future<void> _publishRemoteHost({
+  required InMemoryVaultService vault,
+  required LocalDirectorySyncProvider provider,
+  required VaultRecordId id,
+  required String hostname,
+}) async {
+  final records = InMemoryVaultRecordRepository();
+  await records.upsert(
+    await vault.encryptRecord(
+      id: id,
+      type: 'host',
+      plaintext: utf8.encode('{"hostname":"$hostname"}'),
+    ),
+  );
+  await SyncRunService(
+    vault: vault,
+    records: records,
+  ).pushEncryptedSnapshot(provider);
+}
+
+Future<void> _waitForAutoSyncIdle(ProviderContainer container) async {
+  await _waitForAutoSyncPhase(container, AutoSyncPhase.idle);
+}
+
+Future<void> _waitForAutoSyncPhase(
+  ProviderContainer container,
+  AutoSyncPhase expected,
+) async {
+  for (var attempt = 0; attempt < 300; attempt += 1) {
+    final status = container.read(autoSyncControllerProvider);
+    if (status.phase == expected) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  final status = container.read(autoSyncControllerProvider);
+  fail(
+    'Expected auto-sync phase $expected but found ${status.phase}. '
+    'Failure: ${status.lastFailureMessage}.',
+  );
+}
+
+Future<void> _waitForVaultState(
+  ProviderContainer container,
+  VaultState expected,
+) async {
+  for (var attempt = 0; attempt < 300; attempt += 1) {
+    final state = container.read(vaultSessionControllerProvider).value;
+    if (state?.vaultState == expected) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  final state = container.read(vaultSessionControllerProvider).value;
+  final status = container.read(autoSyncControllerProvider);
+  fail(
+    'Expected vault state $expected but found ${state?.vaultState}. '
+    'Auto-sync phase: ${status.phase}, failure: ${status.lastFailureMessage}.',
+  );
+}
+
+Future<void> _waitForLocalRecords(
+  SerlinkDatabase database,
+  List<VaultRecordId> ids,
+) async {
+  for (var attempt = 0; attempt < 300; attempt += 1) {
+    final records = DriftVaultRecordRepository(database);
+    var allPresent = true;
+    for (final id in ids) {
+      allPresent = allPresent && await records.read(id) != null;
+    }
+    if (allPresent) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  fail('Expected records ${ids.map((id) => id.value).join(', ')}.');
+}
+
+Future<List<String>> _manifestRecordIds({
+  required LocalDirectorySyncProvider provider,
+  required InMemoryVaultService vault,
+}) async {
+  final manifest = await provider.readManifest();
+  expect(manifest, isNotNull);
+  final manifestEnvelope = VaultRecordEnvelope.fromJson(
+    jsonDecode(utf8.decode(manifest!.encryptedPayload)) as Map<String, Object?>,
+  );
+  final manifestData =
+      jsonDecode(utf8.decode(await vault.decryptRecord(manifestEnvelope)))
+          as Map<String, Object?>;
+  final entries = manifestData['records'] as List<Object?>;
+  return [
+    for (final raw in entries) (raw as Map<String, Object?>)['id'] as String,
+  ];
+}
+
+class _KindOverrideSyncProvider implements SyncProvider {
+  const _KindOverrideSyncProvider(
+    this.inner,
+    this.kind, {
+    this.failResetMarkerWrites = false,
+  });
+
+  final LocalDirectorySyncProvider inner;
+  final SyncProviderKind kind;
+  final bool failResetMarkerWrites;
+
+  @override
+  Future<ProviderCapabilities> capabilities() async {
+    final capabilities = await inner.capabilities();
+    return ProviderCapabilities(
+      kind: kind,
+      supportsConditionalWrites: capabilities.supportsConditionalWrites,
+      requiresTls: capabilities.requiresTls,
+    );
+  }
+
+  @override
+  Future<RemoteManifest?> readManifest() => inner.readManifest();
+
+  @override
+  Future<void> writeManifest(RemoteManifest manifest) {
+    return inner.writeManifest(manifest);
+  }
+
+  @override
+  Future<void> writeManifestIfUnchanged(
+    RemoteManifest manifest,
+    RemoteManifest? expectedCurrent,
+  ) {
+    return inner.writeManifestIfUnchanged(manifest, expectedCurrent);
+  }
+
+  @override
+  Future<List<RemoteObjectRef>> listRecordObjects({String? prefix}) {
+    return inner.listRecordObjects(prefix: prefix);
+  }
+
+  @override
+  Future<List<int>> readObject(RemoteObjectRef ref) {
+    return inner.readObject(ref);
+  }
+
+  @override
+  Future<void> writeObject(RemoteObjectRef ref, List<int> bytes) {
+    if (failResetMarkerWrites && ref.path == resetMarkerRef.path) {
+      throw const SyncProviderException(
+        'sync.provider.unavailable',
+        'CloudKit is unavailable.',
+      );
+    }
+    return inner.writeObject(ref, bytes);
+  }
+
+  @override
+  Future<void> deleteObject(RemoteObjectRef ref) {
+    return inner.deleteObject(ref);
+  }
 }

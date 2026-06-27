@@ -606,6 +606,9 @@ class CloudKitVaultDiscoveryController extends Notifier<void> {
   }
 
   void _requestDiscovery() {
+    if (!ref.mounted) {
+      return;
+    }
     if (_running || !_shouldPoll) {
       return;
     }
@@ -629,6 +632,9 @@ class CloudKitVaultDiscoveryController extends Notifier<void> {
   }
 
   bool get _shouldPoll {
+    if (!ref.mounted) {
+      return false;
+    }
     if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
       return false;
     }
@@ -684,6 +690,9 @@ class CloudKitEncryptedSnapshotPrefetchNotifier extends Notifier<void> {
   }
 
   void requestPrefetch() {
+    if (!ref.mounted) {
+      return;
+    }
     if (!_shouldRun) {
       return;
     }
@@ -711,6 +720,9 @@ class CloudKitEncryptedSnapshotPrefetchNotifier extends Notifier<void> {
   }
 
   bool _shouldAcceptSnapshot(String vaultId) {
+    if (!ref.mounted) {
+      return false;
+    }
     final session = ref.read(vaultSessionControllerProvider).value;
     final header = ref
         .read(vaultSessionControllerProvider.notifier)
@@ -723,6 +735,9 @@ class CloudKitEncryptedSnapshotPrefetchNotifier extends Notifier<void> {
   }
 
   bool get _shouldRun {
+    if (!ref.mounted) {
+      return false;
+    }
     if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
       return false;
     }
@@ -861,7 +876,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
   }
 
   Future<void> _run() async {
-    if (!_canAttemptSync || _running) {
+    if (!ref.mounted || !_canAttemptSync || _running) {
       return;
     }
     _running = true;
@@ -870,6 +885,9 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     var providers = <SyncProvider>[];
     try {
       providers = await _activeSyncProviders();
+      if (!ref.mounted) {
+        return;
+      }
       if (providers.isEmpty) {
         state = const AutoSyncStatus(phase: AutoSyncPhase.idle);
         return;
@@ -877,6 +895,9 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       final result = await _syncAllEnabledProviders(providers, (kind) {
         providerKind = kind;
       });
+      if (!ref.mounted) {
+        return;
+      }
       ref.read(syncConflictControllerProvider.notifier).clear();
       _invalidateSyncedMetadataProviders();
       _failureCount = 0;
@@ -889,6 +910,9 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         recordsDownloaded: result.recordsDownloaded,
       );
     } on SyncRunConflictException catch (error) {
+      if (!ref.mounted) {
+        return;
+      }
       _failureCount = 0;
       _retryDelayAfterRun = null;
       ref
@@ -900,10 +924,16 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         conflictCount: error.conflicts.length,
       );
     } on SyncDeviceException catch (error) {
+      if (!ref.mounted) {
+        return;
+      }
       if (error.code == 'sync.device.revoked') {
         try {
           await _disableSyncAfterLocalDeviceRevoked();
         } on Object catch (disableError) {
+          if (!ref.mounted) {
+            return;
+          }
           final failedAt = DateTime.now().toUtc();
           _failureCount += 1;
           state = state.copyWith(
@@ -914,6 +944,9 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
             lastProviderKind: providerKind,
           );
           _retryDelayAfterRun = _retryDelay(_failureCount);
+          return;
+        }
+        if (!ref.mounted) {
           return;
         }
         state = const AutoSyncStatus.disabled();
@@ -930,6 +963,9 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       );
       _retryDelayAfterRun = _retryDelay(_failureCount);
     } on SyncRunException catch (error) {
+      if (!ref.mounted) {
+        return;
+      }
       if (error.code == 'sync.remote_vault_reset') {
         _failureCount = 0;
         _debounceTimer?.cancel();
@@ -942,6 +978,9 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
             resetProviderKind: providerKind,
           );
         } on Object catch (resetError) {
+          if (!ref.mounted) {
+            return;
+          }
           final failedAt = DateTime.now().toUtc();
           _failureCount += 1;
           state = state.copyWith(
@@ -954,9 +993,15 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
           _retryDelayAfterRun = _retryDelay(_failureCount);
           return;
         }
+        if (!ref.mounted) {
+          return;
+        }
         await ref
             .read(vaultSessionControllerProvider.notifier)
             .applyRemoteReset();
+        if (!ref.mounted) {
+          return;
+        }
         state = const AutoSyncStatus.disabled();
         return;
       }
@@ -971,6 +1016,9 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       );
       _retryDelayAfterRun = _retryDelay(_failureCount);
     } on Object catch (error) {
+      if (!ref.mounted) {
+        return;
+      }
       final failedAt = DateTime.now().toUtc();
       _failureCount += 1;
       state = state.copyWith(
@@ -983,17 +1031,23 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       _retryDelayAfterRun = _retryDelay(_failureCount);
     } finally {
       _running = false;
-      final retryDelay = _retryDelayAfterRun;
-      if (retryDelay != null && _canAttemptSync) {
-        _retryDelayAfterRun = null;
-        _rerunRequested = false;
-        _scheduleRetry(retryDelay);
-      } else if (_rerunRequested && _canAttemptSync) {
-        _rerunRequested = false;
-        requestSync(delay: Duration.zero);
-      } else if (!_canAttemptSync) {
+      if (!ref.mounted) {
         _rerunRequested = false;
         _retryDelayAfterRun = null;
+      } else {
+        final retryDelay = _retryDelayAfterRun;
+        final canAttemptSync = _canAttemptSync;
+        if (retryDelay != null && canAttemptSync) {
+          _retryDelayAfterRun = null;
+          _rerunRequested = false;
+          _scheduleRetry(retryDelay);
+        } else if (_rerunRequested && canAttemptSync) {
+          _rerunRequested = false;
+          requestSync(delay: Duration.zero);
+        } else if (!canAttemptSync) {
+          _rerunRequested = false;
+          _retryDelayAfterRun = null;
+        }
       }
     }
   }
@@ -1005,7 +1059,13 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     _rerunRequested = false;
     _retryDelayAfterRun = null;
     await ref.read(syncSettingsServiceProvider).disableAllSync();
+    if (!ref.mounted) {
+      return;
+    }
     await ref.read(syncDeviceServiceProvider).forgetLocalDeviceRegistration();
+    if (!ref.mounted) {
+      return;
+    }
     _invalidateSyncedMetadataProviders();
   }
 
@@ -1013,11 +1073,16 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(delay, () {
       _debounceTimer = null;
-      unawaited(_run());
+      if (ref.mounted) {
+        unawaited(_run());
+      }
     });
   }
 
   bool get _canAttemptSync {
+    if (!ref.mounted) {
+      return false;
+    }
     if (!ref.read(autoSyncEnabledProvider)) {
       return false;
     }
@@ -1038,6 +1103,9 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     var localChangedAfterEarlierProvider = false;
     for (final provider in providers) {
       final kind = (await provider.capabilities()).kind;
+      if (!ref.mounted) {
+        break;
+      }
       onProvider(kind);
       final result = await ref
           .read(syncRunServiceProvider)
@@ -1054,6 +1122,9 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     if (localChangedAfterEarlierProvider) {
       for (final provider in syncedProviders) {
         final kind = (await provider.capabilities()).kind;
+        if (!ref.mounted) {
+          break;
+        }
         onProvider(kind);
         final result = await ref
             .read(syncRunServiceProvider)
@@ -1083,9 +1154,15 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     if (resetProviderKind == null) {
       return;
     }
+    if (!ref.mounted) {
+      return;
+    }
     final service = ref.read(syncRunServiceProvider);
     for (final provider in providers) {
       final kind = (await provider.capabilities()).kind;
+      if (!ref.mounted) {
+        return;
+      }
       if (kind == resetProviderKind) {
         continue;
       }
@@ -1096,10 +1173,16 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
   Future<List<SyncProvider>> _activeSyncProviders() async {
     final providers = <SyncProvider>[];
     final cloudKit = await ref.read(cloudKitSyncSettingsProvider.future);
+    if (!ref.mounted) {
+      return providers;
+    }
     if (cloudKit?.enabled ?? false) {
       providers.add(ref.read(cloudKitSyncProviderFactoryProvider)());
     }
     final webDav = await ref.read(webDavSyncSettingsProvider.future);
+    if (!ref.mounted) {
+      return providers;
+    }
     if (webDav?.enabled ?? false) {
       providers.add(
         await ref.read(webDavSyncProviderFactoryProvider)(

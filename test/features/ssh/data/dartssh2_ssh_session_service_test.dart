@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/core/ids/entity_id.dart';
+import 'package:serlink/core/logging/offline_diagnostic_logger.dart';
 import 'package:serlink/core/security/secret_bytes.dart';
 import 'package:serlink/features/ssh/data/dartssh2_ssh_session_service.dart';
 import 'package:serlink/features/ssh/data/ssh_agent_client.dart';
@@ -132,6 +133,41 @@ void main() {
     );
   });
 
+  test(
+    'logs connection failures without host user or secret details',
+    () async {
+      final logger = _CapturingDiagnosticLogger();
+      final service = DartSsh2SessionService(
+        socketFactory: (_, _, {timeout}) async {
+          throw StateError('host=example.internal password=hunter2');
+        },
+        diagnosticLogger: logger,
+      );
+
+      await expectLater(
+        service.testConnection(
+          _profile([
+            SshPasswordAuth(password: SecretBytes(utf8.encode('hunter2'))),
+          ]),
+        ),
+        throwsStateError,
+      );
+
+      expect(logger.events.map((event) => event.event), [
+        'ssh.connect.start',
+        'ssh.connect.failure',
+      ]);
+      final serialized = jsonEncode([
+        for (final event in logger.events) event.details,
+      ]);
+      expect(serialized, contains('password'));
+      expect(serialized, contains('StateError'));
+      expect(serialized, isNot(contains('example.internal')));
+      expect(serialized, isNot(contains('ops')));
+      expect(serialized, isNot(contains('hunter2')));
+    },
+  );
+
   test('remote forwarding requires an active SSH session', () async {
     final service = DartSsh2SessionService();
 
@@ -236,6 +272,37 @@ class _FakeAgentClient implements SshAgentClient {
           _bytesEqual(candidate.toPublicKey().encode(), publicKeyBlob),
     );
     return keyPair.sign(data).encode();
+  }
+}
+
+class _CapturedDiagnosticEvent {
+  const _CapturedDiagnosticEvent({
+    required this.event,
+    required this.level,
+    required this.details,
+  });
+
+  final String event;
+  final DiagnosticLogLevel level;
+  final Map<String, Object?> details;
+}
+
+class _CapturingDiagnosticLogger implements DiagnosticLogger {
+  final events = <_CapturedDiagnosticEvent>[];
+
+  @override
+  Future<void> record(
+    String event, {
+    DiagnosticLogLevel level = DiagnosticLogLevel.info,
+    Map<String, Object?> details = const {},
+  }) async {
+    events.add(
+      _CapturedDiagnosticEvent(
+        event: event,
+        level: level,
+        details: Map<String, Object?>.unmodifiable(details),
+      ),
+    );
   }
 }
 

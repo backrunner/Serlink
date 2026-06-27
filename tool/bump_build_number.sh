@@ -2,24 +2,30 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PUBSPEC="$ROOT_DIR/pubspec.yaml"
 DRY_RUN=0
-RUN_PUB_GET=1
 SET_BUILD_NUMBER=""
+PLATFORM=""
+PRINT_CURRENT=0
 
 usage() {
   cat <<'USAGE'
-Usage: tool/bump_build_number.sh [options]
+Usage: tool/bump_build_number.sh --platform ios|macos [options]
 
 Options:
+  --platform PLATFORM
+      Choose which platform build number to update: ios or macos.
+
   --set BUILD_NUMBER
       Set the build number instead of incrementing it.
 
   --dry-run
-      Print the next version without changing files.
+      Print the next platform build number without changing files.
+
+  --print
+      Print the current platform build number without changing files.
 
   --no-pub-get
-      Do not run flutter pub get after changing pubspec.yaml.
+      Accepted for compatibility. Platform build numbers do not modify pubspec.yaml.
 
   -h, --help
       Show this help.
@@ -33,6 +39,11 @@ fail() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --platform)
+      shift
+      [[ $# -gt 0 ]] || fail "--platform requires ios or macos"
+      PLATFORM="$1"
+      ;;
     --set)
       shift
       [[ $# -gt 0 ]] || fail "--set requires a build number"
@@ -41,8 +52,14 @@ while [[ $# -gt 0 ]]; do
     --dry-run)
       DRY_RUN=1
       ;;
+    --print)
+      PRINT_CURRENT=1
+      ;;
     --no-pub-get)
-      RUN_PUB_GET=0
+      ;;
+    ios|macos)
+      [[ -z "$PLATFORM" ]] || fail "platform specified more than once"
+      PLATFORM="$1"
       ;;
     -h|--help)
       usage
@@ -55,21 +72,40 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-[[ -f "$PUBSPEC" ]] || fail "pubspec.yaml not found at $PUBSPEC"
+case "$PLATFORM" in
+  ios)
+    CONFIG_FILE="$ROOT_DIR/ios/Runner/Configs/AppInfo.xcconfig"
+    SETTING_NAME="SERLINK_IOS_BUILD_NUMBER"
+    PLATFORM_LABEL="iOS"
+    ;;
+  macos)
+    CONFIG_FILE="$ROOT_DIR/macos/Runner/Configs/AppInfo.xcconfig"
+    SETTING_NAME="SERLINK_MACOS_BUILD_NUMBER"
+    PLATFORM_LABEL="macOS"
+    ;;
+  "")
+    fail "choose a platform with --platform ios or --platform macos"
+    ;;
+  *)
+    fail "--platform must be ios or macos"
+    ;;
+esac
+
+[[ -f "$CONFIG_FILE" ]] || fail "build number config not found at $CONFIG_FILE"
 
 if [[ -n "$SET_BUILD_NUMBER" && ! "$SET_BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
   fail "--set must be a non-negative integer"
 fi
 
-version_line="$(grep -E '^version:[[:space:]]*[0-9]+(\.[0-9]+){2}(\+[0-9]+)?[[:space:]]*$' "$PUBSPEC" || true)"
-[[ -n "$version_line" ]] || fail "pubspec.yaml must contain a version like 1.0.0+1"
+current_line="$(grep -E "^${SETTING_NAME}[[:space:]]*=[[:space:]]*[0-9]+[[:space:]]*$" "$CONFIG_FILE" || true)"
+[[ -n "$current_line" ]] || fail "$CONFIG_FILE must contain $SETTING_NAME = <number>"
 
-version_value="${version_line#version:}"
-version_value="${version_value//[[:space:]]/}"
-version_name="${version_value%%+*}"
-current_build="0"
-if [[ "$version_value" == *"+"* ]]; then
-  current_build="${version_value##*+}"
+current_build="${current_line#*=}"
+current_build="${current_build//[[:space:]]/}"
+
+if [[ "$PRINT_CURRENT" -eq 1 ]]; then
+  echo "$current_build"
+  exit 0
 fi
 
 if [[ -n "$SET_BUILD_NUMBER" ]]; then
@@ -78,18 +114,16 @@ else
   next_build=$((current_build + 1))
 fi
 
-next_version="$version_name+$next_build"
-
 if [[ "$DRY_RUN" -eq 1 ]]; then
-  echo "$next_version"
+  echo "$next_build"
   exit 0
 fi
 
 tmp_file="$(mktemp)"
-awk -v next_version="$next_version" '
+awk -v setting_name="$SETTING_NAME" -v next_build="$next_build" '
   BEGIN { changed = 0 }
-  /^version:[[:space:]]*[0-9]+(\.[0-9]+){2}(\+[0-9]+)?[[:space:]]*$/ && changed == 0 {
-    print "version: " next_version
+  $0 ~ "^" setting_name "[[:space:]]*=[[:space:]]*[0-9]+[[:space:]]*$" && changed == 0 {
+    print setting_name " = " next_build
     changed = 1
     next
   }
@@ -99,15 +133,10 @@ awk -v next_version="$next_version" '
       exit 1
     }
   }
-' "$PUBSPEC" >"$tmp_file" || {
+' "$CONFIG_FILE" >"$tmp_file" || {
   rm -f "$tmp_file"
-  fail "failed to update pubspec.yaml"
+  fail "failed to update $CONFIG_FILE"
 }
-mv "$tmp_file" "$PUBSPEC"
+mv "$tmp_file" "$CONFIG_FILE"
 
-echo "Updated pubspec.yaml to version: $next_version"
-
-if [[ "$RUN_PUB_GET" -eq 1 ]]; then
-  cd "$ROOT_DIR"
-  flutter pub get
-fi
+echo "Updated $PLATFORM_LABEL build number to $next_build"

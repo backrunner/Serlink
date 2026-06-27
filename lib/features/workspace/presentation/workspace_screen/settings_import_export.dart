@@ -332,11 +332,11 @@ Future<void> _exportDiagnosticBundle(
         .read(documentGatewayProvider)
         .exportBytes(
           bytes: Uint8List.fromList(bundle.bytes),
-          suggestedName: 'serlink-diagnostics.json',
+          suggestedName: 'serlink-diagnostics.zip',
           acceptedTypeGroups: const [
-            XTypeGroup(label: 'Serlink Diagnostics', extensions: ['json']),
+            XTypeGroup(label: 'Serlink Diagnostics', extensions: ['zip']),
           ],
-          mimeType: 'application/json',
+          mimeType: 'application/zip',
         );
     if (!exported) {
       return;

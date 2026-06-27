@@ -41,6 +41,7 @@ final sshSessionServiceProvider = Provider<SshSessionService>((ref) {
     confirmHostKey: ref
         .watch(hostKeyVerificationServiceProvider)
         .confirmHostKey,
+    diagnosticLogger: ref.watch(offlineDiagnosticLoggerProvider),
   );
 });
 

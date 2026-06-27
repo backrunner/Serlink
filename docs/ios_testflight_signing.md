@@ -71,7 +71,7 @@ After the CloudKit schema has been deployed to Production:
 1. Increment the build number:
 
    ```sh
-   ./tool/bump_build_number.sh
+   ./tool/bump_build_number.sh --platform ios
    ```
 
 2. Open `ios/Runner.xcworkspace` in Xcode.
@@ -91,9 +91,9 @@ Apple creates the first beta version after the first build upload. The build
 still needs to finish App Store Connect processing before it can be assigned to
 internal or external testers.
 
-`tool/bump_build_number.sh` updates the `version: x.y.z+n` line in
-`pubspec.yaml` and runs `flutter pub get`, which refreshes Flutter's generated
-build settings before Xcode archives the app.
+`tool/bump_build_number.sh --platform ios` updates
+`SERLINK_IOS_BUILD_NUMBER` in `ios/Runner/Configs/AppInfo.xcconfig`, which
+Xcode uses as the iOS `CFBundleVersion`.
 
 ## Scripted upload
 
@@ -107,7 +107,7 @@ SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
 The upload script:
 
 1. Runs the signing readiness check.
-2. Optionally increments the Flutter build number when
+2. Optionally increments the iOS build number when
    `--bump-build-number` is provided.
 3. Configures the Flutter iOS release build with
    `SERLINK_DISTRIBUTION=app_store`.

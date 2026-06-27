@@ -1,204 +1,115 @@
-# Serlink
+<p align="center">
+  <img src="macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png" width="96" height="96" alt="Serlink app icon">
+</p>
 
-Serlink is a Flutter-based SSH terminal and SFTP workstation, with a desktop-first core for macOS, Windows, and Linux and an early iOS foundation.
+<h1 align="center">Serlink</h1>
 
-> Status: Work in progress. Serlink is open source, but it is not release-ready yet. Desktop packaging, real integration fixtures, cross-platform QA, and mobile/iOS validation are still in progress.
+<p align="center">
+  <strong>A private SSH terminal and SFTP workspace for remote machines.</strong>
+</p>
 
-Current code status: the project already has a substantial desktop core, including an encrypted vault, host and identity management, mixed Terminal/SFTP/local-terminal tabs, transfer queueing, and automatic encrypted WebDAV sync. iOS support has an initial project shell, touch workspace, document gateway, mobile capability gating, and CloudKit sync wiring, but it is still WIP.
+<p align="center">
+  <a href="LICENSE"><img alt="License: AGPL-3.0-or-later" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-111827"></a>
+  <img alt="Status: active development" src="https://img.shields.io/badge/status-active%20development-0f766e">
+  <img alt="Platforms: macOS, Windows, Linux, iOS" src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS-2563eb">
+</p>
 
-## Current Scope
+Serlink brings SSH sessions, SFTP transfers, host profiles, command snippets,
+and encrypted sync into one focused Flutter app. It is built for people who
+move between servers often and want their connection data to stay private.
 
-Primary target in this repository:
+> Serlink is in active development. The desktop core is substantial, iOS support
+> and Apple sync/release paths are being hardened, and public production builds
+> are not release-ready yet.
 
-- macOS
-- Windows
-- Linux
-- iOS WIP foundation
+## Highlights
 
-Desktop remains the primary production target. The iOS code path is present for mobile validation and incremental hardening; Android is not part of the current implementation round.
+| Area | What Serlink already does |
+| --- | --- |
+| Terminal workspace | SSH tabs, local terminal tabs, split panes, reconnect-in-place, buffer search, paste guard, startup commands, ZMODEM, and local/remote/SOCKS port forwarding. |
+| SFTP and transfers | Remote directory browsing, file actions, bounded text preview/edit, upload/download queues, progress details, pause/resume/retry, and conflict handling. |
+| Hosts and credentials | Host profiles, password identities, private keys, OpenSSH certificates, known-host verification, jump hosts, tags, and OpenSSH config import/export. |
+| Private vault | Encrypted Drift/SQLite storage, recovery keys, encrypted backups, secure-storage secrets, Face ID unlock where available, and background privacy controls. |
+| Encrypted sync | WebDAV sync, private CloudKit sync on Apple platforms, device records, conflict review, tombstones, remote repair, TLS diagnostics, and certificate pinning. |
+| Daily workflow | Command snippets, transfer history, redacted diagnostics, and app localization for English, Simplified Chinese, and Japanese. |
 
-## Implemented
+## Platform Snapshot
 
-### Security and Storage
-
-- Encrypted vault with lock/unlock flows
-- Recovery key support
-- Biometric vault unlock protector via OS secure storage
-- Encrypted Drift/SQLite record storage
-- Encrypted backup export/import
-- Encrypted known-host storage
-- Best-effort local profile locking and restrictive file permissions on non-Windows platforms
-
-### Hosts and Credentials
-
-- Host CRUD
-- Password identities
-- Private key identities
-- OpenSSH certificate identities
-- Known-host verification and fingerprint confirmation modal
-- OpenSSH config preview/import with:
-  - `Include` expansion
-  - `Host *` inheritance
-  - wildcard inheritance for concrete aliases
-  - `Match` isolation
-  - `IdentityFile` import/linking
-  - paired `CertificateFile` import
-  - `ProxyJump` resolution/linking
-- OpenSSH `known_hosts` import with explicit warnings for hashed entries, patterns, `@cert-authority`, and `@revoked`
-
-### Terminal
-
-- SSH terminal tabs backed by `xterm`
-- Local terminal tabs backed by `flutter_pty`
-- Mixed Terminal / SFTP / Local Terminal tab container
-- Reconnect-in-place semantics
-- Automatic reconnect policy from host settings
-- Multiline paste confirmation
-- Terminal buffer search
-- Theme / font / line-height settings
-- Per-host terminal display profiles
-- Split terminal panes inside a tab
-- Local/remote/SOCKS dynamic port forwarding UI and lifecycle
-- Startup commands after shell attach
-- ZMODEM `rz` / `sz` transfers from terminal sessions
-
-### SFTP and Transfers
-
-- SFTP list/table view
-- Directory navigation and filtering
-- `mkdir`, rename, move, delete, `chmod`
-- Bounded text preview/edit for remote files
-- File and folder upload/download
-- Transfer queue with:
-  - global concurrency limit
-  - progress, speed, ETA
-  - pause / resume / cancel / retry
-  - encrypted transfer history
-- Conflict handling for upload/download targets:
-  - replace / merge
-  - rename
-  - skip
-
-### Sync
-
-- Automatic encrypted WebDAV sync
-- Encrypted WebDAV settings
-- WebDAV password storage via secure storage, not plaintext DB records
-- Conflict detection and blocking resolution flow
-- Delete tombstone propagation
-- Device metadata and device cleanup
-- Remote repair handling for missing/corrupt/wrong-vault manifests
-- TLS certificate diagnostics and endpoint pinning
-- Sync object-path validation to reject traversal/unsafe refs
-- CloudKit sync bridge and entitlements for iOS and macOS
-
-### Diagnostics
-
-- Sentry integration with redaction hooks
-- Redacted diagnostic bundle export
-- Debug-oriented logging without a debug panel
-
-## Not Yet Release-Complete
-
-These areas are still open before a production desktop release:
-
-- macOS signing/notarization, Windows installer/MSIX, Linux packaging
-- CI, dependency audit, SBOM, third-party notices
-- Real integration fixtures for SSH/SFTP/WebDAV/ProxyJump/OpenSSH certificates/forwarding
-- Cross-platform secure-storage and IME verification on real machines
-- iOS simulator/device validation and mobile file-transfer UX hardening
-- CloudKit signed-device validation, production schema deployment, and provider hardening
-- Final accessibility and polish pass
-- OpenSSH import validation against real `ssh -G` behavior
-
-## Intentionally Deferred From First Desktop Release
-
-- iCloud Drive sync
-- SSH Agent auth
-- FIDO2 / hardware security key SSH auth
-- PuTTY PPK import
-- Explorer-style SFTP file manager mode
-- Full vault cryptographic rekey flow
-
-See [.agents/14-release-scope-decisions.md](.agents/14-release-scope-decisions.md) for the maintained scope decisions.
+| Platform | Status |
+| --- | --- |
+| macOS | Primary desktop target with App Store, TestFlight, and direct distribution tooling in progress. |
+| iOS | Active mobile foundation with CloudKit sync bridge, touch workspace, document gateway, and device validation work underway. |
+| Windows | Desktop Flutter project and shared desktop core are present; installer and real-machine QA are still pending. |
+| Linux | Desktop Flutter project and shared desktop core are present; packaging and distro QA are still pending. |
+| Android | Not an active release target right now. |
 
 ## Development
 
-### Requirements
+Requirements:
 
-- Flutter SDK compatible with `sdk: ^3.12.0`
-- Desktop Flutter toolchains for the target OS
-- Xcode command line tools on macOS
-- Visual Studio C++ desktop workload on Windows
-- GTK/clang toolchain normally required by Flutter desktop on Linux
+- Flutter SDK compatible with Dart `^3.12.0`
+- Desktop Flutter toolchain for the target OS
+- Xcode command line tools for Apple platforms
+- Visual Studio C++ desktop workload for Windows
+- GTK/clang tooling normally required by Flutter desktop on Linux
 
-### Install Dependencies
+Install dependencies:
 
-```bash
+```sh
 flutter pub get
 ```
 
-### Run
+Run the app:
 
-```bash
+```sh
 flutter run -d macos
 flutter run -d windows
 flutter run -d linux
 ```
 
-### Static Analysis
+Check the project:
 
-```bash
+```sh
 flutter analyze
+flutter test -r expanded
 ```
 
-### Tests
+Release helpers and platform runbooks live in `docs/`:
 
-```bash
-flutter test
-```
+- [Development release commands](docs/development_release_commands.md)
+- [iOS release](docs/ios_release.md)
+- [macOS release](docs/macos_release.md)
+- [CloudKit production release](docs/cloudkit_production_release.md)
+- [macOS distribution](docs/macos_distribution.md)
 
-As of 2026-06-04:
-
-- `flutter analyze` passes
-- Targeted iOS/mobile foundation tests pass
-
-### Release Commands
-
-Common local verification, build-number, and TestFlight upload commands are in
-[docs/development_release_commands.md](docs/development_release_commands.md).
-Schema/version bump rules are in
-[docs/development_schema_versioning.md](docs/development_schema_versioning.md).
-Full platform release runbooks are in [docs/ios_release.md](docs/ios_release.md)
-and [docs/macos_release.md](docs/macos_release.md).
-
-## Repository Layout
+## Repository Map
 
 ```text
 lib/
-  app/          app shell, dependency wiring, router, theme
-  core/         shared failures, ids, runtime, security, logging
-  database/     Drift database
-  features/     product modules: vault, hosts, ssh, terminal, sftp, sync, etc.
-  platform/     OS integration wrappers such as secure storage
+  app/          app shell, dependency wiring, router, and theme
+  core/         shared ids, failures, runtime, security, and logging
+  database/     Drift database and recovery helpers
+  design_system/Serlink UI primitives and tokens
+  features/     vault, hosts, identities, ssh, terminal, sftp, sync, transfers
+  platform/     OS integrations such as secure storage and document gateways
 
-test/           unit, widget, and smoke tests
-.agents/        planning, architecture, gap analysis, and roadmap docs
+test/           unit, widget, smoke, platform, sync, and release-gate tests
+docs/           release, signing, CloudKit, distribution, and schema notes
+third_party/    vendored dependencies with local patches
 ```
 
 ## Security Notes
 
-- Sensitive host, identity, and settings data are designed to be stored encrypted at rest.
-- WebDAV sync transfers encrypted manifests and encrypted records, not plaintext host data.
-- Vault lock does not forcibly tear down already-established SSH/SFTP sessions.
-- Full app exit does not restore workspace tabs or live sessions on next launch.
+- Host data, identities, snippets, transfer history, sync settings, and recovery
+  data are designed to live in encrypted vault records.
+- WebDAV and CloudKit sync store encrypted manifests and encrypted objects, not
+  plaintext host data.
+- Diagnostic exports are redacted and exclude terminal output, commands, hosts,
+  usernames, paths, credentials, and private keys.
+- Vault lock prevents new profile resolution but does not forcibly terminate
+  already-established SSH or SFTP sessions.
 
-## Known Issues
-
-- `flutter_pty` currently emits a macOS Swift Package Manager support warning during Flutter commands. It is non-blocking today, but it must be addressed before upgrading to a Flutter version that makes it fatal.
-- Current verification is mostly unit/widget/smoke level. Integration coverage against real SSH/SFTP/WebDAV stacks is still missing.
-
-## License
+## License and Brand
 
 Serlink source code is licensed under the GNU Affero General Public License
 version 3 or any later version. See [LICENSE](LICENSE).
@@ -207,28 +118,6 @@ The Serlink name, logos, icons, app store assets, screenshots, and related
 branding materials are not licensed under the AGPL. See
 [TRADEMARKS.md](TRADEMARKS.md) for the brand and trademark policy.
 
-This repository also vendors a patched copy of `xterm.dart` 4.0.0 under
+This repository vendors a patched copy of `xterm.dart` 4.0.0 under
 `third_party/xterm`, which remains under the MIT License. See [NOTICE](NOTICE)
 and [third_party/xterm/LICENSE](third_party/xterm/LICENSE).
-
-## Project Docs
-
-Detailed planning and implementation docs live under `.agents/`:
-
-- [.agents/01-product-requirements.md](.agents/01-product-requirements.md)
-- [.agents/02-technical-feasibility.md](.agents/02-technical-feasibility.md)
-- [.agents/06-code-level-design.md](.agents/06-code-level-design.md)
-- [.agents/07-roadmap.md](.agents/07-roadmap.md)
-- [.agents/12-gap-analysis.md](.agents/12-gap-analysis.md)
-- [.agents/13-progress-status.md](.agents/13-progress-status.md)
-- [.agents/14-release-scope-decisions.md](.agents/14-release-scope-decisions.md)
-
-Release and platform-operation docs:
-
-- [docs/ios_release.md](docs/ios_release.md)
-- [docs/macos_release.md](docs/macos_release.md)
-- [docs/development_release_commands.md](docs/development_release_commands.md)
-- [docs/cloudkit_production_release.md](docs/cloudkit_production_release.md)
-- [docs/ios_testflight_signing.md](docs/ios_testflight_signing.md)
-- [docs/macos_testflight_signing.md](docs/macos_testflight_signing.md)
-- [docs/macos_distribution.md](docs/macos_distribution.md)

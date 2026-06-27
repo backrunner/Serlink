@@ -166,6 +166,80 @@ void main() {
       expect(service.state, VaultState.unlocked);
     });
 
+    test('reads only one available biometric protector per unlock', () async {
+      final store = _CountingSecretStore();
+      await service.initialize(passphrase: 'good passphrase');
+      final protectedHeader = await service.enableLocalUnlock(secrets: store);
+      final activeProtector = protectedHeader.localUnlockProtectors.single;
+      const staleRef = SecretRef('vault/biometric-unlock/stale');
+      await store.write(staleRef, [
+        1,
+        2,
+        3,
+      ], protection: SecretProtection.biometricCurrentSet);
+      final staleProtector = VaultLocalUnlockProtector(
+        id: 'stale-protector',
+        secretRef: staleRef,
+        nonce: activeProtector.nonce,
+        mac: activeProtector.mac,
+        ciphertext: activeProtector.ciphertext,
+        createdAt: DateTime.utc(2020),
+        protection: VaultLocalUnlockProtection.biometricCurrentSet,
+      );
+      final multiProtectorService = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+        header: protectedHeader.copyWith(
+          localUnlockProtectors: [staleProtector, activeProtector],
+        ),
+      );
+      store.resetCounts();
+
+      await multiProtectorService.unlockWithLocalKey(secrets: store);
+
+      expect(multiProtectorService.state, VaultState.unlocked);
+      expect(store.biometricReadRefs, [activeProtector.secretRef]);
+    });
+
+    test(
+      'falls back when the newest biometric protector cannot decrypt',
+      () async {
+        final store = _CountingSecretStore();
+        await service.initialize(passphrase: 'good passphrase');
+        final protectedHeader = await service.enableLocalUnlock(secrets: store);
+        final activeProtector = protectedHeader.localUnlockProtectors.single;
+        const staleRef = SecretRef('vault/biometric-unlock/newer-stale');
+        await store.write(staleRef, [
+          1,
+          2,
+          3,
+        ], protection: SecretProtection.biometricCurrentSet);
+        final staleProtector = VaultLocalUnlockProtector(
+          id: 'newer-stale-protector',
+          secretRef: staleRef,
+          nonce: activeProtector.nonce,
+          mac: activeProtector.mac,
+          ciphertext: activeProtector.ciphertext,
+          createdAt: DateTime.utc(2100),
+          protection: VaultLocalUnlockProtection.biometricCurrentSet,
+        );
+        final multiProtectorService = InMemoryVaultService(
+          config: const VaultCryptoConfig.testing(),
+          header: protectedHeader.copyWith(
+            localUnlockProtectors: [activeProtector, staleProtector],
+          ),
+        );
+        store.resetCounts();
+
+        await multiProtectorService.unlockWithLocalKey(secrets: store);
+
+        expect(multiProtectorService.state, VaultState.unlocked);
+        expect(store.biometricReadRefs, [
+          staleProtector.secretRef,
+          activeProtector.secretRef,
+        ]);
+      },
+    );
+
     test(
       'ignores biometric secret lookup failures when checking status',
       () async {
@@ -507,6 +581,25 @@ class _ReadFailingSecretStore extends InMemorySecretStore {
   }) async {
     if (protection == SecretProtection.biometricCurrentSet) {
       throw StateError('biometric read failed');
+    }
+    return super.read(ref, protection: protection);
+  }
+}
+
+class _CountingSecretStore extends InMemorySecretStore {
+  final List<SecretRef> biometricReadRefs = [];
+
+  void resetCounts() {
+    biometricReadRefs.clear();
+  }
+
+  @override
+  Future<List<int>?> read(
+    SecretRef ref, {
+    SecretProtection protection = SecretProtection.deviceLocal,
+  }) async {
+    if (protection == SecretProtection.biometricCurrentSet) {
+      biometricReadRefs.add(ref);
     }
     return super.read(ref, protection: protection);
   }

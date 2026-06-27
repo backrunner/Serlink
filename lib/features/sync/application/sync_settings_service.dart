@@ -225,6 +225,12 @@ class MigratingCloudKitSyncSettingsRepository
   Future<CloudKitSyncSettings?> readCloudKit() async {
     final settings = await primary.readCloudKit();
     if (settings != null) {
+      try {
+        await legacy.deleteCloudKit();
+      } on Object {
+        // The primary local preference is authoritative. Legacy cleanup can be
+        // retried on a later unlocked read.
+      }
       return settings;
     }
     final legacySettings = await legacy.readCloudKit();
@@ -271,6 +277,12 @@ class MigratingWebDavSyncSettingsRepository implements SyncSettingsRepository {
   Future<WebDavSyncSettings?> readWebDav() async {
     final settings = await primary.readWebDav();
     if (settings != null) {
+      try {
+        await legacy.deleteWebDav();
+      } on Object {
+        // Local WebDAV settings are authoritative. Legacy cleanup can be
+        // retried on a later unlocked read.
+      }
       return settings;
     }
     final legacySettings = await legacy.readWebDav();

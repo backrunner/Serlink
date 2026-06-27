@@ -5,6 +5,7 @@ class MainFlutterWindow: NSWindow {
   private static let minimumWindowSize = NSSize(width: 960, height: 600)
 
   private var windowChannel: FlutterMethodChannel?
+  private var platformChannel: FlutterMethodChannel?
   private let cloudKitChannel = CloudKitSyncChannel()
 
   override func awakeFromNib() {
@@ -14,6 +15,7 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
     configureWindowChrome()
     registerWindowChannel(flutterViewController: flutterViewController)
+    registerPlatformChannel(flutterViewController: flutterViewController)
     cloudKitChannel.register(with: flutterViewController.engine.binaryMessenger)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
@@ -81,5 +83,21 @@ class MainFlutterWindow: NSWindow {
       }
     }
     windowChannel = channel
+  }
+
+  private func registerPlatformChannel(flutterViewController: FlutterViewController) {
+    let channel = FlutterMethodChannel(
+      name: "serlink/platform",
+      binaryMessenger: flutterViewController.engine.binaryMessenger
+    )
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "displayName":
+        result(Host.current().localizedName ?? ProcessInfo.processInfo.hostName)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    platformChannel = channel
   }
 }

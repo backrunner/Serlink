@@ -47,9 +47,9 @@ fi
 
 if [[ "$BUMP_BUILD_NUMBER" -eq 1 ]]; then
   if [[ -n "$SET_BUILD_NUMBER" ]]; then
-    "$ROOT_DIR/tool/bump_build_number.sh" --set "$SET_BUILD_NUMBER"
+    "$ROOT_DIR/tool/bump_build_number.sh" --platform macos --set "$SET_BUILD_NUMBER"
   else
-    "$ROOT_DIR/tool/bump_build_number.sh"
+    "$ROOT_DIR/tool/bump_build_number.sh" --platform macos
   fi
 fi
 

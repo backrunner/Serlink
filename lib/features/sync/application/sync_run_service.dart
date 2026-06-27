@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../core/logging/offline_diagnostic_logger.dart';
 import '../../../core/ids/entity_id.dart';
 import '../../vault/application/vault_record_repository.dart';
 import '../../vault/application/vault_service.dart';
@@ -132,12 +133,14 @@ class SyncRunService {
     SyncDeviceService? devices,
     SyncFieldMergeService? fieldMerge,
     Future<bool> Function()? localDataHealthy,
+    DiagnosticLogger diagnosticLogger = const NoopDiagnosticLogger(),
   }) : this._(
          vault,
          records,
          devices,
          fieldMerge ?? const SyncFieldMergeService(),
          localDataHealthy,
+         diagnosticLogger,
        );
 
   const SyncRunService._(
@@ -146,6 +149,7 @@ class SyncRunService {
     this._devices,
     this._fieldMerge,
     this._localDataHealthy,
+    this._diagnosticLogger,
   );
 
   final VaultService _vault;
@@ -153,6 +157,98 @@ class SyncRunService {
   final SyncDeviceService? _devices;
   final SyncFieldMergeService _fieldMerge;
   final Future<bool> Function()? _localDataHealthy;
+  final DiagnosticLogger _diagnosticLogger;
+
+  Future<T> _runLoggedSyncOperation<T>(
+    String operation,
+    SyncProvider provider,
+    Future<T> Function() run, {
+    Map<String, Object?> startDetails = const {},
+    Map<String, Object?> Function(T result)? resultDetails,
+  }) async {
+    final baseDetails = {
+      ...await _syncProviderDetails(provider),
+      ...startDetails,
+    };
+    await _diagnosticLogger.record(
+      'sync.$operation.start',
+      details: baseDetails,
+    );
+    try {
+      final result = await run();
+      await _diagnosticLogger.record(
+        'sync.$operation.success',
+        details: {
+          ...baseDetails,
+          if (resultDetails != null) ...resultDetails(result),
+        },
+      );
+      return result;
+    } on Object catch (error) {
+      await _diagnosticLogger.record(
+        'sync.$operation.failure',
+        level: DiagnosticLogLevel.error,
+        details: {...baseDetails, ..._syncErrorDetails(error)},
+      );
+      rethrow;
+    }
+  }
+
+  Future<Map<String, Object?>> _syncProviderDetails(
+    SyncProvider provider,
+  ) async {
+    try {
+      final capabilities = await provider.capabilities();
+      return {
+        'providerKind': capabilities.kind.name,
+        'supportsConditionalWrites': capabilities.supportsConditionalWrites,
+        'requiresTls': capabilities.requiresTls,
+      };
+    } on Object {
+      return {'providerType': provider.runtimeType.toString()};
+    }
+  }
+
+  Map<String, Object?> _syncRunResultDetails(SyncRunResult result) {
+    return {
+      'recordsUploaded': result.recordsUploaded,
+      'recordsDownloaded': result.recordsDownloaded,
+      'recordsUnchanged': result.recordsUnchanged,
+      'headerUploaded': result.headerUploaded,
+      'hasWriterDevice': result.writerDevice != null,
+      'hasRemoteDevice': result.remoteDevice != null,
+    };
+  }
+
+  Map<String, Object?> _syncPullResultDetails(SyncPullResult result) {
+    return {
+      'recordsDownloaded': result.recordsDownloaded,
+      'recordsUnchanged': result.recordsUnchanged,
+      'conflicts': result.conflicts.length,
+      'hasRemoteManifest': result.remoteManifest != null,
+      'hasRemoteDevice': result.remoteDevice != null,
+    };
+  }
+
+  Map<String, Object?> _syncErrorDetails(Object error) {
+    return switch (error) {
+      SyncRunConflictException(:final code, :final conflicts) => {
+        'errorType': 'SyncRunConflictException',
+        'code': code,
+        'conflicts': conflicts.length,
+      },
+      SyncRunException(:final code) => {
+        'errorType': 'SyncRunException',
+        'code': code,
+      },
+      SyncProviderException(:final code, :final statusCode) => {
+        'errorType': 'SyncProviderException',
+        'code': code,
+        ...statusCode == null ? const {} : {'statusCode': statusCode},
+      },
+      _ => {'errorType': error.runtimeType.toString()},
+    };
+  }
 
   Future<RemoteResetMarker?> readRemoteResetMarker(
     SyncProvider provider,
@@ -179,48 +275,62 @@ class SyncRunService {
   }
 
   Future<void> publishRemoteReset(SyncProvider provider) async {
-    final header = _vault.header;
-    if (header == null) {
-      throw const SyncRunException(
-        'sync.vault_header_missing',
-        'Vault header is missing.',
-      );
-    }
-    final manifest = await provider.readManifest();
-    if (manifest == null || manifest.vaultId != syncVaultId(header)) {
-      return;
-    }
-    await _ensureExpectedRemoteCompatible(provider, manifest);
-    await provider.writeObject(
-      resetMarkerRef,
-      RemoteResetMarker(
-        vaultId: syncVaultId(header),
-        resetAt: DateTime.now().toUtc(),
-      ).toBytes(),
+    await _runLoggedSyncOperation<void>(
+      'remote_reset.publish',
+      provider,
+      () async {
+        final header = _vault.header;
+        if (header == null) {
+          throw const SyncRunException(
+            'sync.vault_header_missing',
+            'Vault header is missing.',
+          );
+        }
+        final manifest = await provider.readManifest();
+        if (manifest == null || manifest.vaultId != syncVaultId(header)) {
+          return;
+        }
+        await _ensureExpectedRemoteCompatible(provider, manifest);
+        await provider.writeObject(
+          resetMarkerRef,
+          RemoteResetMarker(
+            vaultId: syncVaultId(header),
+            resetAt: DateTime.now().toUtc(),
+          ).toBytes(),
+        );
+        await _clearRemoteSnapshot(provider);
+      },
     );
-    await _clearRemoteSnapshot(provider);
   }
 
   Future<SyncRunResult> syncEncryptedSnapshot(
     SyncProvider provider, {
     bool reportConflicts = false,
   }) async {
-    for (var attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        return await _syncEncryptedSnapshotOnce(
-          provider,
-          reportConflicts: reportConflicts,
-        );
-      } on SyncProviderException catch (error) {
-        if (attempt == 0 && _isRemoteManifestWriteConflict(error)) {
-          continue;
+    return _runLoggedSyncOperation(
+      'run',
+      provider,
+      () async {
+        for (var attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            return await _syncEncryptedSnapshotOnce(
+              provider,
+              reportConflicts: reportConflicts,
+            );
+          } on SyncProviderException catch (error) {
+            if (attempt == 0 && _isRemoteManifestWriteConflict(error)) {
+              continue;
+            }
+            rethrow;
+          }
         }
-        rethrow;
-      }
-    }
-    throw const SyncRunException(
-      'sync.provider.conflict',
-      'Remote sync data changed while syncing.',
+        throw const SyncRunException(
+          'sync.provider.conflict',
+          'Remote sync data changed while syncing.',
+        );
+      },
+      startDetails: {'reportConflicts': reportConflicts},
+      resultDetails: _syncRunResultDetails,
     );
   }
 
@@ -276,12 +386,21 @@ class SyncRunService {
     bool missingManifestOk = false,
     bool reportConflicts = false,
   }) {
-    return _pullEncryptedSnapshot(
+    return _runLoggedSyncOperation(
+      'pull',
       provider,
-      missingManifestOk: missingManifestOk,
-      conflictPolicy: reportConflicts
-          ? _SyncConflictPolicy.report
-          : _SyncConflictPolicy.useLatest,
+      () => _pullEncryptedSnapshot(
+        provider,
+        missingManifestOk: missingManifestOk,
+        conflictPolicy: reportConflicts
+            ? _SyncConflictPolicy.report
+            : _SyncConflictPolicy.useLatest,
+      ),
+      startDetails: {
+        'missingManifestOk': missingManifestOk,
+        'reportConflicts': reportConflicts,
+      },
+      resultDetails: _syncPullResultDetails,
     );
   }
 
@@ -471,25 +590,36 @@ class SyncRunService {
     SyncConflictResolution resolution, {
     List<SyncRecordConflict> acceptedConflicts = const [],
   }) async {
-    for (var attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        return switch (resolution) {
-          SyncConflictResolution.keepLocal => _keepLocalThenPush(
-            provider,
-            acceptedConflicts: acceptedConflicts,
-          ),
-          SyncConflictResolution.useRemote => _useRemoteThenPush(provider),
-        };
-      } on SyncProviderException catch (error) {
-        if (attempt == 0 && _isRemoteManifestWriteConflict(error)) {
-          continue;
+    return _runLoggedSyncOperation(
+      'conflicts.resolve',
+      provider,
+      () async {
+        for (var attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            return switch (resolution) {
+              SyncConflictResolution.keepLocal => _keepLocalThenPush(
+                provider,
+                acceptedConflicts: acceptedConflicts,
+              ),
+              SyncConflictResolution.useRemote => _useRemoteThenPush(provider),
+            };
+          } on SyncProviderException catch (error) {
+            if (attempt == 0 && _isRemoteManifestWriteConflict(error)) {
+              continue;
+            }
+            rethrow;
+          }
         }
-        rethrow;
-      }
-    }
-    throw const SyncRunException(
-      'sync.provider.conflict',
-      'Remote sync data changed while syncing.',
+        throw const SyncRunException(
+          'sync.provider.conflict',
+          'Remote sync data changed while syncing.',
+        );
+      },
+      startDetails: {
+        'resolution': resolution.name,
+        'acceptedConflicts': acceptedConflicts.length,
+      },
+      resultDetails: _syncRunResultDetails,
     );
   }
 
@@ -497,69 +627,77 @@ class SyncRunService {
     SyncProvider provider, {
     required List<SyncMergedConflict> merges,
   }) async {
-    if (merges.isEmpty) {
-      throw const SyncRunException(
-        'sync.conflict_merge_empty',
-        'No sync conflicts were selected for merge.',
-      );
-    }
-    for (var attempt = 0; attempt < 2; attempt += 1) {
-      final originals = <VaultRecordId, VaultRecordEnvelope>{};
-      try {
-        final pull = await _pullEncryptedSnapshot(
-          provider,
-          conflictPolicy: _SyncConflictPolicy.report,
-        );
-        final unresolved = _unacceptedConflicts(pull.conflicts, [
-          for (final merge in merges) merge.conflict,
-        ]);
-        if (unresolved.isNotEmpty) {
-          throw SyncRunConflictException(unresolved);
-        }
-        for (final merge in merges) {
-          final original = await _records.read(merge.conflict.id);
-          if (original == null) {
-            throw const SyncRunException(
-              'sync.conflict.record_missing',
-              'Conflicting record no longer exists locally.',
-            );
-          }
-          originals.putIfAbsent(original.id, () => original);
-          final updated = await _vault.encryptRecord(
-            id: original.id,
-            type: original.type,
-            plaintext: utf8.encode(jsonEncode(merge.mergedJson)),
+    return _runLoggedSyncOperation(
+      'conflicts.merge',
+      provider,
+      () async {
+        if (merges.isEmpty) {
+          throw const SyncRunException(
+            'sync.conflict_merge_empty',
+            'No sync conflicts were selected for merge.',
           );
-          await _records.upsert(updated);
         }
-        final push = await _pushEncryptedSnapshot(
-          provider,
-          pruneRemote: true,
-          expectedRemoteManifest: pull.remoteManifest,
-        );
-        return SyncRunResult(
-          recordsUploaded: push.recordsUploaded,
-          recordsDownloaded: pull.recordsDownloaded,
-          recordsUnchanged: pull.recordsUnchanged,
-          headerUploaded: push.headerUploaded,
-          completedAt: push.completedAt,
-          writerDevice: push.writerDevice,
-          remoteDevice: pull.remoteDevice,
-        );
-      } on SyncProviderException catch (error) {
-        await _restoreOriginalRecords(originals);
-        if (attempt == 0 && _isRemoteManifestWriteConflict(error)) {
-          continue;
+        for (var attempt = 0; attempt < 2; attempt += 1) {
+          final originals = <VaultRecordId, VaultRecordEnvelope>{};
+          try {
+            final pull = await _pullEncryptedSnapshot(
+              provider,
+              conflictPolicy: _SyncConflictPolicy.report,
+            );
+            final unresolved = _unacceptedConflicts(pull.conflicts, [
+              for (final merge in merges) merge.conflict,
+            ]);
+            if (unresolved.isNotEmpty) {
+              throw SyncRunConflictException(unresolved);
+            }
+            for (final merge in merges) {
+              final original = await _records.read(merge.conflict.id);
+              if (original == null) {
+                throw const SyncRunException(
+                  'sync.conflict.record_missing',
+                  'Conflicting record no longer exists locally.',
+                );
+              }
+              originals.putIfAbsent(original.id, () => original);
+              final updated = await _vault.encryptRecord(
+                id: original.id,
+                type: original.type,
+                plaintext: utf8.encode(jsonEncode(merge.mergedJson)),
+              );
+              await _records.upsert(updated);
+            }
+            final push = await _pushEncryptedSnapshot(
+              provider,
+              pruneRemote: true,
+              expectedRemoteManifest: pull.remoteManifest,
+            );
+            return SyncRunResult(
+              recordsUploaded: push.recordsUploaded,
+              recordsDownloaded: pull.recordsDownloaded,
+              recordsUnchanged: pull.recordsUnchanged,
+              headerUploaded: push.headerUploaded,
+              completedAt: push.completedAt,
+              writerDevice: push.writerDevice,
+              remoteDevice: pull.remoteDevice,
+            );
+          } on SyncProviderException catch (error) {
+            await _restoreOriginalRecords(originals);
+            if (attempt == 0 && _isRemoteManifestWriteConflict(error)) {
+              continue;
+            }
+            rethrow;
+          } on Object {
+            await _restoreOriginalRecords(originals);
+            rethrow;
+          }
         }
-        rethrow;
-      } on Object {
-        await _restoreOriginalRecords(originals);
-        rethrow;
-      }
-    }
-    throw const SyncRunException(
-      'sync.provider.conflict',
-      'Remote sync data changed while syncing.',
+        throw const SyncRunException(
+          'sync.provider.conflict',
+          'Remote sync data changed while syncing.',
+        );
+      },
+      startDetails: {'mergeCount': merges.length},
+      resultDetails: _syncRunResultDetails,
     );
   }
 
@@ -613,23 +751,30 @@ class SyncRunService {
   }
 
   Future<SyncRunResult> pushEncryptedSnapshot(SyncProvider provider) async {
-    final manifest = await provider.readManifest();
-    await _ensureExpectedRemoteCompatible(provider, manifest);
-    return _pushEncryptedSnapshot(
-      provider,
-      pruneRemote: true,
-      expectedRemoteManifest: manifest,
-    );
+    return _runLoggedSyncOperation('push', provider, () async {
+      final manifest = await provider.readManifest();
+      await _ensureExpectedRemoteCompatible(provider, manifest);
+      return _pushEncryptedSnapshot(
+        provider,
+        pruneRemote: true,
+        expectedRemoteManifest: manifest,
+      );
+    }, resultDetails: _syncRunResultDetails);
   }
 
   Future<SyncRunResult> publishInitialEncryptedSnapshot(
     SyncProvider provider,
   ) async {
-    return _pushEncryptedSnapshot(
+    return _runLoggedSyncOperation(
+      'push_initial',
       provider,
-      pruneRemote: true,
-      expectedRemoteManifest: null,
-      cleanupPartialRemoteObjectsOnFailure: true,
+      () => _pushEncryptedSnapshot(
+        provider,
+        pruneRemote: true,
+        expectedRemoteManifest: null,
+        cleanupPartialRemoteObjectsOnFailure: true,
+      ),
+      resultDetails: _syncRunResultDetails,
     );
   }
 

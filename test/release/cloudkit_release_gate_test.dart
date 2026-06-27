@@ -164,6 +164,13 @@ void main() {
 
   test('macOS TestFlight upload uses App Store Connect export options', () {
     final script = File('tool/upload_macos_testflight.sh').readAsStringSync();
+    final appInfo = File(
+      'macos/Runner/Configs/AppInfo.xcconfig',
+    ).readAsStringSync();
+    final infoPlist = File('macos/Runner/Info.plist').readAsStringSync();
+    final project = File(
+      'macos/Runner.xcodeproj/project.pbxproj',
+    ).readAsStringSync();
     final signingCheck = File(
       'tool/check_macos_testflight_signing.sh',
     ).readAsStringSync();
@@ -176,11 +183,18 @@ void main() {
     expect(script, contains('-allowProvisioningUpdates'));
     expect(script, contains('SERLINK_SKIP_LOCAL_SIGNING_CHECK'));
     expect(script, contains('tool/bump_build_number.sh'));
+    expect(script, contains('--platform macos'));
     expect(script, contains('--bump-build-number'));
     expect(script, contains('--build-number'));
     expect(script, contains('tool/build_macos_app_store.sh'));
     expect(script, contains('xcodebuild -exportArchive'));
     expect(script, contains('ExportOptionsAppStore.plist'));
+    expect(appInfo, contains('SERLINK_MACOS_BUILD_NUMBER'));
+    expect(infoPlist, contains(r'$(SERLINK_MACOS_BUILD_NUMBER)'));
+    expect(
+      project,
+      contains(r'CURRENT_PROJECT_VERSION = "$(SERLINK_MACOS_BUILD_NUMBER)"'),
+    );
     expect(exportOptions, contains('<string>app-store-connect</string>'));
     expect(exportOptions, contains('<string>upload</string>'));
     expect(exportOptions, contains('<string>Production</string>'));
@@ -195,6 +209,13 @@ void main() {
 
   test('iOS TestFlight upload uses App Store Connect export options', () {
     final script = File('tool/upload_ios_testflight.sh').readAsStringSync();
+    final appInfo = File(
+      'ios/Runner/Configs/AppInfo.xcconfig',
+    ).readAsStringSync();
+    final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
+    final project = File(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsStringSync();
     final buildNumberScript = File(
       'tool/bump_build_number.sh',
     ).readAsStringSync();
@@ -211,6 +232,7 @@ void main() {
     expect(script, contains('-allowProvisioningUpdates'));
     expect(script, contains('SERLINK_SKIP_LOCAL_SIGNING_CHECK'));
     expect(script, contains('tool/bump_build_number.sh'));
+    expect(script, contains('--platform ios'));
     expect(script, contains('--bump-build-number'));
     expect(script, contains('--build-number'));
     expect(script, contains('flutter build ios'));
@@ -223,8 +245,15 @@ void main() {
     expect(signingCheck, contains('get-task-allow'));
     expect(signingCheck, contains('iCloud.com.alkinum.serlink'));
     expect(signingCheck, contains('Xcode-managed automatic signing'));
-    expect(buildNumberScript, contains('version: " next_version'));
-    expect(buildNumberScript, contains('flutter pub get'));
+    expect(appInfo, contains('SERLINK_IOS_BUILD_NUMBER'));
+    expect(infoPlist, contains(r'$(SERLINK_IOS_BUILD_NUMBER)'));
+    expect(
+      project,
+      contains(r'CURRENT_PROJECT_VERSION = "$(SERLINK_IOS_BUILD_NUMBER)"'),
+    );
+    expect(buildNumberScript, contains('--platform ios|macos'));
+    expect(buildNumberScript, contains('SERLINK_IOS_BUILD_NUMBER'));
+    expect(buildNumberScript, contains('SERLINK_MACOS_BUILD_NUMBER'));
     expect(exportOptions, contains('<string>app-store-connect</string>'));
     expect(exportOptions, contains('<string>upload</string>'));
     expect(exportOptions, contains('<string>Production</string>'));
@@ -237,46 +266,63 @@ void main() {
     expect(docs, contains('iCloud.com.alkinum.serlink'));
   });
 
-  test('build number script previews the next pubspec build number', () {
+  test('build number script previews the next iOS build number', () {
     final result = Process.runSync('bash', [
       'tool/bump_build_number.sh',
+      '--platform',
+      'ios',
       '--dry-run',
-      '--no-pub-get',
     ]);
 
     expect(result.exitCode, 0, reason: result.stderr.toString());
-    expect(
-      result.stdout.toString().trim(),
-      matches(RegExp(r'^\d+\.\d+\.\d+\+\d+$')),
-    );
+    expect(result.stdout.toString().trim(), matches(RegExp(r'^\d+$')));
   });
 
-  test('build number script can set a specific pubspec build number', () {
+  test('build number script keeps platform build numbers separate', () {
     final tempRoot = Directory.systemTemp.createTempSync(
       'serlink-build-number-',
     );
-    final fixture = File(p.join(tempRoot.path, 'pubspec.yaml'));
+    final iosFixture = File(
+      p.join(tempRoot.path, 'ios/Runner/Configs/AppInfo.xcconfig'),
+    );
+    final macosFixture = File(
+      p.join(tempRoot.path, 'macos/Runner/Configs/AppInfo.xcconfig'),
+    );
     final script = File(p.join(tempRoot.path, 'tool/bump_build_number.sh'));
 
     try {
       Directory(p.join(tempRoot.path, 'tool')).createSync();
-      fixture.writeAsStringSync('''
-name: fixture
-version: 2.3.4+8
-''');
+      iosFixture.parent.createSync(recursive: true);
+      macosFixture.parent.createSync(recursive: true);
+      iosFixture.writeAsStringSync('SERLINK_IOS_BUILD_NUMBER = 8\n');
+      macosFixture.writeAsStringSync('SERLINK_MACOS_BUILD_NUMBER = 12\n');
       script.writeAsStringSync(
         File('tool/bump_build_number.sh').readAsStringSync(),
       );
 
-      final result = Process.runSync('bash', [
+      final iosResult = Process.runSync('bash', [
         script.path,
+        '--platform',
+        'ios',
         '--set',
         '42',
-        '--no-pub-get',
+      ]);
+      final macosResult = Process.runSync('bash', [
+        script.path,
+        '--platform',
+        'macos',
       ]);
 
-      expect(result.exitCode, 0, reason: result.stderr.toString());
-      expect(fixture.readAsStringSync(), contains('version: 2.3.4+42'));
+      expect(iosResult.exitCode, 0, reason: iosResult.stderr.toString());
+      expect(macosResult.exitCode, 0, reason: macosResult.stderr.toString());
+      expect(
+        iosFixture.readAsStringSync(),
+        contains('SERLINK_IOS_BUILD_NUMBER = 42'),
+      );
+      expect(
+        macosFixture.readAsStringSync(),
+        contains('SERLINK_MACOS_BUILD_NUMBER = 13'),
+      );
     } finally {
       tempRoot.deleteSync(recursive: true);
     }

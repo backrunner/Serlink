@@ -18,6 +18,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     with TickerProviderStateMixin {
   final TextEditingController _passphraseController = TextEditingController();
   String? _localErrorMessage;
+  VaultSessionNotice? _lastShownNotice;
 
   late final AnimationController _shakeController = AnimationController(
     vsync: this,
@@ -39,6 +40,23 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     }
     _lastShownError = errorMessage;
     _shakeController.forward(from: 0);
+  }
+
+  void _showOneShotNotice(VaultSessionNotice? notice) {
+    if (notice == null) {
+      _lastShownNotice = null;
+      return;
+    }
+    if (notice == _lastShownNotice) {
+      return;
+    }
+    _lastShownNotice = notice;
+    final message = switch (notice) {
+      VaultSessionNotice.cloudKitRemoteVaultAdopted =>
+        context.l10n.syncICloudRemoteVaultAdoptedSnack,
+    };
+    _showSnackBar(context, message);
+    ref.read(vaultSessionControllerProvider.notifier).dismissNotice(notice);
   }
 
   @override
@@ -67,9 +85,13 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
       );
     }
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _triggerShake(errorMessage),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _triggerShake(errorMessage);
+      _showOneShotNotice(session?.notice);
+    });
 
     return Center(
       child: SingleChildScrollView(

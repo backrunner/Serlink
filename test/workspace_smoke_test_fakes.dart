@@ -10,6 +10,23 @@ class _LockedVaultHarness {
   final VaultRecoveryKey recoveryKey;
 }
 
+class _MemoryAppPrivacySettingsRepository
+    implements AppPrivacySettingsRepository {
+  _MemoryAppPrivacySettingsRepository(this._protectBackground);
+
+  bool _protectBackground;
+
+  @override
+  Future<bool> readProtectBackground() async {
+    return _protectBackground;
+  }
+
+  @override
+  Future<void> saveProtectBackground(bool enabled) async {
+    _protectBackground = enabled;
+  }
+}
+
 class _IOSWithoutCloudKitCapabilities extends PlatformCapabilities {
   const _IOSWithoutCloudKitCapabilities()
     : super(operatingSystem: 'ios', targetPlatform: TargetPlatform.iOS);

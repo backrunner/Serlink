@@ -138,6 +138,8 @@ class SyncDeviceException implements Exception {
   String toString() => 'SyncDeviceException($code): $message';
 }
 
+typedef SyncDeviceDisplayNameResolver = Future<String?> Function();
+
 class SyncDeviceService {
   SyncDeviceService({
     required SyncDeviceRepository devices,
@@ -146,6 +148,8 @@ class SyncDeviceService {
     Uuid? uuid,
     DateTime Function()? now,
     String? displayName,
+    SyncDeviceDisplayNameResolver? displayNameResolver,
+    String Function()? fallbackHostname,
     String? platform,
   }) : this._(
          devices,
@@ -154,6 +158,8 @@ class SyncDeviceService {
          uuid ?? const Uuid(),
          now ?? DateTime.now,
          displayName,
+         displayNameResolver,
+         fallbackHostname ?? (() => Platform.localHostname),
          platform,
        );
 
@@ -164,6 +170,8 @@ class SyncDeviceService {
     this._uuid,
     this._now,
     this._displayName,
+    this._displayNameResolver,
+    this._fallbackHostname,
     this._platform,
   );
 
@@ -175,6 +183,8 @@ class SyncDeviceService {
   final Uuid _uuid;
   final DateTime Function() _now;
   final String? _displayName;
+  final SyncDeviceDisplayNameResolver? _displayNameResolver;
+  final String Function() _fallbackHostname;
   final String? _platform;
 
   Future<SyncDeviceMetadata?> readLocalDevice() async {
@@ -187,19 +197,19 @@ class SyncDeviceService {
     await _ensureLocalDeviceNotRevoked(id);
     final existing = await _devices.read(id);
     final now = _now().toUtc();
+    final resolvedDisplayName = await _resolveDisplayName(
+      requested: displayName,
+      existing: existing?.displayName,
+    );
     final device =
         existing?.copyWith(
-          displayName: _normalizeDisplayName(
-            displayName ?? _displayName ?? existing.displayName,
-          ),
+          displayName: resolvedDisplayName,
           platform: _platformName,
           lastSeenAt: now,
         ) ??
         SyncDeviceMetadata(
           id: id,
-          displayName: _normalizeDisplayName(
-            displayName ?? _displayName ?? _defaultDisplayName(),
-          ),
+          displayName: resolvedDisplayName,
           platform: _platformName,
           createdAt: now,
           lastSeenAt: now,
@@ -249,7 +259,9 @@ class SyncDeviceService {
       await _devices.delete(localDeviceId);
       await _secrets.delete(_localDeviceIdRef);
     }
-    return touchLocalDevice(displayName: displayName ?? existing?.displayName);
+    return touchLocalDevice(
+      displayName: displayName ?? _preservedDisplayName(existing?.displayName),
+    );
   }
 
   Future<void> _ensureLocalDeviceNotRevoked(String id) async {
@@ -288,17 +300,60 @@ class SyncDeviceService {
     return id;
   }
 
+  Future<String> _resolveDisplayName({
+    required String? requested,
+    required String? existing,
+  }) async {
+    final requestedName = _usableDisplayName(requested);
+    if (requestedName != null) {
+      return requestedName;
+    }
+    final configuredName = _usableDisplayName(_displayName);
+    if (configuredName != null) {
+      return configuredName;
+    }
+    final existingName = _usableDisplayName(existing);
+    if (existingName != null && !_isFallbackDisplayName(existingName)) {
+      return existingName;
+    }
+    final resolvedName = _usableDisplayName(await _displayNameResolver?.call());
+    if (resolvedName != null) {
+      return resolvedName;
+    }
+    final hostname = _usableDisplayName(_fallbackHostname());
+    if (hostname != null) {
+      return hostname;
+    }
+    return existingName ?? 'This device';
+  }
+
   String get _platformName => _platform ?? Platform.operatingSystem;
 }
 
-String _normalizeDisplayName(String value) {
-  final trimmed = value.trim();
-  return trimmed.isEmpty ? 'This device' : trimmed;
+String? _preservedDisplayName(String? value) {
+  final displayName = _usableDisplayName(value);
+  return displayName == null || _isFallbackDisplayName(displayName)
+      ? null
+      : displayName;
 }
 
-String _defaultDisplayName() {
-  final hostname = Platform.localHostname.trim();
-  return hostname.isEmpty ? 'This device' : hostname;
+String? _usableDisplayName(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+  final lower = trimmed.toLowerCase();
+  if (lower == 'localhost' ||
+      lower == 'localhost.localdomain' ||
+      lower == '127.0.0.1' ||
+      lower == '::1') {
+    return null;
+  }
+  return trimmed;
+}
+
+bool _isFallbackDisplayName(String value) {
+  return value.trim().toLowerCase() == 'this device';
 }
 
 VaultRecordId syncDeviceRecordId(String id) => VaultRecordId('sync:device:$id');

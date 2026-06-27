@@ -13,7 +13,7 @@ SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
   ./tool/upload_macos_testflight.sh --bump-build-number -allowProvisioningUpdates
 ```
 
-The upload script increments the shared Flutter build number, archives with:
+The upload script increments the macOS build number, archives with:
 
 - `SERLINK_DISTRIBUTION=app_store`
 - `Runner/Release.entitlements`

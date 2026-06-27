@@ -194,10 +194,13 @@ check_cloudkit_entitlements "ios/Runner/Release.entitlements" "iOS Release entit
 plist_rejects_development_environment "ios/Runner/Release.entitlements" "iOS Release entitlements"
 plist_requires_aps_environment "ios/Runner/Release.entitlements" "production" "iOS Release entitlements"
 check_script_contains "ios/Runner/Info.plist" "remote-notification" "iOS Info.plist"
+check_script_contains "ios/Runner/Info.plist" "SERLINK_IOS_BUILD_NUMBER" "iOS Info.plist"
+check_script_contains "ios/Runner/Configs/AppInfo.xcconfig" "SERLINK_IOS_BUILD_NUMBER" "iOS build number config"
 
 if [[ "$DISTRIBUTION" == "ios_app_store" || "$DISTRIBUTION" == "all" ]]; then
   check_script_contains "tool/upload_ios_testflight.sh" "--dart-define=SERLINK_DISTRIBUTION=app_store" "iOS TestFlight upload script"
   check_script_contains "tool/upload_ios_testflight.sh" "tool/bump_build_number.sh" "iOS TestFlight upload script"
+  check_script_contains "tool/upload_ios_testflight.sh" "--platform ios" "iOS TestFlight upload script"
   check_script_contains "tool/upload_ios_testflight.sh" "--bump-build-number" "iOS TestFlight upload script"
   check_script_contains "tool/upload_ios_testflight.sh" "ios/Runner/ExportOptionsAppStore.plist" "iOS TestFlight upload script"
   check_script_contains "tool/upload_ios_testflight.sh" "xcodebuild archive" "iOS TestFlight upload script"
@@ -210,6 +213,8 @@ fi
 check_cloudkit_entitlements "macos/Runner/DebugProfile.entitlements" "macOS Debug/Profile entitlements"
 plist_requires_development_environment "macos/Runner/DebugProfile.entitlements" "macOS Debug/Profile entitlements"
 plist_requires_aps_environment "macos/Runner/DebugProfile.entitlements" "development" "macOS Debug/Profile entitlements"
+check_script_contains "macos/Runner/Info.plist" "SERLINK_MACOS_BUILD_NUMBER" "macOS Info.plist"
+check_script_contains "macos/Runner/Configs/AppInfo.xcconfig" "SERLINK_MACOS_BUILD_NUMBER" "macOS build number config"
 
 if [[ "$DISTRIBUTION" == "app_store" || "$DISTRIBUTION" == "all" ]]; then
   check_cloudkit_entitlements "macos/Runner/Release.entitlements" "macOS App Store entitlements"
@@ -225,6 +230,7 @@ if [[ "$DISTRIBUTION" == "app_store" || "$DISTRIBUTION" == "all" ]]; then
   check_script_contains "tool/build_macos_app_store.sh" "xcodebuild archive" "macOS App Store build script"
   check_script_contains "tool/build_macos_app_store.sh" "ALLOW_PROVISIONING_UPDATES" "macOS App Store build script"
   check_script_contains "tool/upload_macos_testflight.sh" "tool/bump_build_number.sh" "macOS TestFlight upload script"
+  check_script_contains "tool/upload_macos_testflight.sh" "--platform macos" "macOS TestFlight upload script"
   check_script_contains "tool/upload_macos_testflight.sh" "--bump-build-number" "macOS TestFlight upload script"
   ok "macOS App Store release surface is locked"
 fi

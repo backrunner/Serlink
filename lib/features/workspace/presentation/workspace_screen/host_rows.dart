@@ -128,7 +128,8 @@ class _SwipeHostActionsRow extends StatefulWidget {
     required this.onDelete,
   });
 
-  static const double revealWidth = 100;
+  static const double _actionGap = SerlinkSpacing.sm;
+  static const double revealWidth = _SwipeHostAction.side * 2 + _actionGap * 2;
 
   final Widget child;
   final VoidCallback onEdit;
@@ -182,29 +183,26 @@ class _SwipeHostActionsRowState extends State<_SwipeHostActionsRow> {
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _SwipeHostAction(
-                        buttonKey: const ValueKey('mobile-host-edit-button'),
-                        onPressed: _handleEdit,
-                        icon: Icons.edit_outlined,
-                        iconKey: const ValueKey('mobile-host-edit-icon'),
-                        semanticsLabel: context.l10n.hostEditMenu,
-                      ),
-                      const SizedBox(width: 8),
-                      _SwipeHostAction(
-                        buttonKey: const ValueKey('mobile-host-delete-button'),
-                        onPressed: _handleDelete,
-                        icon: Icons.delete_outline,
-                        iconKey: const ValueKey('mobile-host-delete-icon'),
-                        semanticsLabel: context.l10n.hostsDeleteAction,
-                        danger: true,
-                      ),
-                    ],
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _SwipeHostAction(
+                      buttonKey: const ValueKey('mobile-host-edit-button'),
+                      onPressed: _handleEdit,
+                      icon: Icons.edit_outlined,
+                      iconKey: const ValueKey('mobile-host-edit-icon'),
+                      semanticsLabel: context.l10n.hostEditMenu,
+                    ),
+                    const SizedBox(width: _SwipeHostActionsRow._actionGap),
+                    _SwipeHostAction(
+                      buttonKey: const ValueKey('mobile-host-delete-button'),
+                      onPressed: _handleDelete,
+                      icon: Icons.delete_outline,
+                      iconKey: const ValueKey('mobile-host-delete-icon'),
+                      semanticsLabel: context.l10n.hostsDeleteAction,
+                      danger: true,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -234,7 +232,7 @@ class _SwipeHostAction extends StatelessWidget {
     this.danger = false,
   });
 
-  static const double _side = 44;
+  static const double side = 44;
 
   final Key buttonKey;
   final VoidCallback onPressed;
@@ -259,14 +257,14 @@ class _SwipeHostAction extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: background,
-            borderRadius: SerlinkRadii.control,
+            borderRadius: SerlinkRadii.dialog,
             border: Border.all(color: borderColor),
             boxShadow: serlinkShadow(t, elevation: 6, opacity: 0.45),
           ),
           child: SerlinkPressable(
             key: buttonKey,
             onTap: onPressed,
-            borderRadius: SerlinkRadii.control,
+            borderRadius: SerlinkRadii.dialog,
             hoverColor: danger
                 ? Colors.white.withValues(alpha: 0.08)
                 : t.accentPrimary.withValues(alpha: 0.08),
@@ -274,7 +272,7 @@ class _SwipeHostAction extends StatelessWidget {
                 ? Colors.black.withValues(alpha: 0.14)
                 : t.accentPrimary.withValues(alpha: 0.14),
             child: SizedBox.square(
-              dimension: _side,
+              dimension: side,
               child: Icon(icon, key: iconKey, size: 20, color: foreground),
             ),
           ),

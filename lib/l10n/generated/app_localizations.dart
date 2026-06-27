@@ -499,31 +499,31 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLocalUnlockTitle.
   ///
   /// In en, this message translates to:
-  /// **'Biometric unlock'**
+  /// **'Face ID unlock'**
   String get settingsLocalUnlockTitle;
 
   /// No description provided for @settingsLocalUnlockSemantics.
   ///
   /// In en, this message translates to:
-  /// **'Enable biometric unlock'**
+  /// **'Enable Face ID unlock'**
   String get settingsLocalUnlockSemantics;
 
   /// No description provided for @settingsLocalUnlockNeedsVault.
   ///
   /// In en, this message translates to:
-  /// **'Create the vault before enabling biometric unlock.'**
+  /// **'Create the vault before enabling Face ID unlock.'**
   String get settingsLocalUnlockNeedsVault;
 
   /// No description provided for @settingsLocalUnlockEnabled.
   ///
   /// In en, this message translates to:
-  /// **'Enabled. Lock the vault to unlock with Face ID or Touch ID.'**
+  /// **'Enabled. Lock the vault to unlock with Face ID.'**
   String get settingsLocalUnlockEnabled;
 
   /// No description provided for @settingsLocalUnlockUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Face ID or Touch ID is not available on this device.'**
+  /// **'Face ID is not available on this device.'**
   String get settingsLocalUnlockUnavailable;
 
   /// No description provided for @settingsLocalUnlockDisabled.
@@ -535,14 +535,44 @@ abstract class AppLocalizations {
   /// No description provided for @settingsUnlockWithDeviceAction.
   ///
   /// In en, this message translates to:
-  /// **'Use biometrics'**
+  /// **'Use Face ID'**
   String get settingsUnlockWithDeviceAction;
 
-  /// No description provided for @settingsHostKeyConfirmationTitle.
+  /// No description provided for @settingsBackgroundPrivacyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Host key confirmation'**
-  String get settingsHostKeyConfirmationTitle;
+  /// **'Background privacy'**
+  String get settingsBackgroundPrivacyTitle;
+
+  /// No description provided for @settingsBackgroundPrivacySemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Show privacy screen in the background'**
+  String get settingsBackgroundPrivacySemantics;
+
+  /// No description provided for @settingsBackgroundPrivacyEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'On. Show a lock screen when Serlink is backgrounded.'**
+  String get settingsBackgroundPrivacyEnabled;
+
+  /// No description provided for @settingsBackgroundPrivacyDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Off. Keep the current screen visible in the background.'**
+  String get settingsBackgroundPrivacyDisabled;
+
+  /// No description provided for @settingsBackgroundPrivacySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Background privacy updated.'**
+  String get settingsBackgroundPrivacySaved;
+
+  /// No description provided for @settingsBackgroundPrivacySaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Background privacy could not be updated.'**
+  String get settingsBackgroundPrivacySaveFailed;
 
   /// No description provided for @settingsCredentialsTitle.
   ///
@@ -655,25 +685,25 @@ abstract class AppLocalizations {
   /// No description provided for @settingsEnableLocalUnlockTitle.
   ///
   /// In en, this message translates to:
-  /// **'Enable biometric unlock?'**
+  /// **'Enable Face ID unlock?'**
   String get settingsEnableLocalUnlockTitle;
 
   /// No description provided for @settingsDisableLocalUnlockTitle.
   ///
   /// In en, this message translates to:
-  /// **'Disable biometric unlock?'**
+  /// **'Disable Face ID unlock?'**
   String get settingsDisableLocalUnlockTitle;
 
   /// No description provided for @settingsEnableLocalUnlockBody.
   ///
   /// In en, this message translates to:
-  /// **'Serlink will store a random device key protected by Face ID or Touch ID. Your vault passphrase is not stored.'**
+  /// **'Serlink will store a random device key protected by Face ID. Your vault passphrase is not stored.'**
   String get settingsEnableLocalUnlockBody;
 
   /// No description provided for @settingsDisableLocalUnlockBody.
   ///
   /// In en, this message translates to:
-  /// **'This removes this device key from biometric protection. Existing connections keep running.'**
+  /// **'This removes this device key from Face ID protection. Existing connections keep running.'**
   String get settingsDisableLocalUnlockBody;
 
   /// No description provided for @vaultEnableFaceIdUnlockTitle.
@@ -685,7 +715,7 @@ abstract class AppLocalizations {
   /// No description provided for @vaultEnableFaceIdUnlockBody.
   ///
   /// In en, this message translates to:
-  /// **'Use Face ID or Touch ID to unlock this vault on this device. Serlink stores a random device key protected by biometrics, not your vault passphrase.'**
+  /// **'Use Face ID to unlock this vault on this device. Serlink stores a random device key protected by Face ID, not your vault passphrase.'**
   String get vaultEnableFaceIdUnlockBody;
 
   /// No description provided for @settingsEnableAction.
@@ -703,31 +733,31 @@ abstract class AppLocalizations {
   /// No description provided for @settingsLocalUnlockEnabledSnack.
   ///
   /// In en, this message translates to:
-  /// **'Biometric unlock enabled. Lock the vault to use Face ID or Touch ID.'**
+  /// **'Face ID unlock enabled. Lock the vault to use Face ID.'**
   String get settingsLocalUnlockEnabledSnack;
 
   /// No description provided for @settingsLocalUnlockVerifyFailedSnack.
   ///
   /// In en, this message translates to:
-  /// **'Biometric unlock could not be verified.'**
+  /// **'Face ID unlock could not be verified.'**
   String get settingsLocalUnlockVerifyFailedSnack;
 
   /// No description provided for @settingsLocalUnlockDisabledSnack.
   ///
   /// In en, this message translates to:
-  /// **'Biometric unlock disabled.'**
+  /// **'Face ID unlock disabled.'**
   String get settingsLocalUnlockDisabledSnack;
 
   /// No description provided for @settingsLocalUnlockStillAvailableSnack.
   ///
   /// In en, this message translates to:
-  /// **'Biometric unlock is still available on this device.'**
+  /// **'Face ID unlock is still available on this device.'**
   String get settingsLocalUnlockStillAvailableSnack;
 
   /// No description provided for @settingsLocalUnlockUpdateFailed.
   ///
   /// In en, this message translates to:
-  /// **'Biometric unlock could not be updated.'**
+  /// **'Face ID unlock could not be updated.'**
   String get settingsLocalUnlockUpdateFailed;
 
   /// No description provided for @copyAction.
@@ -916,6 +946,12 @@ abstract class AppLocalizations {
   /// **'iCloud sync paused.'**
   String get syncICloudPausedSnack;
 
+  /// No description provided for @syncICloudRemoteVaultAdoptedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'iCloud already has a Serlink vault. Use that vault passphrase to finish syncing.'**
+  String get syncICloudRemoteVaultAdoptedSnack;
+
   /// No description provided for @syncConflictsResolvedSnack.
   ///
   /// In en, this message translates to:
@@ -1054,6 +1090,18 @@ abstract class AppLocalizations {
   /// **'auto-sync waiting'**
   String get syncAutoSyncWaiting;
 
+  /// No description provided for @syncAutoSyncNeedsVault.
+  ///
+  /// In en, this message translates to:
+  /// **'create a vault to start syncing'**
+  String get syncAutoSyncNeedsVault;
+
+  /// No description provided for @syncAutoSyncNeedsUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'unlock the vault to continue syncing'**
+  String get syncAutoSyncNeedsUnlock;
+
   /// No description provided for @syncAutoSyncReady.
   ///
   /// In en, this message translates to:
@@ -1065,6 +1113,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'last synced {time}'**
   String syncLastSynced(String time);
+
+  /// No description provided for @syncLastFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'sync failed at {time}'**
+  String syncLastFailed(String time);
 
   /// No description provided for @syncAutoSyncQueued.
   ///
@@ -2713,7 +2767,7 @@ abstract class AppLocalizations {
   /// No description provided for @vaultUnlockWithDeviceAction.
   ///
   /// In en, this message translates to:
-  /// **'Use biometrics'**
+  /// **'Use Face ID'**
   String get vaultUnlockWithDeviceAction;
 
   /// No description provided for @vaultUseRecoveryCodeAction.
@@ -2749,19 +2803,19 @@ abstract class AppLocalizations {
   /// No description provided for @vaultLocalUnlockNotEnabledError.
   ///
   /// In en, this message translates to:
-  /// **'Biometric vault unlock is not enabled on this device.'**
+  /// **'Face ID vault unlock is not enabled on this device.'**
   String get vaultLocalUnlockNotEnabledError;
 
   /// No description provided for @vaultLocalUnlockFailedError.
   ///
   /// In en, this message translates to:
-  /// **'Biometric unlock failed. Use the vault passphrase.'**
+  /// **'Face ID unlock failed. Use the vault passphrase.'**
   String get vaultLocalUnlockFailedError;
 
   /// No description provided for @vaultLocalUnlockUnavailableError.
   ///
   /// In en, this message translates to:
-  /// **'Face ID or Touch ID is not available on this device.'**
+  /// **'Face ID is not available on this device.'**
   String get vaultLocalUnlockUnavailableError;
 
   /// No description provided for @vaultEmptyPassphraseError.

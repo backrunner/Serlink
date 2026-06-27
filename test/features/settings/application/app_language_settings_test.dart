@@ -52,6 +52,47 @@ void main() {
       );
     },
   );
+
+  test(
+    'background privacy controller reads and saves the selected setting',
+    () async {
+      final repository = _FakeAppPrivacySettingsRepository(enabled: true);
+      final container = ProviderContainer(
+        overrides: [
+          appPrivacySettingsRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(await container.read(appProtectBackgroundProvider.future), isTrue);
+
+      await container
+          .read(appProtectBackgroundProvider.notifier)
+          .setProtectBackground(false);
+
+      expect(container.read(appProtectBackgroundProvider).value, isFalse);
+      expect(repository.saved, isFalse);
+    },
+  );
+
+  test(
+    'background privacy controller defaults to off when reading fails',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          appPrivacySettingsRepositoryProvider.overrideWithValue(
+            const _ThrowingAppPrivacySettingsRepository(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(
+        await container.read(appProtectBackgroundProvider.future),
+        isFalse,
+      );
+    },
+  );
 }
 
 class _FakeAppLanguageSettingsRepository
@@ -84,4 +125,36 @@ class _ThrowingAppLanguageSettingsRepository
 
   @override
   Future<void> save(AppLanguage language) async {}
+}
+
+class _FakeAppPrivacySettingsRepository
+    implements AppPrivacySettingsRepository {
+  _FakeAppPrivacySettingsRepository({required this.enabled});
+
+  bool enabled;
+  bool? saved;
+
+  @override
+  Future<bool> readProtectBackground() async {
+    return enabled;
+  }
+
+  @override
+  Future<void> saveProtectBackground(bool enabled) async {
+    saved = enabled;
+    this.enabled = enabled;
+  }
+}
+
+class _ThrowingAppPrivacySettingsRepository
+    implements AppPrivacySettingsRepository {
+  const _ThrowingAppPrivacySettingsRepository();
+
+  @override
+  Future<bool> readProtectBackground() {
+    throw StateError('preferences unavailable');
+  }
+
+  @override
+  Future<void> saveProtectBackground(bool enabled) async {}
 }

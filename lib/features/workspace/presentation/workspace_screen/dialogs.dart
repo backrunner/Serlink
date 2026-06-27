@@ -328,9 +328,13 @@ String? _defaultImportUsername() {
 
 const double _snackBarMaxWidth = 320;
 const double _snackBarMargin = 16;
+const double _snackBarCloseButtonSize = 22;
+const double _mobileBottomNavigationBaseHeight = 56;
 
 void _showSnackBar(BuildContext context, String message) {
   final t = context.tokens;
+  final l10n = context.l10n;
+  final bottomMargin = _snackBarMargin + _snackBarBottomReservedHeight(context);
   final screenWidth = MediaQuery.sizeOf(context).width;
   final availableWidth = math.max(0.0, screenWidth - (_snackBarMargin * 2));
   final snackBarWidth = math.min(_snackBarMaxWidth, availableWidth);
@@ -338,7 +342,8 @@ void _showSnackBar(BuildContext context, String message) {
     _snackBarMargin,
     screenWidth - snackBarWidth - _snackBarMargin,
   );
-  ScaffoldMessenger.of(context)
+  final messenger = ScaffoldMessenger.of(context);
+  messenger
     ..clearSnackBars()
     ..showSnackBar(
       SnackBar(
@@ -347,17 +352,70 @@ void _showSnackBar(BuildContext context, String message) {
           leftMargin,
           0,
           _snackBarMargin,
-          _snackBarMargin,
+          bottomMargin,
         ),
         backgroundColor: t.surfaceRaised,
         elevation: 8,
+        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
         shape: RoundedRectangleBorder(
           borderRadius: SerlinkRadii.dialog,
           side: BorderSide(color: t.borderSubtle),
         ),
-        content: Text(message, style: TextStyle(color: t.textPrimary)),
+        content: Row(
+          children: [
+            Expanded(
+              child: Text(message, style: TextStyle(color: t.textPrimary)),
+            ),
+            const SizedBox(width: 10),
+            _SnackBarCloseButton(
+              tooltip: l10n.closeAction,
+              onPressed: () {
+                messenger.hideCurrentSnackBar(
+                  reason: SnackBarClosedReason.hide,
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
+}
+
+double _snackBarBottomReservedHeight(BuildContext context) {
+  final hasMobileBottomNavigation =
+      context.platformVariant.touch &&
+      MediaQuery.sizeOf(context).width <
+          MobileWorkspaceScreen._tabletBreakpoint;
+  if (!hasMobileBottomNavigation) {
+    return 0;
+  }
+  final bottomSafePadding = MediaQuery.viewPaddingOf(context).bottom * 2 / 3;
+  return _mobileBottomNavigationBaseHeight + bottomSafePadding;
+}
+
+class _SnackBarCloseButton extends StatelessWidget {
+  const _SnackBarCloseButton({required this.tooltip, required this.onPressed});
+
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return SerlinkTooltip(
+      message: tooltip,
+      child: SerlinkPressable(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(5),
+        hoverColor: t.accentPrimary.withValues(alpha: 0.08),
+        pressedColor: t.accentPrimary.withValues(alpha: 0.14),
+        child: SizedBox.square(
+          dimension: _snackBarCloseButtonSize,
+          child: Icon(Icons.close, size: 12, color: t.textSecondary),
+        ),
+      ),
+    );
+  }
 }
 
 class _PlaceholderSurface extends StatelessWidget {

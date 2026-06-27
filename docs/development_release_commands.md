@@ -90,27 +90,37 @@ first and re-check the Xcode device pairing.
 
 ## Build numbers
 
-Preview the next shared Flutter build number without changing files:
+Preview the next iOS build number without changing files:
 
 ```sh
-./tool/bump_build_number.sh --dry-run --no-pub-get
+./tool/bump_build_number.sh --platform ios --dry-run
 ```
 
-Increment the shared Flutter build number before a manual Xcode archive:
+Increment the iOS build number before a manual Xcode archive:
 
 ```sh
-./tool/bump_build_number.sh
+./tool/bump_build_number.sh --platform ios
 ```
 
-Set a specific build number:
+Preview or increment the macOS build number:
 
 ```sh
-./tool/bump_build_number.sh --set 42
+./tool/bump_build_number.sh --platform macos --dry-run
+./tool/bump_build_number.sh --platform macos
 ```
 
-The script updates the `version: x.y.z+n` line in `pubspec.yaml` and runs
-`flutter pub get` unless `--no-pub-get` is provided. iOS and macOS both read
-that build number through Flutter's generated Xcode settings.
+Set a specific platform build number:
+
+```sh
+./tool/bump_build_number.sh --platform ios --set 42
+./tool/bump_build_number.sh --platform macos --set 42
+```
+
+The script updates the platform-specific Xcode settings in
+`ios/Runner/Configs/AppInfo.xcconfig` or
+`macos/Runner/Configs/AppInfo.xcconfig`. iOS reads
+`SERLINK_IOS_BUILD_NUMBER`; macOS reads `SERLINK_MACOS_BUILD_NUMBER`.
+`pubspec.yaml` still provides the shared app version name.
 
 ## iOS TestFlight
 

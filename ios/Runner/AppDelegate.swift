@@ -4,6 +4,7 @@ import UIKit
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let cloudKitChannel = CloudKitSyncChannel()
+  private var platformChannel: FlutterMethodChannel?
 
   override func application(
     _ application: UIApplication,
@@ -14,7 +15,22 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    cloudKitChannel.register(with: engineBridge.applicationRegistrar.messenger())
+    let messenger = engineBridge.applicationRegistrar.messenger()
+    registerPlatformChannel(with: messenger)
+    cloudKitChannel.register(with: messenger)
+  }
+
+  private func registerPlatformChannel(with messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "serlink/platform", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "displayName":
+        result(UIDevice.current.name)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    platformChannel = channel
   }
 
   override func application(

@@ -19,6 +19,7 @@ import 'package:serlink/features/vault/application/vault_record_repository.dart'
 import 'package:serlink/features/vault/application/vault_service.dart';
 import 'package:serlink/features/vault/data/drift_vault_repository.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
+import 'package:serlink/platform/local_device_info.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
 void main() {
@@ -42,6 +43,37 @@ void main() {
       await webDavDir.delete(recursive: true);
     }
   });
+
+  test(
+    'auto sync status tracks failed attempts separately from last success',
+    () {
+      final completedAt = DateTime.utc(2026, 6, 18, 12);
+      final failedAt = DateTime.utc(2026, 6, 18, 12, 5);
+
+      final failed =
+          AutoSyncStatus(
+            phase: AutoSyncPhase.idle,
+            lastCompletedAt: completedAt,
+          ).copyWith(
+            phase: AutoSyncPhase.failed,
+            lastFailedAt: failedAt,
+            lastFailureMessage: 'Manifest missing.',
+          );
+
+      expect(failed.lastCompletedAt, completedAt);
+      expect(failed.lastFailedAt, failedAt);
+      expect(failed.lastFailureMessage, 'Manifest missing.');
+
+      final retrying = failed.copyWith(
+        phase: AutoSyncPhase.scheduled,
+        clearFailure: true,
+      );
+
+      expect(retrying.lastCompletedAt, completedAt);
+      expect(retrying.lastFailedAt, isNull);
+      expect(retrying.lastFailureMessage, isNull);
+    },
+  );
 
   test('iCloud sync defaults to enabled on fresh install', () async {
     final database = SerlinkDatabase(NativeDatabase.memory());
@@ -666,6 +698,7 @@ void main() {
             ),
           );
       container.read(autoSyncControllerProvider);
+      final syncRequestedAt = DateTime.now().toUtc();
       container
           .read(autoSyncControllerProvider.notifier)
           .requestSync(delay: Duration.zero);
@@ -674,6 +707,10 @@ void main() {
 
       final status = container.read(autoSyncControllerProvider);
       expect(status.lastProviderKind, SyncProviderKind.webDav);
+      final lastFailedAt = status.lastFailedAt;
+      expect(lastFailedAt, isNotNull);
+      expect(lastFailedAt!.isBefore(syncRequestedAt), isFalse);
+      expect(lastFailedAt.isAfter(DateTime.now().toUtc()), isFalse);
       expect(
         status.lastFailure,
         isA<SyncRunException>().having(
@@ -870,6 +907,9 @@ ProviderContainer _createDualSyncContainer({
       ),
       secretStoreProvider.overrideWithValue(InMemorySecretStore()),
       transferQueueControllerProvider.overrideWithValue(transferQueue),
+      localDeviceInfoProvider.overrideWithValue(
+        const _FixedLocalDeviceInfo('Sync Metadata Test Mac'),
+      ),
       autoSyncDebounceDurationProvider.overrideWithValue(
         const Duration(days: 1),
       ),
@@ -919,7 +959,7 @@ Future<void> _waitForAutoSyncPhase(
   final status = container.read(autoSyncControllerProvider);
   fail(
     'Expected auto-sync phase $expected but found ${status.phase}. '
-    'Failure: ${status.lastFailureMessage}.',
+    'Failure: ${status.lastFailureMessage}. Details: ${status.lastFailure}.',
   );
 }
 
@@ -938,7 +978,8 @@ Future<void> _waitForVaultState(
   final status = container.read(autoSyncControllerProvider);
   fail(
     'Expected vault state $expected but found ${state?.vaultState}. '
-    'Auto-sync phase: ${status.phase}, failure: ${status.lastFailureMessage}.',
+    'Auto-sync phase: ${status.phase}, failure: ${status.lastFailureMessage}. '
+    'Details: ${status.lastFailure}.',
   );
 }
 
@@ -1070,6 +1111,15 @@ Future<int> _remoteHeaderSchemaVersion({
   return header.schemaVersion;
 }
 
+class _FixedLocalDeviceInfo extends LocalDeviceInfo {
+  const _FixedLocalDeviceInfo(this.name);
+
+  final String name;
+
+  @override
+  Future<String?> displayName() async => name;
+}
+
 class _KindOverrideSyncProvider implements SyncProvider {
   const _KindOverrideSyncProvider(
     this.inner,
@@ -1086,8 +1136,10 @@ class _KindOverrideSyncProvider implements SyncProvider {
     final capabilities = await inner.capabilities();
     return ProviderCapabilities(
       kind: kind,
-      supportsConditionalWrites: capabilities.supportsConditionalWrites,
-      requiresTls: capabilities.requiresTls,
+      supportsConditionalWrites:
+          kind == SyncProviderKind.cloudKit ||
+          capabilities.supportsConditionalWrites,
+      requiresTls: kind == SyncProviderKind.webDav || capabilities.requiresTls,
     );
   }
 

@@ -77,6 +77,108 @@ void main() {
   });
 
   test(
+    'vault session coalesces concurrent biometric unlock requests',
+    () async {
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final secretStore = _CountingSecretStore();
+      final container = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'windows',
+              targetPlatform: TargetPlatform.windows,
+            ),
+          ),
+          secretStoreProvider.overrideWithValue(secretStore),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+          autoSyncEnabledProvider.overrideWithValue(false),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      final controller = container.read(
+        vaultSessionControllerProvider.notifier,
+      );
+      await container.read(vaultSessionControllerProvider.future);
+      await controller.initialize(passphrase: 'good passphrase');
+      expect(await controller.enableLocalUnlock(), isTrue);
+      await controller.lock();
+      secretStore.resetCounts();
+
+      final firstUnlock = controller.unlockWithLocalKey();
+      final secondUnlock = controller.unlockWithLocalKey();
+
+      expect(identical(firstUnlock, secondUnlock), isTrue);
+
+      await Future.wait([firstUnlock, secondUnlock]);
+
+      final session = container
+          .read(vaultSessionControllerProvider)
+          .requireValue;
+      expect(session.vaultState, VaultState.unlocked);
+      expect(session.localUnlockAvailable, isTrue);
+      expect(session.biometricUnlockSupported, isTrue);
+      expect(secretStore.biometricReadCount, 1);
+      expect(secretStore.biometricContainsCount, 0);
+    },
+  );
+
+  test(
+    'vault session automatically unlocks with local key on startup',
+    () async {
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final secretStore = _CountingSecretStore();
+      final overrides = [
+        serlinkDatabaseProvider.overrideWithValue(database),
+        vaultCryptoConfigProvider.overrideWithValue(
+          const VaultCryptoConfig.testing(),
+        ),
+        platformCapabilitiesProvider.overrideWithValue(
+          const PlatformCapabilities(
+            operatingSystem: 'windows',
+            targetPlatform: TargetPlatform.windows,
+          ),
+        ),
+        secretStoreProvider.overrideWithValue(secretStore),
+        transferQueueControllerProvider.overrideWithValue(transferQueue),
+        autoSyncEnabledProvider.overrideWithValue(false),
+      ];
+      final firstContainer = ProviderContainer(overrides: overrides);
+      final secondContainer = ProviderContainer(overrides: overrides);
+      addTearDown(firstContainer.dispose);
+      addTearDown(secondContainer.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      final firstController = firstContainer.read(
+        vaultSessionControllerProvider.notifier,
+      );
+      await firstContainer.read(vaultSessionControllerProvider.future);
+      await firstController.initialize(passphrase: 'good passphrase');
+      expect(await firstController.enableLocalUnlock(), isTrue);
+      secretStore.resetCounts();
+
+      final session = await secondContainer.read(
+        vaultSessionControllerProvider.future,
+      );
+
+      expect(session.vaultState, VaultState.unlocked);
+      expect(session.localUnlockAvailable, isTrue);
+      expect(session.biometricUnlockSupported, isTrue);
+      expect(secretStore.biometricReadCount, 1);
+      expect(secretStore.biometricContainsCount, 0);
+    },
+  );
+
+  test(
     'vault session sanitizes unsupported local unlock protectors on load',
     () async {
       final database = SerlinkDatabase(NativeDatabase.memory());
@@ -153,4 +255,37 @@ void main() {
       expect(storedHeader!.localUnlockProtectors, isEmpty);
     },
   );
+}
+
+class _CountingSecretStore extends InMemorySecretStore {
+  int biometricReadCount = 0;
+  int biometricContainsCount = 0;
+
+  void resetCounts() {
+    biometricReadCount = 0;
+    biometricContainsCount = 0;
+  }
+
+  @override
+  Future<List<int>?> read(
+    SecretRef ref, {
+    SecretProtection protection = SecretProtection.deviceLocal,
+  }) async {
+    if (protection == SecretProtection.biometricCurrentSet) {
+      biometricReadCount += 1;
+      await Future<void>.delayed(Duration.zero);
+    }
+    return super.read(ref, protection: protection);
+  }
+
+  @override
+  Future<bool> contains(
+    SecretRef ref, {
+    SecretProtection protection = SecretProtection.deviceLocal,
+  }) async {
+    if (protection == SecretProtection.biometricCurrentSet) {
+      biometricContainsCount += 1;
+    }
+    return super.contains(ref, protection: protection);
+  }
 }

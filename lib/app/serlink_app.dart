@@ -18,6 +18,8 @@ class SerlinkApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     final language = ref.watch(appLanguageProvider).value ?? AppLanguage.system;
+    final protectBackground =
+        ref.watch(appProtectBackgroundProvider).value ?? false;
     final capabilities = ref.watch(platformCapabilitiesProvider);
     ref.watch(cloudKitVaultDiscoveryControllerProvider);
     ref.watch(cloudKitEncryptedSnapshotPrefetchControllerProvider);
@@ -49,7 +51,12 @@ class SerlinkApp extends ConsumerWidget {
           data: foruiTheme,
           platform: capabilities.foruiPlatformVariant,
           child: FToaster(
-            child: FTooltipGroup(child: _LifecycleOverlay(child: body)),
+            child: FTooltipGroup(
+              child: _LifecycleOverlay(
+                protectBackground: protectBackground,
+                child: body,
+              ),
+            ),
           ),
         );
         if (!AppWindow.needsFlutterSurfaceClip) {
@@ -68,8 +75,12 @@ class SerlinkApp extends ConsumerWidget {
 }
 
 class _LifecycleOverlay extends ConsumerStatefulWidget {
-  const _LifecycleOverlay({required this.child});
+  const _LifecycleOverlay({
+    required this.protectBackground,
+    required this.child,
+  });
 
+  final bool protectBackground;
   final Widget child;
 
   @override
@@ -128,7 +139,7 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
 
   @override
   Widget build(BuildContext context) {
-    if (!_hidden) {
+    if (!_hidden || !widget.protectBackground) {
       return widget.child;
     }
     final colors = Theme.of(context).colorScheme;

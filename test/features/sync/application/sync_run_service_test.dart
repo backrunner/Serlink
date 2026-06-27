@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/core/ids/entity_id.dart';
+import 'package:serlink/core/logging/offline_diagnostic_logger.dart';
 import 'package:serlink/features/sync/application/sync_device_service.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
 import 'package:serlink/features/sync/application/sync_record_scope.dart';
@@ -85,6 +86,34 @@ void main() {
 
     final manifestPayload = utf8.decode(manifest.encryptedPayload);
     expect(manifestPayload, isNot(contains('secret.example.test')));
+  });
+
+  test('logs sync push lifecycle without plaintext record data', () async {
+    final logger = _CapturingDiagnosticLogger();
+    service = SyncRunService(
+      vault: vault,
+      records: records,
+      diagnosticLogger: logger,
+    );
+    final envelope = await vault.encryptRecord(
+      id: VaultRecordId('host:1'),
+      type: 'host',
+      plaintext: utf8.encode('{"hostname":"secret.example.test"}'),
+    );
+    await records.upsert(envelope);
+
+    final provider = LocalDirectorySyncProvider(tempDir);
+    await service.pushEncryptedSnapshot(provider);
+
+    expect(logger.events.map((event) => event.event), [
+      'sync.push.start',
+      'sync.push.success',
+    ]);
+    final serialized = jsonEncode([
+      for (final event in logger.events) event.details,
+    ]);
+    expect(serialized, contains('recordsUploaded'));
+    expect(serialized, isNot(contains('secret.example.test')));
   });
 
   test('push includes encrypted writer device metadata', () async {
@@ -2558,6 +2587,37 @@ class _FailingCleanupProvider implements SyncProvider {
     throw const SyncProviderException(
       'sync.provider.cleanup_failed',
       'Cleanup failed.',
+    );
+  }
+}
+
+class _CapturedDiagnosticEvent {
+  const _CapturedDiagnosticEvent({
+    required this.event,
+    required this.level,
+    required this.details,
+  });
+
+  final String event;
+  final DiagnosticLogLevel level;
+  final Map<String, Object?> details;
+}
+
+class _CapturingDiagnosticLogger implements DiagnosticLogger {
+  final events = <_CapturedDiagnosticEvent>[];
+
+  @override
+  Future<void> record(
+    String event, {
+    DiagnosticLogLevel level = DiagnosticLogLevel.info,
+    Map<String, Object?> details = const {},
+  }) async {
+    events.add(
+      _CapturedDiagnosticEvent(
+        event: event,
+        level: level,
+        details: Map<String, Object?>.unmodifiable(details),
+      ),
     );
   }
 }

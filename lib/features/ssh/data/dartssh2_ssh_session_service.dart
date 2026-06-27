@@ -9,6 +9,7 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:dartssh2/src/ssh_hostkey.dart';
 
 import '../../../core/ids/entity_id.dart';
+import '../../../core/logging/offline_diagnostic_logger.dart';
 import '../../sftp/application/sftp_connection.dart';
 import '../../sftp/data/dartssh2_sftp_connection.dart';
 import '../application/ssh_session_service.dart';
@@ -23,17 +24,20 @@ class DartSsh2SessionService implements SshSessionService {
     SshSocketFactory socketFactory = SSHSocket.connect,
     Future<HostKeyDecision> Function(HostKeyPrompt prompt)? confirmHostKey,
     SshAgentClient agentClient = const LocalSshAgentClient(),
-  }) : this._(socketFactory, confirmHostKey, agentClient);
+    DiagnosticLogger diagnosticLogger = const NoopDiagnosticLogger(),
+  }) : this._(socketFactory, confirmHostKey, agentClient, diagnosticLogger);
 
   DartSsh2SessionService._(
     this._socketFactory,
     this._confirmHostKey,
     this._agentClient,
+    this._diagnosticLogger,
   );
 
   final SshSocketFactory _socketFactory;
   final Future<HostKeyDecision> Function(HostKeyPrompt prompt)? _confirmHostKey;
   final SshAgentClient _agentClient;
+  final DiagnosticLogger _diagnosticLogger;
   final Map<SessionId, _SshClientChain> _clientChains = {};
   final Map<SessionId, ServerSocket> _localForwards = {};
   final Map<SessionId, SSHRemoteForward> _remoteForwards = {};
@@ -41,7 +45,7 @@ class DartSsh2SessionService implements SshSessionService {
 
   @override
   Future<SshShellSession> openShell(ConnectionProfileSnapshot profile) async {
-    final chain = await _connect(profile);
+    final chain = await _connect(profile, purpose: 'shell');
     late final SSHSession session;
     try {
       session = await chain.target.shell(
@@ -63,7 +67,7 @@ class DartSsh2SessionService implements SshSessionService {
 
   @override
   Future<SftpConnection> openSftp(ConnectionProfileSnapshot profile) async {
-    final chain = await _connect(profile);
+    final chain = await _connect(profile, purpose: 'sftp');
     late final SftpClient sftp;
     try {
       sftp = await chain.target.sftp();
@@ -81,7 +85,7 @@ class DartSsh2SessionService implements SshSessionService {
 
   @override
   Future<void> testConnection(ConnectionProfileSnapshot profile) async {
-    final chain = await _connect(profile);
+    final chain = await _connect(profile, purpose: 'test');
     try {
       await chain.target.ping();
     } finally {
@@ -189,7 +193,12 @@ class DartSsh2SessionService implements SshSessionService {
     return client;
   }
 
-  Future<_SshClientChain> _connect(ConnectionProfileSnapshot profile) async {
+  Future<_SshClientChain> _connect(
+    ConnectionProfileSnapshot profile, {
+    required String purpose,
+  }) async {
+    final details = _connectionLogDetails(profile, purpose: purpose);
+    await _diagnosticLogger.record('ssh.connect.start', details: details);
     final clients = <SSHClient>[];
     try {
       SSHSocket socket;
@@ -221,11 +230,60 @@ class DartSsh2SessionService implements SshSessionService {
       }
 
       clients.add(_createClient(socket, _SshEndpoint.fromProfile(profile)));
-      return _SshClientChain(clients);
-    } on Object {
+      final chain = _SshClientChain(clients);
+      await _diagnosticLogger.record('ssh.connect.success', details: details);
+      return chain;
+    } on Object catch (error) {
+      await _diagnosticLogger.record(
+        'ssh.connect.failure',
+        level: DiagnosticLogLevel.error,
+        details: {...details, ..._sshErrorDetails(error)},
+      );
       _SshClientChain(clients).close();
       rethrow;
     }
+  }
+
+  Map<String, Object?> _connectionLogDetails(
+    ConnectionProfileSnapshot profile, {
+    required String purpose,
+  }) {
+    return {
+      'sessionId': profile.sessionId.value,
+      'purpose': purpose,
+      'jumpHosts': profile.jumpHosts.length,
+      'authMethods': _authMethodKinds(profile.authMethods),
+      'automaticReconnect': profile.reconnectPolicy.isAutomatic,
+      'connectTimeoutSeconds': profile.connectTimeout.inSeconds,
+    };
+  }
+
+  List<String> _authMethodKinds(List<SshAuthMethod> authMethods) {
+    return [
+      for (final method in authMethods)
+        switch (method) {
+          SshPasswordAuth() => 'password',
+          SshPrivateKeyAuth() => 'privateKey',
+          SshKeyboardInteractiveAuth() => 'keyboardInteractive',
+          SshAgentAuth() => 'agent',
+          SshOpenSshCertificateAuth() => 'openSshCertificate',
+          SshHardwareKeyAuth() => 'hardwareKey',
+        },
+    ];
+  }
+
+  Map<String, Object?> _sshErrorDetails(Object error) {
+    return switch (error) {
+      UnsupportedSshAuthException(:final code) => {
+        'errorType': 'UnsupportedSshAuthException',
+        'code': code,
+      },
+      SshAgentException(:final code) => {
+        'errorType': 'SshAgentException',
+        'code': code,
+      },
+      _ => {'errorType': error.runtimeType.toString()},
+    };
   }
 
   SSHClient _createClient(SSHSocket socket, _SshEndpoint endpoint) {

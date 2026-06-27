@@ -14,6 +14,7 @@ class _SettingsSurface extends ConsumerWidget {
     final vaultBusy = vault?.isBusy == true || vaultSession.isLoading;
     final canImportHostData = vaultState == VaultState.unlocked;
     final language = ref.watch(appLanguageProvider).value ?? AppLanguage.system;
+    final protectBackground = ref.watch(appProtectBackgroundProvider);
     final appPackageInfo = ref.watch(appPackageInfoProvider);
     final showInPageTitle = !ref
         .watch(platformCapabilitiesProvider)
@@ -167,9 +168,24 @@ class _SettingsSurface extends ConsumerWidget {
                             )
                           : null,
                     ),
-                    _SettingsInfoRow(
-                      icon: Icons.verified_user_outlined,
-                      title: l10n.settingsHostKeyConfirmationTitle,
+                    _SettingsActionRow(
+                      icon: Icons.visibility_off_outlined,
+                      title: l10n.settingsBackgroundPrivacyTitle,
+                      subtitle: (protectBackground.value ?? false)
+                          ? l10n.settingsBackgroundPrivacyEnabled
+                          : l10n.settingsBackgroundPrivacyDisabled,
+                      action: _SettingsSwitch(
+                        key: const ValueKey(
+                          'settings-background-privacy-switch',
+                        ),
+                        semanticsLabel: l10n.settingsBackgroundPrivacySemantics,
+                        value: protectBackground.value ?? false,
+                        onChanged: protectBackground.isLoading
+                            ? null
+                            : (value) => unawaited(
+                                _setProtectBackground(context, ref, value),
+                              ),
+                      ),
                     ),
                     _SettingsActionRow(
                       icon: Icons.badge_outlined,

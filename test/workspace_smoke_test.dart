@@ -38,6 +38,53 @@ import 'package:serlink/platform/platform_capabilities.dart';
 part 'workspace_smoke_test_fakes.dart';
 
 void main() {
+  testWidgets('settings prompts vault creation when iCloud has no vault', (
+    tester,
+  ) async {
+    final database = SerlinkDatabase(NativeDatabase.memory());
+    final transferQueue = TransferQueueController();
+    addTearDown(database.close);
+    addTearDown(transferQueue.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'macos',
+              targetPlatform: TargetPlatform.macOS,
+            ),
+          ),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(
+            () => Future.value(true),
+          ),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => _EmptySyncProvider(),
+          ),
+          cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          appPackageInfoProvider.overrideWith((ref) async {
+            return _testPackageInfo();
+          }),
+        ],
+        child: const SerlinkApp(),
+      ),
+    );
+
+    await _pumpUntilFound(tester, find.text('Create Vault'));
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('iCloud'), findsOneWidget);
+    expect(find.text('create a vault to start syncing'), findsOneWidget);
+    expect(find.text('unlock the vault to continue syncing'), findsNothing);
+  });
+
   testWidgets('workspace creates vault and shows empty hosts', (tester) async {
     final database = SerlinkDatabase(NativeDatabase.memory());
     final sshService = _FakeSshSessionService();
@@ -560,9 +607,7 @@ void main() {
     expect(tester.takeException(), isNull);
 
     expect(
-      find.text(
-        'Biometric unlock enabled. Lock the vault to use Face ID or Touch ID.',
-      ),
+      find.text('Face ID unlock enabled. Lock the vault to use Face ID.'),
       findsOneWidget,
     );
     final session = container.read(vaultSessionControllerProvider).value;
@@ -801,7 +846,7 @@ void main() {
     expect(find.text('Reset Vault Permanently'), findsOneWidget);
   });
 
-  testWidgets('settings shows biometric unlock controls after enabling', (
+  testWidgets('settings shows Face ID unlock controls after enabling', (
     tester,
   ) async {
     await _pumpLockedVaultApp(
@@ -833,14 +878,12 @@ void main() {
       find.byKey(const ValueKey('settings-local-unlock-switch')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Enable biometric unlock?'), findsOneWidget);
+    expect(find.text('Enable Face ID unlock?'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Enable'));
     await tester.pumpAndSettle();
     expect(
-      find.text(
-        'Biometric unlock enabled. Lock the vault to use Face ID or Touch ID.',
-      ),
+      find.text('Face ID unlock enabled. Lock the vault to use Face ID.'),
       findsOneWidget,
     );
     await tester.pump(const Duration(seconds: 4));
@@ -856,7 +899,7 @@ void main() {
       find.byKey(const ValueKey('settings-local-unlock-button')),
       findsOneWidget,
     );
-    expect(find.text('Use biometrics'), findsOneWidget);
+    expect(find.text('Use Face ID'), findsOneWidget);
   });
 
   testWidgets('mobile settings controls stay compact and readable', (
@@ -912,7 +955,7 @@ void main() {
     final switchRect = tester.getRect(localUnlockSwitch);
     expect(switchRect.width, lessThanOrEqualTo(38));
     expect(switchRect.height, lessThanOrEqualTo(26));
-    final localUnlockTitleRect = tester.getRect(find.text('Biometric unlock'));
+    final localUnlockTitleRect = tester.getRect(find.text('Face ID unlock'));
     expect(
       (switchRect.center.dy - localUnlockTitleRect.center.dy).abs(),
       lessThanOrEqualTo(16),
@@ -940,6 +983,37 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('background privacy screen is off by default', (tester) async {
+    await _pumpLockedVaultApp(tester);
+
+    expect(find.text('Unlock Vault'), findsWidgets);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+
+    expect(find.text('Unlock Vault'), findsWidgets);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+  });
+
+  testWidgets('background privacy screen covers app when enabled', (
+    tester,
+  ) async {
+    await _pumpLockedVaultApp(tester, protectBackground: true);
+
+    expect(find.text('Unlock Vault'), findsWidgets);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+
+    expect(find.text('Unlock Vault'), findsNothing);
+    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
   });
 
   testWidgets('settings runtime exports diagnostic logs', (tester) async {
@@ -1208,11 +1282,24 @@ void main() {
     final editIconRect = tester.getRect(editIcon);
     final deleteButtonRect = tester.getRect(deleteButton);
     final deleteIconRect = tester.getRect(deleteIcon);
+    final swipedHostRowRect = tester.getRect(hostRow);
+    final hostEditGap = editButtonRect.left - swipedHostRowRect.right;
+    final editDeleteGap = deleteButtonRect.left - editButtonRect.right;
     expect(editButtonRect.width, 44);
     expect(editButtonRect.height, 44);
     expect(deleteButtonRect.width, 44);
     expect(deleteButtonRect.height, 44);
     expect(editButtonRect.center.dx, lessThan(deleteButtonRect.center.dx));
+    expect(hostEditGap, moreOrLessEquals(editDeleteGap, epsilon: 0.5));
+    expect(hostEditGap, moreOrLessEquals(SerlinkSpacing.sm, epsilon: 0.5));
+    expect(
+      tester.widget<SerlinkPressable>(editButton).borderRadius,
+      SerlinkRadii.dialog,
+    );
+    expect(
+      tester.widget<SerlinkPressable>(deleteButton).borderRadius,
+      SerlinkRadii.dialog,
+    );
     expect(
       (editButtonRect.center.dx - editIconRect.center.dx).abs(),
       lessThanOrEqualTo(0.5),
@@ -1648,10 +1735,14 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   WidgetTester tester, {
   PlatformCapabilities? capabilities,
   _FakeSshSessionService? sshService,
+  bool protectBackground = false,
 }) async {
   final database = SerlinkDatabase(NativeDatabase.memory());
   final transferQueue = TransferQueueController();
   final secretStore = InMemorySecretStore();
+  final privacySettings = _MemoryAppPrivacySettingsRepository(
+    protectBackground,
+  );
   final resolvedSshService = sshService ?? _FakeSshSessionService();
   final resolvedCapabilities =
       capabilities ??
@@ -1696,6 +1787,7 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
         sshSessionServiceProvider.overrideWithValue(resolvedSshService),
         transferQueueControllerProvider.overrideWithValue(transferQueue),
         secretStoreProvider.overrideWithValue(secretStore),
+        appPrivacySettingsRepositoryProvider.overrideWithValue(privacySettings),
         autoSyncEnabledProvider.overrideWithValue(false),
         appPackageInfoProvider.overrideWith((ref) async {
           return _testPackageInfo();

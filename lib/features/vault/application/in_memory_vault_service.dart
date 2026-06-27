@@ -165,10 +165,12 @@ class InMemoryVaultService implements VaultService {
     if (protectors.isEmpty) {
       throw const VaultException(
         'vault.local_unlock_not_enabled',
-        'Biometric vault unlock is not enabled on this device.',
+        'Face ID vault unlock is not enabled on this device.',
       );
     }
-    for (final protector in protectors) {
+    final candidates = [...protectors]
+      ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
+    for (final protector in candidates) {
       final List<int>? secretBytes;
       try {
         secretBytes = await secrets.read(
@@ -195,7 +197,7 @@ class InMemoryVaultService implements VaultService {
         _replaceRootKey(rootKeyBytes);
         _setState(VaultState.unlocked);
         return;
-      } on SecretBoxAuthenticationError {
+      } on Object {
         continue;
       } finally {
         secretKey.destroy();
@@ -203,7 +205,7 @@ class InMemoryVaultService implements VaultService {
     }
     throw const VaultException(
       'vault.local_unlock_failed',
-      'Biometric unlock failed. Use the vault passphrase.',
+      'Face ID unlock failed. Use the vault passphrase.',
     );
   }
 
@@ -247,7 +249,7 @@ class InMemoryVaultService implements VaultService {
         !capabilities.biometricGate) {
       throw const VaultException(
         'vault.local_unlock_unavailable',
-        'Biometric secure storage is not available on this device.',
+        'Face ID secure storage is not available on this device.',
       );
     }
     final header = _requireHeader();

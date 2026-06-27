@@ -51,6 +51,46 @@ void main() {
     expect(serializedEnvelope, isNot(contains('test-os')));
   });
 
+  test('uses resolved local device name for sync registration', () async {
+    service = SyncDeviceService(
+      devices: EncryptedSyncDeviceRepository(vault: vault, records: records),
+      secrets: secrets,
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ),
+      displayNameResolver: () async => 'Orchi iPhone',
+      fallbackHostname: () => 'localhost',
+      platform: 'ios',
+      now: () => DateTime.utc(2026, 5, 27, 10),
+    );
+
+    final device = await service.touchLocalDevice();
+
+    expect(device.displayName, 'Orchi iPhone');
+    expect(device.displayName, isNot('localhost'));
+  });
+
+  test('does not store localhost as sync device name', () async {
+    service = SyncDeviceService(
+      devices: EncryptedSyncDeviceRepository(vault: vault, records: records),
+      secrets: secrets,
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ),
+      displayNameResolver: () async => 'localhost',
+      fallbackHostname: () => 'localhost',
+      platform: 'ios',
+      now: () => DateTime.utc(2026, 5, 27, 10),
+    );
+
+    final device = await service.touchLocalDevice();
+
+    expect(device.displayName, 'This device');
+    expect(device.displayName, isNot('localhost'));
+  });
+
   test('reuses local device id and updates last seen time', () async {
     final first = await service.touchLocalDevice();
 

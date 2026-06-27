@@ -65,27 +65,27 @@ The output should include `hasAlpha: no`.
 
 ## Build number
 
-Preview the next shared Flutter build number:
+Preview the next iOS build number:
 
 ```sh
-./tool/bump_build_number.sh --dry-run --no-pub-get
+./tool/bump_build_number.sh --platform ios --dry-run
 ```
 
-Increment the build number before a manual archive:
+Increment the iOS build number before a manual archive:
 
 ```sh
-./tool/bump_build_number.sh
+./tool/bump_build_number.sh --platform ios
 ```
 
 Set a specific build number:
 
 ```sh
-./tool/bump_build_number.sh --set 42
+./tool/bump_build_number.sh --platform ios --set 42
 ```
 
-The script updates the `version: x.y.z+n` line in `pubspec.yaml` and runs
-`flutter pub get` unless `--no-pub-get` is provided. iOS and macOS both read
-this shared build number through Flutter's generated Xcode settings.
+The script updates `SERLINK_IOS_BUILD_NUMBER` in
+`ios/Runner/Configs/AppInfo.xcconfig`. iOS uses that value for
+`CFBundleVersion`; macOS has its own independent build number.
 
 ## Scripted TestFlight upload
 
@@ -120,7 +120,7 @@ first.
 
 Use this path when you prefer to archive from Xcode:
 
-1. Run `./tool/bump_build_number.sh`.
+1. Run `./tool/bump_build_number.sh --platform ios`.
 2. Open `ios/Runner.xcworkspace` in Xcode.
 3. Select the `Runner` scheme.
 4. Select `Any iOS Device` or `Any iOS Device (arm64)`.

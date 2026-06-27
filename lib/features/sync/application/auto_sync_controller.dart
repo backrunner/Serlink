@@ -106,6 +106,7 @@ class AutoSyncStatus {
   const AutoSyncStatus({
     required this.phase,
     this.lastCompletedAt,
+    this.lastFailedAt,
     this.lastFailureMessage,
     this.lastFailure,
     this.lastProviderKind,
@@ -118,6 +119,7 @@ class AutoSyncStatus {
 
   final AutoSyncPhase phase;
   final DateTime? lastCompletedAt;
+  final DateTime? lastFailedAt;
   final String? lastFailureMessage;
   final Object? lastFailure;
   final SyncProviderKind? lastProviderKind;
@@ -130,6 +132,7 @@ class AutoSyncStatus {
   AutoSyncStatus copyWith({
     AutoSyncPhase? phase,
     DateTime? lastCompletedAt,
+    DateTime? lastFailedAt,
     String? lastFailureMessage,
     Object? lastFailure,
     SyncProviderKind? lastProviderKind,
@@ -141,6 +144,7 @@ class AutoSyncStatus {
     return AutoSyncStatus(
       phase: phase ?? this.phase,
       lastCompletedAt: lastCompletedAt ?? this.lastCompletedAt,
+      lastFailedAt: clearFailure ? null : lastFailedAt ?? this.lastFailedAt,
       lastFailureMessage: clearFailure
           ? null
           : lastFailureMessage ?? this.lastFailureMessage,

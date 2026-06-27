@@ -429,6 +429,26 @@ Future<void> _setAppLanguage(
   }
 }
 
+Future<void> _setProtectBackground(
+  BuildContext context,
+  WidgetRef ref,
+  bool enabled,
+) async {
+  final l10n = context.l10n;
+  try {
+    await ref
+        .read(appProtectBackgroundProvider.notifier)
+        .setProtectBackground(enabled);
+    if (context.mounted) {
+      _showSnackBar(context, l10n.settingsBackgroundPrivacySaved);
+    }
+  } on Object {
+    if (context.mounted) {
+      _showSnackBar(context, l10n.settingsBackgroundPrivacySaveFailed);
+    }
+  }
+}
+
 String _vaultStatusPillLabel(AppLocalizations l10n, VaultState? state) {
   return switch (state) {
     VaultState.uninitialized => l10n.settingsVaultNotCreatedPill,
@@ -481,9 +501,9 @@ String _localUnlockLabel(
     if (session?.localUnlockAvailable == true) {
       return _mobileText(
         l10n,
-        zh: '可用生物解锁',
-        en: 'Biometric ready',
-        ja: '生体認証可',
+        zh: 'Face ID 可用',
+        en: 'Face ID ready',
+        ja: 'Face ID 可',
       );
     }
     if (session?.biometricUnlockSupported != true) {

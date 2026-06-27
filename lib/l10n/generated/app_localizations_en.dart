@@ -234,32 +234,51 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsRecoverResetAction => 'Recover / Reset';
 
   @override
-  String get settingsLocalUnlockTitle => 'Biometric unlock';
+  String get settingsLocalUnlockTitle => 'Face ID unlock';
 
   @override
-  String get settingsLocalUnlockSemantics => 'Enable biometric unlock';
+  String get settingsLocalUnlockSemantics => 'Enable Face ID unlock';
 
   @override
   String get settingsLocalUnlockNeedsVault =>
-      'Create the vault before enabling biometric unlock.';
+      'Create the vault before enabling Face ID unlock.';
 
   @override
   String get settingsLocalUnlockEnabled =>
-      'Enabled. Lock the vault to unlock with Face ID or Touch ID.';
+      'Enabled. Lock the vault to unlock with Face ID.';
 
   @override
   String get settingsLocalUnlockUnavailable =>
-      'Face ID or Touch ID is not available on this device.';
+      'Face ID is not available on this device.';
 
   @override
   String get settingsLocalUnlockDisabled =>
       'Disabled. Passphrase or recovery key is required after lock.';
 
   @override
-  String get settingsUnlockWithDeviceAction => 'Use biometrics';
+  String get settingsUnlockWithDeviceAction => 'Use Face ID';
 
   @override
-  String get settingsHostKeyConfirmationTitle => 'Host key confirmation';
+  String get settingsBackgroundPrivacyTitle => 'Background privacy';
+
+  @override
+  String get settingsBackgroundPrivacySemantics =>
+      'Show privacy screen in the background';
+
+  @override
+  String get settingsBackgroundPrivacyEnabled =>
+      'On. Show a lock screen when Serlink is backgrounded.';
+
+  @override
+  String get settingsBackgroundPrivacyDisabled =>
+      'Off. Keep the current screen visible in the background.';
+
+  @override
+  String get settingsBackgroundPrivacySaved => 'Background privacy updated.';
+
+  @override
+  String get settingsBackgroundPrivacySaveFailed =>
+      'Background privacy could not be updated.';
 
   @override
   String get settingsCredentialsTitle => 'Credentials';
@@ -324,25 +343,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAppVersionUnavailable => 'Version unavailable';
 
   @override
-  String get settingsEnableLocalUnlockTitle => 'Enable biometric unlock?';
+  String get settingsEnableLocalUnlockTitle => 'Enable Face ID unlock?';
 
   @override
-  String get settingsDisableLocalUnlockTitle => 'Disable biometric unlock?';
+  String get settingsDisableLocalUnlockTitle => 'Disable Face ID unlock?';
 
   @override
   String get settingsEnableLocalUnlockBody =>
-      'Serlink will store a random device key protected by Face ID or Touch ID. Your vault passphrase is not stored.';
+      'Serlink will store a random device key protected by Face ID. Your vault passphrase is not stored.';
 
   @override
   String get settingsDisableLocalUnlockBody =>
-      'This removes this device key from biometric protection. Existing connections keep running.';
+      'This removes this device key from Face ID protection. Existing connections keep running.';
 
   @override
   String get vaultEnableFaceIdUnlockTitle => 'Enable Face ID unlock?';
 
   @override
   String get vaultEnableFaceIdUnlockBody =>
-      'Use Face ID or Touch ID to unlock this vault on this device. Serlink stores a random device key protected by biometrics, not your vault passphrase.';
+      'Use Face ID to unlock this vault on this device. Serlink stores a random device key protected by Face ID, not your vault passphrase.';
 
   @override
   String get settingsEnableAction => 'Enable';
@@ -352,22 +371,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLocalUnlockEnabledSnack =>
-      'Biometric unlock enabled. Lock the vault to use Face ID or Touch ID.';
+      'Face ID unlock enabled. Lock the vault to use Face ID.';
 
   @override
   String get settingsLocalUnlockVerifyFailedSnack =>
-      'Biometric unlock could not be verified.';
+      'Face ID unlock could not be verified.';
 
   @override
-  String get settingsLocalUnlockDisabledSnack => 'Biometric unlock disabled.';
+  String get settingsLocalUnlockDisabledSnack => 'Face ID unlock disabled.';
 
   @override
   String get settingsLocalUnlockStillAvailableSnack =>
-      'Biometric unlock is still available on this device.';
+      'Face ID unlock is still available on this device.';
 
   @override
   String get settingsLocalUnlockUpdateFailed =>
-      'Biometric unlock could not be updated.';
+      'Face ID unlock could not be updated.';
 
   @override
   String get copyAction => 'Copy';
@@ -471,6 +490,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get syncICloudPausedSnack => 'iCloud sync paused.';
 
   @override
+  String get syncICloudRemoteVaultAdoptedSnack =>
+      'iCloud already has a Serlink vault. Use that vault passphrase to finish syncing.';
+
+  @override
   String syncConflictsResolvedSnack(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -568,11 +591,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get syncAutoSyncWaiting => 'auto-sync waiting';
 
   @override
+  String get syncAutoSyncNeedsVault => 'create a vault to start syncing';
+
+  @override
+  String get syncAutoSyncNeedsUnlock => 'unlock the vault to continue syncing';
+
+  @override
   String get syncAutoSyncReady => 'auto-sync ready';
 
   @override
   String syncLastSynced(String time) {
     return 'last synced $time';
+  }
+
+  @override
+  String syncLastFailed(String time) {
+    return 'sync failed at $time';
   }
 
   @override
@@ -1487,7 +1521,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultUnlockAction => 'Unlock';
 
   @override
-  String get vaultUnlockWithDeviceAction => 'Use biometrics';
+  String get vaultUnlockWithDeviceAction => 'Use Face ID';
 
   @override
   String get vaultUseRecoveryCodeAction => 'Use recovery code';
@@ -1509,15 +1543,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultLocalUnlockNotEnabledError =>
-      'Biometric vault unlock is not enabled on this device.';
+      'Face ID vault unlock is not enabled on this device.';
 
   @override
   String get vaultLocalUnlockFailedError =>
-      'Biometric unlock failed. Use the vault passphrase.';
+      'Face ID unlock failed. Use the vault passphrase.';
 
   @override
   String get vaultLocalUnlockUnavailableError =>
-      'Face ID or Touch ID is not available on this device.';
+      'Face ID is not available on this device.';
 
   @override
   String get vaultEmptyPassphraseError => 'Vault passphrase cannot be empty.';

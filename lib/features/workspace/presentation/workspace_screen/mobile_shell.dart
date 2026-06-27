@@ -489,6 +489,7 @@ class _MobileBottomNavigation extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return FBottomNavigationBar(
+      key: const ValueKey('mobile-workspace-bottom-navigation'),
       index: index,
       safeAreaBottom: false,
       onChange: onChange,

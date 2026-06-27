@@ -74,7 +74,7 @@ SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
 The upload script:
 
 1. Runs the signing readiness check.
-2. Optionally increments the Flutter build number when
+2. Optionally increments the macOS build number when
    `--bump-build-number` is provided.
 3. Archives with `SERLINK_DISTRIBUTION=app_store`.
 4. Uses `macos/Runner/ExportOptionsAppStore.plist`.
@@ -87,11 +87,11 @@ SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
   ./tool/upload_macos_testflight.sh --build-number 42
 ```
 
-For manual Xcode Organizer archives, increment the shared Flutter build number
+For manual Xcode Organizer archives, increment the macOS build number
 before archiving:
 
 ```sh
-./tool/bump_build_number.sh
+./tool/bump_build_number.sh --platform macos
 ```
 
 For CI or a clean machine, use Xcode's automatic provisioning options by passing

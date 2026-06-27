@@ -41,7 +41,7 @@ class _SyncSettingsSection extends ConsumerWidget {
       data: (settings) => _SettingsActionRow(
         icon: Icons.cloud_queue,
         title: 'WebDAV',
-        subtitle: _webDavSettingsSubtitle(l10n, settings, autoSync),
+        subtitle: _webDavSettingsSubtitle(l10n, settings, autoSync, vaultState),
         action: _SettingsTextButton(
           onPressed: () => _showWebDavSyncDialog(context, ref, settings),
           child: Text(
@@ -83,7 +83,12 @@ class _SyncSettingsSection extends ConsumerWidget {
                 return _SettingsActionRow(
                   icon: Icons.cloud_outlined,
                   title: 'iCloud',
-                  subtitle: _iCloudSettingsSubtitle(l10n, enabled, autoSync),
+                  subtitle: _iCloudSettingsSubtitle(
+                    l10n,
+                    enabled,
+                    autoSync,
+                    vaultState,
+                  ),
                   action: _SettingsSwitch(
                     value: enabled,
                     onChanged: (value) => _setICloudSync(context, ref, value),
@@ -625,6 +630,11 @@ Future<void> _setICloudSync(
     }
     ref.invalidate(cloudKitSyncSettingsProvider);
     if (enabled) {
+      if (header == null) {
+        await ref
+            .read(vaultSessionControllerProvider.notifier)
+            .refreshCloudKitVaultDiscovery();
+      }
       ref.read(autoSyncControllerProvider.notifier).requestSync();
     }
     if (context.mounted) {
@@ -644,20 +654,19 @@ String _iCloudSettingsSubtitle(
   AppLocalizations l10n,
   bool enabled,
   AutoSyncStatus autoSync,
+  VaultState? vaultState,
 ) {
   if (!enabled) {
     return l10n.syncPausedICloudSubtitle;
   }
-  return [
-    l10n.syncEnabledStatus,
-    _autoSyncStatusSubtitle(l10n, autoSync),
-  ].join(' · ');
+  return _autoSyncStatusSubtitle(l10n, autoSync, vaultState);
 }
 
 String _webDavSettingsSubtitle(
   AppLocalizations l10n,
   WebDavSyncSettings? settings,
   AutoSyncStatus autoSync,
+  VaultState? vaultState,
 ) {
   if (settings == null) {
     return l10n.syncWebDavNotConfiguredSubtitle;
@@ -669,7 +678,7 @@ String _webDavSettingsSubtitle(
       ? l10n.syncHttpAllowedStatus
       : l10n.syncHttpsStatus;
   final sync = settings.enabled
-      ? _autoSyncStatusSubtitle(l10n, autoSync)
+      ? _autoSyncStatusSubtitle(l10n, autoSync, vaultState)
       : null;
   return [
     state,
@@ -679,20 +688,64 @@ String _webDavSettingsSubtitle(
   ].join(' · ');
 }
 
-String _autoSyncStatusSubtitle(AppLocalizations l10n, AutoSyncStatus status) {
+String _autoSyncStatusSubtitle(
+  AppLocalizations l10n,
+  AutoSyncStatus status,
+  VaultState? vaultState,
+) {
   return switch (status.phase) {
-    AutoSyncPhase.disabled => l10n.syncAutoSyncWaiting,
+    AutoSyncPhase.disabled => switch (vaultState) {
+      VaultState.uninitialized => l10n.syncAutoSyncNeedsVault,
+      VaultState.locked => l10n.syncAutoSyncNeedsUnlock,
+      _ => l10n.syncAutoSyncWaiting,
+    },
     AutoSyncPhase.idle =>
       status.lastCompletedAt == null
           ? l10n.syncAutoSyncReady
-          : l10n.syncLastSynced(_shortLocalDateTime(status.lastCompletedAt!)),
+          : l10n.syncLastSynced(
+              _syncLastCompletedTime(status.lastCompletedAt!),
+            ),
     AutoSyncPhase.scheduled => l10n.syncAutoSyncQueued,
     AutoSyncPhase.syncing => l10n.syncSyncingAutomatically,
     AutoSyncPhase.conflicts => l10n.syncConflictCount(status.conflictCount),
-    AutoSyncPhase.failed =>
-      status.lastFailureMessage ?? l10n.syncAutoSyncFailed,
+    AutoSyncPhase.failed => _autoSyncFailureSubtitle(l10n, status),
   };
 }
+
+String _autoSyncFailureSubtitle(AppLocalizations l10n, AutoSyncStatus status) {
+  final failedAt = status.lastFailedAt;
+  final failureStatus = failedAt == null
+      ? l10n.syncAutoSyncFailed
+      : l10n.syncLastFailed(_syncLastCompletedTime(failedAt));
+  final message = status.lastFailureMessage;
+  if (message == null || message.isEmpty) {
+    return failureStatus;
+  }
+  return '$failureStatus · $message';
+}
+
+String _syncLastCompletedTime(DateTime value) {
+  final local = value.toLocal();
+  final now = DateTime.now();
+  final datePrefix = _isSameLocalDay(local, now)
+      ? ''
+      : '${_fourDigits(local.year)}-${_twoDigits(local.month)}-'
+            '${_twoDigits(local.day)} ';
+  return '$datePrefix${_twoDigits(local.hour)}:${_twoDigits(local.minute)}:'
+      '${_twoDigits(local.second)}';
+}
+
+bool _isSameLocalDay(DateTime a, DateTime b) {
+  final localA = a.toLocal();
+  final localB = b.toLocal();
+  return localA.year == localB.year &&
+      localA.month == localB.month &&
+      localA.day == localB.day;
+}
+
+String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+String _fourDigits(int value) => value.toString().padLeft(4, '0');
 
 ({String title, String message}) _syncRepairCopy(
   AppLocalizations l10n,

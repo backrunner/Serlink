@@ -1699,6 +1699,65 @@ void main() {
     },
   );
 
+  testWidgets('hosts can be sorted from the header menu', (tester) async {
+    final hosts = _DelayedHostRepository([
+      _hostConfig(
+        id: 'zulu',
+        displayName: 'Zulu Jump',
+        hostname: 'zulu.internal',
+        createdAt: DateTime.utc(2026, 6, 18, 10),
+        lastConnectedAt: DateTime.utc(2026, 6, 20),
+      ),
+      _hostConfig(
+        id: 'alpha',
+        displayName: 'Alpha Bastion',
+        hostname: 'alpha.internal',
+        createdAt: DateTime.utc(2026, 6, 18, 12),
+        lastConnectedAt: DateTime.utc(2026, 6, 21),
+      ),
+      _hostConfig(
+        id: 'mid',
+        displayName: 'Mid Recently Added',
+        hostname: 'mid.internal',
+        createdAt: DateTime.utc(2026, 6, 18, 14),
+      ),
+    ]);
+
+    await _pumpLockedVaultApp(tester, hostRepository: hosts);
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _pumpUntil(tester, () => hosts.listRequested);
+    hosts.completeList();
+    await _pumpUntilFound(tester, find.text('Mid Recently Added'));
+
+    _expectTextVerticalOrder(tester, [
+      'Mid Recently Added',
+      'Alpha Bastion',
+      'Zulu Jump',
+    ]);
+
+    await tester.tap(find.byKey(const ValueKey('sort-hosts-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sort by name'));
+    await tester.pumpAndSettle();
+
+    _expectTextVerticalOrder(tester, [
+      'Alpha Bastion',
+      'Mid Recently Added',
+      'Zulu Jump',
+    ]);
+
+    await tester.tap(find.byKey(const ValueKey('sort-hosts-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sort by last connection'));
+    await tester.pumpAndSettle();
+
+    _expectTextVerticalOrder(tester, [
+      'Alpha Bastion',
+      'Zulu Jump',
+      'Mid Recently Added',
+    ]);
+  });
+
   testWidgets('vault unlock error resets after switching workspace tabs', (
     tester,
   ) async {
@@ -1735,6 +1794,7 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   WidgetTester tester, {
   PlatformCapabilities? capabilities,
   _FakeSshSessionService? sshService,
+  HostRepository? hostRepository,
   bool protectBackground = false,
 }) async {
   final database = SerlinkDatabase(NativeDatabase.memory());
@@ -1784,6 +1844,8 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
         vaultCryptoConfigProvider.overrideWithValue(
           const VaultCryptoConfig.testing(),
         ),
+        if (hostRepository != null)
+          hostRepositoryProvider.overrideWithValue(hostRepository),
         sshSessionServiceProvider.overrideWithValue(resolvedSshService),
         transferQueueControllerProvider.overrideWithValue(transferQueue),
         secretStoreProvider.overrideWithValue(secretStore),
@@ -1891,6 +1953,40 @@ Finder _byTooltipLabel(String label) => find.bySemanticsLabel(label);
 
 Rect _rectForKey(WidgetTester tester, String key) {
   return tester.getRect(find.byKey(ValueKey<String>(key)));
+}
+
+void _expectTextVerticalOrder(WidgetTester tester, List<String> labels) {
+  final tops = [
+    for (final label in labels) tester.getTopLeft(find.text(label)).dy,
+  ];
+  for (var index = 0; index < tops.length - 1; index += 1) {
+    expect(tops[index], lessThan(tops[index + 1]));
+  }
+}
+
+HostConfig _hostConfig({
+  required String id,
+  required String displayName,
+  required String hostname,
+  required DateTime createdAt,
+  DateTime? lastConnectedAt,
+}) {
+  return HostConfig(
+    id: HostId(id),
+    displayName: displayName,
+    hostname: hostname,
+    username: 'ops',
+    port: 22,
+    authKinds: const {HostAuthKind.password},
+    tags: const {},
+    trustState: HostTrustState.trusted,
+    identityIds: const [],
+    startupCommands: const [],
+    jumpHostIds: const [],
+    createdAt: createdAt,
+    updatedAt: createdAt,
+    lastConnectedAt: lastConnectedAt,
+  );
 }
 
 class _DelayedHostRepository implements HostRepository {

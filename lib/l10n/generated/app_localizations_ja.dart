@@ -81,6 +81,18 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostsAddTooltip => 'ホストを追加';
 
   @override
+  String get hostsSortTooltip => 'ホストを並べ替え';
+
+  @override
+  String get hostsSortByName => '名前順';
+
+  @override
+  String get hostsSortByLastConnected => '最終接続順';
+
+  @override
+  String get hostsSortByAdded => '追加日時順';
+
+  @override
   String get hostsEmptyTitle => 'ホストがありません';
 
   @override
@@ -1188,6 +1200,91 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get connectionInactive => '接続はアクティブではありません。';
+
+  @override
+  String get sessionDisconnectedMessage => '接続が中断されました。再接続すると新しいセッションが開始されます。';
+
+  @override
+  String get sessionBackgroundedMessage =>
+      'Serlink がバックグラウンドに入ったためセッションが切断されました。再接続すると新しいセッションが開始されます。';
+
+  @override
+  String get connectionFailedMessage => '接続に失敗しました。';
+
+  @override
+  String get connectionProfileVaultLockedMessage =>
+      '新しい接続を開始する前にボールトを解除してください。';
+
+  @override
+  String get connectionProfileNotFoundMessage => '接続プロファイルが見つかりません。';
+
+  @override
+  String get connectionProfileHostNotFoundMessage => 'ホストが見つかりません。';
+
+  @override
+  String get connectionProfileIdentityNotFoundMessage => '認証情報が見つかりません。';
+
+  @override
+  String get connectionProfileNoAuthMethodsMessage => 'このホストには認証情報が設定されていません。';
+
+  @override
+  String get connectionProfileJumpChainTooDeepMessage => '踏み台ホストのチェーンが長すぎます。';
+
+  @override
+  String get connectionProfileJumpCycleMessage => '踏み台ホストのチェーンに循環があります。';
+
+  @override
+  String get connectionProfileSshAgentUnsupportedMessage =>
+      'このプラットフォームでは SSH agent 認証を利用できません。';
+
+  @override
+  String get connectionProfileHardwareKeyUnsupportedMessage =>
+      'このプラットフォームではハードウェアキー認証を利用できません。';
+
+  @override
+  String get connectionProfileIdentitySecretMissingMessage =>
+      '認証情報がシークレット記録を参照していません。';
+
+  @override
+  String get connectionProfileSecretNotFoundMessage => 'シークレット記録が見つかりません。';
+
+  @override
+  String get connectionProfilePasswordMissingMessage => '認証情報にパスワードが含まれていません。';
+
+  @override
+  String get connectionProfilePrivateKeyMissingMessage => '認証情報に秘密鍵が含まれていません。';
+
+  @override
+  String get connectionProfileCertificateMissingMessage =>
+      '認証情報に OpenSSH 証明書が含まれていません。';
+
+  @override
+  String get sshAuthAgentUnavailableMessage => 'SSH agent を利用できません。';
+
+  @override
+  String get sshAuthHardwareKeyUnsupportedMessage =>
+      'ハードウェアセキュリティキー認証にはプラットフォームの対応が必要です。';
+
+  @override
+  String get sshAuthAgentEmptyMessage => 'SSH agent に読み込まれた認証情報がありません。';
+
+  @override
+  String get sshAuthEmptyMessage => '接続プロファイルに対応している認証方式がありません。';
+
+  @override
+  String get sshAuthCertificateInvalidMessage => 'OpenSSH 証明書の内容が無効です。';
+
+  @override
+  String get localTerminalExitedMessage => 'ローカルシェルが終了しました。再起動すると新しいシェルを開きます。';
+
+  @override
+  String get localTerminalFailedMessage => 'ローカル端末に失敗しました。';
+
+  @override
+  String get localTerminalShellMissingMessage => 'ローカルシェル実行ファイルが見つかりません。';
+
+  @override
+  String get localTerminalStartFailedMessage => 'ローカル端末を開始できませんでした。';
 
   @override
   String get localShellTitle => 'ローカルシェル';

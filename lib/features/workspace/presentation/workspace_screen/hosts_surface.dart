@@ -1,5 +1,21 @@
 part of '../workspace_screen.dart';
 
+final _hostSortOrderProvider =
+    NotifierProvider<_HostSortOrderController, _HostSortOrder>(
+      _HostSortOrderController.new,
+    );
+
+enum _HostSortOrder { addedAt, name, lastConnectedAt }
+
+class _HostSortOrderController extends Notifier<_HostSortOrder> {
+  @override
+  _HostSortOrder build() => _HostSortOrder.addedAt;
+
+  void setOrder(_HostSortOrder order) {
+    state = order;
+  }
+}
+
 class _HostsSurface extends ConsumerWidget {
   const _HostsSurface();
 
@@ -9,6 +25,7 @@ class _HostsSurface extends ConsumerWidget {
     final vaultSession = ref.watch(vaultSessionControllerProvider);
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final searchQuery = ref.watch(_workspaceSearchQueryProvider);
+    final sortOrder = ref.watch(_hostSortOrderProvider);
     final mobile = ref.watch(
       platformCapabilitiesProvider.select(
         (capabilities) => capabilities.prefersMobileWorkspaceShell,
@@ -44,7 +61,10 @@ class _HostsSurface extends ConsumerWidget {
             body: error.toString(),
           ),
           data: (hosts) {
-            final filteredHosts = filterHostSummaries(hosts, searchQuery);
+            final filteredHosts = _sortHostSummaries(
+              filterHostSummaries(hosts, searchQuery),
+              sortOrder,
+            );
             if (hosts.isEmpty) {
               return _HostsEmptyState(
                 onAddHost: () => _showAddHostDialog(context),
@@ -55,6 +75,10 @@ class _HostsSurface extends ConsumerWidget {
                 if (!mobile)
                   _HostsHeader(
                     count: filteredHosts.length,
+                    sortOrder: sortOrder,
+                    onSortOrderChanged: ref
+                        .read(_hostSortOrderProvider.notifier)
+                        .setOrder,
                     onAddHost: () => _showAddHostDialog(context),
                   ),
                 Expanded(
@@ -151,9 +175,16 @@ Future<void> _confirmDeleteHost(
 }
 
 class _HostsHeader extends StatelessWidget {
-  const _HostsHeader({required this.count, required this.onAddHost});
+  const _HostsHeader({
+    required this.count,
+    required this.sortOrder,
+    required this.onSortOrderChanged,
+    required this.onAddHost,
+  });
 
   final int count;
+  final _HostSortOrder sortOrder;
+  final ValueChanged<_HostSortOrder> onSortOrderChanged;
   final VoidCallback onAddHost;
 
   @override
@@ -173,6 +204,11 @@ class _HostsHeader extends StatelessWidget {
           const SizedBox(width: 8),
           _CountBadge(count: count),
           const Spacer(),
+          _HostSortMenuButton(
+            selectedOrder: sortOrder,
+            onSelected: onSortOrderChanged,
+          ),
+          const SizedBox(width: 8),
           SerlinkTooltip(
             message: l10n.hostsAddTooltip,
             child: SerlinkIconButton(
@@ -183,6 +219,60 @@ class _HostsHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HostSortMenuButton extends StatelessWidget {
+  const _HostSortMenuButton({
+    required this.selectedOrder,
+    required this.onSelected,
+    this.mobile = false,
+  });
+
+  final _HostSortOrder selectedOrder;
+  final ValueChanged<_HostSortOrder> onSelected;
+  final bool mobile;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return SerlinkMenuButton(
+      key: const ValueKey('sort-hosts-button'),
+      tooltip: l10n.hostsSortTooltip,
+      icon: const Icon(Icons.sort),
+      constraints: mobile
+          ? const BoxConstraints.tightFor(
+              width: _mobileHeaderActionSide,
+              height: _mobileHeaderActionSide,
+            )
+          : null,
+      iconSize: mobile ? _mobileHeaderActionIconSize : null,
+      actions: [
+        _hostSortAction(
+          label: l10n.hostsSortByName,
+          order: _HostSortOrder.name,
+        ),
+        _hostSortAction(
+          label: l10n.hostsSortByLastConnected,
+          order: _HostSortOrder.lastConnectedAt,
+        ),
+        _hostSortAction(
+          label: l10n.hostsSortByAdded,
+          order: _HostSortOrder.addedAt,
+        ),
+      ],
+    );
+  }
+
+  SerlinkMenuAction _hostSortAction({
+    required String label,
+    required _HostSortOrder order,
+  }) {
+    return SerlinkMenuAction(
+      label: label,
+      icon: selectedOrder == order ? Icons.check : null,
+      onPressed: () => onSelected(order),
     );
   }
 }
@@ -229,4 +319,56 @@ class _HostsEmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+List<HostSummary> _sortHostSummaries(
+  List<HostSummary> hosts,
+  _HostSortOrder order,
+) {
+  final sorted = [...hosts]
+    ..sort((left, right) {
+      final byPrimary = switch (order) {
+        _HostSortOrder.addedAt => _compareDateDesc(
+          left.createdAt,
+          right.createdAt,
+        ),
+        _HostSortOrder.name => _compareHostName(left, right),
+        _HostSortOrder.lastConnectedAt => _compareNullableDateDesc(
+          left.lastConnectedAt,
+          right.lastConnectedAt,
+        ),
+      };
+      if (byPrimary != 0) {
+        return byPrimary;
+      }
+      final byAdded = _compareDateDesc(left.createdAt, right.createdAt);
+      return byAdded == 0 ? _compareHostName(left, right) : byAdded;
+    });
+  return sorted;
+}
+
+int _compareHostName(HostSummary left, HostSummary right) {
+  final byDisplayName = left.displayName.toLowerCase().compareTo(
+    right.displayName.toLowerCase(),
+  );
+  if (byDisplayName != 0) {
+    return byDisplayName;
+  }
+  final byHostname = left.hostname.toLowerCase().compareTo(
+    right.hostname.toLowerCase(),
+  );
+  return byHostname == 0 ? left.id.value.compareTo(right.id.value) : byHostname;
+}
+
+int _compareDateDesc(DateTime left, DateTime right) {
+  return right.compareTo(left);
+}
+
+int _compareNullableDateDesc(DateTime? left, DateTime? right) {
+  return switch ((left, right)) {
+    (null, null) => 0,
+    (null, _) => 1,
+    (_, null) => -1,
+    (final leftDate?, final rightDate?) => rightDate.compareTo(leftDate),
+  };
 }

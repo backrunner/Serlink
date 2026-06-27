@@ -200,12 +200,24 @@ class _MobileHeaderActions extends ConsumerWidget {
     if (session?.vaultState != VaultState.unlocked) {
       return const SizedBox.shrink();
     }
+    final sortOrder = ref.watch(_hostSortOrderProvider);
     return _MobileHeaderActionGroup(
-      action: _MobileHeaderIconButton(
-        key: const ValueKey('add-host-button'),
-        tooltip: context.l10n.hostsAddTooltip,
-        icon: Icons.add,
-        onPressed: () => _showAddHostDialog(context),
+      action: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _HostSortMenuButton(
+            selectedOrder: sortOrder,
+            onSelected: ref.read(_hostSortOrderProvider.notifier).setOrder,
+            mobile: true,
+          ),
+          const SizedBox(width: _mobileHeaderControlGap),
+          _MobileHeaderIconButton(
+            key: const ValueKey('add-host-button'),
+            tooltip: context.l10n.hostsAddTooltip,
+            icon: Icons.add,
+            onPressed: () => _showAddHostDialog(context),
+          ),
+        ],
       ),
     );
   }

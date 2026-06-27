@@ -399,12 +399,16 @@ class SerlinkMenuButton extends StatelessWidget {
     required this.actions,
     required this.icon,
     this.tooltip,
+    this.constraints,
+    this.iconSize,
     this.enabled = true,
   });
 
   final List<SerlinkMenuAction> actions;
   final Widget icon;
   final String? tooltip;
+  final BoxConstraints? constraints;
+  final double? iconSize;
   final bool enabled;
 
   @override
@@ -431,6 +435,8 @@ class SerlinkMenuButton extends StatelessWidget {
         tooltip: tooltip,
         onPressed: enabled ? controller.toggle : null,
         icon: icon,
+        constraints: constraints,
+        iconSize: iconSize,
       ),
     );
   }

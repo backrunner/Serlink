@@ -33,7 +33,15 @@ class LocalDirectorySyncProvider implements SyncProvider {
   Future<void> writeManifest(RemoteManifest manifest) async {
     await rootDirectory.create(recursive: true);
     final file = File(p.join(rootDirectory.path, _manifestFileName));
-    await file.writeAsBytes(manifest.toBytes(), flush: true);
+    final tempFile = File(
+      p.join(
+        rootDirectory.path,
+        '.$_manifestFileName.${DateTime.now().microsecondsSinceEpoch}.'
+        '${identityHashCode(manifest)}.tmp',
+      ),
+    );
+    await tempFile.writeAsBytes(manifest.toBytes(), flush: true);
+    await tempFile.rename(file.path);
   }
 
   @override
@@ -62,7 +70,8 @@ class LocalDirectorySyncProvider implements SyncProvider {
       final relativePath = p
           .split(p.relative(entity.path, from: rootDirectory.path))
           .join('/');
-      if (relativePath == _manifestFileName) {
+      if (relativePath == _manifestFileName ||
+          _isTemporaryManifestPath(relativePath)) {
         continue;
       }
       if (prefix != null && !relativePath.startsWith(prefix)) {
@@ -105,6 +114,10 @@ class LocalDirectorySyncProvider implements SyncProvider {
   String _objectPath(RemoteObjectRef ref) {
     final relativePath = _safeRemoteObjectPath(ref.path);
     return p.joinAll([rootDirectory.path, ...relativePath.split('/')]);
+  }
+
+  static bool _isTemporaryManifestPath(String path) {
+    return path.startsWith('.$_manifestFileName.') && path.endsWith('.tmp');
   }
 }
 

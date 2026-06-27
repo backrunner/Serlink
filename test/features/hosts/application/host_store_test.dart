@@ -97,14 +97,77 @@ void main() {
       expect(vault.state, VaultState.unlocked);
     },
   );
+
+  test('host summaries default to date added order', () async {
+    final database = SerlinkDatabase(NativeDatabase.memory());
+    final transferQueue = TransferQueueController();
+    final container = ProviderContainer(
+      overrides: [
+        serlinkDatabaseProvider.overrideWithValue(database),
+        vaultCryptoConfigProvider.overrideWithValue(
+          const VaultCryptoConfig.testing(),
+        ),
+        platformCapabilitiesProvider.overrideWithValue(
+          const PlatformCapabilities(
+            operatingSystem: 'linux',
+            targetPlatform: TargetPlatform.linux,
+          ),
+        ),
+        secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+        transferQueueControllerProvider.overrideWithValue(transferQueue),
+        hostRepositoryProvider.overrideWithValue(
+          _StaticHostRepository([
+            _host(
+              id: HostId('older'),
+              displayName: 'Zulu Host',
+              hostname: 'older.example.test',
+              createdAt: DateTime.utc(2026, 6, 18, 10),
+            ),
+            _host(
+              id: HostId('middle'),
+              displayName: 'Remote Host',
+              hostname: 'remote.example.test',
+              createdAt: DateTime.utc(2026, 6, 18, 12),
+            ),
+            _host(
+              id: HostId('newer'),
+              displayName: 'Alpha Host',
+              hostname: 'newer.example.test',
+              createdAt: DateTime.utc(2026, 6, 18, 14),
+            ),
+          ]),
+        ),
+        autoSyncEnabledProvider.overrideWithValue(false),
+      ],
+    );
+    addTearDown(container.dispose);
+    addTearDown(transferQueue.dispose);
+    addTearDown(database.close);
+
+    await container
+        .read(vaultSessionControllerProvider.notifier)
+        .initialize(passphrase: 'good passphrase');
+    final session = container.read(vaultSessionControllerProvider).requireValue;
+
+    final summaries = await container.read(
+      hostSummariesProvider(session.unlockGeneration).future,
+    );
+
+    expect(summaries.map((host) => host.displayName), [
+      'Alpha Host',
+      'Remote Host',
+      'Zulu Host',
+    ]);
+  });
 }
 
 HostConfig _host({
   required HostId id,
   required String displayName,
   required String hostname,
+  DateTime? createdAt,
 }) {
-  final now = DateTime.utc(2026, 6, 18, 12);
+  final now = createdAt ?? DateTime.utc(2026, 6, 18, 12);
   return HostConfig(
     id: id,
     displayName: displayName,
@@ -125,4 +188,30 @@ HostConfig _host({
 Future<void> _drainMicrotasks() async {
   await Future<void>.delayed(Duration.zero);
   await Future<void>.delayed(Duration.zero);
+}
+
+class _StaticHostRepository implements HostRepository {
+  const _StaticHostRepository(this.hosts);
+
+  final List<HostConfig> hosts;
+
+  @override
+  Future<void> save(HostConfig host) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<HostConfig?> read(HostId id) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<List<HostConfig>> list() async {
+    return [...hosts];
+  }
+
+  @override
+  Future<void> delete(HostId id) {
+    throw UnimplementedError();
+  }
 }

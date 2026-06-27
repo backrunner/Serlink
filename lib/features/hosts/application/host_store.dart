@@ -18,9 +18,18 @@ final hostSummariesProvider = FutureProvider.autoDispose
       }
       ref.watch(vaultRecordChangesProvider);
       final hosts = await ref.watch(hostRepositoryProvider).list();
-      hosts.sort(
-        (left, right) => left.displayName.compareTo(right.displayName),
-      );
+      hosts.sort((left, right) {
+        final byCreatedAt = right.createdAt.compareTo(left.createdAt);
+        if (byCreatedAt != 0) {
+          return byCreatedAt;
+        }
+        final byDisplayName = left.displayName.toLowerCase().compareTo(
+          right.displayName.toLowerCase(),
+        );
+        return byDisplayName == 0
+            ? left.id.value.compareTo(right.id.value)
+            : byDisplayName;
+      });
       ref.keepAlive();
       return [for (final host in hosts) host.toSummary()];
     });

@@ -9,12 +9,38 @@ import 'sync_record_scope.dart';
 
 enum VaultRecordChangeKind { upsert, delete }
 
+enum VaultRecordChangeOrigin { local, remoteSync }
+
+final _vaultRecordChangeOriginZoneKey = Object();
+
+VaultRecordChangeOrigin get _currentVaultRecordChangeOrigin {
+  return Zone.current[_vaultRecordChangeOriginZoneKey]
+          as VaultRecordChangeOrigin? ??
+      VaultRecordChangeOrigin.local;
+}
+
+Future<T> runWithVaultRecordChangeOrigin<T>(
+  VaultRecordChangeOrigin origin,
+  Future<T> Function() action,
+) {
+  return runZoned(
+    action,
+    zoneValues: {_vaultRecordChangeOriginZoneKey: origin},
+  );
+}
+
 class VaultRecordChange {
-  const VaultRecordChange({required this.kind, required this.id, this.type});
+  const VaultRecordChange({
+    required this.kind,
+    required this.id,
+    this.type,
+    this.origin = VaultRecordChangeOrigin.local,
+  });
 
   final VaultRecordChangeKind kind;
   final VaultRecordId id;
   final String? type;
+  final VaultRecordChangeOrigin origin;
 }
 
 class VaultRecordChangeBus {
@@ -52,6 +78,7 @@ class NotifyingVaultRecordRepository implements VaultRecordRepository {
           kind: VaultRecordChangeKind.upsert,
           id: envelope.id,
           type: envelope.type,
+          origin: _currentVaultRecordChangeOrigin,
         ),
       );
     }
@@ -77,6 +104,7 @@ class NotifyingVaultRecordRepository implements VaultRecordRepository {
           kind: VaultRecordChangeKind.delete,
           id: id,
           type: existing.type,
+          origin: _currentVaultRecordChangeOrigin,
         ),
       );
     }
@@ -93,6 +121,7 @@ class NotifyingVaultRecordRepository implements VaultRecordRepository {
             kind: VaultRecordChangeKind.delete,
             id: record.id,
             type: record.type,
+            origin: _currentVaultRecordChangeOrigin,
           ),
         );
       }

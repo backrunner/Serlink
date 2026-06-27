@@ -47,6 +47,23 @@ void main() {
     expect(emitted.single.type, 'host');
   });
 
+  test('marks remote sync writes without hiding change events', () async {
+    final envelope = await vault.encryptRecord(
+      id: VaultRecordId('host:prod'),
+      type: 'host',
+      plaintext: utf8.encode('encrypted host payload'),
+    );
+
+    await runWithVaultRecordChangeOrigin(
+      VaultRecordChangeOrigin.remoteSync,
+      () => repository.upsert(envelope),
+    );
+
+    expect(emitted, hasLength(1));
+    expect(emitted.single.kind, VaultRecordChangeKind.upsert);
+    expect(emitted.single.origin, VaultRecordChangeOrigin.remoteSync);
+  });
+
   test('does not emit change events for sync device touches', () async {
     final envelope = await vault.encryptRecord(
       id: VaultRecordId('sync:device:local'),

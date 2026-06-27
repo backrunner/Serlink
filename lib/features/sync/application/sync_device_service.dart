@@ -222,6 +222,17 @@ class SyncDeviceService {
     return _devices.list();
   }
 
+  Future<bool> isLocalDeviceRecord(VaultRecordId recordId) async {
+    final id = await _readLocalDeviceId();
+    return id != null && recordId == _deviceRecordId(id);
+  }
+
+  Future<bool> isLocalDeviceTombstone(SyncDeleteTombstone tombstone) async {
+    return tombstone.targetRecordType ==
+            EncryptedSyncDeviceRepository.recordType &&
+        await isLocalDeviceRecord(tombstone.targetRecordId);
+  }
+
   Future<void> deleteKnownDevice(String id) async {
     final localDeviceId = await _readLocalDeviceId();
     if (id == localDeviceId) {
@@ -262,6 +273,14 @@ class SyncDeviceService {
     return touchLocalDevice(
       displayName: displayName ?? _preservedDisplayName(existing?.displayName),
     );
+  }
+
+  Future<void> forgetLocalDeviceRegistration() async {
+    final localDeviceId = await _readLocalDeviceId();
+    if (localDeviceId != null) {
+      await _devices.delete(localDeviceId);
+    }
+    await _secrets.delete(_localDeviceIdRef);
   }
 
   Future<void> _ensureLocalDeviceNotRevoked(String id) async {

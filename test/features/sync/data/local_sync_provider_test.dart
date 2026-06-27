@@ -223,6 +223,57 @@ void main() {
     expect(client.createdDirectories, isEmpty);
   });
 
+  test(
+    'webdav conditional manifest writes reject stale snapshot paths',
+    () async {
+      final client = _FakeWebDavClient();
+      final provider = WebDavSyncProvider(
+        endpoint: Uri.parse('https://example.test/webdav'),
+        username: 'u',
+        password: 'p',
+        client: client,
+      );
+      final current = RemoteManifest(
+        vaultId: 'vault-1',
+        protocolVersion: 1,
+        headerPath: 'vault/headers/vault-1.json',
+        encryptedPayload: [1, 2, 3],
+        snapshotObjectPaths: const ['records/current.bin'],
+      );
+      final staleExpected = RemoteManifest(
+        vaultId: 'vault-1',
+        protocolVersion: 1,
+        headerPath: 'vault/headers/vault-1.json',
+        encryptedPayload: [1, 2, 3],
+        snapshotObjectPaths: const ['records/stale.bin'],
+      );
+      final next = RemoteManifest(
+        vaultId: 'vault-1',
+        protocolVersion: 1,
+        headerPath: 'vault/headers/vault-1.json',
+        encryptedPayload: [4, 5, 6],
+        snapshotObjectPaths: const ['records/next.bin'],
+      );
+
+      await provider.writeManifest(current);
+
+      await expectLater(
+        provider.writeManifestIfUnchanged(next, staleExpected),
+        throwsA(
+          isA<SyncProviderException>().having(
+            (error) => error.code,
+            'code',
+            'sync.provider.conflict',
+          ),
+        ),
+      );
+      expect(
+        (await provider.readManifest())?.snapshotObjectPaths,
+        current.snapshotObjectPaths,
+      );
+    },
+  );
+
   test('webdav provider maps provider errors to stable sync errors', () async {
     final client = _FakeWebDavClient(
       readError: DioException(
@@ -323,7 +374,11 @@ class _FakeWebDavClient implements webdav.Client {
     if (error != null) {
       throw error;
     }
-    return const [];
+    return writes[path] ??
+        (throw const SyncProviderException(
+          'sync.provider.not_found',
+          'Sync object was not found.',
+        ));
   }
 
   @override

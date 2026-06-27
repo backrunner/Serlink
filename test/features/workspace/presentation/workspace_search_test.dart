@@ -98,6 +98,7 @@ HostSummary _host({
     authKinds: const {HostAuthKind.password},
     tags: tags,
     trustState: HostTrustState.trusted,
+    createdAt: DateTime.utc(2026),
   );
 }
 

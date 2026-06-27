@@ -83,6 +83,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostsAddTooltip => 'Add host';
 
   @override
+  String get hostsSortTooltip => 'Sort hosts';
+
+  @override
+  String get hostsSortByName => 'Sort by name';
+
+  @override
+  String get hostsSortByLastConnected => 'Sort by last connection';
+
+  @override
+  String get hostsSortByAdded => 'Sort by date added';
+
+  @override
   String get hostsEmptyTitle => 'No Hosts';
 
   @override
@@ -1258,6 +1270,105 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get connectionInactive => 'Connection is not active.';
+
+  @override
+  String get sessionDisconnectedMessage =>
+      'Connection interrupted. Reconnect starts a new session.';
+
+  @override
+  String get sessionBackgroundedMessage =>
+      'Session was disconnected when Serlink entered the background. Reconnect starts a new session.';
+
+  @override
+  String get connectionFailedMessage => 'Connection failed.';
+
+  @override
+  String get connectionProfileVaultLockedMessage =>
+      'Unlock the vault before starting a new connection.';
+
+  @override
+  String get connectionProfileNotFoundMessage =>
+      'Connection profile could not be found.';
+
+  @override
+  String get connectionProfileHostNotFoundMessage => 'Host could not be found.';
+
+  @override
+  String get connectionProfileIdentityNotFoundMessage =>
+      'Identity could not be found.';
+
+  @override
+  String get connectionProfileNoAuthMethodsMessage =>
+      'This host has no identity configured.';
+
+  @override
+  String get connectionProfileJumpChainTooDeepMessage =>
+      'Jump host chain has too many hops.';
+
+  @override
+  String get connectionProfileJumpCycleMessage =>
+      'Jump host chain contains a cycle.';
+
+  @override
+  String get connectionProfileSshAgentUnsupportedMessage =>
+      'SSH agent authentication is not available on this platform.';
+
+  @override
+  String get connectionProfileHardwareKeyUnsupportedMessage =>
+      'Hardware key authentication is not available on this platform.';
+
+  @override
+  String get connectionProfileIdentitySecretMissingMessage =>
+      'Identity does not reference a secret record.';
+
+  @override
+  String get connectionProfileSecretNotFoundMessage =>
+      'Secret record could not be found.';
+
+  @override
+  String get connectionProfilePasswordMissingMessage =>
+      'Identity does not contain a password.';
+
+  @override
+  String get connectionProfilePrivateKeyMissingMessage =>
+      'Identity does not contain a private key.';
+
+  @override
+  String get connectionProfileCertificateMissingMessage =>
+      'Identity does not contain an OpenSSH certificate.';
+
+  @override
+  String get sshAuthAgentUnavailableMessage => 'SSH agent is not available.';
+
+  @override
+  String get sshAuthHardwareKeyUnsupportedMessage =>
+      'Hardware security key authentication requires platform support.';
+
+  @override
+  String get sshAuthAgentEmptyMessage => 'SSH agent has no loaded identities.';
+
+  @override
+  String get sshAuthEmptyMessage =>
+      'Connection profile does not contain a supported authentication method.';
+
+  @override
+  String get sshAuthCertificateInvalidMessage =>
+      'OpenSSH certificate material is invalid.';
+
+  @override
+  String get localTerminalExitedMessage =>
+      'Local shell exited. Restart opens a new shell.';
+
+  @override
+  String get localTerminalFailedMessage => 'Local terminal failed.';
+
+  @override
+  String get localTerminalShellMissingMessage =>
+      'No local shell executable was found.';
+
+  @override
+  String get localTerminalStartFailedMessage =>
+      'Local terminal could not start.';
 
   @override
   String get localShellTitle => 'Local Shell';

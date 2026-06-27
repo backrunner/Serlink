@@ -829,6 +829,7 @@ final _host = HostSummary(
   authKinds: const {HostAuthKind.password},
   tags: const {},
   trustState: HostTrustState.trusted,
+  createdAt: DateTime.utc(2026),
 );
 
 HostSummary _hostWithSftpDefault(String path) {
@@ -841,6 +842,7 @@ HostSummary _hostWithSftpDefault(String path) {
     authKinds: _host.authKinds,
     tags: _host.tags,
     trustState: _host.trustState,
+    createdAt: _host.createdAt,
     sftpDefaultDirectory: path,
   );
 }

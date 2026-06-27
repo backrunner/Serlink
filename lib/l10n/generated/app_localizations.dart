@@ -244,6 +244,30 @@ abstract class AppLocalizations {
   /// **'Add host'**
   String get hostsAddTooltip;
 
+  /// No description provided for @hostsSortTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort hosts'**
+  String get hostsSortTooltip;
+
+  /// No description provided for @hostsSortByName.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by name'**
+  String get hostsSortByName;
+
+  /// No description provided for @hostsSortByLastConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by last connection'**
+  String get hostsSortByLastConnected;
+
+  /// No description provided for @hostsSortByAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by date added'**
+  String get hostsSortByAdded;
+
   /// No description provided for @hostsEmptyTitle.
   ///
   /// In en, this message translates to:
@@ -2271,6 +2295,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connection is not active.'**
   String get connectionInactive;
+
+  /// No description provided for @sessionDisconnectedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection interrupted. Reconnect starts a new session.'**
+  String get sessionDisconnectedMessage;
+
+  /// No description provided for @sessionBackgroundedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Session was disconnected when Serlink entered the background. Reconnect starts a new session.'**
+  String get sessionBackgroundedMessage;
+
+  /// No description provided for @connectionFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed.'**
+  String get connectionFailedMessage;
+
+  /// No description provided for @connectionProfileVaultLockedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock the vault before starting a new connection.'**
+  String get connectionProfileVaultLockedMessage;
+
+  /// No description provided for @connectionProfileNotFoundMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection profile could not be found.'**
+  String get connectionProfileNotFoundMessage;
+
+  /// No description provided for @connectionProfileHostNotFoundMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Host could not be found.'**
+  String get connectionProfileHostNotFoundMessage;
+
+  /// No description provided for @connectionProfileIdentityNotFoundMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity could not be found.'**
+  String get connectionProfileIdentityNotFoundMessage;
+
+  /// No description provided for @connectionProfileNoAuthMethodsMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This host has no identity configured.'**
+  String get connectionProfileNoAuthMethodsMessage;
+
+  /// No description provided for @connectionProfileJumpChainTooDeepMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump host chain has too many hops.'**
+  String get connectionProfileJumpChainTooDeepMessage;
+
+  /// No description provided for @connectionProfileJumpCycleMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump host chain contains a cycle.'**
+  String get connectionProfileJumpCycleMessage;
+
+  /// No description provided for @connectionProfileSshAgentUnsupportedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH agent authentication is not available on this platform.'**
+  String get connectionProfileSshAgentUnsupportedMessage;
+
+  /// No description provided for @connectionProfileHardwareKeyUnsupportedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware key authentication is not available on this platform.'**
+  String get connectionProfileHardwareKeyUnsupportedMessage;
+
+  /// No description provided for @connectionProfileIdentitySecretMissingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity does not reference a secret record.'**
+  String get connectionProfileIdentitySecretMissingMessage;
+
+  /// No description provided for @connectionProfileSecretNotFoundMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Secret record could not be found.'**
+  String get connectionProfileSecretNotFoundMessage;
+
+  /// No description provided for @connectionProfilePasswordMissingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity does not contain a password.'**
+  String get connectionProfilePasswordMissingMessage;
+
+  /// No description provided for @connectionProfilePrivateKeyMissingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity does not contain a private key.'**
+  String get connectionProfilePrivateKeyMissingMessage;
+
+  /// No description provided for @connectionProfileCertificateMissingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity does not contain an OpenSSH certificate.'**
+  String get connectionProfileCertificateMissingMessage;
+
+  /// No description provided for @sshAuthAgentUnavailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH agent is not available.'**
+  String get sshAuthAgentUnavailableMessage;
+
+  /// No description provided for @sshAuthHardwareKeyUnsupportedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware security key authentication requires platform support.'**
+  String get sshAuthHardwareKeyUnsupportedMessage;
+
+  /// No description provided for @sshAuthAgentEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH agent has no loaded identities.'**
+  String get sshAuthAgentEmptyMessage;
+
+  /// No description provided for @sshAuthEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection profile does not contain a supported authentication method.'**
+  String get sshAuthEmptyMessage;
+
+  /// No description provided for @sshAuthCertificateInvalidMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenSSH certificate material is invalid.'**
+  String get sshAuthCertificateInvalidMessage;
+
+  /// No description provided for @localTerminalExitedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Local shell exited. Restart opens a new shell.'**
+  String get localTerminalExitedMessage;
+
+  /// No description provided for @localTerminalFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Local terminal failed.'**
+  String get localTerminalFailedMessage;
+
+  /// No description provided for @localTerminalShellMissingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No local shell executable was found.'**
+  String get localTerminalShellMissingMessage;
+
+  /// No description provided for @localTerminalStartFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Local terminal could not start.'**
+  String get localTerminalStartFailedMessage;
 
   /// No description provided for @localShellTitle.
   ///

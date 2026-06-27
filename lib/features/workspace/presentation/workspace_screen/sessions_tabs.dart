@@ -287,19 +287,25 @@ class _ActiveTabView extends ConsumerWidget {
     final l10n = context.l10n;
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final isLocalTerminal = tab.content is LocalTerminalTabContent;
+    final compactFailureBanner = ref.watch(
+      platformCapabilitiesProvider.select((capabilities) => capabilities.isIOS),
+    );
     final showBanner =
         tab.lifecycle == SessionLifecycleState.disconnected ||
         tab.lifecycle == SessionLifecycleState.failed;
     final banner = showBanner
         ? _RecoverableFailureBanner(
             message:
-                tab.failure?.message ??
+                (tab.failure == null
+                    ? null
+                    : localizedSessionFailureMessage(l10n, tab.failure!)) ??
                 (isLocalTerminal
                     ? l10n.localShellInactive
                     : l10n.connectionInactive),
             actionLabel: isLocalTerminal
                 ? l10n.restartAction
                 : l10n.reconnectAction,
+            compact: compactFailureBanner,
             onReconnect: () => controller.reconnect(tab.id),
             onClose: () => controller.closeTab(tab.id),
           )
@@ -386,35 +392,60 @@ class _RecoverableFailureBanner extends StatelessWidget {
   const _RecoverableFailureBanner({
     required this.message,
     required this.actionLabel,
+    required this.compact,
     required this.onReconnect,
     required this.onClose,
   });
 
   final String message;
   final String actionLabel;
+  final bool compact;
   final VoidCallback onReconnect;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final textStyle = compact
+        ? Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: t.textPrimary, height: 1.2)
+        : TextStyle(color: t.textPrimary);
+    final buttonSize = compact ? SerlinkButtonSize.xs : SerlinkButtonSize.lg;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: t.statusDanger.withValues(alpha: 0.12),
         border: Border(bottom: BorderSide(color: t.borderSubtle)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 12,
+          vertical: compact ? 5 : 8,
+        ),
         child: Row(
           children: [
-            Icon(Icons.error_outline, size: 17, color: t.statusDanger),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(message, style: TextStyle(color: t.textPrimary)),
+            Icon(
+              Icons.error_outline,
+              size: compact ? 15 : 17,
+              color: t.statusDanger,
             ),
-            SerlinkTextButton(onPressed: onReconnect, child: Text(actionLabel)),
+            SizedBox(width: compact ? 8 : 10),
+            Expanded(
+              child: Text(
+                message,
+                maxLines: compact ? 2 : null,
+                overflow: compact ? TextOverflow.ellipsis : null,
+                style: textStyle,
+              ),
+            ),
+            SerlinkTextButton(
+              onPressed: onReconnect,
+              size: buttonSize,
+              child: Text(actionLabel),
+            ),
             SerlinkTextButton(
               onPressed: onClose,
+              size: buttonSize,
               child: Text(context.l10n.closeAction),
             ),
           ],

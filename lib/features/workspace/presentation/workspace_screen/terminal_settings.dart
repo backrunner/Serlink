@@ -118,17 +118,41 @@ Future<void> _showTerminalSettingsDialog(
   );
 }
 
-class _TerminalSettingsDialog extends ConsumerWidget {
+class _TerminalSettingsDialog extends ConsumerStatefulWidget {
   const _TerminalSettingsDialog({required this.tabId, required this.hostId});
 
   final WorkspaceTabId tabId;
   final HostId? hostId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TerminalSettingsDialog> createState() =>
+      _TerminalSettingsDialogState();
+}
+
+class _TerminalSettingsDialogState
+    extends ConsumerState<_TerminalSettingsDialog> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final workspaceState = ref.watch(workspaceTabControllerProvider);
-    final hostSettings = _terminalDisplaySettingsForTab(workspaceState, tabId);
+    final hostSettings = _terminalDisplaySettingsForTab(
+      workspaceState,
+      widget.tabId,
+    );
     final globalSettings =
         ref.watch(terminalDisplaySettingsProvider).value ??
         const TerminalDisplaySettings();
@@ -136,7 +160,7 @@ class _TerminalSettingsDialog extends ConsumerWidget {
     final fontCatalogAsync = ref.watch(terminalFontCatalogProvider);
     final fontCatalog =
         fontCatalogAsync.value ?? TerminalFontCatalog.fallback();
-    final editingHostProfile = hostId != null && hostSettings != null;
+    final editingHostProfile = widget.hostId != null && hostSettings != null;
     final globalController = ref.read(terminalDisplaySettingsProvider.notifier);
     final workspaceController = ref.read(
       workspaceTabControllerProvider.notifier,
@@ -144,121 +168,59 @@ class _TerminalSettingsDialog extends ConsumerWidget {
 
     void updateSettings(TerminalDisplaySettings next) {
       if (editingHostProfile) {
-        workspaceController.saveTerminalDisplaySettingsForHost(tabId, next);
+        workspaceController.saveTerminalDisplaySettingsForHost(
+          widget.tabId,
+          next,
+        );
       } else {
         globalController.setSettings(next);
       }
     }
+
+    final viewportHeight = math.min(
+      640.0,
+      MediaQuery.sizeOf(context).height * 0.72,
+    );
 
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
       title: Text(l10n.terminalSettingsTitle),
       content: SizedBox(
         width: 560,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.72,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _TerminalSettingsGroup(
-                  title: l10n.terminalAppearanceSection,
-                  children: [
-                    SerlinkLabeledField(
-                      label: l10n.terminalThemeLabel,
-                      child: SerlinkSelect<SerlinkTerminalThemeId>(
-                        key: ValueKey(
-                          'terminal-theme-${settings.themeId.name}-$editingHostProfile',
-                        ),
-                        value: settings.themeId,
-                        items: [
-                          for (final themeId in SerlinkTerminalThemeId.values)
-                            SerlinkSelectItem(
-                              value: themeId,
-                              label: themeId.label,
-                              icon: Icons.palette_outlined,
-                            ),
-                        ],
-                        onChanged: (themeId) {
-                          updateSettings(settings.copyWith(themeId: themeId));
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _TerminalFontPicker(
-                      settings: settings,
-                      catalog: fontCatalog,
-                      catalogLoading: fontCatalogAsync.isLoading,
-                      editingHostProfile: editingHostProfile,
-                      onFontFamilyChanged: (fontFamily) {
-                        updateSettings(
-                          settings.copyWith(fontFamily: fontFamily),
-                        );
-                      },
-                    ),
-                  ],
+        height: viewportHeight,
+        child: ClipRect(
+          child: Scrollbar(
+            controller: _scrollController,
+            child: ScrollConfiguration(
+              behavior: ScrollConfiguration.of(
+                context,
+              ).copyWith(scrollbars: false),
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                physics: const ClampingScrollPhysics(),
+                child: _TerminalSettingsContent(
+                  settings: settings,
+                  fontCatalog: fontCatalog,
+                  catalogLoading: fontCatalogAsync.isLoading,
+                  editingHostProfile: editingHostProfile,
+                  onChanged: updateSettings,
                 ),
-                const SizedBox(height: 22),
-                _TerminalSettingsGroup(
-                  title: l10n.terminalLayoutSection,
-                  children: [
-                    _SettingsSlider(
-                      label: l10n.terminalFontSizeLabel,
-                      value: settings.fontSize,
-                      min: 10,
-                      max: 24,
-                      divisions: 14,
-                      displayValue:
-                          '${settings.fontSize.toStringAsFixed(0)} px',
-                      onChanged: (value) =>
-                          updateSettings(settings.copyWith(fontSize: value)),
-                    ),
-                    const SizedBox(height: 10),
-                    _SettingsSlider(
-                      label: l10n.terminalLineHeightLabel,
-                      value: settings.lineHeight,
-                      min: 1,
-                      max: 1.5,
-                      divisions: 10,
-                      displayValue: settings.lineHeight.toStringAsFixed(2),
-                      onChanged: (value) =>
-                          updateSettings(settings.copyWith(lineHeight: value)),
-                    ),
-                    const SizedBox(height: 10),
-                    _SettingsSlider(
-                      label: l10n.terminalScrollbackLabel,
-                      value: settings.scrollbackLines.toDouble(),
-                      min: 1000,
-                      max: 100000,
-                      divisions: 99,
-                      displayValue: _formatScrollbackLines(
-                        settings.scrollbackLines,
-                      ),
-                      onChanged: (value) => updateSettings(
-                        settings.copyWith(scrollbackLines: value.round()),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
           ),
         ),
       ),
       actions: [
-        if (hostId != null && hostSettings == null)
+        if (widget.hostId != null && hostSettings == null)
           SerlinkTextButton(
             onPressed: () => workspaceController
-                .saveTerminalDisplaySettingsForHost(tabId, settings),
+                .saveTerminalDisplaySettingsForHost(widget.tabId, settings),
             child: Text(l10n.terminalSaveForHostAction),
           ),
-        if (hostId != null && hostSettings != null)
+        if (widget.hostId != null && hostSettings != null)
           SerlinkTextButton(
-            onPressed: () =>
-                workspaceController.resetTerminalDisplaySettingsForHost(tabId),
+            onPressed: () => workspaceController
+                .resetTerminalDisplaySettingsForHost(widget.tabId),
             child: Text(l10n.terminalUseGlobalAction),
           ),
         SerlinkFilledButton(
@@ -266,6 +228,111 @@ class _TerminalSettingsDialog extends ConsumerWidget {
           child: Text(l10n.doneAction),
         ),
       ],
+    );
+  }
+}
+
+class _TerminalSettingsContent extends StatelessWidget {
+  const _TerminalSettingsContent({
+    required this.settings,
+    required this.fontCatalog,
+    required this.catalogLoading,
+    required this.editingHostProfile,
+    required this.onChanged,
+  });
+
+  final TerminalDisplaySettings settings;
+  final TerminalFontCatalog fontCatalog;
+  final bool catalogLoading;
+  final bool editingHostProfile;
+  final ValueChanged<TerminalDisplaySettings> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _TerminalSettingsGroup(
+            title: l10n.terminalAppearanceSection,
+            children: [
+              SerlinkLabeledField(
+                label: l10n.terminalThemeLabel,
+                child: SerlinkSelect<SerlinkTerminalThemeId>(
+                  key: ValueKey(
+                    'terminal-theme-${settings.themeId.name}-$editingHostProfile',
+                  ),
+                  value: settings.themeId,
+                  items: [
+                    for (final themeId in SerlinkTerminalThemeId.values)
+                      SerlinkSelectItem(
+                        value: themeId,
+                        label: themeId.label,
+                        icon: Icons.palette_outlined,
+                      ),
+                  ],
+                  onChanged: (themeId) {
+                    onChanged(settings.copyWith(themeId: themeId));
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              _TerminalFontPicker(
+                settings: settings,
+                catalog: fontCatalog,
+                catalogLoading: catalogLoading,
+                editingHostProfile: editingHostProfile,
+                onFontFamilyChanged: (fontFamily) {
+                  onChanged(settings.copyWith(fontFamily: fontFamily));
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          _TerminalSettingsGroup(
+            title: l10n.terminalLayoutSection,
+            children: [
+              _SettingsSlider(
+                label: l10n.terminalFontSizeLabel,
+                value: settings.fontSize,
+                min: 10,
+                max: 24,
+                divisions: 14,
+                displayValue: '${settings.fontSize.toStringAsFixed(0)} px',
+                onChanged: (value) {
+                  onChanged(settings.copyWith(fontSize: value));
+                },
+              ),
+              const SizedBox(height: 10),
+              _SettingsSlider(
+                label: l10n.terminalLineHeightLabel,
+                value: settings.lineHeight,
+                min: 1,
+                max: 1.5,
+                divisions: 10,
+                displayValue: settings.lineHeight.toStringAsFixed(2),
+                onChanged: (value) {
+                  onChanged(settings.copyWith(lineHeight: value));
+                },
+              ),
+              const SizedBox(height: 10),
+              _SettingsSlider(
+                label: l10n.terminalScrollbackLabel,
+                value: settings.scrollbackLines.toDouble(),
+                min: 1000,
+                max: 100000,
+                divisions: 99,
+                displayValue: _formatScrollbackLines(settings.scrollbackLines),
+                onChanged: (value) {
+                  onChanged(settings.copyWith(scrollbackLines: value.round()));
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

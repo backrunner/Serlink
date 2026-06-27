@@ -21,6 +21,7 @@ class HostSummary {
     required this.authKinds,
     required this.tags,
     required this.trustState,
+    required this.createdAt,
     this.sftpDefaultDirectory = '/',
     this.lastConnectedAt,
   });
@@ -33,6 +34,7 @@ class HostSummary {
   final Set<HostAuthKind> authKinds;
   final Set<String> tags;
   final HostTrustState trustState;
+  final DateTime createdAt;
   final String sftpDefaultDirectory;
   final DateTime? lastConnectedAt;
 }
@@ -86,6 +88,7 @@ class HostConfig {
       authKinds: authKinds,
       tags: tags,
       trustState: trustState,
+      createdAt: createdAt,
       sftpDefaultDirectory: sftpDefaultDirectory,
       lastConnectedAt: lastConnectedAt,
     );

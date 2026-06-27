@@ -439,6 +439,32 @@ void main() {
       expect(await service.activeSyncProvider(), isNull);
     },
   );
+
+  test(
+    'disableAllSync disables CloudKit and WebDAV local preferences',
+    () async {
+      await service.saveCloudKit(true);
+      await service.saveWebDav(
+        const WebDavSyncSettingsDraft(
+          endpoint: 'https://dav.example.test',
+          username: 'ops',
+          password: 'server-password',
+        ),
+      );
+
+      await service.disableAllSync();
+
+      expect((await service.readCloudKit())!.enabled, isFalse);
+      final webDav = await service.readWebDav();
+      expect(webDav, isNotNull);
+      expect(webDav!.enabled, isFalse);
+      expect(
+        utf8.decode((await secrets.read(webDav.passwordRef))!),
+        'server-password',
+      );
+      expect(await service.activeSyncProvider(), isNull);
+    },
+  );
 }
 
 class _InMemoryCloudKitSyncSettingsRepository

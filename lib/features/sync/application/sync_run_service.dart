@@ -5,12 +5,15 @@ import '../../../core/ids/entity_id.dart';
 import '../../vault/application/vault_record_repository.dart';
 import '../../vault/application/vault_service.dart';
 import '../domain/sync_provider.dart';
+import 'auto_sync_controller.dart';
 import 'sync_delete_tombstone_repository.dart';
 import 'sync_device_service.dart';
 import 'sync_exceptions.dart';
 import 'sync_field_merge_service.dart';
+import 'sync_record_baseline_repository.dart';
 import 'sync_compatibility.dart';
 import 'sync_record_scope.dart';
+import 'sync_settings_service.dart';
 
 export 'sync_exceptions.dart';
 
@@ -40,6 +43,8 @@ class SyncRecordConflict {
     required this.type,
     required this.localRevision,
     required this.remoteRevision,
+    required this.title,
+    required this.subtitle,
     this.fieldSet,
   });
 
@@ -47,6 +52,8 @@ class SyncRecordConflict {
   final String type;
   final String localRevision;
   final String remoteRevision;
+  final String title;
+  final String subtitle;
   final SyncConflictFieldSet? fieldSet;
 }
 
@@ -127,11 +134,12 @@ class RemoteResetMarker {
 }
 
 class SyncRunService {
-  const SyncRunService({
+  SyncRunService({
     required VaultService vault,
     required VaultRecordRepository records,
     SyncDeviceService? devices,
     SyncFieldMergeService? fieldMerge,
+    SyncRecordBaselineRepository? baselines,
     Future<bool> Function()? localDataHealthy,
     DiagnosticLogger diagnosticLogger = const NoopDiagnosticLogger(),
   }) : this._(
@@ -139,15 +147,17 @@ class SyncRunService {
          records,
          devices,
          fieldMerge ?? const SyncFieldMergeService(),
+         baselines ?? InMemorySyncRecordBaselineRepository(),
          localDataHealthy,
          diagnosticLogger,
        );
 
-  const SyncRunService._(
+  SyncRunService._(
     this._vault,
     this._records,
     this._devices,
     this._fieldMerge,
+    this._baselines,
     this._localDataHealthy,
     this._diagnosticLogger,
   );
@@ -156,6 +166,7 @@ class SyncRunService {
   final VaultRecordRepository _records;
   final SyncDeviceService? _devices;
   final SyncFieldMergeService _fieldMerge;
+  final SyncRecordBaselineRepository _baselines;
   final Future<bool> Function()? _localDataHealthy;
   final DiagnosticLogger _diagnosticLogger;
 
@@ -299,6 +310,11 @@ class SyncRunService {
           ).toBytes(),
         );
         await _clearRemoteSnapshot(provider);
+        final baselineContext = await _syncBaselineContext(provider);
+        await _baselines.clearForVault(
+          providerKind: baselineContext.providerKind,
+          vaultId: baselineContext.vaultId,
+        );
       },
     );
   }
@@ -433,6 +449,11 @@ class SyncRunService {
     _validateRemoteManifestIdentity(manifest);
     await readRemoteVaultHeader(provider, manifest);
 
+    final baselineContext = await _syncBaselineContext(provider);
+    final baselines = await _baselines.readForVault(
+      providerKind: baselineContext.providerKind,
+      vaultId: baselineContext.vaultId,
+    );
     final manifestData = await _decryptManifest(manifest);
     final recordEntries = _manifestRecords(manifestData);
     final recordEntriesById = {
@@ -440,9 +461,11 @@ class SyncRunService {
     };
     final remoteDevice = _manifestWriterDevice(manifestData);
     final localTombstones = await _localTombstones();
+    await _rejectIfRemoteRevokesLocalDevice(provider, recordEntries);
     final tombstonesToDelete = <VaultRecordId>{};
     final conflicts = <SyncRecordConflict>[];
     final remoteTombstones = <SyncDeleteTombstone>[];
+    final remoteBaselineEnvelopes = <VaultRecordEnvelope>[];
     var downloaded = 0;
     var unchanged = 0;
 
@@ -452,6 +475,7 @@ class SyncRunService {
       }
       final remoteEnvelope = await _readRemoteEnvelope(provider, entry.ref);
       _validateRemoteEnvelopeEntry(remoteEnvelope, entry);
+      remoteBaselineEnvelopes.add(remoteEnvelope);
 
       if (remoteEnvelope.type ==
           EncryptedSyncDeleteTombstoneRepository.recordType) {
@@ -470,7 +494,7 @@ class SyncRunService {
         final localEnvelope = await _records.read(remoteEnvelope.id);
         if (localEnvelope == null ||
             localEnvelope.revision != remoteEnvelope.revision) {
-          await _records.upsert(remoteEnvelope);
+          await _upsertRemoteSyncedRecord(remoteEnvelope);
           downloaded += 1;
         } else {
           unchanged += 1;
@@ -489,7 +513,7 @@ class SyncRunService {
         if (remoteModifiedAt != null &&
             remoteModifiedAt.isAfter(localTombstone.deletedAt)) {
           tombstonesToDelete.add(tombstoneRecordId(remoteEnvelope.id));
-          await _records.upsert(remoteEnvelope);
+          await _upsertRemoteSyncedRecord(remoteEnvelope);
           downloaded += 1;
         } else {
           unchanged += 1;
@@ -499,7 +523,7 @@ class SyncRunService {
 
       final localEnvelope = await _records.read(remoteEnvelope.id);
       if (localEnvelope == null) {
-        await _records.upsert(remoteEnvelope);
+        await _upsertRemoteSyncedRecord(remoteEnvelope);
         downloaded += 1;
         continue;
       }
@@ -507,14 +531,16 @@ class SyncRunService {
         unchanged += 1;
         continue;
       }
+      final changeComparison = await _compareRecordChanges(
+        localEnvelope: localEnvelope,
+        remoteEnvelope: remoteEnvelope,
+        baseline: baselines[remoteEnvelope.id],
+        provider: provider,
+        manifestEntriesById: recordEntriesById,
+      );
       if (_shouldAutoResolveMetadataConflict(remoteEnvelope.type)) {
-        if (await _remoteRecordWins(
-          localEnvelope: localEnvelope,
-          remoteEnvelope: remoteEnvelope,
-          provider: provider,
-          manifestEntriesById: recordEntriesById,
-        )) {
-          await _records.upsert(remoteEnvelope);
+        if (_remoteRecordWinsFromModifiedTimes(changeComparison)) {
+          await _upsertRemoteSyncedRecord(remoteEnvelope);
           downloaded += 1;
         } else {
           unchanged += 1;
@@ -522,18 +548,33 @@ class SyncRunService {
         continue;
       }
       if (conflictPolicy == _SyncConflictPolicy.useRemote) {
-        await _records.upsert(remoteEnvelope);
+        await _upsertRemoteSyncedRecord(remoteEnvelope);
         downloaded += 1;
         continue;
       }
+      if (changeComparison.hasBaseline) {
+        if (!changeComparison.localChanged) {
+          await _upsertRemoteSyncedRecord(remoteEnvelope);
+          downloaded += 1;
+          continue;
+        }
+        if (!changeComparison.remoteChanged) {
+          unchanged += 1;
+          continue;
+        }
+      }
       if (conflictPolicy == _SyncConflictPolicy.useLatest) {
-        if (await _remoteRecordWins(
-          localEnvelope: localEnvelope,
-          remoteEnvelope: remoteEnvelope,
-          provider: provider,
-          manifestEntriesById: recordEntriesById,
-        )) {
-          await _records.upsert(remoteEnvelope);
+        if (_remoteRecordWinsFromModifiedTimes(changeComparison)) {
+          await _upsertRemoteSyncedRecord(remoteEnvelope);
+          downloaded += 1;
+        } else {
+          unchanged += 1;
+        }
+        continue;
+      }
+      if (!changeComparison.hasBaseline) {
+        if (_remoteRecordWinsFromModifiedTimes(changeComparison)) {
+          await _upsertRemoteSyncedRecord(remoteEnvelope);
           downloaded += 1;
         } else {
           unchanged += 1;
@@ -541,17 +582,9 @@ class SyncRunService {
         continue;
       }
       conflicts.add(
-        SyncRecordConflict(
-          id: remoteEnvelope.id,
-          type: remoteEnvelope.type,
-          localRevision: localEnvelope.revision,
-          remoteRevision: remoteEnvelope.revision,
-          fieldSet: await _buildFieldSet(
-            recordId: remoteEnvelope.id,
-            recordType: remoteEnvelope.type,
-            localEnvelope: localEnvelope,
-            remoteEnvelope: remoteEnvelope,
-          ),
+        await _buildRecordConflict(
+          localEnvelope: localEnvelope,
+          remoteEnvelope: remoteEnvelope,
         ),
       );
     }
@@ -567,13 +600,21 @@ class SyncRunService {
       );
       if (localModifiedAt == null ||
           !localModifiedAt.isAfter(tombstone.deletedAt)) {
-        await _records.delete(tombstone.targetRecordId);
+        await _deleteRemoteSyncedRecord(tombstone.targetRecordId);
       } else {
         tombstonesToDelete.add(tombstoneRecordId(tombstone.targetRecordId));
       }
     }
     for (final tombstoneRecordId in tombstonesToDelete) {
-      await _records.delete(tombstoneRecordId);
+      await _deleteRemoteSyncedRecord(tombstoneRecordId);
+    }
+
+    if (conflicts.isEmpty) {
+      await _replaceBaselinesForRemoteSnapshot(
+        provider,
+        envelopes: remoteBaselineEnvelopes,
+        manifestEntriesById: recordEntriesById,
+      );
     }
 
     return SyncPullResult(
@@ -886,6 +927,11 @@ class SyncRunService {
       );
     }
 
+    await _replaceBaselinesForCurrentLocalSnapshot(
+      provider,
+      envelopes: envelopes,
+    );
+
     return SyncRunResult(
       recordsUploaded: envelopes.length,
       headerUploaded: true,
@@ -973,6 +1019,20 @@ class SyncRunService {
         // Keep the original upload/manifest error visible to callers.
       }
     }
+  }
+
+  Future<void> _upsertRemoteSyncedRecord(VaultRecordEnvelope envelope) {
+    return runWithVaultRecordChangeOrigin(
+      VaultRecordChangeOrigin.remoteSync,
+      () => _records.upsert(envelope),
+    );
+  }
+
+  Future<void> _deleteRemoteSyncedRecord(VaultRecordId id) {
+    return runWithVaultRecordChangeOrigin(
+      VaultRecordChangeOrigin.remoteSync,
+      () => _records.delete(id),
+    );
   }
 
   Future<void> _restoreOriginalRecords(
@@ -1241,6 +1301,38 @@ class SyncRunService {
     ];
   }
 
+  Future<void> _rejectIfRemoteRevokesLocalDevice(
+    SyncProvider provider,
+    List<_ManifestRecordEntry> recordEntries,
+  ) async {
+    final devices = _devices;
+    if (devices == null) {
+      return;
+    }
+    for (final entry in recordEntries) {
+      if (entry.type != EncryptedSyncDeleteTombstoneRepository.recordType) {
+        continue;
+      }
+      final remoteEnvelope = await _readRemoteEnvelope(provider, entry.ref);
+      _validateRemoteEnvelopeEntry(remoteEnvelope, entry);
+      final tombstone = await _decodeTombstone(
+        remoteEnvelope,
+        source: _RecordSource.remote,
+      );
+      if (!await devices.isLocalDeviceTombstone(tombstone)) {
+        continue;
+      }
+      await _upsertRemoteSyncedRecord(remoteEnvelope);
+      if (await _records.read(tombstone.targetRecordId) != null) {
+        await _deleteRemoteSyncedRecord(tombstone.targetRecordId);
+      }
+      throw const SyncDeviceException(
+        'sync.device.revoked',
+        'This device has been removed from encrypted sync. Re-enable sync with a new device registration.',
+      );
+    }
+  }
+
   Future<VaultRecordEnvelope> _readRemoteEnvelope(
     SyncProvider provider,
     RemoteObjectRef ref,
@@ -1313,9 +1405,86 @@ class SyncRunService {
     }
   }
 
-  Future<bool> _remoteRecordWins({
+  Future<_SyncBaselineContext> _syncBaselineContext(
+    SyncProvider provider,
+  ) async {
+    final header = _vault.header;
+    if (header == null) {
+      throw const SyncRunException(
+        'sync.vault_header_missing',
+        'Vault header is missing.',
+      );
+    }
+    final capabilities = await provider.capabilities();
+    return _SyncBaselineContext(
+      providerKind: capabilities.kind,
+      vaultId: syncVaultId(header),
+    );
+  }
+
+  Future<void> _replaceBaselinesForCurrentLocalSnapshot(
+    SyncProvider provider, {
+    List<VaultRecordEnvelope>? envelopes,
+  }) async {
+    final baselineContext = await _syncBaselineContext(provider);
+    final snapshot = envelopes ?? await _syncableLocalRecords();
+    await _baselines.replaceForVault(
+      providerKind: baselineContext.providerKind,
+      vaultId: baselineContext.vaultId,
+      records: await _baselineEntriesForEnvelopes(
+        snapshot,
+        source: _RecordSource.local,
+      ),
+    );
+  }
+
+  Future<void> _replaceBaselinesForRemoteSnapshot(
+    SyncProvider provider, {
+    required List<VaultRecordEnvelope> envelopes,
+    required Map<VaultRecordId, _ManifestRecordEntry> manifestEntriesById,
+  }) async {
+    final baselineContext = await _syncBaselineContext(provider);
+    await _baselines.replaceForVault(
+      providerKind: baselineContext.providerKind,
+      vaultId: baselineContext.vaultId,
+      records: await _baselineEntriesForEnvelopes(
+        envelopes,
+        source: _RecordSource.remote,
+        provider: provider,
+        manifestEntriesById: manifestEntriesById,
+      ),
+    );
+  }
+
+  Future<List<SyncRecordBaselineEntry>> _baselineEntriesForEnvelopes(
+    List<VaultRecordEnvelope> envelopes, {
+    required _RecordSource source,
+    SyncProvider? provider,
+    Map<VaultRecordId, _ManifestRecordEntry>? manifestEntriesById,
+  }) async {
+    final entries = <SyncRecordBaselineEntry>[];
+    for (final envelope in envelopes) {
+      entries.add(
+        SyncRecordBaselineEntry(
+          recordId: envelope.id,
+          recordType: envelope.type,
+          revision: envelope.revision,
+          modifiedAt: await _recordModifiedAt(
+            envelope,
+            source: source,
+            provider: provider,
+            manifestEntriesById: manifestEntriesById,
+          ),
+        ),
+      );
+    }
+    return entries;
+  }
+
+  Future<_RecordChangeComparison> _compareRecordChanges({
     required VaultRecordEnvelope localEnvelope,
     required VaultRecordEnvelope remoteEnvelope,
+    required SyncRecordBaseline? baseline,
     required SyncProvider provider,
     required Map<VaultRecordId, _ManifestRecordEntry> manifestEntriesById,
   }) async {
@@ -1329,16 +1498,21 @@ class SyncRunService {
       provider: provider,
       manifestEntriesById: manifestEntriesById,
     );
-    if (remoteModifiedAt != null && localModifiedAt != null) {
-      return remoteModifiedAt.isAfter(localModifiedAt);
-    }
-    if (remoteModifiedAt != null) {
-      return true;
-    }
-    if (localModifiedAt != null) {
-      return false;
-    }
-    return true;
+    return _RecordChangeComparison(
+      baseline: baseline,
+      localModifiedAt: localModifiedAt,
+      remoteModifiedAt: remoteModifiedAt,
+      localChanged: _changedSinceBaseline(
+        envelope: localEnvelope,
+        modifiedAt: localModifiedAt,
+        baseline: baseline,
+      ),
+      remoteChanged: _changedSinceBaseline(
+        envelope: remoteEnvelope,
+        modifiedAt: remoteModifiedAt,
+        baseline: baseline,
+      ),
+    );
   }
 
   Future<DateTime?> _recordModifiedAt(
@@ -1358,7 +1532,7 @@ class SyncRunService {
           manifestEntriesById: manifestEntriesById,
         );
       }
-      return _timestampFromRecordJson(decoded) ??
+      return _timestampFromRecordJson(envelope.type, decoded) ??
           await _relatedRecordModifiedAt(
             envelope,
             source: source,
@@ -1438,12 +1612,12 @@ class SyncRunService {
     return envelope;
   }
 
-  Future<SyncConflictFieldSet?> _buildFieldSet({
-    required VaultRecordId recordId,
-    required String recordType,
+  Future<SyncRecordConflict> _buildRecordConflict({
     required VaultRecordEnvelope localEnvelope,
     required VaultRecordEnvelope remoteEnvelope,
   }) async {
+    SyncConflictFieldSet? fieldSet;
+    String? title;
     try {
       final localJson =
           jsonDecode(utf8.decode(await _vault.decryptRecord(localEnvelope)))
@@ -1451,25 +1625,44 @@ class SyncRunService {
       final remoteJson =
           jsonDecode(utf8.decode(await _vault.decryptRecord(remoteEnvelope)))
               as Map<String, Object?>;
-      return _fieldMerge.inspect(
-        recordType: recordType,
-        recordId: recordId,
+      fieldSet = _fieldMerge.inspect(
+        recordType: remoteEnvelope.type,
+        recordId: remoteEnvelope.id,
+        localJson: localJson,
+        remoteJson: remoteJson,
+      );
+      title = _conflictRecordTitle(
+        recordType: remoteEnvelope.type,
+        recordId: remoteEnvelope.id,
         localJson: localJson,
         remoteJson: remoteJson,
       );
     } on Object {
-      return null;
+      title = null;
     }
+    return SyncRecordConflict(
+      id: remoteEnvelope.id,
+      type: remoteEnvelope.type,
+      localRevision: localEnvelope.revision,
+      remoteRevision: remoteEnvelope.revision,
+      title:
+          title ?? _fallbackRecordTitle(remoteEnvelope.type, remoteEnvelope.id),
+      subtitle: _conflictRecordSubtitle(remoteEnvelope.type, remoteEnvelope.id),
+      fieldSet: fieldSet,
+    );
   }
 }
 
-DateTime? _timestampFromRecordJson(Map<String, Object?> json) {
-  for (final key in const [
-    'updatedAt',
-    'deletedAt',
-    'lastSeenAt',
-    'createdAt',
-  ]) {
+DateTime? _timestampFromRecordJson(
+  String recordType,
+  Map<String, Object?> json,
+) {
+  final keys = switch (recordType) {
+    EncryptedSyncDeleteTombstoneRepository.recordType => const ['deletedAt'],
+    EncryptedSyncDeviceRepository.recordType => const ['lastSeenAt'],
+    _ => const ['updatedAt'],
+  };
+  for (final key in keys) {
     final value = json[key];
     if (value is! String) {
       continue;
@@ -1477,6 +1670,134 @@ DateTime? _timestampFromRecordJson(Map<String, Object?> json) {
     final parsed = DateTime.tryParse(value);
     if (parsed != null) {
       return parsed.toUtc();
+    }
+  }
+  return null;
+}
+
+bool _remoteRecordWinsFromModifiedTimes(_RecordChangeComparison comparison) {
+  final localModifiedAt = comparison.localModifiedAt;
+  final remoteModifiedAt = comparison.remoteModifiedAt;
+  if (remoteModifiedAt != null && localModifiedAt != null) {
+    return remoteModifiedAt.isAfter(localModifiedAt);
+  }
+  if (remoteModifiedAt != null) {
+    return true;
+  }
+  if (localModifiedAt != null) {
+    return false;
+  }
+  return true;
+}
+
+bool _changedSinceBaseline({
+  required VaultRecordEnvelope envelope,
+  required DateTime? modifiedAt,
+  required SyncRecordBaseline? baseline,
+}) {
+  if (baseline == null || envelope.revision == baseline.revision) {
+    return false;
+  }
+  final baselineModifiedAt = baseline.modifiedAt;
+  if (modifiedAt != null && baselineModifiedAt != null) {
+    return modifiedAt.isAfter(baselineModifiedAt);
+  }
+  if (modifiedAt == null && baselineModifiedAt == null) {
+    return true;
+  }
+  return true;
+}
+
+String _conflictRecordTitle({
+  required String recordType,
+  required VaultRecordId recordId,
+  required Map<String, Object?> localJson,
+  required Map<String, Object?> remoteJson,
+}) {
+  final localTitle = _recordTitleFromJson(recordType, recordId, localJson);
+  final remoteTitle = _recordTitleFromJson(recordType, recordId, remoteJson);
+  if (localTitle != null && remoteTitle != null && localTitle != remoteTitle) {
+    return '$localTitle / $remoteTitle';
+  }
+  return localTitle ??
+      remoteTitle ??
+      _fallbackRecordTitle(recordType, recordId);
+}
+
+String? _recordTitleFromJson(
+  String recordType,
+  VaultRecordId recordId,
+  Map<String, Object?> json,
+) {
+  return switch (recordType) {
+    'host' =>
+      _firstNonBlank(json, const ['displayName', 'hostname']) ??
+          _compactRecordId(recordId),
+    'snippet' =>
+      _firstNonBlank(json, const ['name']) ?? _compactRecordId(recordId),
+    'identity' =>
+      _firstNonBlank(json, const ['displayName']) ?? _compactRecordId(recordId),
+    'identity_secret' => 'Identity secret ${_compactRecordId(recordId)}',
+    EncryptedSyncSettingsRepository.recordType => _syncSettingsTitle(
+      recordId,
+      json,
+    ),
+    EncryptedSyncDeviceRepository.recordType =>
+      _firstNonBlank(json, const ['displayName']) ?? _compactRecordId(recordId),
+    _ => _firstNonBlank(json, const ['displayName', 'name', 'hostname']),
+  };
+}
+
+String _syncSettingsTitle(VaultRecordId recordId, Map<String, Object?> json) {
+  if (recordId == cloudKitSyncSettingsRecordId) {
+    return 'iCloud sync settings';
+  }
+  if (recordId == webDavSyncSettingsRecordId) {
+    return 'WebDAV sync settings';
+  }
+  return _firstNonBlank(json, const ['endpoint', 'username']) ??
+      _fallbackRecordTitle(
+        EncryptedSyncSettingsRepository.recordType,
+        recordId,
+      );
+}
+
+String _fallbackRecordTitle(String recordType, VaultRecordId recordId) {
+  return '${_recordKindLabel(recordType)} ${_compactRecordId(recordId)}';
+}
+
+String _conflictRecordSubtitle(String recordType, VaultRecordId recordId) {
+  return '${_recordKindLabel(recordType)} - ${recordId.value}';
+}
+
+String _recordKindLabel(String recordType) {
+  return switch (recordType) {
+    'host' => 'Host',
+    'snippet' => 'Snippet',
+    'identity' => 'Identity',
+    'identity_secret' => 'Identity secret',
+    EncryptedSyncSettingsRepository.recordType => 'Sync settings',
+    EncryptedSyncDeviceRepository.recordType => 'Device',
+    EncryptedSyncDeleteTombstoneRepository.recordType => 'Deleted record',
+    'terminal_settings' => 'Terminal settings',
+    _ => 'Encrypted record',
+  };
+}
+
+String _compactRecordId(VaultRecordId recordId) {
+  final value = recordId.value;
+  final separator = value.lastIndexOf(':');
+  if (separator == -1 || separator == value.length - 1) {
+    return value;
+  }
+  return value.substring(separator + 1);
+}
+
+String? _firstNonBlank(Map<String, Object?> json, List<String> keys) {
+  for (final key in keys) {
+    final value = json[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
     }
   }
   return null;
@@ -1505,6 +1826,34 @@ class SyncRunConflictException extends SyncRunException {
       );
 
   final List<SyncRecordConflict> conflicts;
+}
+
+class _SyncBaselineContext {
+  const _SyncBaselineContext({
+    required this.providerKind,
+    required this.vaultId,
+  });
+
+  final SyncProviderKind providerKind;
+  final String vaultId;
+}
+
+class _RecordChangeComparison {
+  const _RecordChangeComparison({
+    required this.baseline,
+    required this.localModifiedAt,
+    required this.remoteModifiedAt,
+    required this.localChanged,
+    required this.remoteChanged,
+  });
+
+  final SyncRecordBaseline? baseline;
+  final DateTime? localModifiedAt;
+  final DateTime? remoteModifiedAt;
+  final bool localChanged;
+  final bool remoteChanged;
+
+  bool get hasBaseline => baseline != null;
 }
 
 class _ManifestRecordEntry {

@@ -467,13 +467,13 @@ void main() {
         vault: sourceVault,
         provider: LocalDirectorySyncProvider(cloudKitDir),
         id: sharedId,
-        hostname: 'cloudkit-conflict.example.test',
+        hostname: 'baseline-conflict.example.test',
       );
       await _publishRemoteHost(
         vault: sourceVault,
         provider: LocalDirectorySyncProvider(webDavDir),
         id: sharedId,
-        hostname: 'webdav-conflict.example.test',
+        hostname: 'baseline-conflict.example.test',
       );
 
       final database = SerlinkDatabase(NativeDatabase.memory());
@@ -502,6 +502,23 @@ void main() {
             ),
           );
       container.read(autoSyncControllerProvider);
+      container
+          .read(autoSyncControllerProvider.notifier)
+          .requestSync(delay: Duration.zero);
+      await _waitForAutoSyncIdle(container);
+
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(cloudKitDir),
+        id: sharedId,
+        hostname: 'cloudkit-conflict.example.test',
+      );
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(webDavDir),
+        id: sharedId,
+        hostname: 'webdav-conflict.example.test',
+      );
       container
           .read(autoSyncControllerProvider.notifier)
           .requestSync(delay: Duration.zero);
@@ -553,13 +570,13 @@ void main() {
         vault: sourceVault,
         provider: LocalDirectorySyncProvider(cloudKitDir),
         id: sharedId,
-        hostname: 'cloudkit-resolution.example.test',
+        hostname: 'baseline-resolution.example.test',
       );
       await _publishRemoteHost(
         vault: sourceVault,
         provider: LocalDirectorySyncProvider(webDavDir),
         id: sharedId,
-        hostname: 'webdav-resolution.example.test',
+        hostname: 'baseline-resolution.example.test',
       );
 
       final database = SerlinkDatabase(NativeDatabase.memory());
@@ -591,6 +608,23 @@ void main() {
       container
           .read(autoSyncControllerProvider.notifier)
           .requestSync(delay: Duration.zero);
+      await _waitForAutoSyncIdle(container);
+
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(cloudKitDir),
+        id: sharedId,
+        hostname: 'cloudkit-resolution.example.test',
+      );
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(webDavDir),
+        id: sharedId,
+        hostname: 'webdav-resolution.example.test',
+      );
+      container
+          .read(autoSyncControllerProvider.notifier)
+          .requestSync(delay: Duration.zero);
 
       await _waitForAutoSyncPhase(container, AutoSyncPhase.conflicts);
       final conflicts = container.read(syncConflictControllerProvider);
@@ -600,7 +634,10 @@ void main() {
       final result = await container
           .read(syncRunServiceProvider)
           .resolveConflicts(
-            LocalDirectorySyncProvider(webDavDir),
+            _KindOverrideSyncProvider(
+              LocalDirectorySyncProvider(webDavDir),
+              SyncProviderKind.webDav,
+            ),
             SyncConflictResolution.keepLocal,
             acceptedConflicts: conflicts,
           );

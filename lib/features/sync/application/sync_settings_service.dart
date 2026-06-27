@@ -60,6 +60,7 @@ class WebDavSyncSettings {
   WebDavSyncSettings copyWith({
     String? pinnedCertificateFingerprint,
     bool clearPinnedCertificateFingerprint = false,
+    bool? enabled,
     DateTime? updatedAt,
   }) {
     return WebDavSyncSettings(
@@ -68,7 +69,7 @@ class WebDavSyncSettings {
       basePath: basePath,
       passwordRef: passwordRef,
       allowInsecureHttp: allowInsecureHttp,
-      enabled: enabled,
+      enabled: enabled ?? this.enabled,
       updatedAt: updatedAt ?? this.updatedAt,
       pinnedCertificateFingerprint: clearPinnedCertificateFingerprint
           ? null
@@ -484,6 +485,21 @@ class SyncSettingsService {
     );
     await _cloudKitSettings.saveCloudKit(settings);
     return settings;
+  }
+
+  Future<void> disableAllSync() async {
+    final now = DateTime.now().toUtc();
+    if (cloudKitAvailable) {
+      await _cloudKitSettings.saveCloudKit(
+        CloudKitSyncSettings(enabled: false, updatedAt: now),
+      );
+    }
+    final webDav = await _settings.readWebDav();
+    if (webDav?.enabled ?? false) {
+      await _settings.saveWebDav(
+        webDav!.copyWith(enabled: false, updatedAt: now),
+      );
+    }
   }
 
   Future<void> deleteCloudKit() {

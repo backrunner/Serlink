@@ -35,12 +35,15 @@ class _SyncConflictReviewDialogState
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthReview),
       title: Text(l10n.syncConflictReviewDialogTitle),
-      content: SizedBox(
-        width: 820,
-        height: 520,
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 820,
+          maxHeight: math.min(560, MediaQuery.sizeOf(context).height * 0.68),
+        ),
         child: ListView.separated(
+          shrinkWrap: true,
           itemCount: widget.conflicts.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 14),
+          separatorBuilder: (_, _) => const SizedBox(height: SerlinkSpacing.md),
           itemBuilder: (context, index) {
             final conflict = widget.conflicts[index];
             final fieldSet = conflict.fieldSet;
@@ -155,41 +158,223 @@ class _SyncConflictFieldCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${conflict.type} · ${conflict.id.value}',
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: 8),
-        for (final field in fieldSet.fields) ...[
-          Text(field.label, style: Theme.of(context).textTheme.labelMedium),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: _ConflictChoiceTile(
-                  title: l10n.syncConflictLocalLabel,
-                  value: describeConflictValue(field.localValue),
-                  selected: !(useRemoteByField[field.key] ?? false),
-                  onSelected: () => onChanged(field.key, false),
+    final t = context.tokens;
+    final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+      color: t.textPrimary,
+      fontWeight: FontWeight.w800,
+    );
+    return SurfacePanel(
+      borderRadius: SerlinkRadii.dialog,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SerlinkSpacing.lg,
+              vertical: SerlinkSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              color: t.surfaceOverlay,
+              border: Border(bottom: BorderSide(color: t.borderSubtle)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: t.statusWarning.withValues(alpha: 0.13),
+                    borderRadius: SerlinkRadii.control,
+                    border: Border.all(
+                      color: t.statusWarning.withValues(alpha: 0.28),
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.compare_arrows_rounded,
+                    size: 18,
+                    color: t.statusWarning,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _ConflictChoiceTile(
-                  title: l10n.syncConflictRemoteLabel,
-                  value: describeConflictValue(field.remoteValue),
-                  selected: useRemoteByField[field.key] ?? false,
-                  onSelected: () => onChanged(field.key, true),
+                const SizedBox(width: SerlinkSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        conflict.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: titleStyle,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        conflict.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: t.textMuted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: SerlinkSpacing.md),
+                StatusPill(
+                  label: fieldSet.fields.length.toString(),
+                  color: t.statusWarning,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.all(SerlinkSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ConflictColumnLabels(
+                  localLabel: l10n.syncConflictLocalLabel,
+                  remoteLabel: l10n.syncConflictRemoteLabel,
+                ),
+                const SizedBox(height: SerlinkSpacing.sm),
+                for (var index = 0; index < fieldSet.fields.length; index++)
+                  _ConflictFieldRow(
+                    field: fieldSet.fields[index],
+                    useRemote:
+                        useRemoteByField[fieldSet.fields[index].key] ?? false,
+                    localLabel: l10n.syncConflictLocalLabel,
+                    remoteLabel: l10n.syncConflictRemoteLabel,
+                    showTopDivider: index > 0,
+                    onChanged: onChanged,
+                  ),
+              ],
+            ),
+          ),
         ],
-      ],
+      ),
+    );
+  }
+}
+
+class _ConflictColumnLabels extends StatelessWidget {
+  const _ConflictColumnLabels({
+    required this.localLabel,
+    required this.remoteLabel,
+  });
+
+  final String localLabel;
+  final String remoteLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: t.textMuted,
+      fontWeight: FontWeight.w800,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 620) {
+          return const SizedBox.shrink();
+        }
+        return Row(
+          children: [
+            const SizedBox(width: 116),
+            Expanded(child: Text(localLabel, style: style)),
+            const SizedBox(width: SerlinkSpacing.sm),
+            Expanded(child: Text(remoteLabel, style: style)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ConflictFieldRow extends StatelessWidget {
+  const _ConflictFieldRow({
+    required this.field,
+    required this.useRemote,
+    required this.localLabel,
+    required this.remoteLabel,
+    required this.showTopDivider,
+    required this.onChanged,
+  });
+
+  final SyncConflictFieldChoice field;
+  final bool useRemote;
+  final String localLabel;
+  final String remoteLabel;
+  final bool showTopDivider;
+  final void Function(String fieldKey, bool useRemote) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final label = Text(
+      field.label,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: t.textSecondary,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: showTopDivider
+            ? Border(top: BorderSide(color: t.borderSubtle))
+            : null,
+      ),
+      child: Padding(
+        padding: EdgeInsets.only(
+          top: showTopDivider ? SerlinkSpacing.md : 0,
+          bottom: SerlinkSpacing.md,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final localTile = _ConflictChoiceTile(
+              title: localLabel,
+              value: describeConflictValue(field.localValue),
+              selected: !useRemote,
+              onSelected: () => onChanged(field.key, false),
+            );
+            final remoteTile = _ConflictChoiceTile(
+              title: remoteLabel,
+              value: describeConflictValue(field.remoteValue),
+              selected: useRemote,
+              onSelected: () => onChanged(field.key, true),
+            );
+            if (constraints.maxWidth < 620) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  label,
+                  const SizedBox(height: SerlinkSpacing.sm),
+                  localTile,
+                  const SizedBox(height: SerlinkSpacing.sm),
+                  remoteTile,
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 104,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: label,
+                  ),
+                ),
+                const SizedBox(width: SerlinkSpacing.md),
+                Expanded(child: localTile),
+                const SizedBox(width: SerlinkSpacing.sm),
+                Expanded(child: remoteTile),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 }
@@ -210,28 +395,65 @@ class _ConflictChoiceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final borderColor = selected
+        ? t.accentPrimary.withValues(alpha: 0.72)
+        : t.borderSubtle;
+    final background = selected
+        ? t.accentPrimary.withValues(alpha: 0.09)
+        : t.surfaceSunken.withValues(alpha: 0.72);
     return SerlinkPressable(
       onTap: onSelected,
       borderRadius: SerlinkRadii.control,
-      child: Container(
-        padding: const EdgeInsets.all(10),
+      hoverColor: t.accentPrimary.withValues(alpha: 0.06),
+      pressedColor: t.accentPrimary.withValues(alpha: 0.12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOut,
+        constraints: const BoxConstraints(minHeight: 66),
+        padding: const EdgeInsets.symmetric(
+          horizontal: SerlinkSpacing.md,
+          vertical: SerlinkSpacing.sm,
+        ),
         decoration: BoxDecoration(
           borderRadius: SerlinkRadii.control,
-          border: Border.all(
-            color: selected ? t.accentPrimary : t.borderSubtle,
-          ),
-          color: selected ? t.accentPrimary.withValues(alpha: 0.08) : null,
+          border: Border.all(color: borderColor),
+          color: background,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.labelMedium),
-            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  size: 16,
+                  color: selected ? t.accentPrimary : t.textMuted,
+                ),
+                const SizedBox(width: SerlinkSpacing.xs),
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: selected ? t.accentPrimary : t.textMuted,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: SerlinkSpacing.sm),
             Text(
               value,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: t.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -247,16 +469,50 @@ class _SyncConflictUnsupportedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${conflict.type} · ${conflict.id.value}',
-          style: Theme.of(context).textTheme.titleSmall,
-        ),
-        const SizedBox(height: 8),
-        Text(context.l10n.syncConflictUnsupportedBody),
-      ],
+    final t = context.tokens;
+    return SurfacePanel(
+      padding: const EdgeInsets.all(SerlinkSpacing.lg),
+      borderRadius: SerlinkRadii.dialog,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: t.statusWarning, size: 22),
+          const SizedBox(width: SerlinkSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  conflict.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: t.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: SerlinkSpacing.xs),
+                Text(
+                  conflict.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: t.textMuted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: SerlinkSpacing.xs),
+                Text(
+                  context.l10n.syncConflictUnsupportedBody,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

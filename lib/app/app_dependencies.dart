@@ -34,12 +34,14 @@ import '../features/sync/application/remote_vault_discovery_service.dart';
 import '../features/sync/application/sync_delete_tombstone_repository.dart';
 import '../features/sync/application/sync_device_service.dart';
 import '../features/sync/application/sync_field_merge_service.dart';
+import '../features/sync/application/sync_record_baseline_repository.dart';
 import '../features/sync/application/sync_repair_service.dart';
 import '../features/sync/application/sync_run_service.dart';
 import '../features/sync/application/sync_settings_service.dart';
 import '../features/sync/data/cloudkit_sync_provider.dart';
 import '../features/sync/data/encrypted_snapshot_staging_repository.dart';
 import '../features/sync/data/local_cloudkit_sync_settings_repository.dart';
+import '../features/sync/data/local_sync_record_baseline_repository.dart';
 import '../features/sync/data/local_webdav_sync_settings_repository.dart';
 import '../features/sync/domain/sync_provider.dart';
 import '../features/ssh/application/connection_profile_resolver.dart';
@@ -154,6 +156,13 @@ final pendingRemoteResetRepositoryProvider =
 final cloudKitSyncShadowSettingsStoreProvider =
     Provider<CloudKitSyncShadowSettingsStore>((ref) {
       return CloudKitSyncShadowSettingsStore(
+        ref.watch(serlinkDatabaseProvider),
+      );
+    });
+
+final syncRecordBaselineRepositoryProvider =
+    Provider<SyncRecordBaselineRepository>((ref) {
+      return LocalSyncRecordBaselineRepository(
         ref.watch(serlinkDatabaseProvider),
       );
     });
@@ -472,6 +481,7 @@ final syncRunServiceProvider = Provider<SyncRunService>((ref) {
     vault: ref.watch(vaultServiceProvider),
     records: ref.watch(vaultRecordRepositoryProvider),
     devices: ref.watch(syncDeviceServiceProvider),
+    baselines: ref.watch(syncRecordBaselineRepositoryProvider),
     diagnosticLogger: ref.watch(offlineDiagnosticLoggerProvider),
     localDataHealthy: () async {
       final session = ref.read(vaultSessionControllerProvider).value;
@@ -497,11 +507,11 @@ final syncDeleteTombstoneRepositoryProvider =
     });
 
 final autoSyncDebounceDurationProvider = Provider<Duration>((ref) {
-  return const Duration(seconds: 3);
+  return Duration.zero;
 });
 
 final autoSyncIntervalDurationProvider = Provider<Duration>((ref) {
-  return const Duration(minutes: 5);
+  return Duration.zero;
 });
 
 final autoSyncEnabledProvider = Provider<bool>((ref) {
@@ -726,7 +736,6 @@ class CloudKitEncryptedSnapshotPrefetchNotifier extends Notifier<void> {
 
 class AutoSyncController extends Notifier<AutoSyncStatus> {
   Timer? _debounceTimer;
-  Timer? _intervalTimer;
   bool _running = false;
   bool _rerunRequested = false;
   bool _configureQueued = false;
@@ -737,7 +746,6 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
   AutoSyncStatus build() {
     ref.onDispose(() {
       _debounceTimer?.cancel();
-      _intervalTimer?.cancel();
     });
     ref.listen<AsyncValue<VaultSessionState>>(
       vaultSessionControllerProvider,
@@ -755,7 +763,8 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       _,
       change,
     ) {
-      if (change.hasValue) {
+      if (change.hasValue &&
+          change.value?.origin == VaultRecordChangeOrigin.local) {
         _scheduleConfigure();
         requestSync(delay: Duration.zero);
       }
@@ -768,8 +777,15 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     if (!_canAttemptSync || state.phase == AutoSyncPhase.conflicts) {
       return;
     }
+    final Duration effectiveDelay =
+        delay ?? ref.read(autoSyncDebounceDurationProvider);
     if (_running) {
       _rerunRequested = true;
+      return;
+    }
+    if (state.phase == AutoSyncPhase.scheduled &&
+        _debounceTimer == null &&
+        effectiveDelay == Duration.zero) {
       return;
     }
     _retryDelayAfterRun = null;
@@ -779,7 +795,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       clearFailure: true,
       conflictCount: 0,
     );
-    if (delay == Duration.zero) {
+    if (effectiveDelay == Duration.zero) {
       unawaited(
         Future<void>.microtask(() {
           if (ref.mounted) {
@@ -789,13 +805,10 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       );
       return;
     }
-    _debounceTimer = Timer(
-      delay ?? ref.read(autoSyncDebounceDurationProvider),
-      () {
-        _debounceTimer = null;
-        unawaited(_run());
-      },
-    );
+    _debounceTimer = Timer(effectiveDelay, () {
+      _debounceTimer = null;
+      unawaited(_run());
+    });
   }
 
   void markConflictResolution(
@@ -818,9 +831,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     }
     if (!_canAttemptSync) {
       _debounceTimer?.cancel();
-      _intervalTimer?.cancel();
       _debounceTimer = null;
-      _intervalTimer = null;
       _retryDelayAfterRun = null;
       if (!_running) {
         state = const AutoSyncStatus.disabled();
@@ -828,14 +839,10 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       return;
     }
 
-    _intervalTimer ??= Timer.periodic(
-      ref.read(autoSyncIntervalDurationProvider),
-      (_) => requestSync(delay: Duration.zero),
-    );
     if (state.phase == AutoSyncPhase.disabled) {
       state = const AutoSyncStatus(phase: AutoSyncPhase.idle);
     }
-    requestSync();
+    requestSync(delay: Duration.zero);
   }
 
   void _scheduleConfigure() {
@@ -892,13 +899,41 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         lastProviderKind: providerKind,
         conflictCount: error.conflicts.length,
       );
+    } on SyncDeviceException catch (error) {
+      if (error.code == 'sync.device.revoked') {
+        try {
+          await _disableSyncAfterLocalDeviceRevoked();
+        } on Object catch (disableError) {
+          final failedAt = DateTime.now().toUtc();
+          _failureCount += 1;
+          state = state.copyWith(
+            phase: AutoSyncPhase.failed,
+            lastFailedAt: failedAt,
+            lastFailureMessage: _autoSyncFailureMessage(disableError),
+            lastFailure: disableError,
+            lastProviderKind: providerKind,
+          );
+          _retryDelayAfterRun = _retryDelay(_failureCount);
+          return;
+        }
+        state = const AutoSyncStatus.disabled();
+        return;
+      }
+      final failedAt = DateTime.now().toUtc();
+      _failureCount += 1;
+      state = state.copyWith(
+        phase: AutoSyncPhase.failed,
+        lastFailedAt: failedAt,
+        lastFailureMessage: _autoSyncFailureMessage(error),
+        lastFailure: error,
+        lastProviderKind: providerKind,
+      );
+      _retryDelayAfterRun = _retryDelay(_failureCount);
     } on SyncRunException catch (error) {
       if (error.code == 'sync.remote_vault_reset') {
         _failureCount = 0;
         _debounceTimer?.cancel();
-        _intervalTimer?.cancel();
         _debounceTimer = null;
-        _intervalTimer = null;
         _rerunRequested = false;
         _retryDelayAfterRun = null;
         try {
@@ -961,6 +996,17 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
         _retryDelayAfterRun = null;
       }
     }
+  }
+
+  Future<void> _disableSyncAfterLocalDeviceRevoked() async {
+    _failureCount = 0;
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    _rerunRequested = false;
+    _retryDelayAfterRun = null;
+    await ref.read(syncSettingsServiceProvider).disableAllSync();
+    await ref.read(syncDeviceServiceProvider).forgetLocalDeviceRegistration();
+    _invalidateSyncedMetadataProviders();
   }
 
   void _scheduleRetry(Duration delay) {

@@ -223,4 +223,24 @@ void main() {
       EncryptedSyncDeviceRepository.recordType,
     );
   });
+
+  test('forgets local sync device registration without tombstone', () async {
+    final first = await service.touchLocalDevice();
+
+    await service.forgetLocalDeviceRegistration();
+
+    expect(await service.readLocalDevice(), isNull);
+    expect(await secrets.read(const SecretRef('sync:device:id')), isNull);
+    expect(await service.listKnownDevices(), isEmpty);
+    expect(
+      await EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ).list(),
+      isEmpty,
+    );
+
+    final next = await service.touchLocalDevice();
+    expect(next.id, isNot(first.id));
+  });
 }

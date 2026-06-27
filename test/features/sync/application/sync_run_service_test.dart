@@ -6,6 +6,7 @@ import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/core/logging/offline_diagnostic_logger.dart';
 import 'package:serlink/features/sync/application/sync_device_service.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
+import 'package:serlink/features/sync/application/sync_record_baseline_repository.dart';
 import 'package:serlink/features/sync/application/sync_record_scope.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
 import 'package:serlink/features/sync/application/sync_settings_service.dart';
@@ -369,6 +370,19 @@ void main() {
     're-enabled iCloud sync pushes local additions after conflicts are resolved',
     () async {
       final provider = LocalDirectorySyncProvider(tempDir);
+      final baseConflict = await vault.encryptRecord(
+        id: VaultRecordId('host:re-enabled-conflict'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'baseline-conflict.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+          }),
+        ),
+      );
+      await records.upsert(baseConflict);
+      await service.pushEncryptedSnapshot(provider);
+
       final remoteRecords = InMemoryVaultRecordRepository();
       await _saveLegacyCloudKitSettings(
         vault: vault,
@@ -379,8 +393,8 @@ void main() {
         cloudKitSyncSettingsRecordId,
       );
       final remoteConflict = await vault.encryptRecord(
-        id: VaultRecordId('host:re-enabled-conflict'),
-        type: 'host',
+        id: baseConflict.id,
+        type: baseConflict.type,
         plaintext: utf8.encode(
           jsonEncode({
             'hostname': 'remote-conflict.example.test',
@@ -1038,6 +1052,17 @@ void main() {
       plaintext: utf8.encode('{"hostname":"local.example.test"}'),
     );
     await records.upsert(localEnvelope);
+    final newerRemoteEnvelope = await vault.encryptRecord(
+      id: localEnvelope.id,
+      type: localEnvelope.type,
+      plaintext: utf8.encode('{"hostname":"remote-updated.example.test"}'),
+    );
+    final remoteRecords = InMemoryVaultRecordRepository();
+    await remoteRecords.upsert(newerRemoteEnvelope);
+    await SyncRunService(
+      vault: vault,
+      records: remoteRecords,
+    ).pushEncryptedSnapshot(provider);
 
     final pull = await service.pullEncryptedSnapshot(
       provider,
@@ -1052,6 +1077,56 @@ void main() {
       localEnvelope.revision,
     );
   });
+
+  test(
+    'reported sync pulls a remote-only record change without conflict',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final baselineEnvelope = await vault.encryptRecord(
+        id: VaultRecordId('host:remote-newer-report'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'baseline.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+          }),
+        ),
+      );
+      await records.upsert(baselineEnvelope);
+      await service.pushEncryptedSnapshot(provider);
+
+      final remoteEnvelope = await vault.encryptRecord(
+        id: baselineEnvelope.id,
+        type: baselineEnvelope.type,
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'remote.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 30).toIso8601String(),
+          }),
+        ),
+      );
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await remoteRecords.upsert(remoteEnvelope);
+      await SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      ).pushEncryptedSnapshot(provider);
+
+      final result = await service.syncEncryptedSnapshot(
+        provider,
+        reportConflicts: true,
+      );
+
+      expect(result.recordsDownloaded, 1);
+      expect(result.recordsUploaded, 0);
+      final restored = await records.read(remoteEnvelope.id);
+      expect(restored!.revision, remoteEnvelope.revision);
+      final restoredJson =
+          jsonDecode(utf8.decode(await vault.decryptRecord(restored)))
+              as Map<String, Object?>;
+      expect(restoredJson['hostname'], 'remote.example.test');
+    },
+  );
 
   test(
     'sync reports same-record conflicts without overwriting unlocked local data',
@@ -1081,6 +1156,22 @@ void main() {
         ),
       );
       await records.upsert(localEnvelope);
+      final newerRemoteEnvelope = await vault.encryptRecord(
+        id: remoteEnvelope.id,
+        type: remoteEnvelope.type,
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'remote-updated.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 31).toIso8601String(),
+          }),
+        ),
+      );
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await remoteRecords.upsert(newerRemoteEnvelope);
+      await SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      ).pushEncryptedSnapshot(provider);
 
       await expectLater(
         service.syncEncryptedSnapshot(provider, reportConflicts: true),
@@ -1111,7 +1202,7 @@ void main() {
             )
             as Map<String, Object?>,
       );
-      expect(remoteObject.revision, remoteEnvelope.revision);
+      expect(remoteObject.revision, newerRemoteEnvelope.revision);
     },
   );
 
@@ -1163,12 +1254,41 @@ void main() {
             'jumpHostIds': <String>[],
             'groupId': null,
             'createdAt': DateTime.utc(2026, 5, 28).toIso8601String(),
-            'updatedAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+            'updatedAt': DateTime.utc(2026, 5, 30).toIso8601String(),
             'lastConnectedAt': null,
           }),
         ),
       );
       await records.upsert(localEnvelope);
+      final newerRemoteEnvelope = await vault.encryptRecord(
+        id: remoteEnvelope.id,
+        type: remoteEnvelope.type,
+        plaintext: utf8.encode(
+          jsonEncode({
+            'id': 'host-1',
+            'displayName': 'Ops Bastion',
+            'hostname': 'ops.remote',
+            'username': 'deploy',
+            'port': 2222,
+            'authKinds': ['password'],
+            'tags': ['prod', 'bastion'],
+            'trustState': 'trusted',
+            'identityIds': <String>[],
+            'startupCommands': ['tmux attach'],
+            'jumpHostIds': <String>[],
+            'groupId': null,
+            'createdAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+            'updatedAt': DateTime.utc(2026, 5, 31).toIso8601String(),
+            'lastConnectedAt': null,
+          }),
+        ),
+      );
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await remoteRecords.upsert(newerRemoteEnvelope);
+      await SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      ).pushEncryptedSnapshot(provider);
 
       final pull = await service.pullEncryptedSnapshot(
         provider,
@@ -1176,6 +1296,8 @@ void main() {
       );
       final fieldSet = pull.conflicts.single.fieldSet!;
 
+      expect(pull.conflicts.single.title, 'Ops / Ops Bastion');
+      expect(pull.conflicts.single.subtitle, 'Host - host:conflict');
       expect(fieldSet.supportsFieldMerge, isTrue);
       expect(
         fieldSet.fields.map((field) => field.key),
@@ -1459,6 +1581,27 @@ void main() {
         ),
       );
       await records.upsert(localEnvelope);
+      final newerRemoteEnvelope = await vault.encryptRecord(
+        id: remoteEnvelope.id,
+        type: remoteEnvelope.type,
+        plaintext: utf8.encode(
+          jsonEncode({
+            'id': 'snippet-1',
+            'name': 'Logs',
+            'command': 'journalctl -fu app',
+            'tags': ['ops'],
+            'confirmBeforeRun': false,
+            'createdAt': DateTime.utc(2026, 5, 28).toIso8601String(),
+            'updatedAt': DateTime.utc(2026, 5, 31).toIso8601String(),
+          }),
+        ),
+      );
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await remoteRecords.upsert(newerRemoteEnvelope);
+      await SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      ).pushEncryptedSnapshot(provider);
 
       final pull = await service.pullEncryptedSnapshot(
         provider,
@@ -1695,6 +1838,26 @@ void main() {
         ),
       );
       await records.upsert(localEnvelope);
+      final newerRemoteEnvelope = await vault.encryptRecord(
+        id: remoteEnvelope.id,
+        type: remoteEnvelope.type,
+        plaintext: utf8.encode(
+          jsonEncode({
+            'id': 'snippet-1',
+            'name': 'Remote',
+            'command': 'journalctl -fu app',
+            'tags': ['ops'],
+            'confirmBeforeRun': false,
+            'updatedAt': DateTime.utc(2026, 5, 31).toIso8601String(),
+          }),
+        ),
+      );
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await remoteRecords.upsert(newerRemoteEnvelope);
+      await SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      ).pushEncryptedSnapshot(provider.inner);
       final pull = await service.pullEncryptedSnapshot(
         provider.inner,
         reportConflicts: true,
@@ -1834,6 +1997,17 @@ void main() {
         plaintext: utf8.encode('{"hostname":"local.example.test"}'),
       );
       await records.upsert(localEnvelope);
+      final newerRemoteEnvelope = await vault.encryptRecord(
+        id: localEnvelope.id,
+        type: localEnvelope.type,
+        plaintext: utf8.encode('{"hostname":"remote-updated.example.test"}'),
+      );
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await remoteRecords.upsert(newerRemoteEnvelope);
+      await SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      ).pushEncryptedSnapshot(provider);
 
       final pull = await service.pullEncryptedSnapshot(
         provider,
@@ -1883,6 +2057,17 @@ void main() {
         plaintext: utf8.encode('{"hostname":"local.example.test"}'),
       );
       await records.upsert(localEnvelope);
+      final newerRemoteEnvelope = await vault.encryptRecord(
+        id: remoteEnvelope.id,
+        type: remoteEnvelope.type,
+        plaintext: utf8.encode('{"hostname":"remote-updated.example.test"}'),
+      );
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await remoteRecords.upsert(newerRemoteEnvelope);
+      await SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      ).pushEncryptedSnapshot(provider);
 
       await expectLater(
         service.resolveConflicts(provider, SyncConflictResolution.keepLocal),
@@ -1892,7 +2077,7 @@ void main() {
               .having(
                 (error) => error.conflicts.single.remoteRevision,
                 'remote revision',
-                remoteEnvelope.revision,
+                newerRemoteEnvelope.revision,
               ),
         ),
       );
@@ -1911,7 +2096,7 @@ void main() {
             )
             as Map<String, Object?>,
       );
-      expect(remoteObject.revision, remoteEnvelope.revision);
+      expect(remoteObject.revision, newerRemoteEnvelope.revision);
       expect(
         (await records.read(localEnvelope.id))!.revision,
         localEnvelope.revision,
@@ -1937,6 +2122,17 @@ void main() {
         plaintext: utf8.encode('{"hostname":"local.example.test"}'),
       );
       await records.upsert(localEnvelope);
+      final remoteChangedEnvelope = await vault.encryptRecord(
+        id: remoteEnvelope.id,
+        type: remoteEnvelope.type,
+        plaintext: utf8.encode('{"hostname":"remote-updated.example.test"}'),
+      );
+      final changedRemoteRecords = InMemoryVaultRecordRepository();
+      await changedRemoteRecords.upsert(remoteChangedEnvelope);
+      await SyncRunService(
+        vault: vault,
+        records: changedRemoteRecords,
+      ).pushEncryptedSnapshot(provider);
       final accepted = await service.pullEncryptedSnapshot(
         provider,
         reportConflicts: true,
@@ -2022,6 +2218,22 @@ void main() {
         ),
       );
       await records.upsert(localEnvelope);
+      final remoteChangedEnvelope = await vault.encryptRecord(
+        id: remoteEnvelope.id,
+        type: remoteEnvelope.type,
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'remote-updated.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 30).toIso8601String(),
+          }),
+        ),
+      );
+      final changedRemoteRecords = InMemoryVaultRecordRepository();
+      await changedRemoteRecords.upsert(remoteChangedEnvelope);
+      await SyncRunService(
+        vault: vault,
+        records: changedRemoteRecords,
+      ).pushEncryptedSnapshot(provider);
 
       final pull = await service.pullEncryptedSnapshot(
         provider,
@@ -2030,7 +2242,7 @@ void main() {
       expect(pull.conflicts, hasLength(1));
 
       final remoteRecords = InMemoryVaultRecordRepository();
-      await remoteRecords.upsert(remoteEnvelope);
+      await remoteRecords.upsert(remoteChangedEnvelope);
       final remoteAddition = await vault.encryptRecord(
         id: VaultRecordId('host:remote-new'),
         type: 'host',
@@ -2191,6 +2403,57 @@ void main() {
   );
 
   test(
+    'pull baseline tracks remote snapshot without local-only records',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final remoteRecords = InMemoryVaultRecordRepository();
+      final remoteService = SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      );
+      final remoteEnvelope = await vault.encryptRecord(
+        id: VaultRecordId('host:remote-only'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'remote-only.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 29).toIso8601String(),
+          }),
+        ),
+      );
+      await remoteRecords.upsert(remoteEnvelope);
+      await remoteService.pushEncryptedSnapshot(provider);
+
+      final localOnlyEnvelope = await vault.encryptRecord(
+        id: VaultRecordId('host:local-only'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'local-only.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 30).toIso8601String(),
+          }),
+        ),
+      );
+      await records.upsert(localOnlyEnvelope);
+      final baselines = InMemorySyncRecordBaselineRepository();
+      service = SyncRunService(
+        vault: vault,
+        records: records,
+        baselines: baselines,
+      );
+
+      await service.pullEncryptedSnapshot(provider);
+
+      final baseline = await baselines.readForVault(
+        providerKind: SyncProviderKind.local,
+        vaultId: syncVaultId(vault.header!),
+      );
+      expect(baseline.keys, contains(remoteEnvelope.id));
+      expect(baseline.keys, isNot(contains(localOnlyEnvelope.id)));
+    },
+  );
+
+  test(
     'device tombstone prevents revoked remote device from being restored',
     () async {
       final provider = LocalDirectorySyncProvider(tempDir);
@@ -2242,6 +2505,95 @@ void main() {
       expect(
         refs.map((ref) => ref.path),
         contains(startsWith('records/sync%3Atombstone%3A')),
+      );
+    },
+  );
+
+  test(
+    'local device tombstone stops pull before applying remote content',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final secrets = InMemorySecretStore();
+      final deviceRepository = EncryptedSyncDeviceRepository(
+        vault: vault,
+        records: records,
+      );
+      final deviceService = SyncDeviceService(
+        devices: deviceRepository,
+        secrets: secrets,
+        tombstones: EncryptedSyncDeleteTombstoneRepository(
+          vault: vault,
+          records: records,
+        ),
+        displayName: 'iPhone',
+        platform: 'ios',
+        now: () => DateTime.utc(2026, 5, 28, 9),
+      );
+      service = SyncRunService(
+        vault: vault,
+        records: records,
+        devices: deviceService,
+      );
+      final localDevice = await deviceService.touchLocalDevice();
+      final baseHost = await vault.encryptRecord(
+        id: VaultRecordId('host:base-before-removal'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'base.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 28, 9).toIso8601String(),
+          }),
+        ),
+      );
+      await records.upsert(baseHost);
+      await service.pushEncryptedSnapshot(provider);
+
+      final remoteRecords = InMemoryVaultRecordRepository();
+      await remoteRecords.upsert(baseHost);
+      await EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: remoteRecords,
+      ).save(
+        SyncDeleteTombstone(
+          targetRecordId: syncDeviceRecordId(localDevice.id),
+          targetRecordType: EncryptedSyncDeviceRepository.recordType,
+          deletedAt: DateTime.utc(2026, 5, 28, 10),
+        ),
+      );
+      final remoteHost = await vault.encryptRecord(
+        id: VaultRecordId('host:after-device-removal'),
+        type: 'host',
+        plaintext: utf8.encode(
+          jsonEncode({
+            'hostname': 'should-not-apply.example.test',
+            'updatedAt': DateTime.utc(2026, 5, 28, 10).toIso8601String(),
+          }),
+        ),
+      );
+      await remoteRecords.upsert(remoteHost);
+      await SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      ).pushEncryptedSnapshot(provider);
+
+      await expectLater(
+        service.syncEncryptedSnapshot(provider, reportConflicts: true),
+        throwsA(
+          isA<SyncDeviceException>().having(
+            (error) => error.code,
+            'code',
+            'sync.device.revoked',
+          ),
+        ),
+      );
+
+      expect(await records.read(remoteHost.id), isNull);
+      expect(await deviceRepository.read(localDevice.id), isNull);
+      expect(
+        await records.read(
+          tombstoneRecordId(syncDeviceRecordId(localDevice.id)),
+        ),
+        isNotNull,
       );
     },
   );

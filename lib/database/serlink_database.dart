@@ -80,7 +80,7 @@ class QuarantinedRecords extends Table {
 class SerlinkDatabase extends _$SerlinkDatabase {
   SerlinkDatabase([QueryExecutor? executor]) : super(executor ?? _open());
 
-  static const currentSchemaVersion = 5;
+  static const currentSchemaVersion = 6;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -111,6 +111,10 @@ class SerlinkDatabase extends _$SerlinkDatabase {
       if (current == 4 && to >= 5) {
         await _createLocalWebDavSyncSettingsTable();
         current = 5;
+      }
+      if (current == 5 && to >= 6) {
+        await _createSyncRecordBaselinesTable();
+        current = 6;
       }
       if (current == to) {
         return;
@@ -169,8 +173,24 @@ CREATE TABLE IF NOT EXISTS cloudkit_sync_shadow_settings (
   updated_at TEXT NOT NULL
 )
 ''');
+      await _createSyncRecordBaselinesTable();
       await _createLocalPreferenceTables();
     });
+  }
+
+  Future<void> _createSyncRecordBaselinesTable() async {
+    await customStatement('''
+CREATE TABLE IF NOT EXISTS sync_record_baselines (
+  provider_kind TEXT NOT NULL,
+  vault_id TEXT NOT NULL,
+  record_id TEXT NOT NULL,
+  record_type TEXT NOT NULL,
+  revision TEXT NOT NULL,
+  modified_at TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (provider_kind, vault_id, record_id)
+)
+''');
   }
 
   Future<void> _createLocalPreferenceTables() async {

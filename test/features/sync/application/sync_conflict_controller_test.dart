@@ -17,6 +17,8 @@ void main() {
         type: 'host',
         localRevision: 'local',
         remoteRevision: 'remote',
+        title: 'Production host',
+        subtitle: 'Host - host:1',
       ),
     ], providerKind: SyncProviderKind.webDav);
 

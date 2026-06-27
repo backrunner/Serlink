@@ -423,6 +423,288 @@ void main() {
     },
   );
 
+  test(
+    'auto sync attributes same-record conflicts to WebDAV after CloudKit pull',
+    () async {
+      final sourceVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await sourceVault.initialize(passphrase: 'good passphrase');
+      final sharedId = VaultRecordId('host:dual-conflict');
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(cloudKitDir),
+        id: sharedId,
+        hostname: 'cloudkit-conflict.example.test',
+      );
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(webDavDir),
+        id: sharedId,
+        hostname: 'webdav-conflict.example.test',
+      );
+
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = _createDualSyncContainer(
+        database: database,
+        transferQueue: transferQueue,
+        cloudKitDir: cloudKitDir,
+        webDavDir: webDavDir,
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      await container.read(vaultSessionControllerProvider.future);
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .unlock(passphrase: 'good passphrase');
+      await container
+          .read(syncSettingsServiceProvider)
+          .saveWebDav(
+            const WebDavSyncSettingsDraft(
+              endpoint: 'https://dav.example.test',
+              username: 'ops',
+              password: 'server-password',
+            ),
+          );
+      container.read(autoSyncControllerProvider);
+      container
+          .read(autoSyncControllerProvider.notifier)
+          .requestSync(delay: Duration.zero);
+
+      await _waitForAutoSyncPhase(container, AutoSyncPhase.conflicts);
+
+      final status = container.read(autoSyncControllerProvider);
+      expect(status.lastProviderKind, SyncProviderKind.webDav);
+      expect(status.conflictCount, 1);
+      final conflicts = container.read(syncConflictControllerProvider);
+      expect(conflicts, hasLength(1));
+      expect(conflicts.single.id, sharedId);
+      expect(
+        container.read(syncConflictControllerProvider.notifier).providerKind,
+        SyncProviderKind.webDav,
+      );
+
+      final localVault =
+          container.read(vaultSessionControllerProvider.notifier).service
+              as InMemoryVaultService;
+      expect(
+        await _localHostName(
+          database: database,
+          vault: localVault,
+          id: sharedId,
+        ),
+        'cloudkit-conflict.example.test',
+      );
+      expect(
+        await _remoteHostName(
+          provider: LocalDirectorySyncProvider(webDavDir),
+          vault: localVault,
+          id: sharedId,
+        ),
+        'webdav-conflict.example.test',
+      );
+    },
+  );
+
+  test(
+    'manual keep-local conflict resolution fans out to both sync providers',
+    () async {
+      final sourceVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await sourceVault.initialize(passphrase: 'good passphrase');
+      final sharedId = VaultRecordId('host:dual-resolution');
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(cloudKitDir),
+        id: sharedId,
+        hostname: 'cloudkit-resolution.example.test',
+      );
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(webDavDir),
+        id: sharedId,
+        hostname: 'webdav-resolution.example.test',
+      );
+
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = _createDualSyncContainer(
+        database: database,
+        transferQueue: transferQueue,
+        cloudKitDir: cloudKitDir,
+        webDavDir: webDavDir,
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      await container.read(vaultSessionControllerProvider.future);
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .unlock(passphrase: 'good passphrase');
+      await container
+          .read(syncSettingsServiceProvider)
+          .saveWebDav(
+            const WebDavSyncSettingsDraft(
+              endpoint: 'https://dav.example.test',
+              username: 'ops',
+              password: 'server-password',
+            ),
+          );
+      container.read(autoSyncControllerProvider);
+      container
+          .read(autoSyncControllerProvider.notifier)
+          .requestSync(delay: Duration.zero);
+
+      await _waitForAutoSyncPhase(container, AutoSyncPhase.conflicts);
+      final conflicts = container.read(syncConflictControllerProvider);
+      expect(conflicts, hasLength(1));
+      expect(conflicts.single.id, sharedId);
+
+      final result = await container
+          .read(syncRunServiceProvider)
+          .resolveConflicts(
+            LocalDirectorySyncProvider(webDavDir),
+            SyncConflictResolution.keepLocal,
+            acceptedConflicts: conflicts,
+          );
+      container.read(syncConflictControllerProvider.notifier).clear();
+      container
+          .read(autoSyncControllerProvider.notifier)
+          .markConflictResolution(
+            result,
+            providerKind: SyncProviderKind.webDav,
+          );
+      container
+          .read(autoSyncControllerProvider.notifier)
+          .requestSync(delay: Duration.zero);
+
+      await _waitForAutoSyncIdle(container);
+
+      final localVault =
+          container.read(vaultSessionControllerProvider.notifier).service
+              as InMemoryVaultService;
+      expect(container.read(syncConflictControllerProvider), isEmpty);
+      expect(
+        await _remoteHostName(
+          provider: LocalDirectorySyncProvider(cloudKitDir),
+          vault: localVault,
+          id: sharedId,
+        ),
+        'cloudkit-resolution.example.test',
+      );
+      expect(
+        await _remoteHostName(
+          provider: LocalDirectorySyncProvider(webDavDir),
+          vault: localVault,
+          id: sharedId,
+        ),
+        'cloudkit-resolution.example.test',
+      );
+      expect(
+        container.read(autoSyncControllerProvider).lastProviderKind,
+        SyncProviderKind.webDav,
+      );
+    },
+  );
+
+  test(
+    'auto sync stops on newer WebDAV vault schema after CloudKit sync',
+    () async {
+      final sourceVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await sourceVault.initialize(passphrase: 'good passphrase');
+      final cloudKitId = VaultRecordId('host:cloudkit-before-newer-webdav');
+      final webDavId = VaultRecordId('host:newer-webdav-schema');
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: LocalDirectorySyncProvider(cloudKitDir),
+        id: cloudKitId,
+        hostname: 'cloudkit-before-newer-webdav.example.test',
+      );
+      final webDavProvider = LocalDirectorySyncProvider(webDavDir);
+      await _publishRemoteHost(
+        vault: sourceVault,
+        provider: webDavProvider,
+        id: webDavId,
+        hostname: 'newer-webdav-schema.example.test',
+      );
+      await _writeRemoteHeaderSchemaVersion(
+        provider: webDavProvider,
+        vault: sourceVault,
+        schemaVersion: sourceVault.header!.schemaVersion + 1,
+      );
+
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = _createDualSyncContainer(
+        database: database,
+        transferQueue: transferQueue,
+        cloudKitDir: cloudKitDir,
+        webDavDir: webDavDir,
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      await container.read(vaultSessionControllerProvider.future);
+      await container
+          .read(vaultSessionControllerProvider.notifier)
+          .unlock(passphrase: 'good passphrase');
+      await container
+          .read(syncSettingsServiceProvider)
+          .saveWebDav(
+            const WebDavSyncSettingsDraft(
+              endpoint: 'https://dav.example.test',
+              username: 'ops',
+              password: 'server-password',
+            ),
+          );
+      container.read(autoSyncControllerProvider);
+      container
+          .read(autoSyncControllerProvider.notifier)
+          .requestSync(delay: Duration.zero);
+
+      await _waitForAutoSyncPhase(container, AutoSyncPhase.failed);
+
+      final status = container.read(autoSyncControllerProvider);
+      expect(status.lastProviderKind, SyncProviderKind.webDav);
+      expect(
+        status.lastFailure,
+        isA<SyncRunException>().having(
+          (error) => error.code,
+          'code',
+          'sync.remote_vault_schema_unsupported',
+        ),
+      );
+      expect(
+        status.lastFailureMessage,
+        contains('Update Serlink before syncing'),
+      );
+      final localVault =
+          container.read(vaultSessionControllerProvider.notifier).service
+              as InMemoryVaultService;
+      expect(
+        await _localHostName(
+          database: database,
+          vault: localVault,
+          id: cloudKitId,
+        ),
+        'cloudkit-before-newer-webdav.example.test',
+      );
+      expect(await DriftVaultRecordRepository(database).read(webDavId), isNull);
+      expect(
+        await _remoteHeaderSchemaVersion(provider: webDavProvider),
+        sourceVault.header!.schemaVersion + 1,
+      );
+    },
+  );
+
   test('auto sync propagates a WebDAV remote reset to CloudKit', () async {
     final sourceVault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),
@@ -694,6 +976,98 @@ Future<List<String>> _manifestRecordIds({
   return [
     for (final raw in entries) (raw as Map<String, Object?>)['id'] as String,
   ];
+}
+
+Future<RemoteObjectRef> _manifestRecordRef({
+  required LocalDirectorySyncProvider provider,
+  required InMemoryVaultService vault,
+  required VaultRecordId id,
+}) async {
+  final manifest = await provider.readManifest();
+  expect(manifest, isNotNull);
+  final manifestEnvelope = VaultRecordEnvelope.fromJson(
+    jsonDecode(utf8.decode(manifest!.encryptedPayload)) as Map<String, Object?>,
+  );
+  final manifestData =
+      jsonDecode(utf8.decode(await vault.decryptRecord(manifestEnvelope)))
+          as Map<String, Object?>;
+  final entries = manifestData['records'] as List<Object?>;
+  for (final raw in entries) {
+    final entry = raw as Map<String, Object?>;
+    if (entry['id'] == id.value) {
+      return RemoteObjectRef(entry['path'] as String);
+    }
+  }
+  fail('Manifest did not contain ${id.value}');
+}
+
+Future<String> _remoteHostName({
+  required LocalDirectorySyncProvider provider,
+  required InMemoryVaultService vault,
+  required VaultRecordId id,
+}) async {
+  final envelope = VaultRecordEnvelope.fromJson(
+    jsonDecode(
+          utf8.decode(
+            await provider.readObject(
+              await _manifestRecordRef(
+                provider: provider,
+                vault: vault,
+                id: id,
+              ),
+            ),
+          ),
+        )
+        as Map<String, Object?>,
+  );
+  final data =
+      jsonDecode(utf8.decode(await vault.decryptRecord(envelope)))
+          as Map<String, Object?>;
+  return data['hostname'] as String;
+}
+
+Future<String> _localHostName({
+  required SerlinkDatabase database,
+  required InMemoryVaultService vault,
+  required VaultRecordId id,
+}) async {
+  final envelope = await DriftVaultRecordRepository(database).read(id);
+  expect(envelope, isNotNull);
+  final data =
+      jsonDecode(utf8.decode(await vault.decryptRecord(envelope!)))
+          as Map<String, Object?>;
+  return data['hostname'] as String;
+}
+
+Future<void> _writeRemoteHeaderSchemaVersion({
+  required LocalDirectorySyncProvider provider,
+  required InMemoryVaultService vault,
+  required int schemaVersion,
+}) async {
+  final manifest = await provider.readManifest();
+  expect(manifest, isNotNull);
+  await provider.writeObject(
+    RemoteObjectRef(manifest!.headerPath!),
+    utf8.encode(
+      jsonEncode(vault.header!.copyWith(schemaVersion: schemaVersion).toJson()),
+    ),
+  );
+}
+
+Future<int> _remoteHeaderSchemaVersion({
+  required LocalDirectorySyncProvider provider,
+}) async {
+  final manifest = await provider.readManifest();
+  expect(manifest, isNotNull);
+  final header = VaultHeader.fromJson(
+    jsonDecode(
+          utf8.decode(
+            await provider.readObject(RemoteObjectRef(manifest!.headerPath!)),
+          ),
+        )
+        as Map<String, Object?>,
+  );
+  return header.schemaVersion;
 }
 
 class _KindOverrideSyncProvider implements SyncProvider {

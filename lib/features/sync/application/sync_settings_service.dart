@@ -239,7 +239,12 @@ class MigratingCloudKitSyncSettingsRepository
       return null;
     }
     await primary.saveCloudKit(legacySettings);
-    await legacy.deleteCloudKit();
+    try {
+      await legacy.deleteCloudKit();
+    } on Object {
+      // The migrated local preference is authoritative. Legacy cleanup can be
+      // retried on a later unlocked read.
+    }
     return legacySettings;
   }
 
@@ -291,7 +296,12 @@ class MigratingWebDavSyncSettingsRepository implements SyncSettingsRepository {
       return null;
     }
     await primary.saveWebDav(legacySettings);
-    await legacy.deleteWebDav();
+    try {
+      await legacy.deleteWebDav();
+    } on Object {
+      // Local WebDAV settings are authoritative after migration. Cleanup can be
+      // retried on a later unlocked read.
+    }
     return legacySettings;
   }
 
@@ -351,14 +361,17 @@ class SyncSettingsService {
   Future<WebDavSyncSettings> saveWebDav(WebDavSyncSettingsDraft draft) async {
     final existing = await _settings.readWebDav();
     final parsed = _parseWebDavDraft(draft, existing: existing);
+    final passwordRef = existing?.passwordRef ?? _webDavPasswordRef;
+    List<int>? previousPassword;
     if (draft.password.isNotEmpty) {
-      await _secrets.write(_webDavPasswordRef, utf8.encode(draft.password));
+      previousPassword = await _secrets.read(passwordRef);
+      await _secrets.write(passwordRef, utf8.encode(draft.password));
     }
     final settings = WebDavSyncSettings(
       endpoint: parsed.endpoint,
       username: parsed.username,
       basePath: parsed.basePath,
-      passwordRef: existing?.passwordRef ?? _webDavPasswordRef,
+      passwordRef: passwordRef,
       allowInsecureHttp: draft.allowInsecureHttp,
       enabled: draft.enabled,
       updatedAt: DateTime.now().toUtc(),
@@ -368,7 +381,18 @@ class SyncSettingsService {
         allowInsecureHttp: draft.allowInsecureHttp,
       ),
     );
-    await _settings.saveWebDav(settings);
+    try {
+      await _settings.saveWebDav(settings);
+    } on Object {
+      if (draft.password.isNotEmpty) {
+        await _restoreWebDavPassword(
+          secrets: _secrets,
+          ref: passwordRef,
+          previousPassword: previousPassword,
+        );
+      }
+      rethrow;
+    }
     return settings;
   }
 
@@ -602,6 +626,18 @@ String? _preservedCertificatePin({
     return null;
   }
   return existing.pinnedCertificateFingerprint;
+}
+
+Future<void> _restoreWebDavPassword({
+  required SecretStore secrets,
+  required SecretRef ref,
+  required List<int>? previousPassword,
+}) async {
+  if (previousPassword == null) {
+    await secrets.delete(ref);
+    return;
+  }
+  await secrets.write(ref, previousPassword);
 }
 
 bool _sameEndpoint(Uri left, Uri right) {

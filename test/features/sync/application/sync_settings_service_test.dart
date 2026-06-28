@@ -141,6 +141,38 @@ void main() {
   );
 
   test(
+    'WebDAV migration still returns local settings when legacy cleanup fails',
+    () async {
+      final legacy = _InMemorySyncSettingsRepository();
+      final local = _InMemorySyncSettingsRepository();
+      await legacy.saveWebDav(
+        WebDavSyncSettings(
+          endpoint: Uri.parse('https://dav.example.test'),
+          username: 'ops',
+          basePath: '/serlink',
+          passwordRef: const SecretRef('sync:webdav:password'),
+          allowInsecureHttp: false,
+          enabled: true,
+          updatedAt: DateTime.utc(2026, 6, 26, 12),
+        ),
+      );
+      final migratingService = SyncSettingsService(
+        settings: MigratingWebDavSyncSettingsRepository(
+          primary: local,
+          legacy: _FailingDeleteSyncSettingsRepository(legacy),
+        ),
+        cloudKitSettings: _InMemoryCloudKitSyncSettingsRepository(),
+        secrets: secrets,
+      );
+
+      final migrated = await migratingService.readWebDav();
+
+      expect(migrated!.endpoint.host, 'dav.example.test');
+      expect((await local.readWebDav())!.enabled, isTrue);
+    },
+  );
+
+  test(
     'updates metadata without replacing password when password is blank',
     () async {
       final initial = await service.saveWebDav(
@@ -169,6 +201,50 @@ void main() {
       );
     },
   );
+
+  test('restores previous WebDAV password when settings save fails', () async {
+    final repository = _InMemorySyncSettingsRepository();
+    service = SyncSettingsService(
+      settings: repository,
+      cloudKitSettings: _InMemoryCloudKitSyncSettingsRepository(),
+      secrets: secrets,
+    );
+    final initial = await service.saveWebDav(
+      const WebDavSyncSettingsDraft(
+        endpoint: 'https://dav.example.test',
+        username: 'ops',
+        password: 'first-password',
+      ),
+    );
+    final failingService = SyncSettingsService(
+      settings: _FailingSaveSyncSettingsRepository(repository),
+      cloudKitSettings: _InMemoryCloudKitSyncSettingsRepository(),
+      secrets: secrets,
+    );
+
+    await expectLater(
+      failingService.saveWebDav(
+        const WebDavSyncSettingsDraft(
+          endpoint: 'https://dav2.example.test',
+          username: 'deploy',
+          password: 'new-password',
+        ),
+      ),
+      throwsA(
+        isA<SyncSettingsException>().having(
+          (error) => error.code,
+          'code',
+          'test.save_failed',
+        ),
+      ),
+    );
+
+    expect(
+      utf8.decode((await secrets.read(initial.passwordRef))!),
+      'first-password',
+    );
+    expect((await repository.readWebDav())!.endpoint.host, 'dav.example.test');
+  });
 
   test(
     'preserves pinned WebDAV certificate for the same HTTPS endpoint',
@@ -373,6 +449,33 @@ void main() {
     },
   );
 
+  test(
+    'CloudKit migration still returns local settings when legacy cleanup fails',
+    () async {
+      final legacy = _InMemoryCloudKitSyncSettingsRepository();
+      final cloudKitSettings = _InMemoryCloudKitSyncSettingsRepository();
+      await legacy.saveCloudKit(
+        CloudKitSyncSettings(
+          enabled: false,
+          updatedAt: DateTime.utc(2026, 6, 25, 12),
+        ),
+      );
+      final migratingService = SyncSettingsService(
+        settings: _InMemorySyncSettingsRepository(),
+        cloudKitSettings: MigratingCloudKitSyncSettingsRepository(
+          primary: cloudKitSettings,
+          legacy: _FailingDeleteCloudKitSyncSettingsRepository(legacy),
+        ),
+        secrets: secrets,
+      );
+
+      final migrated = await migratingService.readCloudKit();
+
+      expect(migrated!.enabled, isFalse);
+      expect((await cloudKitSettings.readCloudKit())!.enabled, isFalse);
+    },
+  );
+
   test('defaults CloudKit sync to enabled when available', () async {
     final settings = await service.readCloudKit();
     expect(settings!.enabled, isTrue);
@@ -499,5 +602,78 @@ class _InMemorySyncSettingsRepository implements SyncSettingsRepository {
   @override
   Future<void> deleteWebDav() async {
     _webDav = null;
+  }
+}
+
+class _FailingSaveSyncSettingsRepository implements SyncSettingsRepository {
+  const _FailingSaveSyncSettingsRepository(this.inner);
+
+  final SyncSettingsRepository inner;
+
+  @override
+  Future<WebDavSyncSettings?> readWebDav() {
+    return inner.readWebDav();
+  }
+
+  @override
+  Future<void> saveWebDav(WebDavSyncSettings settings) async {
+    throw const SyncSettingsException(
+      'test.save_failed',
+      'Settings save failed.',
+    );
+  }
+
+  @override
+  Future<void> deleteWebDav() {
+    return inner.deleteWebDav();
+  }
+}
+
+class _FailingDeleteSyncSettingsRepository implements SyncSettingsRepository {
+  const _FailingDeleteSyncSettingsRepository(this.inner);
+
+  final SyncSettingsRepository inner;
+
+  @override
+  Future<WebDavSyncSettings?> readWebDav() {
+    return inner.readWebDav();
+  }
+
+  @override
+  Future<void> saveWebDav(WebDavSyncSettings settings) {
+    return inner.saveWebDav(settings);
+  }
+
+  @override
+  Future<void> deleteWebDav() async {
+    throw const SyncSettingsException(
+      'test.delete_failed',
+      'Settings delete failed.',
+    );
+  }
+}
+
+class _FailingDeleteCloudKitSyncSettingsRepository
+    implements CloudKitSyncSettingsRepository {
+  const _FailingDeleteCloudKitSyncSettingsRepository(this.inner);
+
+  final CloudKitSyncSettingsRepository inner;
+
+  @override
+  Future<CloudKitSyncSettings?> readCloudKit() {
+    return inner.readCloudKit();
+  }
+
+  @override
+  Future<void> saveCloudKit(CloudKitSyncSettings settings) {
+    return inner.saveCloudKit(settings);
+  }
+
+  @override
+  Future<void> deleteCloudKit() async {
+    throw const SyncSettingsException(
+      'test.delete_failed',
+      'Settings delete failed.',
+    );
   }
 }

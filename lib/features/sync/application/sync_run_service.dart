@@ -504,6 +504,13 @@ class SyncRunService {
 
       final localTombstone = localTombstones[remoteEnvelope.id];
       if (localTombstone != null) {
+        if (_localTombstoneWinsWithoutTimestampComparison(
+          tombstone: localTombstone,
+          remoteEnvelope: remoteEnvelope,
+        )) {
+          unchanged += 1;
+          continue;
+        }
         final remoteModifiedAt = await _recordModifiedAt(
           remoteEnvelope,
           source: _RecordSource.remote,
@@ -1688,6 +1695,15 @@ bool _remoteRecordWinsFromModifiedTimes(_RecordChangeComparison comparison) {
     return false;
   }
   return true;
+}
+
+bool _localTombstoneWinsWithoutTimestampComparison({
+  required SyncDeleteTombstone tombstone,
+  required VaultRecordEnvelope remoteEnvelope,
+}) {
+  return tombstone.targetRecordType ==
+          EncryptedSyncDeviceRepository.recordType &&
+      remoteEnvelope.type == EncryptedSyncDeviceRepository.recordType;
 }
 
 bool _changedSinceBaseline({

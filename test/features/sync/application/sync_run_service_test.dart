@@ -2510,6 +2510,61 @@ void main() {
   );
 
   test(
+    'device tombstone stays authoritative over newer remote device metadata',
+    () async {
+      final provider = LocalDirectorySyncProvider(tempDir);
+      final remoteRecords = InMemoryVaultRecordRepository();
+      final remoteDeviceRepository = EncryptedSyncDeviceRepository(
+        vault: vault,
+        records: remoteRecords,
+      );
+      await remoteDeviceRepository.save(
+        SyncDeviceMetadata(
+          id: 'revoked-device',
+          displayName: 'Revoked Device',
+          platform: 'linux',
+          createdAt: DateTime.utc(2026, 5, 28, 9),
+          lastSeenAt: DateTime.utc(2026, 5, 28, 12),
+        ),
+      );
+      await SyncRunService(
+        vault: vault,
+        records: remoteRecords,
+      ).pushEncryptedSnapshot(provider);
+
+      await EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ).save(
+        SyncDeleteTombstone(
+          targetRecordId: syncDeviceRecordId('revoked-device'),
+          targetRecordType: EncryptedSyncDeviceRepository.recordType,
+          deletedAt: DateTime.utc(2026, 5, 28, 10),
+        ),
+      );
+
+      await service.syncEncryptedSnapshot(provider);
+
+      expect(
+        await EncryptedSyncDeviceRepository(
+          vault: vault,
+          records: records,
+        ).read('revoked-device'),
+        isNull,
+      );
+      final refs = await provider.listRecordObjects(prefix: 'records/');
+      expect(
+        refs.map((ref) => ref.path),
+        isNot(contains(startsWith('records/sync%3Adevice%3Arevoked-device-'))),
+      );
+      expect(
+        refs.map((ref) => ref.path),
+        contains(startsWith('records/sync%3Atombstone%3A')),
+      );
+    },
+  );
+
+  test(
     'local device tombstone stops pull before applying remote content',
     () async {
       final provider = LocalDirectorySyncProvider(tempDir);

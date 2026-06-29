@@ -69,12 +69,44 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
       authMethods: credentials.authMethods,
       startupCommands: host.startupCommands,
       jumpHosts: jumpHosts,
+      portForwarding: _portForwardingProfileFor(host.portForwarding),
       connectTimeout: host.connectionSettings.connectTimeout,
       keepAliveInterval: host.connectionSettings.keepAliveInterval,
       reconnectPolicy: SshReconnectPolicy(
         maxAttempts: host.connectionSettings.reconnectAttempts,
         backoff: host.connectionSettings.reconnectBackoff,
       ),
+    );
+  }
+
+  SshPortForwardingProfile _portForwardingProfileFor(
+    HostPortForwardingSettings settings,
+  ) {
+    return SshPortForwardingProfile(
+      localForwards: [
+        for (final forward in settings.localForwards)
+          SshLocalPortForward(
+            localPort: forward.localPort,
+            remoteHost: forward.remoteHost,
+            remotePort: forward.remotePort,
+          ),
+      ],
+      remoteForwards: [
+        for (final forward in settings.remoteForwards)
+          SshRemotePortForward(
+            bindHost: forward.bindHost,
+            bindPort: forward.bindPort,
+            localHost: forward.localHost,
+            localPort: forward.localPort,
+          ),
+      ],
+      dynamicForwards: [
+        for (final forward in settings.dynamicForwards)
+          SshDynamicPortForward(
+            bindHost: forward.bindHost,
+            bindPort: forward.bindPort,
+          ),
+      ],
     );
   }
 

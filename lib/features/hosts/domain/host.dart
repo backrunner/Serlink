@@ -55,6 +55,7 @@ class HostConfig {
     required this.createdAt,
     required this.updatedAt,
     this.sftpDefaultDirectory = '/',
+    this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
     this.groupId,
     this.lastConnectedAt,
@@ -72,6 +73,7 @@ class HostConfig {
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
   final String sftpDefaultDirectory;
+  final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -108,6 +110,7 @@ class HostConfig {
       'startupCommands': startupCommands,
       'jumpHostIds': [for (final hostId in jumpHostIds) hostId.value],
       'sftpDefaultDirectory': sftpDefaultDirectory,
+      'portForwarding': portForwarding.toJson(),
       'connectionSettings': connectionSettings.toJson(),
       'groupId': groupId,
       'createdAt': createdAt.toUtc().toIso8601String(),
@@ -146,6 +149,11 @@ class HostConfig {
       sftpDefaultDirectory: _remoteDirectoryFromJson(
         json['sftpDefaultDirectory'],
       ),
+      portForwarding: switch (json['portForwarding']) {
+        final Map<Object?, Object?> value =>
+          HostPortForwardingSettings.fromJson(Map<String, Object?>.from(value)),
+        _ => const HostPortForwardingSettings(),
+      },
       connectionSettings: switch (json['connectionSettings']) {
         final Map<Object?, Object?> value => HostConnectionSettings.fromJson(
           Map<String, Object?>.from(value),
@@ -161,6 +169,186 @@ class HostConfig {
       },
     );
   }
+}
+
+class HostPortForwardingSettings {
+  const HostPortForwardingSettings({
+    this.localForwards = const [],
+    this.remoteForwards = const [],
+    this.dynamicForwards = const [],
+  });
+
+  final List<HostLocalPortForward> localForwards;
+  final List<HostRemotePortForward> remoteForwards;
+  final List<HostDynamicPortForward> dynamicForwards;
+
+  bool get isEmpty =>
+      localForwards.isEmpty &&
+      remoteForwards.isEmpty &&
+      dynamicForwards.isEmpty;
+
+  Map<String, Object?> toJson() {
+    return {
+      'localForwards': [for (final forward in localForwards) forward.toJson()],
+      'remoteForwards': [
+        for (final forward in remoteForwards) forward.toJson(),
+      ],
+      'dynamicForwards': [
+        for (final forward in dynamicForwards) forward.toJson(),
+      ],
+    };
+  }
+
+  factory HostPortForwardingSettings.fromJson(Map<String, Object?> json) {
+    return HostPortForwardingSettings(
+      localForwards: [
+        for (final value in _listFromJson(json['localForwards']))
+          if (value is Map<Object?, Object?>)
+            HostLocalPortForward.fromJson(Map<String, Object?>.from(value)),
+      ],
+      remoteForwards: [
+        for (final value in _listFromJson(json['remoteForwards']))
+          if (value is Map<Object?, Object?>)
+            HostRemotePortForward.fromJson(Map<String, Object?>.from(value)),
+      ],
+      dynamicForwards: [
+        for (final value in _listFromJson(json['dynamicForwards']))
+          if (value is Map<Object?, Object?>)
+            HostDynamicPortForward.fromJson(Map<String, Object?>.from(value)),
+      ],
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is HostPortForwardingSettings &&
+        _listEquals(other.localForwards, localForwards) &&
+        _listEquals(other.remoteForwards, remoteForwards) &&
+        _listEquals(other.dynamicForwards, dynamicForwards);
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+      Object.hashAll(localForwards),
+      Object.hashAll(remoteForwards),
+      Object.hashAll(dynamicForwards),
+    );
+  }
+}
+
+class HostLocalPortForward {
+  const HostLocalPortForward({
+    required this.localPort,
+    required this.remoteHost,
+    required this.remotePort,
+  });
+
+  final int localPort;
+  final String remoteHost;
+  final int remotePort;
+
+  Map<String, Object?> toJson() {
+    return {
+      'localPort': localPort,
+      'remoteHost': remoteHost,
+      'remotePort': remotePort,
+    };
+  }
+
+  factory HostLocalPortForward.fromJson(Map<String, Object?> json) {
+    return HostLocalPortForward(
+      localPort: _intFromJson(json['localPort'], fallback: 0),
+      remoteHost: _stringFromJson(json['remoteHost'], fallback: '127.0.0.1'),
+      remotePort: _intFromJson(json['remotePort'], fallback: 0),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is HostLocalPortForward &&
+        other.localPort == localPort &&
+        other.remoteHost == remoteHost &&
+        other.remotePort == remotePort;
+  }
+
+  @override
+  int get hashCode => Object.hash(localPort, remoteHost, remotePort);
+}
+
+class HostRemotePortForward {
+  const HostRemotePortForward({
+    required this.bindHost,
+    required this.bindPort,
+    required this.localHost,
+    required this.localPort,
+  });
+
+  final String bindHost;
+  final int bindPort;
+  final String localHost;
+  final int localPort;
+
+  Map<String, Object?> toJson() {
+    return {
+      'bindHost': bindHost,
+      'bindPort': bindPort,
+      'localHost': localHost,
+      'localPort': localPort,
+    };
+  }
+
+  factory HostRemotePortForward.fromJson(Map<String, Object?> json) {
+    return HostRemotePortForward(
+      bindHost: _stringFromJson(json['bindHost'], fallback: '127.0.0.1'),
+      bindPort: _intFromJson(json['bindPort'], fallback: 0),
+      localHost: _stringFromJson(json['localHost'], fallback: '127.0.0.1'),
+      localPort: _intFromJson(json['localPort'], fallback: 0),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is HostRemotePortForward &&
+        other.bindHost == bindHost &&
+        other.bindPort == bindPort &&
+        other.localHost == localHost &&
+        other.localPort == localPort;
+  }
+
+  @override
+  int get hashCode => Object.hash(bindHost, bindPort, localHost, localPort);
+}
+
+class HostDynamicPortForward {
+  const HostDynamicPortForward({
+    required this.bindHost,
+    required this.bindPort,
+  });
+
+  final String bindHost;
+  final int bindPort;
+
+  Map<String, Object?> toJson() {
+    return {'bindHost': bindHost, 'bindPort': bindPort};
+  }
+
+  factory HostDynamicPortForward.fromJson(Map<String, Object?> json) {
+    return HostDynamicPortForward(
+      bindHost: _stringFromJson(json['bindHost'], fallback: '127.0.0.1'),
+      bindPort: _intFromJson(json['bindPort'], fallback: 0),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is HostDynamicPortForward &&
+        other.bindHost == bindHost &&
+        other.bindPort == bindPort;
+  }
+
+  @override
+  int get hashCode => Object.hash(bindHost, bindPort);
 }
 
 class HostConnectionSettings {
@@ -262,4 +450,24 @@ int _intFromJson(Object? value, {required int fallback}) {
     final String v => int.tryParse(v) ?? fallback,
     _ => fallback,
   };
+}
+
+String _stringFromJson(Object? value, {required String fallback}) {
+  return value is String ? value : fallback;
+}
+
+List<Object?> _listFromJson(Object? value) {
+  return value is List<Object?> ? value : const [];
+}
+
+bool _listEquals<T>(List<T> left, List<T> right) {
+  if (left.length != right.length) {
+    return false;
+  }
+  for (var index = 0; index < left.length; index += 1) {
+    if (left[index] != right[index]) {
+      return false;
+    }
+  }
+  return true;
 }

@@ -38,6 +38,7 @@ class OpenSshConfigImportEntry {
     required this.identityFiles,
     required this.certificateFiles,
     required this.proxyJump,
+    this.portForwarding = const HostPortForwardingSettings(),
   });
 
   final String alias;
@@ -47,6 +48,7 @@ class OpenSshConfigImportEntry {
   final List<String> identityFiles;
   final List<String> certificateFiles;
   final String? proxyJump;
+  final HostPortForwardingSettings portForwarding;
 }
 
 class OpenSshConfigImportResult {
@@ -212,6 +214,27 @@ class OpenSshConfigImportService {
           currentBlock.certificateFiles.add(values.join(' '));
         case 'proxyjump':
           currentBlock.proxyJump ??= values.join(' ');
+        case 'localforward':
+          final forward = _parseOpenSshLocalForward(values);
+          if (forward == null) {
+            warnings.add(_forwardingWarning(line, 'LocalForward'));
+          } else {
+            currentBlock.localForwards.add(forward);
+          }
+        case 'remoteforward':
+          final forward = _parseOpenSshRemoteForward(values);
+          if (forward == null) {
+            warnings.add(_forwardingWarning(line, 'RemoteForward'));
+          } else {
+            currentBlock.remoteForwards.add(forward);
+          }
+        case 'dynamicforward':
+          final forward = _parseOpenSshDynamicForward(values);
+          if (forward == null) {
+            warnings.add(_forwardingWarning(line, 'DynamicForward'));
+          } else {
+            currentBlock.dynamicForwards.add(forward);
+          }
         case 'proxycommand':
           currentBlock.proxyCommand ??= values.join(' ');
           warnings.add(
@@ -373,6 +396,7 @@ class OpenSshConfigImportService {
           identityIds: plan.identityIds,
           startupCommands: const [],
           jumpHostIds: jumpResolution.hostIds,
+          portForwarding: plan.entry.portForwarding,
           createdAt: now,
           updatedAt: now,
         ),

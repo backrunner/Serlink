@@ -202,6 +202,115 @@ bool _hostPatternMatches(String pattern, String alias) {
   return RegExp('^$escaped\$', caseSensitive: false).hasMatch(alias);
 }
 
+HostLocalPortForward? _parseOpenSshLocalForward(List<String> values) {
+  if (values.length != 2) {
+    return null;
+  }
+  final localPort = _parseOpenSshPort(values[0]);
+  final target = _parseOpenSshHostPort(values[1]);
+  if (localPort == null || target == null) {
+    return null;
+  }
+  return HostLocalPortForward(
+    localPort: localPort,
+    remoteHost: target.host,
+    remotePort: target.port,
+  );
+}
+
+HostRemotePortForward? _parseOpenSshRemoteForward(List<String> values) {
+  if (values.length != 2) {
+    return null;
+  }
+  final bind = _parseOpenSshBindEndpoint(values[0]);
+  final target = _parseOpenSshHostPort(values[1]);
+  if (bind == null || target == null) {
+    return null;
+  }
+  return HostRemotePortForward(
+    bindHost: bind.host,
+    bindPort: bind.port,
+    localHost: target.host,
+    localPort: target.port,
+  );
+}
+
+HostDynamicPortForward? _parseOpenSshDynamicForward(List<String> values) {
+  if (values.length != 1) {
+    return null;
+  }
+  final bind = _parseOpenSshBindEndpoint(values.single);
+  if (bind == null) {
+    return null;
+  }
+  return HostDynamicPortForward(bindHost: bind.host, bindPort: bind.port);
+}
+
+OpenSshConfigImportWarning _forwardingWarning(
+  _OpenSshConfigLine line,
+  String directive,
+) {
+  return OpenSshConfigImportWarning(
+    lineNumber: line.lineNumber,
+    code: 'ssh_config.port_forwarding_invalid',
+    message:
+        '$directive on line ${line.lineNumber} is not a supported port forwarding form.',
+  );
+}
+
+_OpenSshHostPort? _parseOpenSshBindEndpoint(String value) {
+  final portOnly = _parseOpenSshPort(value);
+  if (portOnly != null) {
+    return _OpenSshHostPort(host: '127.0.0.1', port: portOnly);
+  }
+  return _parseOpenSshHostPort(value);
+}
+
+_OpenSshHostPort? _parseOpenSshHostPort(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return null;
+  }
+  if (trimmed.startsWith('[')) {
+    final closing = trimmed.indexOf(']');
+    if (closing <= 1 || trimmed.length <= closing + 2) {
+      return null;
+    }
+    if (trimmed[closing + 1] != ':') {
+      return null;
+    }
+    final port = _parseOpenSshPort(trimmed.substring(closing + 2));
+    if (port == null) {
+      return null;
+    }
+    return _OpenSshHostPort(host: trimmed.substring(1, closing), port: port);
+  }
+  final separator = trimmed.lastIndexOf(':');
+  if (separator <= 0 || separator == trimmed.length - 1) {
+    return null;
+  }
+  final port = _parseOpenSshPort(trimmed.substring(separator + 1));
+  if (port == null) {
+    return null;
+  }
+  return _OpenSshHostPort(host: trimmed.substring(0, separator), port: port);
+}
+
+int? _parseOpenSshPort(String value) {
+  final port = int.tryParse(value.trim());
+  if (port == null || port < 1 || port > 65535) {
+    return null;
+  }
+  return port;
+}
+
+class _OpenSshHostPort {
+  const _OpenSshHostPort({required this.host, required this.port});
+
+  final String host;
+  final int port;
+}
+
 bool _hasDuplicate(
   OpenSshConfigImportEntry entry,
   List<HostConfig> existingHosts,

@@ -83,6 +83,25 @@ class OpenSshConfigExportService {
       if (proxyJump.isNotEmpty) {
         lines.add('  ProxyJump $proxyJump');
       }
+      for (final forward in host.portForwarding.localForwards) {
+        lines.add(
+          '  LocalForward ${forward.localPort} '
+          '${_singleLine(forward.remoteHost)}:${forward.remotePort}',
+        );
+      }
+      for (final forward in host.portForwarding.remoteForwards) {
+        lines.add(
+          '  RemoteForward ${_singleLine(forward.bindHost)}:'
+          '${forward.bindPort} ${_singleLine(forward.localHost)}:'
+          '${forward.localPort}',
+        );
+      }
+      for (final forward in host.portForwarding.dynamicForwards) {
+        lines.add(
+          '  DynamicForward ${_singleLine(forward.bindHost)}:'
+          '${forward.bindPort}',
+        );
+      }
       lines.add('');
     }
 

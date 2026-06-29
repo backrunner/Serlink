@@ -182,6 +182,47 @@ class _DialogList extends StatelessWidget {
   }
 }
 
+class _DialogScrollFrame extends StatelessWidget {
+  const _DialogScrollFrame({
+    super.key,
+    required this.width,
+    required this.height,
+    required this.controller,
+    required this.child,
+    this.padding = EdgeInsets.zero,
+  });
+
+  final double width;
+  final double height;
+  final ScrollController controller;
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRect(
+        child: Scrollbar(
+          controller: controller,
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: SingleChildScrollView(
+              controller: controller,
+              physics: const ClampingScrollPhysics(),
+              padding: padding,
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DialogRow extends StatelessWidget {
   const _DialogRow({required this.item});
 

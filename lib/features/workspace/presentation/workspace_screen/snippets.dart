@@ -118,6 +118,9 @@ class _SnippetsHeader extends ConsumerWidget {
     return _WorkspaceListHeader(
       title: l10n.snippetsTitle,
       count: count,
+      beforeAction: _WorkspaceHeaderSearch(
+        placeholder: l10n.searchSnippetsPlaceholder,
+      ),
       action: SerlinkTooltip(
         message: l10n.snippetsAddTooltip,
         child: SerlinkIconButton(
@@ -135,12 +138,14 @@ class _WorkspaceListHeader extends StatelessWidget {
     required this.title,
     required this.count,
     this.status,
+    this.beforeAction,
     this.action,
   });
 
   final String title;
   final int count;
   final Widget? status;
+  final Widget? beforeAction;
   final Widget? action;
 
   @override
@@ -162,6 +167,10 @@ class _WorkspaceListHeader extends StatelessWidget {
           _CountBadge(count: count),
           if (status != null) ...[const SizedBox(width: 8), status!],
           const Spacer(),
+          if (beforeAction != null) ...[
+            Flexible(child: beforeAction!),
+            const SizedBox(width: 8),
+          ],
           ?action,
         ],
       ),

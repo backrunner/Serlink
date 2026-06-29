@@ -191,6 +191,295 @@ class _ConnectionNumberField extends StatelessWidget {
   }
 }
 
+class _HostPortForwardingSection extends StatelessWidget {
+  const _HostPortForwardingSection({
+    required this.localForwards,
+    required this.remoteForwards,
+    required this.dynamicForwards,
+    required this.localPortController,
+    required this.localRemoteHostController,
+    required this.localRemotePortController,
+    required this.remoteBindHostController,
+    required this.remoteBindPortController,
+    required this.remoteLocalHostController,
+    required this.remoteLocalPortController,
+    required this.dynamicBindHostController,
+    required this.dynamicBindPortController,
+    required this.onAddLocal,
+    required this.onRemoveLocal,
+    required this.onAddRemote,
+    required this.onRemoveRemote,
+    required this.onAddDynamic,
+    required this.onRemoveDynamic,
+  });
+
+  final List<HostLocalPortForward> localForwards;
+  final List<HostRemotePortForward> remoteForwards;
+  final List<HostDynamicPortForward> dynamicForwards;
+  final TextEditingController localPortController;
+  final TextEditingController localRemoteHostController;
+  final TextEditingController localRemotePortController;
+  final TextEditingController remoteBindHostController;
+  final TextEditingController remoteBindPortController;
+  final TextEditingController remoteLocalHostController;
+  final TextEditingController remoteLocalPortController;
+  final TextEditingController dynamicBindHostController;
+  final TextEditingController dynamicBindPortController;
+  final VoidCallback onAddLocal;
+  final ValueChanged<int> onRemoveLocal;
+  final VoidCallback onAddRemote;
+  final ValueChanged<int> onRemoveRemote;
+  final VoidCallback onAddDynamic;
+  final ValueChanged<int> onRemoveDynamic;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _HostForwardingRuleEditor(
+          title: l10n.forwardingLocalTitle,
+          subtitle: l10n.hostPortForwardingLocalHint,
+          buttonLabel: l10n.createAction,
+          onAdd: onAddLocal,
+          fields: [
+            _HostForwardingField(
+              controller: localPortController,
+              label: l10n.forwardingLocalPortLabel,
+              number: true,
+            ),
+            _HostForwardingField(
+              controller: localRemoteHostController,
+              label: l10n.forwardingRemoteHostLabel,
+              flex: 2,
+            ),
+            _HostForwardingField(
+              controller: localRemotePortController,
+              label: l10n.forwardingRemotePortLabel,
+              number: true,
+            ),
+          ],
+        ),
+        _HostForwardingRuleList(
+          entries: [
+            for (final forward in localForwards)
+              '127.0.0.1:${forward.localPort} -> '
+                  '${forward.remoteHost}:${forward.remotePort}',
+          ],
+          onRemove: onRemoveLocal,
+        ),
+        const SizedBox(height: 16),
+        _HostForwardingRuleEditor(
+          title: l10n.forwardingRemoteTitle,
+          subtitle: l10n.hostPortForwardingRemoteHint,
+          buttonLabel: l10n.createAction,
+          onAdd: onAddRemote,
+          fields: [
+            _HostForwardingField(
+              controller: remoteBindHostController,
+              label: l10n.forwardingBindHostLabel,
+              flex: 2,
+            ),
+            _HostForwardingField(
+              controller: remoteBindPortController,
+              label: l10n.forwardingBindPortLabel,
+              number: true,
+            ),
+            _HostForwardingField(
+              controller: remoteLocalHostController,
+              label: l10n.forwardingLocalHostLabel,
+              flex: 2,
+            ),
+            _HostForwardingField(
+              controller: remoteLocalPortController,
+              label: l10n.forwardingLocalPortLabel,
+              number: true,
+            ),
+          ],
+        ),
+        _HostForwardingRuleList(
+          entries: [
+            for (final forward in remoteForwards)
+              '${forward.bindHost}:${forward.bindPort} -> '
+                  '${forward.localHost}:${forward.localPort}',
+          ],
+          onRemove: onRemoveRemote,
+        ),
+        const SizedBox(height: 16),
+        _HostForwardingRuleEditor(
+          title: l10n.forwardingSocksTitle,
+          subtitle: l10n.hostPortForwardingDynamicHint,
+          buttonLabel: l10n.createAction,
+          onAdd: onAddDynamic,
+          fields: [
+            _HostForwardingField(
+              controller: dynamicBindHostController,
+              label: l10n.forwardingBindHostLabel,
+              flex: 2,
+            ),
+            _HostForwardingField(
+              controller: dynamicBindPortController,
+              label: l10n.forwardingBindPortLabel,
+              number: true,
+            ),
+          ],
+        ),
+        _HostForwardingRuleList(
+          entries: [
+            for (final forward in dynamicForwards)
+              '${forward.bindHost}:${forward.bindPort}',
+          ],
+          onRemove: onRemoveDynamic,
+        ),
+      ],
+    );
+  }
+}
+
+class _HostForwardingRuleEditor extends StatelessWidget {
+  const _HostForwardingRuleEditor({
+    required this.title,
+    required this.subtitle,
+    required this.buttonLabel,
+    required this.fields,
+    required this.onAdd,
+  });
+
+  final String title;
+  final String subtitle;
+  final String buttonLabel;
+  final List<_HostForwardingField> fields;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            SerlinkFilledButton.tonal(
+              onPressed: onAdd,
+              child: Text(buttonLabel),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final field in fields)
+              SizedBox(width: field.flex == 1 ? 130 : 210, child: field),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _HostForwardingField extends StatelessWidget {
+  const _HostForwardingField({
+    required this.controller,
+    required this.label,
+    this.flex = 1,
+    this.number = false,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final int flex;
+  final bool number;
+
+  @override
+  Widget build(BuildContext context) {
+    return SerlinkTextField(
+      controller: controller,
+      decoration: InputDecoration(labelText: label),
+      keyboardType: number ? TextInputType.number : TextInputType.text,
+      textInputAction: TextInputAction.next,
+    );
+  }
+}
+
+class _HostForwardingRuleList extends StatelessWidget {
+  const _HostForwardingRuleList({
+    required this.entries,
+    required this.onRemove,
+  });
+
+  final List<String> entries;
+  final ValueChanged<int> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final t = context.tokens;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: t.surfaceSunken,
+          borderRadius: SerlinkRadii.control,
+          border: Border.all(color: t.borderSubtle),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var index = 0; index < entries.length; index += 1) ...[
+              Padding(
+                padding: const EdgeInsets.only(left: 12, right: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        entries[index],
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                      ),
+                    ),
+                    SerlinkTooltip(
+                      message: context.l10n.removeAction,
+                      child: SerlinkIconButton(
+                        onPressed: () => onRemove(index),
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (index < entries.length - 1)
+                Divider(height: 1, color: t.borderSubtle),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _HostFormSection extends StatelessWidget {
   const _HostFormSection({
     required this.title,

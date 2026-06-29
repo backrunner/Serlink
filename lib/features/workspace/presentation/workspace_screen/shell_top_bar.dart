@@ -1,23 +1,55 @@
 part of '../workspace_screen.dart';
 
-class _TopBar extends ConsumerStatefulWidget {
+class _TopBar extends StatelessWidget {
   const _TopBar({
-    required this.showSearch,
-    required this.searchPlaceholder,
     required this.showLocalTerminal,
     required this.onOpenLocalTerminal,
   });
 
-  final bool showSearch;
-  final String searchPlaceholder;
   final bool showLocalTerminal;
   final VoidCallback onOpenLocalTerminal;
-
   @override
-  ConsumerState<_TopBar> createState() => _TopBarState();
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return SurfaceToolbar(
+      child: Row(
+        children: [
+          const Expanded(child: _WindowDragRegion()),
+          if (showLocalTerminal)
+            SerlinkTooltip(
+              message: l10n.openLocalTerminalTooltip,
+              child: SerlinkIconButton(
+                constraints: const BoxConstraints.tightFor(
+                  width: 30,
+                  height: 30,
+                ),
+                padding: EdgeInsets.zero,
+                onPressed: onOpenLocalTerminal,
+                icon: const Icon(Icons.terminal_outlined, size: 18),
+              ),
+            ),
+          if (AppWindow.usesTrailingWindowControls) ...[
+            const SizedBox(width: 6),
+            const _WindowControls(),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
-class _TopBarState extends ConsumerState<_TopBar> {
+class _WorkspaceHeaderSearch extends ConsumerStatefulWidget {
+  const _WorkspaceHeaderSearch({required this.placeholder});
+
+  final String placeholder;
+
+  @override
+  ConsumerState<_WorkspaceHeaderSearch> createState() =>
+      _WorkspaceHeaderSearchState();
+}
+
+class _WorkspaceHeaderSearchState
+    extends ConsumerState<_WorkspaceHeaderSearch> {
   late final TextEditingController _searchController;
 
   @override
@@ -34,7 +66,6 @@ class _TopBarState extends ConsumerState<_TopBar> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
     final query = ref.watch(_workspaceSearchQueryProvider);
     if (_searchController.text != query) {
       _searchController.value = TextEditingValue(
@@ -42,50 +73,21 @@ class _TopBarState extends ConsumerState<_TopBar> {
         selection: TextSelection.collapsed(offset: query.length),
       );
     }
-    return SurfaceToolbar(
-      child: Row(
-        children: [
-          if (widget.showSearch) ...[
-            SizedBox(
-              width: 320,
-              child: _WorkspaceSearchPill(
-                fieldKey: const ValueKey('workspace-search-field'),
-                controller: _searchController,
-                placeholder: widget.searchPlaceholder,
-                enabled: true,
-                hasQuery: query.trim().isNotEmpty,
-                onChanged: (value) {
-                  ref
-                      .read(_workspaceSearchQueryProvider.notifier)
-                      .setQuery(value);
-                },
-                onClear: () {
-                  _searchController.clear();
-                  ref.read(_workspaceSearchQueryProvider.notifier).clear();
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-          const Expanded(child: _WindowDragRegion()),
-          if (widget.showLocalTerminal)
-            SerlinkTooltip(
-              message: l10n.openLocalTerminalTooltip,
-              child: SerlinkIconButton(
-                constraints: const BoxConstraints.tightFor(
-                  width: 30,
-                  height: 30,
-                ),
-                padding: EdgeInsets.zero,
-                onPressed: widget.onOpenLocalTerminal,
-                icon: const Icon(Icons.terminal_outlined, size: 18),
-              ),
-            ),
-          if (AppWindow.usesTrailingWindowControls) ...[
-            const SizedBox(width: 6),
-            const _WindowControls(),
-          ],
-        ],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 180, maxWidth: 300),
+      child: _WorkspaceSearchPill(
+        fieldKey: const ValueKey('workspace-search-field'),
+        controller: _searchController,
+        placeholder: widget.placeholder,
+        enabled: true,
+        hasQuery: query.trim().isNotEmpty,
+        onChanged: (value) {
+          ref.read(_workspaceSearchQueryProvider.notifier).setQuery(value);
+        },
+        onClear: () {
+          _searchController.clear();
+          ref.read(_workspaceSearchQueryProvider.notifier).clear();
+        },
       ),
     );
   }

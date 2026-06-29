@@ -156,6 +156,34 @@ class HostMetadataDraft {
   final HostConnectionSettings connectionSettings;
 }
 
+class DuplicateHostDraft {
+  const DuplicateHostDraft({
+    required this.sourceHostId,
+    required this.displayName,
+    required this.hostname,
+    required this.port,
+    required this.username,
+    required this.tags,
+    required this.identityIds,
+    this.startupCommands = const [],
+    this.jumpHostIds = const [],
+    this.sftpDefaultDirectory = '/',
+    this.connectionSettings = const HostConnectionSettings(),
+  });
+
+  final HostId sourceHostId;
+  final String displayName;
+  final String hostname;
+  final int port;
+  final String username;
+  final Set<String> tags;
+  final List<IdentityId> identityIds;
+  final List<String> startupCommands;
+  final List<HostId> jumpHostIds;
+  final String sftpDefaultDirectory;
+  final HostConnectionSettings connectionSettings;
+}
+
 class HostWriteService {
   HostWriteService({
     required HostRepository hosts,
@@ -408,6 +436,49 @@ class HostWriteService {
     );
     await _hosts.save(host);
     return host.toSummary();
+  }
+
+  Future<HostSummary> duplicateHost(DuplicateHostDraft draft) async {
+    final source = await _hosts.read(draft.sourceHostId);
+    if (source == null) {
+      throw const HostWriteException('host.not_found', 'Host does not exist.');
+    }
+    final normalized = _normalizeHostFields(
+      displayName: draft.displayName,
+      hostname: draft.hostname,
+      port: draft.port,
+      username: draft.username,
+    );
+    final identityIds = _normalizeIdentityIds(draft.identityIds);
+    final authKinds = await _resolveAuthKinds(identityIds);
+    final connectionSettings = _normalizeConnectionSettings(
+      draft.connectionSettings,
+    );
+    final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
+      draft.sftpDefaultDirectory,
+    );
+    final now = DateTime.now().toUtc();
+    final hostId = HostId(_uuid.v4());
+    final duplicated = HostConfig(
+      id: hostId,
+      displayName: normalized.displayName,
+      hostname: normalized.hostname,
+      username: normalized.username,
+      port: normalized.port,
+      authKinds: authKinds,
+      tags: draft.tags,
+      trustState: HostTrustState.unknown,
+      identityIds: identityIds,
+      startupCommands: _normalizeStartupCommands(draft.startupCommands),
+      jumpHostIds: _normalizeJumpHostIds(draft.jumpHostIds, hostId: hostId),
+      sftpDefaultDirectory: sftpDefaultDirectory,
+      connectionSettings: connectionSettings,
+      groupId: source.groupId,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await _hosts.save(duplicated);
+    return duplicated.toSummary();
   }
 
   Future<HostSummary> updateHostMetadata(HostMetadataDraft draft) async {

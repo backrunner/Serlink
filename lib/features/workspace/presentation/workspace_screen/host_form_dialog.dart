@@ -2,10 +2,17 @@ part of '../workspace_screen.dart';
 
 enum _HostAuthInputMode { password, privateKey, sshAgent, savedOrNone }
 
+enum _HostFormMode { add, edit, duplicate }
+
 class _HostFormDialog extends ConsumerStatefulWidget {
-  const _HostFormDialog({this.host});
+  const _HostFormDialog({this.host, this.mode = _HostFormMode.add})
+    : assert(
+        mode == _HostFormMode.add || host != null,
+        'Editing or duplicating a host requires a source host.',
+      );
 
   final HostSummary? host;
+  final _HostFormMode mode;
 
   @override
   ConsumerState<_HostFormDialog> createState() => _HostFormDialogState();
@@ -49,7 +56,10 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   bool _saving = false;
   String? _errorMessage;
 
-  bool get _isEditing => widget.host != null;
+  bool get _isEditing => widget.mode == _HostFormMode.edit;
+  bool get _usesSavedCredentialPicker =>
+      widget.mode == _HostFormMode.edit ||
+      widget.mode == _HostFormMode.duplicate;
 
   @override
   void initState() {
@@ -69,7 +79,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_isEditing && _loadingOptions) {
+    if (widget.mode == _HostFormMode.add && _loadingOptions) {
       unawaited(_loadOptions());
     }
   }
@@ -103,7 +113,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     return SerlinkDialog(
       maxWidth: layout.dialogWidth,
       style: layout.dialogStyle,
-      title: Text(_isEditing ? l10n.hostEditTitle : l10n.hostAddTitle),
+      title: Text(_title(l10n)),
       titlePadding: layout.titlePadding,
       contentPadding: layout.contentPadding,
       actionsPadding: layout.actionsPadding,
@@ -182,7 +192,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                     title: l10n.hostSectionAuthentication,
                     padding: layout.sectionPadding,
                     child: _HostAuthenticationFields(
-                      isEditing: _isEditing,
+                      useSavedCredentialPicker: _usesSavedCredentialPicker,
                       authMode: _authMode,
                       loadingOptions: _loadingOptions,
                       passwordController: _passwordController,
@@ -326,10 +336,26 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
         _startupCommandsController.text,
       );
       final jumpHostIds = _selectedJumpHostIds.toList(growable: false);
-      if (host != null) {
+      if (widget.mode == _HostFormMode.edit && host != null) {
         await service.updateHostMetadata(
           HostMetadataDraft(
             id: host.id,
+            displayName: _displayNameController.text,
+            hostname: _hostnameController.text,
+            port: port,
+            username: _usernameController.text,
+            tags: _parseTags(_tagsController.text),
+            identityIds: _selectedIdentityIds.toList(growable: false),
+            startupCommands: startupCommands,
+            jumpHostIds: jumpHostIds,
+            sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
+            connectionSettings: connectionSettings,
+          ),
+        );
+      } else if (widget.mode == _HostFormMode.duplicate && host != null) {
+        await service.duplicateHost(
+          DuplicateHostDraft(
+            sourceHostId: host.id,
             displayName: _displayNameController.text,
             hostname: _hostnameController.text,
             port: port,
@@ -425,6 +451,14 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     }
   }
 
+  String _title(AppLocalizations l10n) {
+    return switch (widget.mode) {
+      _HostFormMode.add => l10n.hostAddTitle,
+      _HostFormMode.edit => l10n.hostEditTitle,
+      _HostFormMode.duplicate => l10n.hostDuplicateTitle,
+    };
+  }
+
   Future<void> _importPrivateKey() async {
     final file = await ref
         .read(documentGatewayProvider)
@@ -447,10 +481,13 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       final capabilities = ref.read(platformCapabilitiesProvider);
       final identities = await ref.read(identityRepositoryProvider).list();
       final hostConfigs = await ref.read(hostRepositoryProvider).list();
-      final editingHostId = widget.host?.id;
-      final hostConfig = editingHostId == null
+      final sourceHostId = widget.host?.id;
+      final excludedJumpHostId = widget.mode == _HostFormMode.edit
+          ? sourceHostId
+          : null;
+      final hostConfig = sourceHostId == null
           ? null
-          : await ref.read(hostRepositoryProvider).read(editingHostId);
+          : await ref.read(hostRepositoryProvider).read(sourceHostId);
       if (!mounted) {
         return;
       }
@@ -466,7 +503,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                 right.displayName.toLowerCase(),
               ),
             ))
-          if (host.id != editingHostId) host,
+          if (host.id != excludedJumpHostId) host,
       ];
       setState(() {
         _identityOptions = List<IdentityConfig>.unmodifiable(

@@ -356,6 +356,8 @@
   "windowMinimizeLabel": "ウィンドウを最小化",
   "windowZoomLabel": "ウィンドウを拡大縮小",
   "hostEditMenu": "ホストを編集",
+  "hostDuplicateMenu": "セッションを複製",
+  "hostDuplicateTitle": "セッションを複製",
   "hostDeleteMenu": "ホストを削除",
   "hostTerminalAction": "端末",
   "hostSftpAction": "SFTP",

@@ -1242,6 +1242,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostEditMenu => 'Edit host';
 
   @override
+  String get hostDuplicateMenu => 'Duplicate session';
+
+  @override
+  String get hostDuplicateTitle => 'Duplicate session';
+
+  @override
   String get hostDeleteMenu => 'Delete host';
 
   @override

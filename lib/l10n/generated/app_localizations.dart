@@ -2236,6 +2236,18 @@ abstract class AppLocalizations {
   /// **'Edit host'**
   String get hostEditMenu;
 
+  /// No description provided for @hostDuplicateMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate session'**
+  String get hostDuplicateMenu;
+
+  /// No description provided for @hostDuplicateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate session'**
+  String get hostDuplicateTitle;
+
   /// No description provided for @hostDeleteMenu.
   ///
   /// In en, this message translates to:

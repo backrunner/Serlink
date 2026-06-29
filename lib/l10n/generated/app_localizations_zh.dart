@@ -1162,6 +1162,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostEditMenu => '编辑主机';
 
   @override
+  String get hostDuplicateMenu => '复制会话';
+
+  @override
+  String get hostDuplicateTitle => '复制会话';
+
+  @override
   String get hostDeleteMenu => '删除主机';
 
   @override

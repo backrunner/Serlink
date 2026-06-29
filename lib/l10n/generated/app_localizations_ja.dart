@@ -1172,6 +1172,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostEditMenu => 'ホストを編集';
 
   @override
+  String get hostDuplicateMenu => 'セッションを複製';
+
+  @override
+  String get hostDuplicateTitle => 'セッションを複製';
+
+  @override
   String get hostDeleteMenu => 'ホストを削除';
 
   @override

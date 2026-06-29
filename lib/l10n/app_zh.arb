@@ -356,6 +356,8 @@
   "windowMinimizeLabel": "最小化窗口",
   "windowZoomLabel": "缩放窗口",
   "hostEditMenu": "编辑主机",
+  "hostDuplicateMenu": "复制会话",
+  "hostDuplicateTitle": "复制会话",
   "hostDeleteMenu": "删除主机",
   "hostTerminalAction": "终端",
   "hostSftpAction": "SFTP",

@@ -7,6 +7,7 @@ class _HostRow extends StatelessWidget {
     required this.onTerminal,
     required this.onSftp,
     required this.onEdit,
+    required this.onDuplicate,
     required this.onDelete,
   });
 
@@ -15,6 +16,7 @@ class _HostRow extends StatelessWidget {
   final VoidCallback onTerminal;
   final VoidCallback onSftp;
   final VoidCallback onEdit;
+  final VoidCallback onDuplicate;
   final VoidCallback onDelete;
 
   @override
@@ -109,6 +111,11 @@ class _HostRow extends StatelessWidget {
           label: l10n.hostEditMenu,
           icon: Icons.edit_outlined,
           onPressed: onEdit,
+        ),
+        SerlinkMenuAction(
+          label: l10n.hostDuplicateMenu,
+          icon: Icons.copy_rounded,
+          onPressed: onDuplicate,
         ),
         SerlinkMenuAction(
           label: l10n.hostDeleteMenu,

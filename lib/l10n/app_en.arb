@@ -581,6 +581,8 @@
   "windowMinimizeLabel": "Minimize window",
   "windowZoomLabel": "Zoom window",
   "hostEditMenu": "Edit host",
+  "hostDuplicateMenu": "Duplicate session",
+  "hostDuplicateTitle": "Duplicate session",
   "hostDeleteMenu": "Delete host",
   "hostTerminalAction": "Terminal",
   "hostSftpAction": "SFTP",

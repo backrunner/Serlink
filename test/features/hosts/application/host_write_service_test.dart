@@ -408,6 +408,124 @@ void main() {
     expect(String.fromCharCodes(auth.password.copyBytes()), 'server-password');
   });
 
+  test(
+    'duplicates host with editable metadata and shared credentials',
+    () async {
+      final vault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      final records = InMemoryVaultRecordRepository();
+      final hosts = EncryptedHostRepository(vault: vault, records: records);
+      final identities = EncryptedIdentityRepository(
+        vault: vault,
+        records: records,
+      );
+      await vault.initialize(passphrase: 'good passphrase');
+
+      final service = HostWriteService(
+        hosts: hosts,
+        identities: identities,
+        knownHosts: EncryptedKnownHostRepository(
+          vault: vault,
+          records: records,
+        ),
+        tombstones: EncryptedSyncDeleteTombstoneRepository(
+          vault: vault,
+          records: records,
+        ),
+        records: records,
+        vault: vault,
+      );
+      final summary = await service.createPasswordHost(
+        const PasswordHostDraft(
+          displayName: 'Source Host',
+          hostname: 'source.internal',
+          port: 22,
+          username: 'ops',
+          password: 'server-password',
+          tags: {'prod'},
+          startupCommands: ['cd /srv/app'],
+          sftpDefaultDirectory: '/srv/app',
+          connectionSettings: HostConnectionSettings(
+            connectTimeoutSeconds: 30,
+            keepAliveIntervalSeconds: 20,
+            reconnectAttempts: 2,
+            reconnectBackoffSeconds: 7,
+          ),
+        ),
+      );
+      final source = await hosts.read(summary.id);
+      await hosts.save(
+        HostConfig(
+          id: source!.id,
+          displayName: source.displayName,
+          hostname: source.hostname,
+          username: source.username,
+          port: source.port,
+          authKinds: source.authKinds,
+          tags: source.tags,
+          trustState: HostTrustState.trusted,
+          identityIds: source.identityIds,
+          startupCommands: source.startupCommands,
+          jumpHostIds: source.jumpHostIds,
+          sftpDefaultDirectory: source.sftpDefaultDirectory,
+          connectionSettings: source.connectionSettings,
+          groupId: 'ops',
+          lastConnectedAt: DateTime.utc(2026, 6, 1),
+          createdAt: source.createdAt,
+          updatedAt: source.updatedAt,
+        ),
+      );
+
+      final duplicate = await service.duplicateHost(
+        DuplicateHostDraft(
+          sourceHostId: summary.id,
+          displayName: 'Copied Host',
+          hostname: 'copied.internal',
+          port: 2200,
+          username: 'deploy',
+          tags: const {'copied'},
+          identityIds: source.identityIds,
+          startupCommands: const ['tmux attach || tmux'],
+          sftpDefaultDirectory: '/home/deploy',
+          connectionSettings: const HostConnectionSettings(
+            connectTimeoutSeconds: 45,
+            keepAliveIntervalSeconds: 25,
+            reconnectAttempts: 3,
+            reconnectBackoffSeconds: 9,
+          ),
+        ),
+      );
+
+      final copied = await hosts.read(duplicate.id);
+      expect(duplicate.id, isNot(summary.id));
+      expect(copied!.displayName, 'Copied Host');
+      expect(copied.hostname, 'copied.internal');
+      expect(copied.port, 2200);
+      expect(copied.username, 'deploy');
+      expect(copied.tags, {'copied'});
+      expect(copied.identityIds, source.identityIds);
+      expect(copied.authKinds, source.authKinds);
+      expect(copied.startupCommands, ['tmux attach || tmux']);
+      expect(copied.sftpDefaultDirectory, '/home/deploy');
+      expect(
+        copied.connectionSettings,
+        const HostConnectionSettings(
+          connectTimeoutSeconds: 45,
+          keepAliveIntervalSeconds: 25,
+          reconnectAttempts: 3,
+          reconnectBackoffSeconds: 9,
+        ),
+      );
+      expect(copied.groupId, 'ops');
+      expect(copied.trustState, HostTrustState.unknown);
+      expect(copied.lastConnectedAt, isNull);
+
+      await service.deleteHost(summary.id);
+      expect(await identities.read(copied.identityIds.single), isNotNull);
+    },
+  );
+
   test('deletes host and unshared identity secret records', () async {
     final vault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),

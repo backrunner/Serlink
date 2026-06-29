@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:forui/forui.dart';
@@ -464,7 +465,11 @@ class _SerlinkContextMenuState extends State<SerlinkContextMenu> {
   static const double _verticalPadding = 6;
   static const double _screenMargin = 8;
 
+  static _SerlinkContextMenuState? _openMenu;
+
   OverlayEntry? _entry;
+  Rect? _menuRect;
+  bool _listeningForGlobalPointers = false;
 
   @override
   void dispose() {
@@ -473,14 +478,20 @@ class _SerlinkContextMenuState extends State<SerlinkContextMenu> {
   }
 
   void _hideMenu() {
+    if (_openMenu == this) {
+      _openMenu = null;
+    }
+    _detachGlobalPointerRoute();
     _entry?.remove();
     _entry = null;
+    _menuRect = null;
   }
 
   void _showMenuAt(Offset globalPosition) {
     if (!widget.enabled || widget.actions.isEmpty) {
       return;
     }
+    _openMenu?._hideMenu();
     _hideMenu();
 
     final overlay = Overlay.maybeOf(context);
@@ -520,6 +531,7 @@ class _SerlinkContextMenuState extends State<SerlinkContextMenu> {
       overlaySize.height - menuHeight - _screenMargin,
     );
     top = top.clamp(_screenMargin, maxTop).toDouble();
+    _menuRect = Rect.fromLTWH(left, top, menuWidth, menuHeight);
 
     _entry = OverlayEntry(
       builder: (context) => _SerlinkContextMenuOverlay(
@@ -532,6 +544,48 @@ class _SerlinkContextMenuState extends State<SerlinkContextMenu> {
       ),
     );
     overlay.insert(_entry!);
+    _openMenu = this;
+    _attachGlobalPointerRoute();
+  }
+
+  void _attachGlobalPointerRoute() {
+    if (_listeningForGlobalPointers) {
+      return;
+    }
+    GestureBinding.instance.pointerRouter.addGlobalRoute(
+      _handleGlobalPointerEvent,
+    );
+    _listeningForGlobalPointers = true;
+  }
+
+  void _detachGlobalPointerRoute() {
+    if (!_listeningForGlobalPointers) {
+      return;
+    }
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(
+      _handleGlobalPointerEvent,
+    );
+    _listeningForGlobalPointers = false;
+  }
+
+  void _handleGlobalPointerEvent(PointerEvent event) {
+    if (event is! PointerDownEvent) {
+      return;
+    }
+    final menuRect = _menuRect;
+    if (_entry == null || menuRect == null) {
+      return;
+    }
+    final overlay = Overlay.maybeOf(context);
+    final overlayBox = overlay?.context.findRenderObject() as RenderBox?;
+    if (overlay == null || overlayBox == null || !overlayBox.hasSize) {
+      _hideMenu();
+      return;
+    }
+    final localPosition = overlayBox.globalToLocal(event.position);
+    if (!menuRect.contains(localPosition)) {
+      _hideMenu();
+    }
   }
 
   @override
@@ -569,51 +623,40 @@ class _SerlinkContextMenuOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: onDismiss,
-            onSecondaryTap: onDismiss,
+    return Positioned(
+      left: left,
+      top: top,
+      width: width,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: t.surfaceRaised,
+            borderRadius: SerlinkRadii.control,
+            border: Border.all(color: t.borderSubtle),
+            boxShadow: serlinkShadow(t, elevation: 12),
           ),
-        ),
-        Positioned(
-          left: left,
-          top: top,
-          width: width,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxHeight),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: t.surfaceRaised,
-                borderRadius: SerlinkRadii.control,
-                border: Border.all(color: t.borderSubtle),
-                boxShadow: serlinkShadow(t, elevation: 12),
-              ),
-              child: ClipRRect(
-                borderRadius: SerlinkRadii.control,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      for (final action in actions)
-                        _SerlinkContextMenuItem(
-                          action: action,
-                          onSelected: () {
-                            onDismiss();
-                            action.onPressed();
-                          },
-                        ),
-                    ],
-                  ),
-                ),
+          child: ClipRRect(
+            borderRadius: SerlinkRadii.control,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final action in actions)
+                    _SerlinkContextMenuItem(
+                      action: action,
+                      onSelected: () {
+                        onDismiss();
+                        action.onPressed();
+                      },
+                    ),
+                ],
               ),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }

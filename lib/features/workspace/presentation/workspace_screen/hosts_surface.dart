@@ -109,6 +109,8 @@ class _HostsSurface extends ConsumerWidget {
                                 onSftp: () => controller.openSftp(host),
                                 onEdit: () =>
                                     _showEditHostDialog(context, host),
+                                onDuplicate: () =>
+                                    _showDuplicateHostDialog(context, host),
                                 onDelete: () =>
                                     _confirmDeleteHost(context, ref, host),
                               ),
@@ -142,7 +144,16 @@ Future<void> _showEditHostDialog(BuildContext context, HostSummary host) {
   return showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (context) => _HostFormDialog(host: host),
+    builder: (context) => _HostFormDialog(host: host, mode: _HostFormMode.edit),
+  );
+}
+
+Future<void> _showDuplicateHostDialog(BuildContext context, HostSummary host) {
+  return showSerlinkDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) =>
+        _HostFormDialog(host: host, mode: _HostFormMode.duplicate),
   );
 }
 

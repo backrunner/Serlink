@@ -232,7 +232,7 @@ class _HostFormSection extends StatelessWidget {
 
 class _HostAuthenticationFields extends StatelessWidget {
   const _HostAuthenticationFields({
-    required this.isEditing,
+    required this.useSavedCredentialPicker,
     required this.authMode,
     required this.loadingOptions,
     required this.passwordController,
@@ -251,7 +251,7 @@ class _HostAuthenticationFields extends StatelessWidget {
     required this.compact,
   });
 
-  final bool isEditing;
+  final bool useSavedCredentialPicker;
   final _HostAuthInputMode authMode;
   final bool loadingOptions;
   final TextEditingController passwordController;
@@ -272,7 +272,7 @@ class _HostAuthenticationFields extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    if (isEditing) {
+    if (useSavedCredentialPicker) {
       return _SavedCredentialFields(
         identityOptions: identityOptions,
         selectedIdentityIds: selectedIdentityIds,

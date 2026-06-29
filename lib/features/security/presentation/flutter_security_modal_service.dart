@@ -6,6 +6,14 @@ import '../../ssh/application/ssh_session_service.dart';
 import '../../sync/domain/webdav_tls_certificate_details.dart';
 import '../application/security_modal_service.dart';
 
+const double _securityDialogHorizontalPadding = 24;
+const double _hostKeyDialogMaxWidth = 520;
+const double _hostKeyDialogContentWidth =
+    _hostKeyDialogMaxWidth - (_securityDialogHorizontalPadding * 2);
+const double _certificateDialogMaxWidth = 608;
+const double _certificateDialogContentWidth =
+    _certificateDialogMaxWidth - (_securityDialogHorizontalPadding * 2);
+
 class FlutterSecurityModalService implements SecurityModalService {
   const FlutterSecurityModalService({required GlobalKey<NavigatorState> key})
     : this._(key);
@@ -99,13 +107,14 @@ class _WebDavCertificateDialog extends StatelessWidget {
         certificate.expectedFingerprint != null &&
         certificate.expectedFingerprint != certificate.fingerprint;
     return SerlinkDialog(
+      maxWidth: _certificateDialogMaxWidth,
       title: Text(
         changed
             ? l10n.securityWebDavCertificateChangedTitle
             : l10n.securityTrustWebDavCertificateTitle,
       ),
       content: SizedBox(
-        width: 560,
+        width: _certificateDialogContentWidth,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,13 +174,14 @@ class _HostKeyDialog extends StatelessWidget {
     final l10n = context.l10n;
     final changed = prompt.previousFingerprint != null;
     return SerlinkDialog(
+      maxWidth: _hostKeyDialogMaxWidth,
       title: Text(
         changed
             ? l10n.securityHostKeyChangedTitle
             : l10n.securityConfirmFingerprintTitle,
       ),
       content: SizedBox(
-        width: 520,
+        width: _hostKeyDialogContentWidth,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

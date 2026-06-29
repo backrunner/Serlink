@@ -23,6 +23,8 @@ import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
 import 'package:serlink/features/ssh/application/known_host_repository.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
+import 'package:serlink/features/sync/application/sync_device_service.dart';
+import 'package:serlink/features/sync/application/sync_run_service.dart';
 import 'package:serlink/features/sync/domain/sync_provider.dart';
 import 'package:serlink/features/terminal/application/terminal_modifier_latch.dart';
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
@@ -916,8 +918,38 @@ void main() {
         operatingSystem: 'android',
         targetPlatform: TargetPlatform.android,
       ),
+      syncDevices: [
+        SyncDeviceMetadata(
+          id: 'mobile-device',
+          displayName: 'Pixel Fold',
+          platform: 'android',
+          createdAt: DateTime.utc(2026, 6, 1),
+          lastSeenAt: DateTime.utc(2026, 6, 28),
+        ),
+        SyncDeviceMetadata(
+          id: 'desktop-device',
+          displayName: 'Studio Mac',
+          platform: 'macos',
+          createdAt: DateTime.utc(2026, 6, 2),
+          lastSeenAt: DateTime.utc(2026, 6, 29),
+        ),
+      ],
     );
     await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SerlinkApp)),
+    );
+    container.read(syncConflictControllerProvider.notifier).setConflicts([
+      SyncRecordConflict(
+        id: VaultRecordId('host:mobile-conflict'),
+        type: 'host',
+        localRevision: 'local',
+        remoteRevision: 'remote',
+        title: 'Mobile conflict host',
+        subtitle: 'Host - host:mobile-conflict',
+      ),
+    ], providerKind: SyncProviderKind.webDav);
+    await tester.pump();
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
@@ -961,12 +993,27 @@ void main() {
       lessThanOrEqualTo(16),
     );
 
+    final syncConflictButton = find.byKey(
+      const ValueKey('settings-sync-conflicts-view-button'),
+    );
+    await tester.ensureVisible(syncConflictButton);
+    await tester.pumpAndSettle();
+    expect(syncConflictButton, findsOneWidget);
+    expect(
+      find.descendant(of: syncConflictButton, matching: find.text('View')),
+      findsOneWidget,
+    );
+    expect(find.text('Use remote'), findsNothing);
+    expect(find.text('Keep local'), findsNothing);
+
     final syncDevicesViewButton = find.byKey(
       const ValueKey('settings-sync-devices-view-button'),
     );
     await tester.ensureVisible(syncDevicesViewButton);
     await tester.pumpAndSettle();
     expect(syncDevicesViewButton, findsOneWidget);
+    expect(find.text('2 devices registered.'), findsOneWidget);
+    expect(find.textContaining('Last writer'), findsNothing);
     expect(
       find.byKey(const ValueKey('settings-sync-devices-reset-button')),
       findsNothing,
@@ -1074,6 +1121,10 @@ void main() {
       );
       await _submitVaultPassphrase(tester, 'correct horse battery staple');
 
+      await _pumpUntilFound(
+        tester,
+        find.byKey(const ValueKey('workspace-search-field')),
+      );
       expect(_byTooltipLabel('Open local terminal tab'), findsNothing);
       expect(
         find.byKey(const ValueKey('workspace-search-field')),
@@ -1795,6 +1846,7 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   PlatformCapabilities? capabilities,
   _FakeSshSessionService? sshService,
   HostRepository? hostRepository,
+  List<SyncDeviceMetadata>? syncDevices,
   bool protectBackground = false,
 }) async {
   final database = SerlinkDatabase(NativeDatabase.memory());
@@ -1846,6 +1898,8 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
         ),
         if (hostRepository != null)
           hostRepositoryProvider.overrideWithValue(hostRepository),
+        if (syncDevices != null)
+          syncKnownDevicesProvider.overrideWith((ref) async => syncDevices),
         sshSessionServiceProvider.overrideWithValue(resolvedSshService),
         transferQueueControllerProvider.overrideWithValue(transferQueue),
         secretStoreProvider.overrideWithValue(secretStore),

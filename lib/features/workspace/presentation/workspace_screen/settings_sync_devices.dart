@@ -2,10 +2,14 @@ part of '../workspace_screen.dart';
 
 String _syncDevicesSubtitle(
   AppLocalizations l10n,
-  List<SyncDeviceMetadata> devices,
-) {
+  List<SyncDeviceMetadata> devices, {
+  required bool mobile,
+}) {
   if (devices.isEmpty) {
     return l10n.syncDevicesWillRegister;
+  }
+  if (mobile) {
+    return l10n.syncDevicesRegisteredSubtitle(devices.length);
   }
   if (devices.length == 1) {
     return l10n.syncDeviceSingleSubtitle(devices.single.displayName);

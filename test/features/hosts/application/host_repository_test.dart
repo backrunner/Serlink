@@ -34,6 +34,26 @@ void main() {
         identityIds: [IdentityId('ops-key')],
         startupCommands: const ['tmux attach || tmux'],
         jumpHostIds: const [],
+        portForwarding: const HostPortForwardingSettings(
+          localForwards: [
+            HostLocalPortForward(
+              localPort: 15432,
+              remoteHost: 'db.internal',
+              remotePort: 5432,
+            ),
+          ],
+          remoteForwards: [
+            HostRemotePortForward(
+              bindHost: '127.0.0.1',
+              bindPort: 18080,
+              localHost: '127.0.0.1',
+              localPort: 8080,
+            ),
+          ],
+          dynamicForwards: [
+            HostDynamicPortForward(bindHost: '127.0.0.1', bindPort: 1080),
+          ],
+        ),
         connectionSettings: const HostConnectionSettings(
           connectTimeoutSeconds: 30,
           keepAliveIntervalSeconds: 12,
@@ -65,6 +85,7 @@ void main() {
         restored.connectionSettings.toJson(),
         host.connectionSettings.toJson(),
       );
+      expect(restored.portForwarding, host.portForwarding);
 
       await vault.lock();
 
@@ -80,4 +101,25 @@ void main() {
       );
     },
   );
+
+  test('host config defaults missing port forwarding to empty settings', () {
+    final host = HostConfig.fromJson({
+      'id': 'legacy',
+      'displayName': 'Legacy Host',
+      'hostname': 'legacy.internal',
+      'username': 'ops',
+      'port': 22,
+      'authKinds': ['password'],
+      'tags': ['legacy'],
+      'trustState': 'unknown',
+      'identityIds': ['identity-1'],
+      'startupCommands': <String>[],
+      'jumpHostIds': <String>[],
+      'createdAt': DateTime.utc(2026, 5, 27).toIso8601String(),
+      'updatedAt': DateTime.utc(2026, 5, 27).toIso8601String(),
+    });
+
+    expect(host.portForwarding, const HostPortForwardingSettings());
+    expect(host.portForwarding.isEmpty, isTrue);
+  });
 }

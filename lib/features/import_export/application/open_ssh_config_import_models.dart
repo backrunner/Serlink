@@ -39,6 +39,9 @@ class _OpenSshHostBlock {
   String? proxyJump;
   String? proxyCommand;
   String? identityAgent;
+  final List<HostLocalPortForward> localForwards = [];
+  final List<HostRemotePortForward> remoteForwards = [];
+  final List<HostDynamicPortForward> dynamicForwards = [];
 
   List<String> get importableAliases {
     return [
@@ -85,6 +88,9 @@ class _OpenSshEffectiveHost {
   final List<String> identityFiles = [];
   final List<String> certificateFiles = [];
   String? proxyJump;
+  final List<HostLocalPortForward> localForwards = [];
+  final List<HostRemotePortForward> remoteForwards = [];
+  final List<HostDynamicPortForward> dynamicForwards = [];
 
   void apply(_OpenSshHostBlock block) {
     hostname ??= block.hostname;
@@ -101,6 +107,21 @@ class _OpenSshEffectiveHost {
         certificateFiles.add(certificateFile);
       }
     }
+    for (final forward in block.localForwards) {
+      if (!localForwards.contains(forward)) {
+        localForwards.add(forward);
+      }
+    }
+    for (final forward in block.remoteForwards) {
+      if (!remoteForwards.contains(forward)) {
+        remoteForwards.add(forward);
+      }
+    }
+    for (final forward in block.dynamicForwards) {
+      if (!dynamicForwards.contains(forward)) {
+        dynamicForwards.add(forward);
+      }
+    }
   }
 
   OpenSshConfigImportEntry toEntry() {
@@ -112,6 +133,15 @@ class _OpenSshEffectiveHost {
       identityFiles: List<String>.unmodifiable(identityFiles),
       certificateFiles: List<String>.unmodifiable(certificateFiles),
       proxyJump: proxyJump,
+      portForwarding: HostPortForwardingSettings(
+        localForwards: List<HostLocalPortForward>.unmodifiable(localForwards),
+        remoteForwards: List<HostRemotePortForward>.unmodifiable(
+          remoteForwards,
+        ),
+        dynamicForwards: List<HostDynamicPortForward>.unmodifiable(
+          dynamicForwards,
+        ),
+      ),
     );
   }
 }

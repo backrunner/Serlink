@@ -174,6 +174,90 @@ void main() {
     );
   });
 
+  test('persists host port forwarding settings', () async {
+    final vault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    final records = InMemoryVaultRecordRepository();
+    final hosts = EncryptedHostRepository(vault: vault, records: records);
+    final identities = EncryptedIdentityRepository(
+      vault: vault,
+      records: records,
+    );
+    await vault.initialize(passphrase: 'good passphrase');
+
+    final service = HostWriteService(
+      hosts: hosts,
+      identities: identities,
+      knownHosts: EncryptedKnownHostRepository(vault: vault, records: records),
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ),
+      records: records,
+      vault: vault,
+    );
+
+    final forwarding = const HostPortForwardingSettings(
+      localForwards: [
+        HostLocalPortForward(
+          localPort: 15432,
+          remoteHost: ' db.internal ',
+          remotePort: 5432,
+        ),
+      ],
+      remoteForwards: [
+        HostRemotePortForward(
+          bindHost: '127.0.0.1',
+          bindPort: 18080,
+          localHost: ' app.internal ',
+          localPort: 8080,
+        ),
+      ],
+      dynamicForwards: [
+        HostDynamicPortForward(bindHost: ' 127.0.0.1 ', bindPort: 1080),
+      ],
+    );
+
+    final summary = await service.createPasswordHost(
+      PasswordHostDraft(
+        displayName: 'Forwarded Host',
+        hostname: 'forwarded.internal',
+        port: 22,
+        username: 'ops',
+        password: 'server-password',
+        tags: {},
+        portForwarding: forwarding,
+      ),
+    );
+
+    final stored = await hosts.read(summary.id);
+    expect(stored, isNotNull);
+    expect(
+      stored!.portForwarding,
+      const HostPortForwardingSettings(
+        localForwards: [
+          HostLocalPortForward(
+            localPort: 15432,
+            remoteHost: 'db.internal',
+            remotePort: 5432,
+          ),
+        ],
+        remoteForwards: [
+          HostRemotePortForward(
+            bindHost: '127.0.0.1',
+            bindPort: 18080,
+            localHost: 'app.internal',
+            localPort: 8080,
+          ),
+        ],
+        dynamicForwards: [
+          HostDynamicPortForward(bindHost: '127.0.0.1', bindPort: 1080),
+        ],
+      ),
+    );
+  });
+
   test('persists normalized host sftp default directory', () async {
     final vault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),
@@ -269,6 +353,61 @@ void main() {
       ),
     );
     expect(await records.list(), isEmpty);
+  });
+
+  test('rejects invalid host port forwarding settings', () async {
+    final vault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    final records = InMemoryVaultRecordRepository();
+    final hosts = EncryptedHostRepository(vault: vault, records: records);
+    final identities = EncryptedIdentityRepository(
+      vault: vault,
+      records: records,
+    );
+    await vault.initialize(passphrase: 'good passphrase');
+
+    final service = HostWriteService(
+      hosts: hosts,
+      identities: identities,
+      knownHosts: EncryptedKnownHostRepository(vault: vault, records: records),
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ),
+      records: records,
+      vault: vault,
+    );
+
+    await expectLater(
+      service.createPasswordHost(
+        const PasswordHostDraft(
+          displayName: 'Bad Forward',
+          hostname: 'bad-forward.internal',
+          port: 22,
+          username: 'ops',
+          password: 'server-password',
+          tags: {},
+          portForwarding: HostPortForwardingSettings(
+            localForwards: [
+              HostLocalPortForward(
+                localPort: 0,
+                remoteHost: 'db.internal',
+                remotePort: 5432,
+              ),
+            ],
+          ),
+        ),
+      ),
+      throwsA(
+        isA<HostWriteException>().having(
+          (error) => error.code,
+          'code',
+          'host.port_forwarding_port_invalid',
+        ),
+      ),
+    );
+    expect(await hosts.list(), isEmpty);
   });
 
   test('creates private key host and resolves private key auth', () async {
@@ -469,6 +608,7 @@ void main() {
           startupCommands: source.startupCommands,
           jumpHostIds: source.jumpHostIds,
           sftpDefaultDirectory: source.sftpDefaultDirectory,
+          portForwarding: source.portForwarding,
           connectionSettings: source.connectionSettings,
           groupId: 'ops',
           lastConnectedAt: DateTime.utc(2026, 6, 1),

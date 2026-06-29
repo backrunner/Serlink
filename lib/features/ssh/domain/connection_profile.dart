@@ -11,6 +11,7 @@ class ConnectionProfileSnapshot {
     required this.authMethods,
     this.startupCommands = const [],
     this.jumpHosts = const [],
+    this.portForwarding = const SshPortForwardingProfile(),
     this.connectTimeout = const Duration(seconds: 20),
     this.keepAliveInterval = const Duration(seconds: 10),
     this.reconnectPolicy = const SshReconnectPolicy(),
@@ -26,6 +27,7 @@ class ConnectionProfileSnapshot {
   final List<SshAuthMethod> authMethods;
   final List<String> startupCommands;
   final List<SshJumpHostSnapshot> jumpHosts;
+  final SshPortForwardingProfile portForwarding;
   final Duration connectTimeout;
   final Duration? keepAliveInterval;
   final SshReconnectPolicy reconnectPolicy;
@@ -51,6 +53,56 @@ class SshJumpHostSnapshot {
   final List<SshAuthMethod> authMethods;
   final Duration connectTimeout;
   final Duration? keepAliveInterval;
+}
+
+class SshPortForwardingProfile {
+  const SshPortForwardingProfile({
+    this.localForwards = const [],
+    this.remoteForwards = const [],
+    this.dynamicForwards = const [],
+  });
+
+  final List<SshLocalPortForward> localForwards;
+  final List<SshRemotePortForward> remoteForwards;
+  final List<SshDynamicPortForward> dynamicForwards;
+
+  bool get isEmpty =>
+      localForwards.isEmpty &&
+      remoteForwards.isEmpty &&
+      dynamicForwards.isEmpty;
+}
+
+class SshLocalPortForward {
+  const SshLocalPortForward({
+    required this.localPort,
+    required this.remoteHost,
+    required this.remotePort,
+  });
+
+  final int localPort;
+  final String remoteHost;
+  final int remotePort;
+}
+
+class SshRemotePortForward {
+  const SshRemotePortForward({
+    required this.bindHost,
+    required this.bindPort,
+    required this.localHost,
+    required this.localPort,
+  });
+
+  final String bindHost;
+  final int bindPort;
+  final String localHost;
+  final int localPort;
+}
+
+class SshDynamicPortForward {
+  const SshDynamicPortForward({required this.bindHost, required this.bindPort});
+
+  final String bindHost;
+  final int bindPort;
 }
 
 class SshReconnectPolicy {

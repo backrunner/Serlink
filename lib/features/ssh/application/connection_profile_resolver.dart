@@ -57,6 +57,7 @@ class StaticConnectionProfile {
     required this.authMethods,
     this.startupCommands = const [],
     this.jumpHosts = const [],
+    this.portForwarding = const SshPortForwardingProfile(),
     this.connectTimeout = const Duration(seconds: 20),
     this.keepAliveInterval = const Duration(seconds: 10),
     this.reconnectPolicy = const SshReconnectPolicy(),
@@ -69,6 +70,7 @@ class StaticConnectionProfile {
   final List<SshAuthMethod> authMethods;
   final List<String> startupCommands;
   final List<SshJumpHostSnapshot> jumpHosts;
+  final SshPortForwardingProfile portForwarding;
   final Duration connectTimeout;
   final Duration? keepAliveInterval;
   final SshReconnectPolicy reconnectPolicy;
@@ -83,6 +85,7 @@ class StaticConnectionProfile {
       authMethods: authMethods,
       startupCommands: startupCommands,
       jumpHosts: jumpHosts,
+      portForwarding: portForwarding,
       connectTimeout: connectTimeout,
       keepAliveInterval: keepAliveInterval,
       reconnectPolicy: reconnectPolicy,

@@ -236,6 +236,24 @@ Host broken
     );
   });
 
+  test('warns on unsupported port forwarding forms without dropping host', () {
+    final service = OpenSshConfigImportService();
+
+    final result = service.preview('''
+Host forwarded
+  HostName forwarded.example.test
+  User deploy
+  LocalForward 0.0.0.0:15432 db.internal:5432
+''');
+
+    expect(result.entries, hasLength(1));
+    expect(result.entries.single.portForwarding.isEmpty, isTrue);
+    expect(
+      result.warnings.map((warning) => warning.code),
+      contains('ssh_config.port_forwarding_invalid'),
+    );
+  });
+
   test('applies preview as encrypted host metadata records', () async {
     final vault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),
@@ -255,6 +273,9 @@ Host prod
   Port 2222
   IdentityFile ~/.ssh/prod
   ProxyJump jumpbox
+  LocalForward 15432 db.internal:5432
+  RemoteForward 127.0.0.1:18080 127.0.0.1:8080
+  DynamicForward 1080
 ''');
     final result = await service.applyPreview(preview);
 
@@ -277,6 +298,27 @@ Host prod
     expect(importedHosts.single.port, 2222);
     expect(importedHosts.single.identityIds, isEmpty);
     expect(importedHosts.single.tags, contains('imported'));
+    expect(
+      importedHosts.single.portForwarding.localForwards.single,
+      const HostLocalPortForward(
+        localPort: 15432,
+        remoteHost: 'db.internal',
+        remotePort: 5432,
+      ),
+    );
+    expect(
+      importedHosts.single.portForwarding.remoteForwards.single,
+      const HostRemotePortForward(
+        bindHost: '127.0.0.1',
+        bindPort: 18080,
+        localHost: '127.0.0.1',
+        localPort: 8080,
+      ),
+    );
+    expect(
+      importedHosts.single.portForwarding.dynamicForwards.single,
+      const HostDynamicPortForward(bindHost: '127.0.0.1', bindPort: 1080),
+    );
 
     final serializedRecords = jsonEncode([
       for (final record in await records.list()) record.toJson(),

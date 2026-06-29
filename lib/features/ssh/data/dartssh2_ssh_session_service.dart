@@ -42,6 +42,9 @@ class DartSsh2SessionService implements SshSessionService {
   final Map<SessionId, ServerSocket> _localForwards = {};
   final Map<SessionId, SSHRemoteForward> _remoteForwards = {};
   final Map<SessionId, SSHDynamicForward> _dynamicForwards = {};
+  final Map<SessionId, List<ServerSocket>> _profileLocalForwards = {};
+  final Map<SessionId, List<SSHRemoteForward>> _profileRemoteForwards = {};
+  final Map<SessionId, List<SSHDynamicForward>> _profileDynamicForwards = {};
 
   @override
   Future<SshShellSession> openShell(ConnectionProfileSnapshot profile) async {
@@ -59,6 +62,13 @@ class DartSsh2SessionService implements SshSessionService {
       rethrow;
     }
     _clientChains[profile.sessionId] = chain;
+    try {
+      await _startProfileForwarding(profile, chain.target);
+    } on Object {
+      session.close();
+      await _closeSessionResources(profile.sessionId);
+      rethrow;
+    }
     return DartSsh2ShellSession(
       session: session,
       onClose: () => _closeSessionResources(profile.sessionId),
@@ -76,6 +86,13 @@ class DartSsh2SessionService implements SshSessionService {
       rethrow;
     }
     _clientChains[profile.sessionId] = chain;
+    try {
+      await _startProfileForwarding(profile, chain.target);
+    } on Object {
+      sftp.close();
+      await _closeSessionResources(profile.sessionId);
+      rethrow;
+    }
     return DartSsh2SftpConnection(
       sftpClient: sftp,
       sshClient: chain.target,
@@ -180,8 +197,11 @@ class DartSsh2SessionService implements SshSessionService {
 
   Future<void> _closeSessionResources(SessionId sessionId) async {
     await stopLocalForward(sessionId: sessionId);
+    await _stopProfileLocalForwards(sessionId);
     await stopDynamicForward(sessionId: sessionId);
+    await _stopProfileDynamicForwards(sessionId);
     await stopRemoteForward(sessionId: sessionId);
+    await _stopProfileRemoteForwards(sessionId);
     _clientChains.remove(sessionId)?.close();
   }
 
@@ -191,6 +211,120 @@ class DartSsh2SessionService implements SshSessionService {
       throw StateError('No active SSH client for session ${sessionId.value}.');
     }
     return client;
+  }
+
+  Future<void> _startProfileForwarding(
+    ConnectionProfileSnapshot profile,
+    SSHClient client,
+  ) async {
+    final forwarding = profile.portForwarding;
+    if (forwarding.isEmpty) {
+      return;
+    }
+    for (final forward in forwarding.localForwards) {
+      await _startProfileLocalForward(
+        sessionId: profile.sessionId,
+        client: client,
+        forward: forward,
+      );
+    }
+    for (final forward in forwarding.remoteForwards) {
+      await _startProfileRemoteForward(
+        sessionId: profile.sessionId,
+        client: client,
+        forward: forward,
+      );
+    }
+    for (final forward in forwarding.dynamicForwards) {
+      await _startProfileDynamicForward(
+        sessionId: profile.sessionId,
+        client: client,
+        forward: forward,
+      );
+    }
+  }
+
+  Future<void> _startProfileLocalForward({
+    required SessionId sessionId,
+    required SSHClient client,
+    required SshLocalPortForward forward,
+  }) async {
+    final server = await ServerSocket.bind(
+      InternetAddress.loopbackIPv4,
+      forward.localPort,
+    );
+    (_profileLocalForwards[sessionId] ??= []).add(server);
+    unawaited(
+      server.forEach((socket) {
+        unawaited(
+          _pipeForward(client, socket, forward.remoteHost, forward.remotePort),
+        );
+      }),
+    );
+  }
+
+  Future<void> _startProfileRemoteForward({
+    required SessionId sessionId,
+    required SSHClient client,
+    required SshRemotePortForward forward,
+  }) async {
+    final remoteForward = await client.forwardRemote(
+      host: forward.bindHost,
+      port: forward.bindPort,
+    );
+    if (remoteForward == null) {
+      throw StateError('Remote port forward request was rejected.');
+    }
+    (_profileRemoteForwards[sessionId] ??= []).add(remoteForward);
+    unawaited(
+      remoteForward.connections.forEach((channel) {
+        unawaited(
+          _pipeRemoteForward(channel, forward.localHost, forward.localPort),
+        );
+      }),
+    );
+  }
+
+  Future<void> _startProfileDynamicForward({
+    required SessionId sessionId,
+    required SSHClient client,
+    required SshDynamicPortForward forward,
+  }) async {
+    final dynamicForward = await client.forwardDynamic(
+      bindHost: forward.bindHost,
+      bindPort: forward.bindPort,
+    );
+    (_profileDynamicForwards[sessionId] ??= []).add(dynamicForward);
+  }
+
+  Future<void> _stopProfileLocalForwards(SessionId sessionId) async {
+    final forwards = _profileLocalForwards.remove(sessionId);
+    if (forwards == null) {
+      return;
+    }
+    for (final forward in forwards) {
+      await forward.close();
+    }
+  }
+
+  Future<void> _stopProfileRemoteForwards(SessionId sessionId) async {
+    final forwards = _profileRemoteForwards.remove(sessionId);
+    if (forwards == null) {
+      return;
+    }
+    for (final forward in forwards) {
+      forward.close();
+    }
+  }
+
+  Future<void> _stopProfileDynamicForwards(SessionId sessionId) async {
+    final forwards = _profileDynamicForwards.remove(sessionId);
+    if (forwards == null) {
+      return;
+    }
+    for (final forward in forwards) {
+      await forward.close();
+    }
   }
 
   Future<_SshClientChain> _connect(

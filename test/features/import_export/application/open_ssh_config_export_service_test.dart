@@ -28,6 +28,26 @@ void main() {
         port: 2222,
         tags: {'prod', 'api'},
         jumpHostIds: [jumpHost.id],
+        portForwarding: const HostPortForwardingSettings(
+          localForwards: [
+            HostLocalPortForward(
+              localPort: 15432,
+              remoteHost: 'db.internal',
+              remotePort: 5432,
+            ),
+          ],
+          remoteForwards: [
+            HostRemotePortForward(
+              bindHost: '127.0.0.1',
+              bindPort: 18080,
+              localHost: '127.0.0.1',
+              localPort: 8080,
+            ),
+          ],
+          dynamicForwards: [
+            HostDynamicPortForward(bindHost: '127.0.0.1', bindPort: 1080),
+          ],
+        ),
         connectionSettings: const HostConnectionSettings(
           connectTimeoutSeconds: 25,
           keepAliveIntervalSeconds: 0,
@@ -51,6 +71,12 @@ void main() {
       expect(bundle.contents, contains('ConnectTimeout 25'));
       expect(bundle.contents, contains('ServerAliveInterval 11'));
       expect(bundle.contents, contains('ProxyJump jump-box'));
+      expect(bundle.contents, contains('LocalForward 15432 db.internal:5432'));
+      expect(
+        bundle.contents,
+        contains('RemoteForward 127.0.0.1:18080 127.0.0.1:8080'),
+      );
+      expect(bundle.contents, contains('DynamicForward 127.0.0.1:1080'));
       expect(bundle.contents, isNot(contains('identity-secret')));
 
       final preview = OpenSshConfigImportService().preview(bundle.contents);
@@ -61,6 +87,12 @@ void main() {
             .proxyJump,
         'jump-box',
       );
+      final importedApp = preview.entries.firstWhere(
+        (entry) => entry.alias == 'app-server',
+      );
+      expect(importedApp.portForwarding.localForwards.single.localPort, 15432);
+      expect(importedApp.portForwarding.remoteForwards.single.localPort, 8080);
+      expect(importedApp.portForwarding.dynamicForwards.single.bindPort, 1080);
       expect(
         preview.entries.firstWhere((entry) => entry.alias == 'jump-box').port,
         2200,
@@ -77,6 +109,8 @@ HostConfig _host({
   int port = 22,
   Set<String> tags = const {},
   List<HostId> jumpHostIds = const [],
+  HostPortForwardingSettings portForwarding =
+      const HostPortForwardingSettings(),
   HostConnectionSettings connectionSettings = const HostConnectionSettings(),
 }) {
   return HostConfig(
@@ -91,6 +125,7 @@ HostConfig _host({
     identityIds: const [],
     startupCommands: const [],
     jumpHostIds: jumpHostIds,
+    portForwarding: portForwarding,
     connectionSettings: connectionSettings,
     createdAt: DateTime.utc(2026),
     updatedAt: DateTime.utc(2026),

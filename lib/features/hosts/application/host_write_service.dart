@@ -35,6 +35,7 @@ class PasswordHostDraft {
     this.startupCommands = const [],
     this.jumpHostIds = const [],
     this.sftpDefaultDirectory = '/',
+    this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
   });
 
@@ -47,6 +48,7 @@ class PasswordHostDraft {
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
   final String sftpDefaultDirectory;
+  final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
 }
 
@@ -62,6 +64,7 @@ class PrivateKeyHostDraft {
     this.startupCommands = const [],
     this.jumpHostIds = const [],
     this.sftpDefaultDirectory = '/',
+    this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
   });
 
@@ -75,6 +78,7 @@ class PrivateKeyHostDraft {
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
   final String sftpDefaultDirectory;
+  final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
 }
 
@@ -89,6 +93,7 @@ class ExistingIdentitiesHostDraft {
     this.startupCommands = const [],
     this.jumpHostIds = const [],
     this.sftpDefaultDirectory = '/',
+    this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
   });
 
@@ -101,6 +106,7 @@ class ExistingIdentitiesHostDraft {
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
   final String sftpDefaultDirectory;
+  final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
 }
 
@@ -114,6 +120,7 @@ class SshAgentHostDraft {
     this.startupCommands = const [],
     this.jumpHostIds = const [],
     this.sftpDefaultDirectory = '/',
+    this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
   });
 
@@ -125,6 +132,7 @@ class SshAgentHostDraft {
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
   final String sftpDefaultDirectory;
+  final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
 }
 
@@ -140,6 +148,7 @@ class HostMetadataDraft {
     this.startupCommands = const [],
     this.jumpHostIds = const [],
     this.sftpDefaultDirectory = '/',
+    this.portForwarding,
     this.connectionSettings = const HostConnectionSettings(),
   });
 
@@ -153,6 +162,7 @@ class HostMetadataDraft {
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
   final String sftpDefaultDirectory;
+  final HostPortForwardingSettings? portForwarding;
   final HostConnectionSettings connectionSettings;
 }
 
@@ -168,6 +178,7 @@ class DuplicateHostDraft {
     this.startupCommands = const [],
     this.jumpHostIds = const [],
     this.sftpDefaultDirectory = '/',
+    this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
   });
 
@@ -181,6 +192,7 @@ class DuplicateHostDraft {
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
   final String sftpDefaultDirectory;
+  final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
 }
 
@@ -225,6 +237,7 @@ class HostWriteService {
     final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
       draft.sftpDefaultDirectory,
     );
+    final portForwarding = _normalizePortForwarding(draft.portForwarding);
     final password = draft.password;
     if (password.isEmpty) {
       throw const HostWriteException(
@@ -270,6 +283,7 @@ class HostWriteService {
       startupCommands: _normalizeStartupCommands(draft.startupCommands),
       jumpHostIds: _normalizeJumpHostIds(draft.jumpHostIds, hostId: hostId),
       sftpDefaultDirectory: sftpDefaultDirectory,
+      portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       createdAt: now,
       updatedAt: now,
@@ -291,6 +305,7 @@ class HostWriteService {
     final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
       draft.sftpDefaultDirectory,
     );
+    final portForwarding = _normalizePortForwarding(draft.portForwarding);
     final privateKeyPem = draft.privateKeyPem.trim();
     if (!_looksLikePrivateKey(privateKeyPem)) {
       throw const HostWriteException(
@@ -340,6 +355,7 @@ class HostWriteService {
       startupCommands: _normalizeStartupCommands(draft.startupCommands),
       jumpHostIds: _normalizeJumpHostIds(draft.jumpHostIds, hostId: hostId),
       sftpDefaultDirectory: sftpDefaultDirectory,
+      portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       createdAt: now,
       updatedAt: now,
@@ -363,6 +379,7 @@ class HostWriteService {
     final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
       draft.sftpDefaultDirectory,
     );
+    final portForwarding = _normalizePortForwarding(draft.portForwarding);
     final now = DateTime.now().toUtc();
     final hostId = HostId(_uuid.v4());
     final identityIds = _normalizeIdentityIds(draft.identityIds);
@@ -381,6 +398,7 @@ class HostWriteService {
       startupCommands: _normalizeStartupCommands(draft.startupCommands),
       jumpHostIds: _normalizeJumpHostIds(draft.jumpHostIds, hostId: hostId),
       sftpDefaultDirectory: sftpDefaultDirectory,
+      portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       createdAt: now,
       updatedAt: now,
@@ -402,6 +420,7 @@ class HostWriteService {
     final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
       draft.sftpDefaultDirectory,
     );
+    final portForwarding = _normalizePortForwarding(draft.portForwarding);
     final now = DateTime.now().toUtc();
     final hostId = HostId(_uuid.v4());
     final identityId = IdentityId(_uuid.v4());
@@ -430,6 +449,7 @@ class HostWriteService {
       startupCommands: _normalizeStartupCommands(draft.startupCommands),
       jumpHostIds: _normalizeJumpHostIds(draft.jumpHostIds, hostId: hostId),
       sftpDefaultDirectory: sftpDefaultDirectory,
+      portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       createdAt: now,
       updatedAt: now,
@@ -457,6 +477,7 @@ class HostWriteService {
     final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
       draft.sftpDefaultDirectory,
     );
+    final portForwarding = _normalizePortForwarding(draft.portForwarding);
     final now = DateTime.now().toUtc();
     final hostId = HostId(_uuid.v4());
     final duplicated = HostConfig(
@@ -472,6 +493,7 @@ class HostWriteService {
       startupCommands: _normalizeStartupCommands(draft.startupCommands),
       jumpHostIds: _normalizeJumpHostIds(draft.jumpHostIds, hostId: hostId),
       sftpDefaultDirectory: sftpDefaultDirectory,
+      portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       groupId: source.groupId,
       createdAt: now,
@@ -500,6 +522,9 @@ class HostWriteService {
     final sftpDefaultDirectory = _normalizeSftpDefaultDirectory(
       draft.sftpDefaultDirectory,
     );
+    final portForwarding = _normalizePortForwarding(
+      draft.portForwarding ?? existing.portForwarding,
+    );
     final updated = HostConfig(
       id: existing.id,
       displayName: normalized.displayName,
@@ -516,6 +541,7 @@ class HostWriteService {
         hostId: existing.id,
       ),
       sftpDefaultDirectory: sftpDefaultDirectory,
+      portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       groupId: existing.groupId,
       lastConnectedAt: existing.lastConnectedAt,
@@ -549,6 +575,7 @@ class HostWriteService {
       sftpDefaultDirectory: _normalizeSftpDefaultDirectory(
         sftpDefaultDirectory,
       ),
+      portForwarding: existing.portForwarding,
       connectionSettings: existing.connectionSettings,
       groupId: existing.groupId,
       lastConnectedAt: existing.lastConnectedAt,
@@ -700,6 +727,58 @@ HostConnectionSettings _normalizeConnectionSettings(
     reconnectAttempts: reconnectAttempts,
     reconnectBackoffSeconds: reconnectBackoffSeconds,
   );
+}
+
+HostPortForwardingSettings _normalizePortForwarding(
+  HostPortForwardingSettings settings,
+) {
+  return HostPortForwardingSettings(
+    localForwards: [
+      for (final forward in settings.localForwards)
+        HostLocalPortForward(
+          localPort: _normalizeForwardPort(forward.localPort),
+          remoteHost: _normalizeForwardHost(forward.remoteHost),
+          remotePort: _normalizeForwardPort(forward.remotePort),
+        ),
+    ],
+    remoteForwards: [
+      for (final forward in settings.remoteForwards)
+        HostRemotePortForward(
+          bindHost: _normalizeForwardHost(forward.bindHost),
+          bindPort: _normalizeForwardPort(forward.bindPort),
+          localHost: _normalizeForwardHost(forward.localHost),
+          localPort: _normalizeForwardPort(forward.localPort),
+        ),
+    ],
+    dynamicForwards: [
+      for (final forward in settings.dynamicForwards)
+        HostDynamicPortForward(
+          bindHost: _normalizeForwardHost(forward.bindHost),
+          bindPort: _normalizeForwardPort(forward.bindPort),
+        ),
+    ],
+  );
+}
+
+int _normalizeForwardPort(int port) {
+  if (port < 1 || port > 65535) {
+    throw const HostWriteException(
+      'host.port_forwarding_port_invalid',
+      'Port forwarding ports must be between 1 and 65535.',
+    );
+  }
+  return port;
+}
+
+String _normalizeForwardHost(String host) {
+  final normalized = host.trim();
+  if (normalized.isEmpty) {
+    throw const HostWriteException(
+      'host.port_forwarding_host_required',
+      'Port forwarding hosts are required.',
+    );
+  }
+  return normalized;
 }
 
 String _normalizeSftpDefaultDirectory(String path) {

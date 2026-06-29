@@ -71,6 +71,63 @@ void main() {
     },
   );
 
+  test('resolves host port forwarding into connection profile', () async {
+    await _saveSecret(
+      vault: vault,
+      records: records,
+      id: VaultRecordId('secret:ops-password'),
+      material: const IdentitySecretMaterial(password: 'server-password'),
+    );
+    await identities.save(
+      IdentityConfig(
+        id: IdentityId('ops-password'),
+        displayName: 'Ops Password',
+        kind: IdentityKind.password,
+        secretRecordId: VaultRecordId('secret:ops-password'),
+        createdAt: DateTime.utc(2026, 5, 27),
+        updatedAt: DateTime.utc(2026, 5, 27),
+      ),
+    );
+    await hosts.save(
+      _host(
+        identityIds: [IdentityId('ops-password')],
+        portForwarding: const HostPortForwardingSettings(
+          localForwards: [
+            HostLocalPortForward(
+              localPort: 15432,
+              remoteHost: 'db.internal',
+              remotePort: 5432,
+            ),
+          ],
+          remoteForwards: [
+            HostRemotePortForward(
+              bindHost: '127.0.0.1',
+              bindPort: 18080,
+              localHost: '127.0.0.1',
+              localPort: 8080,
+            ),
+          ],
+          dynamicForwards: [
+            HostDynamicPortForward(bindHost: '127.0.0.1', bindPort: 1080),
+          ],
+        ),
+      ),
+    );
+
+    final profile = await resolver.resolve(
+      hostId: HostId('production'),
+      sessionId: SessionId('session-1'),
+    );
+
+    expect(profile.portForwarding.localForwards.single.localPort, 15432);
+    expect(
+      profile.portForwarding.localForwards.single.remoteHost,
+      'db.internal',
+    );
+    expect(profile.portForwarding.remoteForwards.single.bindPort, 18080);
+    expect(profile.portForwarding.dynamicForwards.single.bindPort, 1080);
+  });
+
   test('uses password credential username before host username', () async {
     await _saveSecret(
       vault: vault,
@@ -419,6 +476,8 @@ HostConfig _host({
   required List<IdentityId> identityIds,
   List<String> startupCommands = const ['tmux attach || tmux'],
   List<HostId> jumpHostIds = const [],
+  HostPortForwardingSettings portForwarding =
+      const HostPortForwardingSettings(),
 }) {
   return HostConfig(
     id: id ?? HostId('production'),
@@ -432,6 +491,7 @@ HostConfig _host({
     identityIds: identityIds,
     startupCommands: startupCommands,
     jumpHostIds: jumpHostIds,
+    portForwarding: portForwarding,
     createdAt: DateTime.utc(2026, 5, 27),
     updatedAt: DateTime.utc(2026, 5, 27),
   );

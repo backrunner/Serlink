@@ -110,7 +110,8 @@ class _SyncSettingsSection extends ConsumerWidget {
         webDavRow,
         ?iCloudRow,
         if (repairPlan != null) _SyncRepairRow(plan: repairPlan),
-        if (conflicts.isNotEmpty) _SyncConflictRow(conflicts: conflicts),
+        if (conflicts.isNotEmpty)
+          _SyncConflictRow(conflicts: conflicts, mobile: mobile),
         if (knownDevices != null)
           knownDevices.when(
             loading: () => _SettingsInfoRow(
@@ -144,7 +145,7 @@ class _SyncSettingsSection extends ConsumerWidget {
               return _SettingsActionRow(
                 icon: Icons.devices_outlined,
                 title: l10n.syncDevicesTitle,
-                subtitle: _syncDevicesSubtitle(l10n, devices),
+                subtitle: _syncDevicesSubtitle(l10n, devices, mobile: mobile),
                 actionWidth: mobile ? null : 188,
                 action: mobile
                     ? viewButton
@@ -349,50 +350,55 @@ Future<void> _reviewLocalClock(
 }
 
 class _SyncConflictRow extends ConsumerWidget {
-  const _SyncConflictRow({required this.conflicts});
+  const _SyncConflictRow({required this.conflicts, required this.mobile});
 
   final List<SyncRecordConflict> conflicts;
+  final bool mobile;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    final reviewButton = _SettingsTextButton(
+      key: const ValueKey('settings-sync-conflicts-view-button'),
+      onPressed: () => _reviewSyncConflicts(context, ref, conflicts),
+      compactSize: SerlinkButtonSize.xs,
+      child: Text(mobile ? l10n.syncViewAction : l10n.syncReviewAction),
+    );
     return _SettingsActionRow(
       icon: Icons.report_problem_outlined,
       title: l10n.syncConflictsTitle,
       subtitle: l10n.syncConflictsSubtitle(conflicts.length),
-      actionWidth: 286,
-      action: Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        alignment: WrapAlignment.end,
-        children: [
-          _SettingsTextButton(
-            onPressed: () => _reviewSyncConflicts(context, ref, conflicts),
-            compactSize: SerlinkButtonSize.xs,
-            child: Text(l10n.syncReviewAction),
-          ),
-          _SettingsTextButton(
-            onPressed: () => _resolveSyncConflicts(
-              context,
-              ref,
-              SyncConflictResolution.useRemote,
-              conflicts,
+      actionWidth: mobile ? null : 286,
+      action: mobile
+          ? reviewButton
+          : Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              alignment: WrapAlignment.end,
+              children: [
+                reviewButton,
+                _SettingsTextButton(
+                  onPressed: () => _resolveSyncConflicts(
+                    context,
+                    ref,
+                    SyncConflictResolution.useRemote,
+                    conflicts,
+                  ),
+                  compactSize: SerlinkButtonSize.xs,
+                  child: Text(l10n.syncUseRemoteAction),
+                ),
+                _SettingsTextButton(
+                  onPressed: () => _resolveSyncConflicts(
+                    context,
+                    ref,
+                    SyncConflictResolution.keepLocal,
+                    conflicts,
+                  ),
+                  compactSize: SerlinkButtonSize.xs,
+                  child: Text(l10n.syncKeepLocalAction),
+                ),
+              ],
             ),
-            compactSize: SerlinkButtonSize.xs,
-            child: Text(l10n.syncUseRemoteAction),
-          ),
-          _SettingsTextButton(
-            onPressed: () => _resolveSyncConflicts(
-              context,
-              ref,
-              SyncConflictResolution.keepLocal,
-              conflicts,
-            ),
-            compactSize: SerlinkButtonSize.xs,
-            child: Text(l10n.syncKeepLocalAction),
-          ),
-        ],
-      ),
     );
   }
 }

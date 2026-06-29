@@ -12,6 +12,9 @@ class _SettingsSurface extends ConsumerWidget {
     final vault = vaultSession.value;
     final vaultState = vault?.vaultState;
     final vaultBusy = vault?.isBusy == true || vaultSession.isLoading;
+    final vaultBusyReason =
+        vault?.busyReason ?? ref.watch(vaultSessionBusyReasonProvider);
+    final vaultPreparingLabel = _vaultPreparingLabel(l10n, vaultBusyReason);
     final canImportHostData = vaultState == VaultState.unlocked;
     final language = ref.watch(appLanguageProvider).value ?? AppLanguage.system;
     final protectBackground = ref.watch(appProtectBackgroundProvider);
@@ -111,11 +114,14 @@ class _SettingsSurface extends ConsumerWidget {
                     _SettingsActionRow(
                       icon: Icons.lock_outline,
                       title: l10n.settingsVaultTitle,
-                      subtitle: _vaultStateLabel(l10n, vaultState, mobile),
+                      subtitle: _vaultStateLabel(
+                        l10n,
+                        vault,
+                        vaultBusyReason,
+                        mobile,
+                      ),
                       subtitleWidget: vaultState == null
-                          ? _DynamicStatusText(
-                              label: l10n.settingsVaultPreparing,
-                            )
+                          ? _DynamicStatusText(label: vaultPreparingLabel)
                           : null,
                       action: switch (vaultState) {
                         VaultState.unlocked => _SettingsTextButton(

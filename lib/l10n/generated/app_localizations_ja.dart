@@ -196,6 +196,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsVaultPreparing => '暗号化ストレージを準備しています';
 
   @override
+  String get settingsVaultWaitingICloud => 'iCloud 同期を待っています。しばらくお待ちください。';
+
+  @override
   String get settingsVaultNotCreatedPill => 'ボールト未作成';
 
   @override
@@ -738,6 +741,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostSectionRouting => 'ルーティング';
 
   @override
+  String get hostSectionPortForwarding => 'ポート転送';
+
+  @override
   String get hostDisplayNameLabel => '表示名';
 
   @override
@@ -778,6 +784,16 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get hostAdvancedConnectionTitle => '詳細接続';
+
+  @override
+  String get hostPortForwardingLocalHint => 'SSH セッションの開始時にこれらのローカル転送を開始します。';
+
+  @override
+  String get hostPortForwardingRemoteHint => 'SSH セッションの開始時にこれらのリモート転送を開始します。';
+
+  @override
+  String get hostPortForwardingDynamicHint =>
+      'SSH セッションの開始時にこれらの SOCKS プロキシを開始します。';
 
   @override
   String get hostTimeoutLabel => 'タイムアウト（秒）';
@@ -979,6 +995,11 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String syncDeviceSingleSubtitle(String name) {
     return '$name は暗号化同期用に登録されています。';
+  }
+
+  @override
+  String syncDevicesRegisteredSubtitle(num count) {
+    return '$count 台のデバイスが登録済みです。';
   }
 
   @override

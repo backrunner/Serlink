@@ -217,6 +217,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsVaultPreparing => 'Preparing encrypted storage';
 
   @override
+  String get settingsVaultWaitingICloud =>
+      'Waiting for iCloud sync. Please wait.';
+
+  @override
   String get settingsVaultNotCreatedPill => 'Vault not created';
 
   @override
@@ -793,6 +797,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostSectionRouting => 'Routing';
 
   @override
+  String get hostSectionPortForwarding => 'Port forwarding';
+
+  @override
   String get hostDisplayNameLabel => 'Display name';
 
   @override
@@ -834,6 +841,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hostAdvancedConnectionTitle => 'Advanced connection';
+
+  @override
+  String get hostPortForwardingLocalHint =>
+      'Start these local forwards with every SSH session.';
+
+  @override
+  String get hostPortForwardingRemoteHint =>
+      'Start these remote forwards with every SSH session.';
+
+  @override
+  String get hostPortForwardingDynamicHint =>
+      'Start these SOCKS proxies with every SSH session.';
 
   @override
   String get hostTimeoutLabel => 'Timeout (s)';
@@ -1043,6 +1062,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String syncDeviceSingleSubtitle(String name) {
     return '$name registered for encrypted sync.';
+  }
+
+  @override
+  String syncDevicesRegisteredSubtitle(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count devices registered.',
+      one: '1 device registered.',
+    );
+    return '$_temp0';
   }
 
   @override

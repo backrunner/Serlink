@@ -466,6 +466,12 @@ abstract class AppLocalizations {
   /// **'Preparing encrypted storage'**
   String get settingsVaultPreparing;
 
+  /// No description provided for @settingsVaultWaitingICloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for iCloud sync. Please wait.'**
+  String get settingsVaultWaitingICloud;
+
   /// No description provided for @settingsVaultNotCreatedPill.
   ///
   /// In en, this message translates to:
@@ -1426,6 +1432,12 @@ abstract class AppLocalizations {
   /// **'Routing'**
   String get hostSectionRouting;
 
+  /// No description provided for @hostSectionPortForwarding.
+  ///
+  /// In en, this message translates to:
+  /// **'Port forwarding'**
+  String get hostSectionPortForwarding;
+
   /// No description provided for @hostDisplayNameLabel.
   ///
   /// In en, this message translates to:
@@ -1509,6 +1521,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Advanced connection'**
   String get hostAdvancedConnectionTitle;
+
+  /// No description provided for @hostPortForwardingLocalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start these local forwards with every SSH session.'**
+  String get hostPortForwardingLocalHint;
+
+  /// No description provided for @hostPortForwardingRemoteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start these remote forwards with every SSH session.'**
+  String get hostPortForwardingRemoteHint;
+
+  /// No description provided for @hostPortForwardingDynamicHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start these SOCKS proxies with every SSH session.'**
+  String get hostPortForwardingDynamicHint;
 
   /// No description provided for @hostTimeoutLabel.
   ///
@@ -1893,6 +1923,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{name} registered for encrypted sync.'**
   String syncDeviceSingleSubtitle(String name);
+
+  /// No description provided for @syncDevicesRegisteredSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 device registered.} other{{count} devices registered.}}'**
+  String syncDevicesRegisteredSubtitle(num count);
 
   /// No description provided for @syncDevicesMultipleSubtitle.
   ///

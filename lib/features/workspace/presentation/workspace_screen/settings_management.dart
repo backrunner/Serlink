@@ -458,12 +458,21 @@ String _vaultStatusPillLabel(AppLocalizations l10n, VaultState? state) {
   };
 }
 
-String _vaultStateLabel(AppLocalizations l10n, VaultState? state, bool mobile) {
+String _vaultStateLabel(
+  AppLocalizations l10n,
+  VaultSessionState? session,
+  VaultSessionBusyReason? busyReason,
+  bool mobile,
+) {
+  final state = session?.vaultState;
   if (!mobile) {
-    return _vaultStateLabelDesktop(l10n, state);
+    return _vaultStateLabelDesktop(l10n, session, busyReason);
   }
   return switch (state) {
     VaultState.uninitialized => l10n.settingsVaultNotCreated,
+    VaultState.locked
+        when busyReason == VaultSessionBusyReason.waitingForICloud =>
+      l10n.settingsVaultWaitingICloud,
     VaultState.locked => _mobileText(l10n, zh: '已锁定', en: 'Locked', ja: 'ロック中'),
     VaultState.unlocked => _mobileText(
       l10n,
@@ -471,15 +480,33 @@ String _vaultStateLabel(AppLocalizations l10n, VaultState? state, bool mobile) {
       en: 'Unlocked',
       ja: '解除済み',
     ),
-    null => l10n.settingsVaultPreparing,
+    null => _vaultPreparingLabel(l10n, busyReason),
   };
 }
 
-String _vaultStateLabelDesktop(AppLocalizations l10n, VaultState? state) {
+String _vaultStateLabelDesktop(
+  AppLocalizations l10n,
+  VaultSessionState? session,
+  VaultSessionBusyReason? busyReason,
+) {
+  final state = session?.vaultState;
   return switch (state) {
     VaultState.uninitialized => l10n.settingsVaultNotCreated,
+    VaultState.locked
+        when busyReason == VaultSessionBusyReason.waitingForICloud =>
+      l10n.settingsVaultWaitingICloud,
     VaultState.locked => l10n.settingsVaultLocked,
     VaultState.unlocked => l10n.settingsVaultUnlocked,
+    null => _vaultPreparingLabel(l10n, busyReason),
+  };
+}
+
+String _vaultPreparingLabel(
+  AppLocalizations l10n,
+  VaultSessionBusyReason? busyReason,
+) {
+  return switch (busyReason) {
+    VaultSessionBusyReason.waitingForICloud => l10n.settingsVaultWaitingICloud,
     null => l10n.settingsVaultPreparing,
   };
 }

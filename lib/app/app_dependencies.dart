@@ -545,6 +545,8 @@ final cloudKitEncryptedSnapshotPrefetchControllerProvider =
 
 enum _CloudKitUnlockSyncOutcome { skipped, synced, remoteReset }
 
+enum VaultSessionBusyReason { waitingForICloud }
+
 enum VaultSessionNotice { cloudKitRemoteVaultAdopted }
 
 class _CloudKitBootstrapResult {
@@ -1409,6 +1411,25 @@ final vaultSessionControllerProvider =
       VaultSessionController.new,
     );
 
+final vaultSessionBusyReasonProvider =
+    NotifierProvider<VaultSessionBusyReasonController, VaultSessionBusyReason?>(
+      VaultSessionBusyReasonController.new,
+    );
+
+class VaultSessionBusyReasonController
+    extends Notifier<VaultSessionBusyReason?> {
+  @override
+  VaultSessionBusyReason? build() => null;
+
+  void waitForICloud() {
+    state = VaultSessionBusyReason.waitingForICloud;
+  }
+
+  void clear() {
+    state = null;
+  }
+}
+
 final vaultServiceProvider = Provider<VaultService>((ref) {
   ref.watch(
     vaultSessionControllerProvider.select(
@@ -1431,6 +1452,7 @@ class VaultSessionState {
     this.unlockFailureCount = 0,
     this.unlockGeneration = 0,
     this.isBusy = false,
+    this.busyReason,
   });
 
   final VaultState vaultState;
@@ -1444,6 +1466,7 @@ class VaultSessionState {
   final int unlockFailureCount;
   final int unlockGeneration;
   final bool isBusy;
+  final VaultSessionBusyReason? busyReason;
 
   bool get localDataHealthy =>
       recoveryStatus == VaultRecoveryStatus.healthy &&
@@ -1466,6 +1489,8 @@ class VaultSessionState {
     bool clearUnlockFailures = false,
     int? unlockGeneration,
     bool? isBusy,
+    VaultSessionBusyReason? busyReason,
+    bool clearBusyReason = false,
   }) {
     return VaultSessionState(
       vaultState: vaultState ?? this.vaultState,
@@ -1486,6 +1511,7 @@ class VaultSessionState {
           : unlockFailureCount ?? this.unlockFailureCount,
       unlockGeneration: unlockGeneration ?? this.unlockGeneration,
       isBusy: isBusy ?? this.isBusy,
+      busyReason: clearBusyReason ? null : busyReason ?? this.busyReason,
     );
   }
 }
@@ -1526,7 +1552,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     }
     if (header == null) {
       try {
-        header = await _discoverCloudKitVaultHeader();
+        header = await _discoverCloudKitVaultHeader(
+          reportWaiting: true,
+          deferBusyReason: true,
+        );
         if (header != null) {
           _cloudKitHeaderDiscovered = true;
         }
@@ -1561,7 +1590,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     return initialState;
   }
 
-  Future<VaultHeader?> _discoverCloudKitVaultHeader() async {
+  Future<VaultHeader?> _discoverCloudKitVaultHeader({
+    bool reportWaiting = false,
+    bool deferBusyReason = false,
+  }) async {
     if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
       return null;
     }
@@ -1572,6 +1604,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     if (!available) {
       return null;
     }
+    if (reportWaiting) {
+      _markWaitingForICloud(deferred: deferBusyReason);
+    }
     try {
       final discovery = await RemoteVaultDiscoveryService(
         ref.read(cloudKitSyncProviderFactoryProvider)(),
@@ -1579,6 +1614,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       return discovery?.header;
     } on Object {
       rethrow;
+    } finally {
+      if (reportWaiting) {
+        _clearBusyReason(deferred: deferBusyReason);
+      }
     }
   }
 
@@ -1643,6 +1682,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
 
   Future<void> initialize({required String passphrase}) async {
     final service = this.service as InMemoryVaultService;
+    _clearBusyReason();
     final previous =
         state.value ??
         const VaultSessionState(vaultState: VaultState.uninitialized);
@@ -1656,6 +1696,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         clearFailure: true,
         clearNotice: true,
         clearRecoveryKey: true,
+        clearBusyReason: true,
       ),
     );
     try {
@@ -1685,6 +1726,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           'vault.initialize.success',
           details: {'adoptedRemoteHeader': true},
         );
+        _clearBusyReason();
         return;
       }
       final localUnlockStatus = await _localUnlockStatus();
@@ -1706,7 +1748,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         'vault.initialize.success',
         details: {'adoptedRemoteHeader': false},
       );
+      _clearBusyReason();
     } on Object catch (error) {
+      _clearBusyReason();
       _recordVaultEvent(
         'vault.initialize.failure',
         level: DiagnosticLogLevel.error,
@@ -1718,12 +1762,14 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           clearNotice: true,
           clearRecoveryKey: true,
           isBusy: false,
+          clearBusyReason: true,
         ),
       );
     }
   }
 
   Future<void> unlock({required String passphrase}) async {
+    _clearBusyReason();
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
     _recordVaultEvent(
@@ -1740,6 +1786,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         clearFailure: true,
         clearNotice: true,
         clearRecoveryKey: true,
+        clearBusyReason: true,
       ),
     );
     try {
@@ -1750,6 +1797,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           'vault.unlock.success',
           details: {'method': 'passphrase', 'cloudKitSync': cloudKitSync.name},
         );
+        _clearBusyReason();
         return;
       }
       state = AsyncData(await _unlockedState(previous));
@@ -1761,7 +1809,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         'vault.unlock.success',
         details: {'method': 'passphrase', 'cloudKitSync': cloudKitSync.name},
       );
+      _clearBusyReason();
     } on Object catch (error) {
+      _clearBusyReason();
       await _lockServiceIfUnlocked();
       _recordVaultEvent(
         'vault.unlock.failure',
@@ -1775,12 +1825,14 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           clearRecoveryKey: true,
           unlockFailureCount: previous.unlockFailureCount + 1,
           isBusy: false,
+          clearBusyReason: true,
         ),
       );
     }
   }
 
   Future<String?> unlockWithRecoveryCode({required String recoveryCode}) async {
+    _clearBusyReason();
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
     _recordVaultEvent(
@@ -1796,6 +1848,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         clearFailure: true,
         clearNotice: true,
         clearRecoveryKey: true,
+        clearBusyReason: true,
       ),
     );
     try {
@@ -1809,6 +1862,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
             'cloudKitSync': cloudKitSync.name,
           },
         );
+        _clearBusyReason();
         return null;
       }
       state = AsyncData(await _unlockedState(previous));
@@ -1820,8 +1874,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         'vault.unlock.success',
         details: {'method': 'recoveryCode', 'cloudKitSync': cloudKitSync.name},
       );
+      _clearBusyReason();
       return null;
     } on Object catch (error) {
+      _clearBusyReason();
       await _lockServiceIfUnlocked();
       final message = _vaultFailureMessage(ref, error);
       _recordVaultEvent(
@@ -1838,6 +1894,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           clearNotice: true,
           clearRecoveryKey: true,
           isBusy: false,
+          clearBusyReason: true,
         ),
       );
       return message;
@@ -1860,6 +1917,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<void> _unlockWithLocalKeyOnce() async {
+    _clearBusyReason();
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
     if (previous.vaultState == VaultState.unlocked) {
@@ -1878,6 +1936,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         clearFailure: true,
         clearNotice: true,
         clearRecoveryKey: true,
+        clearBusyReason: true,
       ),
     );
     try {
@@ -1888,6 +1947,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           'vault.unlock.success',
           details: {'method': 'localKey', 'cloudKitSync': cloudKitSync.name},
         );
+        _clearBusyReason();
         return;
       }
       state = AsyncData(
@@ -1904,7 +1964,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         'vault.unlock.success',
         details: {'method': 'localKey', 'cloudKitSync': cloudKitSync.name},
       );
+      _clearBusyReason();
     } on Object catch (error) {
+      _clearBusyReason();
       await _lockServiceIfUnlocked();
       _recordVaultEvent(
         'vault.unlock.failure',
@@ -1917,6 +1979,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           clearNotice: true,
           clearRecoveryKey: true,
           isBusy: false,
+          clearBusyReason: true,
         ),
       );
     }
@@ -1948,6 +2011,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
             'cloudKitSync': cloudKitSync.name,
           },
         );
+        _clearBusyReason();
         return const VaultSessionState(vaultState: VaultState.uninitialized);
       }
       final next = await _unlockedState(
@@ -1966,8 +2030,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           'cloudKitSync': cloudKitSync.name,
         },
       );
+      _clearBusyReason();
       return next;
     } on Object catch (error) {
+      _clearBusyReason();
       await _lockServiceIfUnlocked();
       _recordVaultEvent(
         'vault.unlock.failure',
@@ -1978,7 +2044,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           ..._vaultSessionErrorDetails(error),
         },
       );
-      return previous.copyWith(isBusy: false);
+      return previous.copyWith(isBusy: false, clearBusyReason: true);
     }
   }
 
@@ -1990,7 +2056,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       return;
     }
     try {
-      final header = await _discoverCloudKitVaultHeader();
+      final header = await _discoverCloudKitVaultHeader(reportWaiting: true);
       if (header == null) {
         return;
       }
@@ -2029,6 +2095,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           clearNotice: true,
         ),
       );
+    } finally {
+      _clearBusyReason();
     }
   }
 
@@ -2044,6 +2112,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       return _CloudKitUnlockSyncOutcome.skipped;
     }
 
+    _markWaitingForICloud();
     final provider = ref.read(cloudKitSyncProviderFactoryProvider)();
     final vaultId = syncVaultId(header);
     if (!requireInitialPull) {
@@ -2133,6 +2202,41 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     ref.invalidate(cloudKitSyncSettingsProvider);
     ref.invalidate(syncKnownDevicesProvider);
     return _CloudKitUnlockSyncOutcome.synced;
+  }
+
+  void _markWaitingForICloud({bool deferred = false}) {
+    if (deferred) {
+      unawaited(
+        Future<void>.microtask(() {
+          if (ref.mounted) {
+            _markWaitingForICloud();
+          }
+        }),
+      );
+      return;
+    }
+    ref.read(vaultSessionBusyReasonProvider.notifier).waitForICloud();
+    final current = state.value;
+    if (current == null || !current.isBusy) {
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(busyReason: VaultSessionBusyReason.waitingForICloud),
+    );
+  }
+
+  void _clearBusyReason({bool deferred = false}) {
+    if (deferred) {
+      unawaited(
+        Future<void>.microtask(() {
+          if (ref.mounted) {
+            _clearBusyReason();
+          }
+        }),
+      );
+      return;
+    }
+    ref.read(vaultSessionBusyReasonProvider.notifier).clear();
   }
 
   Future<bool> _cloudKitSyncExplicitlyDisabledForUnlockedVault() async {
@@ -2385,6 +2489,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         failureMessage: 'iCloud sync is not available.',
       );
     }
+    _markWaitingForICloud();
     try {
       final records = ref.read(vaultRecordRepositoryProvider);
       final provider = ref.read(cloudKitSyncProviderFactoryProvider)();
@@ -2497,6 +2602,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       clearUnlockFailures: true,
       unlockGeneration: previous.unlockGeneration + 1,
       isBusy: false,
+      clearBusyReason: true,
     );
   }
 
@@ -2620,6 +2726,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         isBusy: true,
         clearFailure: true,
         clearRecoveryKey: true,
+        clearBusyReason: true,
       ),
     );
     try {
@@ -2643,6 +2750,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           failureMessage: message,
           clearRecoveryKey: true,
           isBusy: false,
+          clearBusyReason: true,
         ),
       );
       return message;
@@ -2659,6 +2767,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         isBusy: true,
         clearFailure: true,
         clearRecoveryKey: true,
+        clearBusyReason: true,
       ),
     );
     try {
@@ -2670,6 +2779,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           failureMessage: _vaultFailureMessage(ref, error),
           clearRecoveryKey: true,
           isBusy: false,
+          clearBusyReason: true,
         ),
       );
     }
@@ -2678,7 +2788,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   Future<String?> restoreLatestAutomaticBackup() async {
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
-    state = AsyncData(previous.copyWith(isBusy: true, clearFailure: true));
+    state = AsyncData(
+      previous.copyWith(
+        isBusy: true,
+        clearFailure: true,
+        clearBusyReason: true,
+      ),
+    );
     try {
       final recovery = await ref.read(databaseRecoveryServiceProvider.future);
       final backup = await recovery.latestAutomaticBackup();
@@ -2695,7 +2811,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     } on Object catch (error) {
       final message = _recoveryFailureMessage(ref, error);
       state = AsyncData(
-        previous.copyWith(failureMessage: message, isBusy: false),
+        previous.copyWith(
+          failureMessage: message,
+          isBusy: false,
+          clearBusyReason: true,
+        ),
       );
       return message;
     }
@@ -2704,7 +2824,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   Future<String?> restoreFromBackupBytes(List<int> bytes) async {
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
-    state = AsyncData(previous.copyWith(isBusy: true, clearFailure: true));
+    state = AsyncData(
+      previous.copyWith(
+        isBusy: true,
+        clearFailure: true,
+        clearBusyReason: true,
+      ),
+    );
     try {
       await _closeDatabaseIfOpen();
       await (await ref.read(
@@ -2715,7 +2841,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     } on Object catch (error) {
       final message = _recoveryFailureMessage(ref, error);
       state = AsyncData(
-        previous.copyWith(failureMessage: message, isBusy: false),
+        previous.copyWith(
+          failureMessage: message,
+          isBusy: false,
+          clearBusyReason: true,
+        ),
       );
       return message;
     }
@@ -2724,7 +2854,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   Future<String?> quarantineCorruptRecords() async {
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.unlocked);
-    state = AsyncData(previous.copyWith(isBusy: true, clearFailure: true));
+    state = AsyncData(
+      previous.copyWith(
+        isBusy: true,
+        clearFailure: true,
+        clearBusyReason: true,
+      ),
+    );
     try {
       final backups = await ref.read(
         automaticVaultBackupServiceProvider.future,
@@ -2752,6 +2888,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
               : VaultRecoveryStatus.healthy,
           recordHealthReport: report,
           isBusy: false,
+          clearBusyReason: true,
           clearFailure: true,
         ),
       );
@@ -2759,7 +2896,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     } on Object catch (error) {
       final message = _recoveryFailureMessage(ref, error);
       state = AsyncData(
-        previous.copyWith(failureMessage: message, isBusy: false),
+        previous.copyWith(
+          failureMessage: message,
+          isBusy: false,
+          clearBusyReason: true,
+        ),
       );
       return message;
     }

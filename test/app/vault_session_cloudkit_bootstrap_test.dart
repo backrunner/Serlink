@@ -510,6 +510,65 @@ void main() {
   );
 
   test(
+    'new Apple device reports iCloud wait while discovering a remote vault',
+    () async {
+      final sourceVault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await sourceVault.initialize(passphrase: 'passphrase');
+      await SyncRunService(
+        vault: sourceVault,
+        records: InMemoryVaultRecordRepository(),
+      ).pushEncryptedSnapshot(LocalDirectorySyncProvider(remoteDir));
+
+      final provider = _BlockingObjectReadSyncProvider(
+        LocalDirectorySyncProvider(remoteDir),
+      )..armNextNonResetObjectRead();
+      final database = SerlinkDatabase(NativeDatabase.memory());
+      final transferQueue = TransferQueueController();
+      final container = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(database),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'ios',
+              targetPlatform: TargetPlatform.iOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(() => provider),
+          cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(transferQueue),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(transferQueue.dispose);
+      addTearDown(database.close);
+
+      final load = container.read(vaultSessionControllerProvider.future);
+      await provider.waitForBlockedRead();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        container.read(vaultSessionBusyReasonProvider),
+        VaultSessionBusyReason.waitingForICloud,
+      );
+
+      provider.releaseBlockedRead();
+      final discovered = await load;
+
+      expect(discovered.vaultState, VaultState.locked);
+      expect(discovered.notice, VaultSessionNotice.cloudKitRemoteVaultAdopted);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(vaultSessionBusyReasonProvider), isNull);
+    },
+  );
+
+  test(
     'enabling CloudKit discovers an existing vault after local pause',
     () async {
       final sourceVault = InMemoryVaultService(
@@ -1271,6 +1330,127 @@ void main() {
             .vaultState,
         VaultState.unlocked,
       );
+    },
+  );
+
+  test(
+    'locked Apple device reports iCloud wait while pulling pending changes',
+    () async {
+      final sourceDatabase = SerlinkDatabase(NativeDatabase.memory());
+      final sourceTransferQueue = TransferQueueController();
+      final sourceContainer = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(sourceDatabase),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'ios',
+              targetPlatform: TargetPlatform.iOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(
+            () => LocalDirectorySyncProvider(remoteDir),
+          ),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(
+            sourceTransferQueue,
+          ),
+        ],
+      );
+      addTearDown(sourceContainer.dispose);
+      addTearDown(sourceTransferQueue.dispose);
+      addTearDown(sourceDatabase.close);
+
+      await sourceContainer.read(vaultSessionControllerProvider.future);
+      await sourceContainer
+          .read(vaultSessionControllerProvider.notifier)
+          .initialize(passphrase: 'passphrase');
+
+      final provider = _BlockingObjectReadSyncProvider(
+        LocalDirectorySyncProvider(remoteDir),
+      );
+      final targetDatabase = SerlinkDatabase(NativeDatabase.memory());
+      final targetTransferQueue = TransferQueueController();
+      final targetContainer = ProviderContainer(
+        overrides: [
+          serlinkDatabaseProvider.overrideWithValue(targetDatabase),
+          vaultCryptoConfigProvider.overrideWithValue(
+            const VaultCryptoConfig.testing(),
+          ),
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'ios',
+              targetPlatform: TargetPlatform.iOS,
+            ),
+          ),
+          cloudKitAvailabilityCheckProvider.overrideWithValue(() async => true),
+          cloudKitSyncProviderFactoryProvider.overrideWithValue(() => provider),
+          cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
+          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+          transferQueueControllerProvider.overrideWithValue(
+            targetTransferQueue,
+          ),
+          autoSyncDebounceDurationProvider.overrideWithValue(
+            const Duration(days: 1),
+          ),
+          autoSyncEnabledProvider.overrideWithValue(false),
+        ],
+      );
+      addTearDown(targetContainer.dispose);
+      addTearDown(targetTransferQueue.dispose);
+      addTearDown(targetDatabase.close);
+
+      await targetContainer.read(vaultSessionControllerProvider.future);
+      await targetContainer
+          .read(vaultSessionControllerProvider.notifier)
+          .unlock(passphrase: 'passphrase');
+      await targetContainer
+          .read(vaultSessionControllerProvider.notifier)
+          .lock();
+
+      final sourceVault =
+          sourceContainer.read(vaultSessionControllerProvider.notifier).service
+              as InMemoryVaultService;
+      final host = await sourceVault.encryptRecord(
+        id: VaultRecordId('host:icloud-wait'),
+        type: 'host',
+        plaintext: utf8.encode('{"hostname":"wait.example.test"}'),
+      );
+      await sourceContainer.read(vaultRecordRepositoryProvider).upsert(host);
+      await sourceContainer
+          .read(syncRunServiceProvider)
+          .syncEncryptedSnapshot(LocalDirectorySyncProvider(remoteDir));
+
+      provider.armNextNonResetObjectRead();
+      final unlock = targetContainer
+          .read(vaultSessionControllerProvider.notifier)
+          .unlock(passphrase: 'passphrase');
+      await provider.waitForBlockedRead();
+
+      final waiting = targetContainer
+          .read(vaultSessionControllerProvider)
+          .requireValue;
+      expect(waiting.vaultState, VaultState.locked);
+      expect(waiting.isBusy, isTrue);
+      expect(waiting.busyReason, VaultSessionBusyReason.waitingForICloud);
+      expect(
+        targetContainer.read(vaultSessionBusyReasonProvider),
+        VaultSessionBusyReason.waitingForICloud,
+      );
+
+      provider.releaseBlockedRead();
+      await unlock;
+
+      final unlocked = targetContainer
+          .read(vaultSessionControllerProvider)
+          .requireValue;
+      expect(unlocked.vaultState, VaultState.unlocked);
+      expect(unlocked.isBusy, isFalse);
+      expect(unlocked.busyReason, isNull);
+      expect(targetContainer.read(vaultSessionBusyReasonProvider), isNull);
     },
   );
 

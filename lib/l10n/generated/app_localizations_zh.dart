@@ -196,6 +196,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsVaultPreparing => '正在准备加密存储';
 
   @override
+  String get settingsVaultWaitingICloud => '正在等待 iCloud 同步，请稍候';
+
+  @override
   String get settingsVaultNotCreatedPill => '保险库未创建';
 
   @override
@@ -729,6 +732,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostSectionRouting => '路由';
 
   @override
+  String get hostSectionPortForwarding => '端口转发';
+
+  @override
   String get hostDisplayNameLabel => '显示名称';
 
   @override
@@ -769,6 +775,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hostAdvancedConnectionTitle => '高级连接';
+
+  @override
+  String get hostPortForwardingLocalHint => '每次启动 SSH 会话时启动这些本地转发。';
+
+  @override
+  String get hostPortForwardingRemoteHint => '每次启动 SSH 会话时启动这些远程转发。';
+
+  @override
+  String get hostPortForwardingDynamicHint => '每次启动 SSH 会话时启动这些 SOCKS 代理。';
 
   @override
   String get hostTimeoutLabel => '超时（秒）';
@@ -970,6 +985,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String syncDeviceSingleSubtitle(String name) {
     return '$name 已注册用于加密同步。';
+  }
+
+  @override
+  String syncDevicesRegisteredSubtitle(num count) {
+    return '$count 台设备已注册。';
   }
 
   @override

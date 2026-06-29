@@ -78,6 +78,7 @@
   "settingsSecuritySection": "Security",
   "settingsVaultTitle": "Vault",
   "settingsVaultPreparing": "Preparing encrypted storage",
+  "settingsVaultWaitingICloud": "Waiting for iCloud sync. Please wait.",
   "settingsVaultNotCreatedPill": "Vault not created",
   "settingsVaultLockedPill": "Vault locked",
   "settingsVaultUnlockedPill": "Vault unlocked",
@@ -370,6 +371,7 @@
   "hostSectionAuthentication": "Authentication",
   "hostSectionStartup": "Startup",
   "hostSectionRouting": "Routing",
+  "hostSectionPortForwarding": "Port forwarding",
   "hostDisplayNameLabel": "Display name",
   "hostDisplayNameOptionalLabel": "Display name (optional)",
   "hostDisplayNameHostnameHint": "Same as hostname",
@@ -384,6 +386,9 @@
   "hostImportPrivateKeyTooltip": "Import private key",
   "hostKeyPassphraseLabel": "Key passphrase",
   "hostAdvancedConnectionTitle": "Advanced connection",
+  "hostPortForwardingLocalHint": "Start these local forwards with every SSH session.",
+  "hostPortForwardingRemoteHint": "Start these remote forwards with every SSH session.",
+  "hostPortForwardingDynamicHint": "Start these SOCKS proxies with every SSH session.",
   "hostTimeoutLabel": "Timeout (s)",
   "hostKeepaliveLabel": "Keepalive (s)",
   "hostAutoReconnectLabel": "Auto reconnect",
@@ -473,6 +478,14 @@
     "placeholders": {
       "name": {
         "type": "String"
+      }
+    }
+  },
+  "syncDevicesRegisteredSubtitle": "{count, plural, =1{1 device registered.} other{{count} devices registered.}}",
+  "@syncDevicesRegisteredSubtitle": {
+    "placeholders": {
+      "count": {
+        "type": "num"
       }
     }
   },

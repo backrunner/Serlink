@@ -23,6 +23,9 @@ class _HostsSurface extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final vaultSession = ref.watch(vaultSessionControllerProvider);
+    final session = vaultSession.value;
+    final vaultBusyReason =
+        session?.busyReason ?? ref.watch(vaultSessionBusyReasonProvider);
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final searchQuery = ref.watch(_workspaceSearchQueryProvider);
     final sortOrder = ref.watch(_hostSortOrderProvider);
@@ -37,7 +40,7 @@ class _HostsSurface extends ConsumerWidget {
       skipLoadingOnRefresh: false,
       loading: () => _PlaceholderSurface(
         title: l10n.vaultTitle,
-        body: l10n.settingsVaultPreparing,
+        body: _vaultPreparingLabel(l10n, vaultBusyReason),
         loading: true,
       ),
       error: (error, stackTrace) => _VaultAccessSurface(error: error),
@@ -65,11 +68,6 @@ class _HostsSurface extends ConsumerWidget {
               filterHostSummaries(hosts, searchQuery),
               sortOrder,
             );
-            if (hosts.isEmpty) {
-              return _HostsEmptyState(
-                onAddHost: () => _showAddHostDialog(context),
-              );
-            }
             return Column(
               children: [
                 if (!mobile)
@@ -82,7 +80,11 @@ class _HostsSurface extends ConsumerWidget {
                     onAddHost: () => _showAddHostDialog(context),
                   ),
                 Expanded(
-                  child: filteredHosts.isEmpty
+                  child: hosts.isEmpty
+                      ? _HostsEmptyState(
+                          onAddHost: () => _showAddHostDialog(context),
+                        )
+                      : filteredHosts.isEmpty
                       ? _PlaceholderSurface(
                           title: l10n.hostsNoMatchesTitle,
                           body: l10n.hostsNoMatchesBody,
@@ -218,6 +220,12 @@ class _HostsHeader extends StatelessWidget {
           _HostSortMenuButton(
             selectedOrder: sortOrder,
             onSelected: onSortOrderChanged,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: _WorkspaceHeaderSearch(
+              placeholder: l10n.searchHostsPlaceholder,
+            ),
           ),
           const SizedBox(width: 8),
           SerlinkTooltip(

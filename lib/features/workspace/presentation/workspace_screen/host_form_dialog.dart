@@ -43,6 +43,24 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       TextEditingController(text: '0');
   final TextEditingController _reconnectBackoffController =
       TextEditingController(text: '5');
+  final TextEditingController _localForwardLocalPortController =
+      TextEditingController();
+  final TextEditingController _localForwardRemoteHostController =
+      TextEditingController(text: '127.0.0.1');
+  final TextEditingController _localForwardRemotePortController =
+      TextEditingController();
+  final TextEditingController _remoteForwardBindHostController =
+      TextEditingController(text: '127.0.0.1');
+  final TextEditingController _remoteForwardBindPortController =
+      TextEditingController();
+  final TextEditingController _remoteForwardLocalHostController =
+      TextEditingController(text: '127.0.0.1');
+  final TextEditingController _remoteForwardLocalPortController =
+      TextEditingController();
+  final TextEditingController _dynamicForwardBindHostController =
+      TextEditingController(text: '127.0.0.1');
+  final TextEditingController _dynamicForwardBindPortController =
+      TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   _HostAuthInputMode _authMode = _HostAuthInputMode.password;
@@ -50,13 +68,15 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   List<HostSummary> _jumpHostOptions = const [];
   Set<IdentityId> _selectedIdentityIds = const {};
   Set<HostId> _selectedJumpHostIds = const {};
+  List<HostLocalPortForward> _localForwards = const [];
+  List<HostRemotePortForward> _remoteForwards = const [];
+  List<HostDynamicPortForward> _dynamicForwards = const [];
   bool _showAdvancedConnection = false;
   bool _passwordVisible = false;
   bool _loadingOptions = true;
   bool _saving = false;
   String? _errorMessage;
 
-  bool get _isEditing => widget.mode == _HostFormMode.edit;
   bool get _usesSavedCredentialPicker =>
       widget.mode == _HostFormMode.edit ||
       widget.mode == _HostFormMode.duplicate;
@@ -100,6 +120,15 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     _keepAliveIntervalController.dispose();
     _reconnectAttemptsController.dispose();
     _reconnectBackoffController.dispose();
+    _localForwardLocalPortController.dispose();
+    _localForwardRemoteHostController.dispose();
+    _localForwardRemotePortController.dispose();
+    _remoteForwardBindHostController.dispose();
+    _remoteForwardBindPortController.dispose();
+    _remoteForwardLocalHostController.dispose();
+    _remoteForwardLocalPortController.dispose();
+    _dynamicForwardBindHostController.dispose();
+    _dynamicForwardBindPortController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -117,183 +146,196 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       titlePadding: layout.titlePadding,
       contentPadding: layout.contentPadding,
       actionsPadding: layout.actionsPadding,
-      content: SizedBox(
+      content: _DialogScrollFrame(
         key: const ValueKey('host-form-scroll-frame'),
         width: layout.contentWidth,
         height: layout.contentHeight,
-        child: Scrollbar(
-          controller: _scrollController,
-          child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(
-              context,
-            ).copyWith(scrollbars: false),
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              padding: layout.scrollPadding,
+        controller: _scrollController,
+        padding: layout.scrollPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _HostFormSection(
+              title: l10n.hostSectionConnection,
+              padding: layout.sectionPadding,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _HostFormSection(
-                    title: l10n.hostSectionConnection,
-                    padding: layout.sectionPadding,
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: SerlinkTextField(
-                                key: const ValueKey('host-hostname-field'),
-                                controller: _hostnameController,
-                                decoration: InputDecoration(
-                                  labelText: l10n.hostHostnameLabel,
-                                ),
-                                textInputAction: TextInputAction.next,
-                              ),
-                            ),
-                            SizedBox(width: layout.inlineGap),
-                            Expanded(
-                              child: SerlinkTextField(
-                                controller: _portController,
-                                decoration: InputDecoration(
-                                  labelText: l10n.hostPortLabel,
-                                ),
-                                keyboardType: TextInputType.number,
-                                textInputAction: TextInputAction.next,
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: layout.fieldGap),
-                        SerlinkTextField(
-                          key: const ValueKey('host-display-name-field'),
-                          controller: _displayNameController,
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: SerlinkTextField(
+                          key: const ValueKey('host-hostname-field'),
+                          controller: _hostnameController,
                           decoration: InputDecoration(
-                            labelText: l10n.hostDisplayNameOptionalLabel,
-                            hintText: l10n.hostDisplayNameHostnameHint,
-                            helperText: l10n.hostDisplayNameHostnameHelper,
+                            labelText: l10n.hostHostnameLabel,
                           ),
                           textInputAction: TextInputAction.next,
                         ),
-                        SizedBox(height: layout.fieldGap),
-                        SerlinkTextField(
-                          key: const ValueKey('host-username-field'),
-                          controller: _usernameController,
+                      ),
+                      SizedBox(width: layout.inlineGap),
+                      Expanded(
+                        child: SerlinkTextField(
+                          controller: _portController,
                           decoration: InputDecoration(
-                            labelText: l10n.hostUsernameLabel,
+                            labelText: l10n.hostPortLabel,
                           ),
+                          keyboardType: TextInputType.number,
                           textInputAction: TextInputAction.next,
                         ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: layout.sectionGap),
-                  _HostFormSection(
-                    title: l10n.hostSectionAuthentication,
-                    padding: layout.sectionPadding,
-                    child: _HostAuthenticationFields(
-                      useSavedCredentialPicker: _usesSavedCredentialPicker,
-                      authMode: _authMode,
-                      loadingOptions: _loadingOptions,
-                      passwordController: _passwordController,
-                      passwordVisible: _passwordVisible,
-                      privateKeyController: _privateKeyController,
-                      keyPassphraseController: _keyPassphraseController,
-                      showSshAgent: capabilities.sshAgentAuth,
-                      identityOptions: _identityOptions,
-                      selectedIdentityIds: _selectedIdentityIds,
-                      onAuthModeChanged: (authMode) {
-                        setState(() {
-                          _authMode = authMode;
-                        });
-                      },
-                      onImportPrivateKey: _importPrivateKey,
-                      onTogglePasswordVisible: () {
-                        setState(() {
-                          _passwordVisible = !_passwordVisible;
-                        });
-                      },
-                      onToggleIdentity: _toggleIdentity,
-                      onEditIdentity: _editIdentity,
-                      onSubmit: _save,
-                      compact: layout.compact,
-                    ),
-                  ),
-                  SizedBox(height: layout.sectionGap),
-                  _HostFormSection(
-                    title: l10n.hostSectionStartup,
-                    padding: layout.sectionPadding,
-                    child: Column(
-                      children: [
-                        SerlinkTextField(
-                          key: const ValueKey('host-startup-commands-field'),
-                          controller: _startupCommandsController,
-                          minLines: 2,
-                          maxLines: 5,
-                          decoration: InputDecoration(
-                            labelText: l10n.hostStartupCommandsLabel,
-                          ),
-                        ),
-                        SizedBox(height: layout.fieldGap),
-                        SerlinkTextField(
-                          controller: _tagsController,
-                          decoration: InputDecoration(
-                            labelText: l10n.hostTagsLabel,
-                          ),
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => _save(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_jumpHostOptions.isNotEmpty) ...[
-                    SizedBox(height: layout.sectionGap),
-                    _HostFormSection(
-                      title: l10n.hostSectionRouting,
-                      padding: layout.sectionPadding,
-                      child: _JumpHostSelectionSection(
-                        hosts: _jumpHostOptions,
-                        selectedHostIds: _selectedJumpHostIds,
-                        enabled: !_loadingOptions,
-                        onToggle: _toggleJumpHost,
                       ),
-                    ),
-                  ],
-                  SizedBox(height: layout.sectionGap),
-                  _HostFormSection(
-                    title: 'SFTP',
-                    padding: layout.sectionPadding,
-                    child: SerlinkTextField(
-                      key: const ValueKey('host-sftp-default-directory-field'),
-                      controller: _sftpDefaultDirectoryController,
-                      decoration: InputDecoration(
-                        labelText: l10n.hostStartFolderLabel,
-                      ),
-                      textInputAction: TextInputAction.next,
-                    ),
+                    ],
                   ),
-                  SizedBox(height: layout.sectionGap),
-                  _AdvancedConnectionSettingsSection(
-                    expanded: _showAdvancedConnection,
-                    connectTimeoutController: _connectTimeoutController,
-                    keepAliveIntervalController: _keepAliveIntervalController,
-                    reconnectAttemptsController: _reconnectAttemptsController,
-                    reconnectBackoffController: _reconnectBackoffController,
-                    compact: layout.compact,
-                    onToggle: () {
-                      setState(() {
-                        _showAdvancedConnection = !_showAdvancedConnection;
-                      });
-                    },
+                  SizedBox(height: layout.fieldGap),
+                  SerlinkTextField(
+                    key: const ValueKey('host-display-name-field'),
+                    controller: _displayNameController,
+                    decoration: InputDecoration(
+                      labelText: l10n.hostDisplayNameOptionalLabel,
+                      hintText: l10n.hostDisplayNameHostnameHint,
+                      helperText: l10n.hostDisplayNameHostnameHelper,
+                    ),
+                    textInputAction: TextInputAction.next,
                   ),
-                  if (_errorMessage != null) ...[
-                    const SizedBox(height: 12),
-                    _HostFormError(message: _errorMessage!),
-                  ],
+                  SizedBox(height: layout.fieldGap),
+                  SerlinkTextField(
+                    key: const ValueKey('host-username-field'),
+                    controller: _usernameController,
+                    decoration: InputDecoration(
+                      labelText: l10n.hostUsernameLabel,
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
                 ],
               ),
             ),
-          ),
+            SizedBox(height: layout.sectionGap),
+            _HostFormSection(
+              title: l10n.hostSectionAuthentication,
+              padding: layout.sectionPadding,
+              child: _HostAuthenticationFields(
+                useSavedCredentialPicker: _usesSavedCredentialPicker,
+                authMode: _authMode,
+                loadingOptions: _loadingOptions,
+                passwordController: _passwordController,
+                passwordVisible: _passwordVisible,
+                privateKeyController: _privateKeyController,
+                keyPassphraseController: _keyPassphraseController,
+                showSshAgent: capabilities.sshAgentAuth,
+                identityOptions: _identityOptions,
+                selectedIdentityIds: _selectedIdentityIds,
+                onAuthModeChanged: (authMode) {
+                  setState(() {
+                    _authMode = authMode;
+                  });
+                },
+                onImportPrivateKey: _importPrivateKey,
+                onTogglePasswordVisible: () {
+                  setState(() {
+                    _passwordVisible = !_passwordVisible;
+                  });
+                },
+                onToggleIdentity: _toggleIdentity,
+                onEditIdentity: _editIdentity,
+                onSubmit: _save,
+                compact: layout.compact,
+              ),
+            ),
+            SizedBox(height: layout.sectionGap),
+            _HostFormSection(
+              title: l10n.hostSectionStartup,
+              padding: layout.sectionPadding,
+              child: Column(
+                children: [
+                  SerlinkTextField(
+                    key: const ValueKey('host-startup-commands-field'),
+                    controller: _startupCommandsController,
+                    minLines: 2,
+                    maxLines: 5,
+                    decoration: InputDecoration(
+                      labelText: l10n.hostStartupCommandsLabel,
+                    ),
+                  ),
+                  SizedBox(height: layout.fieldGap),
+                  SerlinkTextField(
+                    controller: _tagsController,
+                    decoration: InputDecoration(labelText: l10n.hostTagsLabel),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _save(),
+                  ),
+                ],
+              ),
+            ),
+            if (_jumpHostOptions.isNotEmpty) ...[
+              SizedBox(height: layout.sectionGap),
+              _HostFormSection(
+                title: l10n.hostSectionRouting,
+                padding: layout.sectionPadding,
+                child: _JumpHostSelectionSection(
+                  hosts: _jumpHostOptions,
+                  selectedHostIds: _selectedJumpHostIds,
+                  enabled: !_loadingOptions,
+                  onToggle: _toggleJumpHost,
+                ),
+              ),
+            ],
+            SizedBox(height: layout.sectionGap),
+            _HostFormSection(
+              title: l10n.hostSectionPortForwarding,
+              padding: layout.sectionPadding,
+              child: _HostPortForwardingSection(
+                localForwards: _localForwards,
+                remoteForwards: _remoteForwards,
+                dynamicForwards: _dynamicForwards,
+                localPortController: _localForwardLocalPortController,
+                localRemoteHostController: _localForwardRemoteHostController,
+                localRemotePortController: _localForwardRemotePortController,
+                remoteBindHostController: _remoteForwardBindHostController,
+                remoteBindPortController: _remoteForwardBindPortController,
+                remoteLocalHostController: _remoteForwardLocalHostController,
+                remoteLocalPortController: _remoteForwardLocalPortController,
+                dynamicBindHostController: _dynamicForwardBindHostController,
+                dynamicBindPortController: _dynamicForwardBindPortController,
+                onAddLocal: _addLocalForward,
+                onRemoveLocal: _removeLocalForward,
+                onAddRemote: _addRemoteForward,
+                onRemoveRemote: _removeRemoteForward,
+                onAddDynamic: _addDynamicForward,
+                onRemoveDynamic: _removeDynamicForward,
+              ),
+            ),
+            SizedBox(height: layout.sectionGap),
+            _HostFormSection(
+              title: 'SFTP',
+              padding: layout.sectionPadding,
+              child: SerlinkTextField(
+                key: const ValueKey('host-sftp-default-directory-field'),
+                controller: _sftpDefaultDirectoryController,
+                decoration: InputDecoration(
+                  labelText: l10n.hostStartFolderLabel,
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+            ),
+            SizedBox(height: layout.sectionGap),
+            _AdvancedConnectionSettingsSection(
+              expanded: _showAdvancedConnection,
+              connectTimeoutController: _connectTimeoutController,
+              keepAliveIntervalController: _keepAliveIntervalController,
+              reconnectAttemptsController: _reconnectAttemptsController,
+              reconnectBackoffController: _reconnectBackoffController,
+              compact: layout.compact,
+              onToggle: () {
+                setState(() {
+                  _showAdvancedConnection = !_showAdvancedConnection;
+                });
+              },
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 12),
+              _HostFormError(message: _errorMessage!),
+            ],
+          ],
         ),
       ),
       actions: [
@@ -324,6 +366,11 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     if (connectionSettings == null) {
       return;
     }
+    final portForwarding = HostPortForwardingSettings(
+      localForwards: _localForwards,
+      remoteForwards: _remoteForwards,
+      dynamicForwards: _dynamicForwards,
+    );
 
     setState(() {
       _saving = true;
@@ -349,6 +396,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             startupCommands: startupCommands,
             jumpHostIds: jumpHostIds,
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
+            portForwarding: portForwarding,
             connectionSettings: connectionSettings,
           ),
         );
@@ -365,6 +413,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             startupCommands: startupCommands,
             jumpHostIds: jumpHostIds,
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
+            portForwarding: portForwarding,
             connectionSettings: connectionSettings,
           ),
         );
@@ -380,6 +429,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             startupCommands: startupCommands,
             jumpHostIds: jumpHostIds,
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
+            portForwarding: portForwarding,
             connectionSettings: connectionSettings,
           ),
         );
@@ -396,6 +446,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             startupCommands: startupCommands,
             jumpHostIds: jumpHostIds,
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
+            portForwarding: portForwarding,
             connectionSettings: connectionSettings,
           ),
         );
@@ -411,6 +462,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             startupCommands: startupCommands,
             jumpHostIds: jumpHostIds,
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
+            portForwarding: portForwarding,
             connectionSettings: connectionSettings,
           ),
         );
@@ -426,6 +478,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             startupCommands: startupCommands,
             jumpHostIds: jumpHostIds,
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
+            portForwarding: portForwarding,
             connectionSettings: connectionSettings,
           ),
         );
@@ -537,6 +590,9 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
               .connectionSettings
               .reconnectBackoffSeconds
               .toString();
+          _localForwards = [...hostConfig.portForwarding.localForwards];
+          _remoteForwards = [...hostConfig.portForwarding.remoteForwards];
+          _dynamicForwards = [...hostConfig.portForwarding.dynamicForwards];
         }
         _loadingOptions = false;
       });
@@ -568,6 +624,107 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     }
     setState(() {
       _selectedJumpHostIds = next;
+    });
+  }
+
+  void _addLocalForward() {
+    final localPort = _parsePort(_localForwardLocalPortController.text);
+    final remoteHost = _localForwardRemoteHostController.text.trim();
+    final remotePort = _parsePort(_localForwardRemotePortController.text);
+    if (localPort == null || remoteHost.isEmpty || remotePort == null) {
+      _setForwardingError(context.l10n.forwardingLocalValidationError);
+      return;
+    }
+    setState(() {
+      _localForwards = [
+        ..._localForwards,
+        HostLocalPortForward(
+          localPort: localPort,
+          remoteHost: remoteHost,
+          remotePort: remotePort,
+        ),
+      ];
+      _localForwardLocalPortController.clear();
+      _localForwardRemotePortController.clear();
+      _errorMessage = null;
+    });
+  }
+
+  void _removeLocalForward(int index) {
+    setState(() {
+      _localForwards = [
+        for (var i = 0; i < _localForwards.length; i += 1)
+          if (i != index) _localForwards[i],
+      ];
+    });
+  }
+
+  void _addRemoteForward() {
+    final bindHost = _remoteForwardBindHostController.text.trim();
+    final bindPort = _parsePort(_remoteForwardBindPortController.text);
+    final localHost = _remoteForwardLocalHostController.text.trim();
+    final localPort = _parsePort(_remoteForwardLocalPortController.text);
+    if (bindHost.isEmpty ||
+        bindPort == null ||
+        localHost.isEmpty ||
+        localPort == null) {
+      _setForwardingError(context.l10n.forwardingRemoteValidationError);
+      return;
+    }
+    setState(() {
+      _remoteForwards = [
+        ..._remoteForwards,
+        HostRemotePortForward(
+          bindHost: bindHost,
+          bindPort: bindPort,
+          localHost: localHost,
+          localPort: localPort,
+        ),
+      ];
+      _remoteForwardBindPortController.clear();
+      _remoteForwardLocalPortController.clear();
+      _errorMessage = null;
+    });
+  }
+
+  void _removeRemoteForward(int index) {
+    setState(() {
+      _remoteForwards = [
+        for (var i = 0; i < _remoteForwards.length; i += 1)
+          if (i != index) _remoteForwards[i],
+      ];
+    });
+  }
+
+  void _addDynamicForward() {
+    final bindHost = _dynamicForwardBindHostController.text.trim();
+    final bindPort = _parsePort(_dynamicForwardBindPortController.text);
+    if (bindHost.isEmpty || bindPort == null) {
+      _setForwardingError(context.l10n.forwardingDynamicValidationError);
+      return;
+    }
+    setState(() {
+      _dynamicForwards = [
+        ..._dynamicForwards,
+        HostDynamicPortForward(bindHost: bindHost, bindPort: bindPort),
+      ];
+      _dynamicForwardBindPortController.clear();
+      _errorMessage = null;
+    });
+  }
+
+  void _removeDynamicForward(int index) {
+    setState(() {
+      _dynamicForwards = [
+        for (var i = 0; i < _dynamicForwards.length; i += 1)
+          if (i != index) _dynamicForwards[i],
+      ];
+    });
+  }
+
+  void _setForwardingError(String message) {
+    setState(() {
+      _errorMessage = message;
     });
   }
 

@@ -108,6 +108,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
       TextEditingController(text: '127.0.0.1');
   final TextEditingController _dynamicBindPortController =
       TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String? _localErrorMessage;
   String? _remoteErrorMessage;
   String? _dynamicErrorMessage;
@@ -146,248 +147,255 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
     _remoteLocalPortController.dispose();
     _dynamicBindHostController.dispose();
     _dynamicBindPortController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final viewportHeight = math.min(
+      560.0,
+      math.max(320.0, MediaQuery.sizeOf(context).height - 180.0),
+    );
+    final dialogWidth = _adaptiveDialogWidth(context, _dialogWidthMedium);
+    final contentWidth = math.max(280.0, dialogWidth - 48.0);
     return SerlinkDialog(
+      maxWidth: dialogWidth,
       title: Text(l10n.forwardingDialogTitle),
-      content: SizedBox(
-        width: 560,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _ForwardSection(
-                title: l10n.forwardingLocalTitle,
-                subtitle: widget.activeLocalForward == null
-                    ? l10n.forwardingLocalSubtitle
-                    : '127.0.0.1:${widget.activeLocalForward!.localPort}'
-                          ' -> ${widget.activeLocalForward!.remoteHost}'
-                          ':${widget.activeLocalForward!.remotePort}',
-                actionLabel: widget.activeLocalForward == null
-                    ? l10n.startAction
-                    : l10n.stopAction,
-                destructive: widget.activeLocalForward != null,
-                onPressed: widget.activeLocalForward == null
-                    ? _submitLocal
-                    : () => Navigator.of(
-                        context,
-                      ).pop(const _ForwardDialogAction.stopLocal()),
-                child: widget.activeLocalForward != null
-                    ? null
-                    : Column(
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: SerlinkTextField(
-                                  key: const ValueKey(
-                                    'local-forward-local-port-field',
-                                  ),
-                                  controller: _localPortController,
-                                  decoration: InputDecoration(
-                                    labelText: l10n.forwardingLocalPortLabel,
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  textInputAction: TextInputAction.next,
+      content: _DialogScrollFrame(
+        width: contentWidth,
+        height: viewportHeight,
+        controller: _scrollController,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _ForwardSection(
+              title: l10n.forwardingLocalTitle,
+              subtitle: widget.activeLocalForward == null
+                  ? l10n.forwardingLocalSubtitle
+                  : '127.0.0.1:${widget.activeLocalForward!.localPort}'
+                        ' -> ${widget.activeLocalForward!.remoteHost}'
+                        ':${widget.activeLocalForward!.remotePort}',
+              actionLabel: widget.activeLocalForward == null
+                  ? l10n.startAction
+                  : l10n.stopAction,
+              destructive: widget.activeLocalForward != null,
+              onPressed: widget.activeLocalForward == null
+                  ? _submitLocal
+                  : () => Navigator.of(
+                      context,
+                    ).pop(const _ForwardDialogAction.stopLocal()),
+              child: widget.activeLocalForward != null
+                  ? null
+                  : Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SerlinkTextField(
+                                key: const ValueKey(
+                                  'local-forward-local-port-field',
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                flex: 2,
-                                child: SerlinkTextField(
-                                  key: const ValueKey(
-                                    'local-forward-remote-host-field',
-                                  ),
-                                  controller: _remoteHostController,
-                                  decoration: InputDecoration(
-                                    labelText: l10n.forwardingRemoteHostLabel,
-                                  ),
-                                  textInputAction: TextInputAction.next,
+                                controller: _localPortController,
+                                decoration: InputDecoration(
+                                  labelText: l10n.forwardingLocalPortLabel,
                                 ),
+                                keyboardType: TextInputType.number,
+                                textInputAction: TextInputAction.next,
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          SerlinkTextField(
-                            key: const ValueKey(
-                              'local-forward-remote-port-field',
                             ),
-                            controller: _remotePortController,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: SerlinkTextField(
+                                key: const ValueKey(
+                                  'local-forward-remote-host-field',
+                                ),
+                                controller: _remoteHostController,
+                                decoration: InputDecoration(
+                                  labelText: l10n.forwardingRemoteHostLabel,
+                                ),
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SerlinkTextField(
+                          key: const ValueKey(
+                            'local-forward-remote-port-field',
+                          ),
+                          controller: _remotePortController,
+                          decoration: InputDecoration(
+                            labelText: l10n.forwardingRemotePortLabel,
+                          ),
+                          keyboardType: TextInputType.number,
+                          onSubmitted: (_) => _submitLocal(),
+                        ),
+                        if (_localErrorMessage != null) ...[
+                          const SizedBox(height: 8),
+                          SerlinkAlert.danger(
+                            message: _localErrorMessage!,
+                            compact: true,
+                          ),
+                        ],
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 16),
+            _ForwardSection(
+              title: l10n.forwardingRemoteTitle,
+              subtitle: widget.activeRemoteForward == null
+                  ? l10n.forwardingRemoteSubtitle
+                  : '${widget.activeRemoteForward!.bindHost}'
+                        ':${widget.activeRemoteForward!.bindPort}'
+                        ' -> ${widget.activeRemoteForward!.localHost}'
+                        ':${widget.activeRemoteForward!.localPort}',
+              actionLabel: widget.activeRemoteForward == null
+                  ? l10n.startAction
+                  : l10n.stopAction,
+              destructive: widget.activeRemoteForward != null,
+              onPressed: widget.activeRemoteForward == null
+                  ? _submitRemote
+                  : () => Navigator.of(
+                      context,
+                    ).pop(const _ForwardDialogAction.stopRemote()),
+              child: widget.activeRemoteForward != null
+                  ? null
+                  : Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: SerlinkTextField(
+                                key: const ValueKey(
+                                  'remote-forward-bind-host-field',
+                                ),
+                                controller: _remoteBindHostController,
+                                decoration: InputDecoration(
+                                  labelText: l10n.forwardingBindHostLabel,
+                                ),
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: SerlinkTextField(
+                                key: const ValueKey(
+                                  'remote-forward-bind-port-field',
+                                ),
+                                controller: _remoteBindPortController,
+                                decoration: InputDecoration(
+                                  labelText: l10n.forwardingBindPortLabel,
+                                ),
+                                keyboardType: TextInputType.number,
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: SerlinkTextField(
+                                key: const ValueKey(
+                                  'remote-forward-local-host-field',
+                                ),
+                                controller: _remoteLocalHostController,
+                                decoration: InputDecoration(
+                                  labelText: l10n.forwardingLocalHostLabel,
+                                ),
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: SerlinkTextField(
+                                key: const ValueKey(
+                                  'remote-forward-local-port-field',
+                                ),
+                                controller: _remoteLocalPortController,
+                                decoration: InputDecoration(
+                                  labelText: l10n.forwardingLocalPortLabel,
+                                ),
+                                keyboardType: TextInputType.number,
+                                onSubmitted: (_) => _submitRemote(),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_remoteErrorMessage != null) ...[
+                          const SizedBox(height: 8),
+                          SerlinkAlert.danger(
+                            message: _remoteErrorMessage!,
+                            compact: true,
+                          ),
+                        ],
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 16),
+            _ForwardSection(
+              title: l10n.forwardingSocksTitle,
+              subtitle: widget.activeDynamicForward == null
+                  ? l10n.forwardingSocksSubtitle
+                  : '${widget.activeDynamicForward!.bindHost}'
+                        ':${widget.activeDynamicForward!.bindPort}',
+              actionLabel: widget.activeDynamicForward == null
+                  ? l10n.startAction
+                  : l10n.stopAction,
+              destructive: widget.activeDynamicForward != null,
+              onPressed: widget.activeDynamicForward == null
+                  ? _submitDynamic
+                  : () => Navigator.of(
+                      context,
+                    ).pop(const _ForwardDialogAction.stopDynamic()),
+              child: widget.activeDynamicForward != null
+                  ? null
+                  : Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: SerlinkTextField(
+                            key: const ValueKey(
+                              'dynamic-forward-bind-host-field',
+                            ),
+                            controller: _dynamicBindHostController,
                             decoration: InputDecoration(
-                              labelText: l10n.forwardingRemotePortLabel,
+                              labelText: l10n.forwardingBindHostLabel,
+                            ),
+                            textInputAction: TextInputAction.next,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SerlinkTextField(
+                            key: const ValueKey(
+                              'dynamic-forward-bind-port-field',
+                            ),
+                            controller: _dynamicBindPortController,
+                            decoration: InputDecoration(
+                              labelText: l10n.forwardingBindPortLabel,
                             ),
                             keyboardType: TextInputType.number,
-                            onSubmitted: (_) => _submitLocal(),
+                            onSubmitted: (_) => _submitDynamic(),
                           ),
-                          if (_localErrorMessage != null) ...[
-                            const SizedBox(height: 8),
-                            SerlinkAlert.danger(
-                              message: _localErrorMessage!,
-                              compact: true,
-                            ),
-                          ],
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
+            ),
+            if (_dynamicErrorMessage != null) ...[
+              const SizedBox(height: 8),
+              SerlinkAlert.danger(
+                message: _dynamicErrorMessage!,
+                compact: true,
               ),
-              const SizedBox(height: 16),
-              _ForwardSection(
-                title: l10n.forwardingRemoteTitle,
-                subtitle: widget.activeRemoteForward == null
-                    ? l10n.forwardingRemoteSubtitle
-                    : '${widget.activeRemoteForward!.bindHost}'
-                          ':${widget.activeRemoteForward!.bindPort}'
-                          ' -> ${widget.activeRemoteForward!.localHost}'
-                          ':${widget.activeRemoteForward!.localPort}',
-                actionLabel: widget.activeRemoteForward == null
-                    ? l10n.startAction
-                    : l10n.stopAction,
-                destructive: widget.activeRemoteForward != null,
-                onPressed: widget.activeRemoteForward == null
-                    ? _submitRemote
-                    : () => Navigator.of(
-                        context,
-                      ).pop(const _ForwardDialogAction.stopRemote()),
-                child: widget.activeRemoteForward != null
-                    ? null
-                    : Column(
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 2,
-                                child: SerlinkTextField(
-                                  key: const ValueKey(
-                                    'remote-forward-bind-host-field',
-                                  ),
-                                  controller: _remoteBindHostController,
-                                  decoration: InputDecoration(
-                                    labelText: l10n.forwardingBindHostLabel,
-                                  ),
-                                  textInputAction: TextInputAction.next,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: SerlinkTextField(
-                                  key: const ValueKey(
-                                    'remote-forward-bind-port-field',
-                                  ),
-                                  controller: _remoteBindPortController,
-                                  decoration: InputDecoration(
-                                    labelText: l10n.forwardingBindPortLabel,
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  textInputAction: TextInputAction.next,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 2,
-                                child: SerlinkTextField(
-                                  key: const ValueKey(
-                                    'remote-forward-local-host-field',
-                                  ),
-                                  controller: _remoteLocalHostController,
-                                  decoration: InputDecoration(
-                                    labelText: l10n.forwardingLocalHostLabel,
-                                  ),
-                                  textInputAction: TextInputAction.next,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: SerlinkTextField(
-                                  key: const ValueKey(
-                                    'remote-forward-local-port-field',
-                                  ),
-                                  controller: _remoteLocalPortController,
-                                  decoration: InputDecoration(
-                                    labelText: l10n.forwardingLocalPortLabel,
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  onSubmitted: (_) => _submitRemote(),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_remoteErrorMessage != null) ...[
-                            const SizedBox(height: 8),
-                            SerlinkAlert.danger(
-                              message: _remoteErrorMessage!,
-                              compact: true,
-                            ),
-                          ],
-                        ],
-                      ),
-              ),
-              const SizedBox(height: 16),
-              _ForwardSection(
-                title: l10n.forwardingSocksTitle,
-                subtitle: widget.activeDynamicForward == null
-                    ? l10n.forwardingSocksSubtitle
-                    : '${widget.activeDynamicForward!.bindHost}'
-                          ':${widget.activeDynamicForward!.bindPort}',
-                actionLabel: widget.activeDynamicForward == null
-                    ? l10n.startAction
-                    : l10n.stopAction,
-                destructive: widget.activeDynamicForward != null,
-                onPressed: widget.activeDynamicForward == null
-                    ? _submitDynamic
-                    : () => Navigator.of(
-                        context,
-                      ).pop(const _ForwardDialogAction.stopDynamic()),
-                child: widget.activeDynamicForward != null
-                    ? null
-                    : Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: SerlinkTextField(
-                              key: const ValueKey(
-                                'dynamic-forward-bind-host-field',
-                              ),
-                              controller: _dynamicBindHostController,
-                              decoration: InputDecoration(
-                                labelText: l10n.forwardingBindHostLabel,
-                              ),
-                              textInputAction: TextInputAction.next,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: SerlinkTextField(
-                              key: const ValueKey(
-                                'dynamic-forward-bind-port-field',
-                              ),
-                              controller: _dynamicBindPortController,
-                              decoration: InputDecoration(
-                                labelText: l10n.forwardingBindPortLabel,
-                              ),
-                              keyboardType: TextInputType.number,
-                              onSubmitted: (_) => _submitDynamic(),
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-              if (_dynamicErrorMessage != null) ...[
-                const SizedBox(height: 8),
-                SerlinkAlert.danger(
-                  message: _dynamicErrorMessage!,
-                  compact: true,
-                ),
-              ],
             ],
-          ),
+          ],
         ),
       ),
       actions: [

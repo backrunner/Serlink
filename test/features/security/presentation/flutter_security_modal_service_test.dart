@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,8 @@ import 'package:serlink/features/security/presentation/flutter_security_modal_se
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/sync/domain/webdav_tls_certificate_details.dart';
 import 'package:serlink/l10n/l10n.dart';
+
+const double _expectedHostKeyDialogDesktopWidth = 520;
 
 void main() {
   testWidgets('host key confirmation blocks until user chooses a decision', (
@@ -37,6 +41,31 @@ void main() {
     await tester.pumpAndSettle();
 
     await expectLater(decisionFuture, completion(HostKeyDecision.trustOnce));
+  });
+
+  testWidgets('host key dialog uses compact desktop width', (tester) async {
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
+
+    final service = FlutterSecurityModalService(key: navigatorKey);
+    unawaited(
+      service.confirmHostKey(
+        HostKeyPrompt(
+          hostId: HostId('host-1'),
+          hostname: 'bastion.internal',
+          port: 22,
+          algorithm: 'ssh-ed25519',
+          fingerprint: 'MD5:aa:bb:cc',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final dialog = tester.widget<FDialog>(find.byType(FDialog));
+    expect(dialog.constraints.maxWidth, _expectedHostKeyDialogDesktopWidth);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('host key changed dialog defaults to cancel', (tester) async {

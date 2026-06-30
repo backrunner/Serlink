@@ -8,9 +8,6 @@ class _TerminalToolbar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final showSplitControls = ref
-        .watch(platformCapabilitiesProvider)
-        .terminalSplit;
     return SizedBox(
       height: 44,
       child: Padding(
@@ -51,27 +48,22 @@ class _TerminalToolbar extends ConsumerWidget {
                 icon: Icons.folder_open_outlined,
                 onPressed: snapshot.onOpenSftp,
               ),
-            if (showSplitControls) ...[
+            if (snapshot.showSplitControls) ...[
               _ToolbarSerlinkIconButton(
                 key: const ValueKey('terminal-split-right-button'),
                 tooltip: l10n.terminalSplitRightTooltip,
                 icon: Icons.view_column_outlined,
-                onPressed: snapshot.onSplitRight,
+                onPressed: snapshot.canSplitRight
+                    ? snapshot.onSplitRight
+                    : null,
               ),
               _ToolbarSerlinkIconButton(
                 key: const ValueKey('terminal-split-down-button'),
                 tooltip: l10n.terminalSplitDownTooltip,
                 icon: Icons.view_agenda_outlined,
-                onPressed: snapshot.onSplitDown,
+                onPressed: snapshot.canSplitDown ? snapshot.onSplitDown : null,
               ),
             ],
-            if (showSplitControls && snapshot.showSplit)
-              _ToolbarSerlinkIconButton(
-                key: const ValueKey('terminal-close-pane-button'),
-                tooltip: l10n.terminalClosePaneTooltip,
-                icon: Icons.close_fullscreen_outlined,
-                onPressed: snapshot.onCloseActivePane,
-              ),
             _ToolbarSerlinkIconButton(
               key: const ValueKey('terminal-settings-button'),
               tooltip: l10n.terminalSettingsTitle,
@@ -88,6 +80,8 @@ class _TerminalToolbar extends ConsumerWidget {
 class _TerminalToolbarSnapshot {
   const _TerminalToolbarSnapshot({
     required this.tabId,
+    required this.activePane,
+    required this.activeHostId,
     required this.searchActive,
     required this.activeLocalForward,
     required this.activeRemoteForward,
@@ -96,17 +90,20 @@ class _TerminalToolbarSnapshot {
     required this.forwardEnabled,
     required this.showForwarding,
     required this.showOpenSftp,
+    required this.showSplitControls,
     required this.onToggleSearch,
     required this.onManageForwarding,
     required this.onOpenSftp,
-    required this.showSplit,
+    required this.canSplitRight,
+    required this.canSplitDown,
     required this.onSplitRight,
     required this.onSplitDown,
-    required this.onCloseActivePane,
     required this.onSettings,
   });
 
   final WorkspaceTabId tabId;
+  final int activePane;
+  final HostId? activeHostId;
   final bool searchActive;
   final _LocalForwardDraft? activeLocalForward;
   final _RemoteForwardDraft? activeRemoteForward;
@@ -115,18 +112,21 @@ class _TerminalToolbarSnapshot {
   final bool forwardEnabled;
   final bool showForwarding;
   final bool showOpenSftp;
+  final bool showSplitControls;
   final VoidCallback onToggleSearch;
   final VoidCallback onManageForwarding;
   final VoidCallback? onOpenSftp;
-  final bool showSplit;
+  final bool canSplitRight;
+  final bool canSplitDown;
   final VoidCallback onSplitRight;
   final VoidCallback onSplitDown;
-  final VoidCallback onCloseActivePane;
   final VoidCallback onSettings;
 
   String get signature {
     return [
       tabId.value,
+      activePane,
+      activeHostId?.value ?? '-',
       searchActive,
       _localForwardSignature(activeLocalForward),
       _remoteForwardSignature(activeRemoteForward),
@@ -135,7 +135,9 @@ class _TerminalToolbarSnapshot {
       forwardEnabled,
       showForwarding,
       showOpenSftp,
-      showSplit,
+      showSplitControls,
+      canSplitRight,
+      canSplitDown,
     ].join('|');
   }
 }

@@ -89,6 +89,71 @@ void main() {
       expect(state.hasActiveTerminalPanes, isFalse);
     },
   );
+
+  test('terminal pane layout updates ratios and swaps leaves', () {
+    const layout = TerminalPaneSplit(
+      axis: Axis.horizontal,
+      ratio: 0.35,
+      first: TerminalPaneLeaf(0),
+      second: TerminalPaneSplit(
+        axis: Axis.vertical,
+        ratio: 0.7,
+        first: TerminalPaneLeaf(1),
+        second: TerminalPaneLeaf(2),
+      ),
+    );
+
+    final resizedRoot = layout.updateSplitRatio(const [], 0.25);
+    final rootSplit = _expectSplit(resizedRoot, Axis.horizontal);
+    expect(rootSplit.ratio, 0.25);
+    final nestedBeforeResize = _expectSplit(rootSplit.second, Axis.vertical);
+    expect(nestedBeforeResize.ratio, 0.7);
+
+    final resizedNested = resizedRoot.updateSplitRatio(const [1], 0.8);
+    final rootAfterNestedResize = _expectSplit(resizedNested, Axis.horizontal);
+    expect(rootAfterNestedResize.ratio, 0.25);
+    final nestedAfterResize = _expectSplit(
+      rootAfterNestedResize.second,
+      Axis.vertical,
+    );
+    expect(nestedAfterResize.ratio, 0.8);
+
+    final swapped = resizedNested.swapLeafIndexes(0, 2);
+    expect(swapped.paneIndexes, [2, 1, 0]);
+  });
+
+  test('terminal pane layout removes and reindexes leaves', () {
+    const layout = TerminalPaneSplit(
+      axis: Axis.horizontal,
+      ratio: 0.4,
+      first: TerminalPaneLeaf(0),
+      second: TerminalPaneSplit(
+        axis: Axis.vertical,
+        ratio: 0.65,
+        first: TerminalPaneLeaf(1),
+        second: TerminalPaneLeaf(2),
+      ),
+    );
+
+    final removed = layout.removeLeaf(1)!.reindexAfterRemoving(1);
+    final root = _expectSplit(removed, Axis.horizontal);
+
+    expect(root.ratio, 0.4);
+    _expectLeaf(root.first, 0);
+    _expectLeaf(root.second, 1);
+    expect(root.paneIndexes, [0, 1]);
+  });
+}
+
+TerminalPaneSplit _expectSplit(TerminalPaneLayout layout, Axis axis) {
+  final split = layout as TerminalPaneSplit;
+  expect(split.axis, axis);
+  return split;
+}
+
+void _expectLeaf(TerminalPaneLayout layout, int paneIndex) {
+  final leaf = layout as TerminalPaneLeaf;
+  expect(leaf.paneIndex, paneIndex);
 }
 
 TerminalPaneState _pane(String id, SessionLifecycleState lifecycle) {

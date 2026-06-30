@@ -375,8 +375,8 @@ void main() {
 
     await tester.tap(_byTooltipLabel('Split right'));
     await tester.pumpAndSettle();
-    expect(_byTooltipLabel('Close active pane'), findsOneWidget);
-    expect(find.textContaining('Connected'), findsWidgets);
+    expect(_byTooltipLabel('Close active pane'), findsNothing);
+    expect(find.textContaining('Connected'), findsNothing);
 
     await tester.tap(_byTooltipLabel('Manage port forwarding'));
     await tester.pumpAndSettle();
@@ -1557,6 +1557,58 @@ void main() {
         const TerminalModifierLatch(),
       ),
     ]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('compact iOS terminal disables right split', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await _tapAddHost(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('host-display-name-field')),
+      'Mobile Split',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'split.internal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'ops',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-password-field')),
+      'server-password',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(_byTooltipLabel('Terminal'));
+    await tester.pumpAndSettle();
+
+    final splitRight = find.byKey(
+      const ValueKey('terminal-split-right-button'),
+    );
+    final splitDown = find.byKey(const ValueKey('terminal-split-down-button'));
+    expect(splitRight, findsOneWidget);
+    expect(splitDown, findsOneWidget);
+    expect(_byTooltipLabel('Close pane'), findsNothing);
+
+    await tester.tap(_byTooltipLabel('Split right'));
+    await tester.pumpAndSettle();
+    expect(_byTooltipLabel('Close pane'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

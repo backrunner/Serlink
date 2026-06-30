@@ -182,6 +182,7 @@ void main() {
         .terminalFor(content.primaryPane.sessionId)!;
 
     expect(terminal.platform, TerminalTargetPlatform.ios);
+    expect(terminal.reflowEnabled, isFalse);
   });
 
   test('background suspend leaves desktop sessions alone', () async {

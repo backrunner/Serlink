@@ -160,14 +160,16 @@ class TerminalAdapter {
 
   void _syncPreAttachedTerminalSize() {
     if (_terminal.viewWidth == _defaultColumns &&
-        _terminal.viewHeight == _defaultRows) {
+        _terminal.viewHeight == _defaultRows &&
+        _terminal.pixelWidth == 0 &&
+        _terminal.pixelHeight == 0) {
       return;
     }
     _sendResize(
       columns: _terminal.viewWidth,
       rows: _terminal.viewHeight,
-      pixelWidth: 0,
-      pixelHeight: 0,
+      pixelWidth: _terminal.pixelWidth,
+      pixelHeight: _terminal.pixelHeight,
     );
   }
 

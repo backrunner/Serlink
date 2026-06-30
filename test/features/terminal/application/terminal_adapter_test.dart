@@ -195,6 +195,22 @@ void main() {
     await adapter.close();
   });
 
+  test('ignores repeated resize events with unchanged dimensions', () async {
+    final terminal = Terminal();
+    final session = _FakeShellSession();
+    final adapter = TerminalAdapter(terminal: terminal, session: session);
+
+    adapter.attach();
+    terminal.resize(120, 32, 1000, 700);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    terminal.resize(120, 32, 1000, 700);
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+
+    expect(session.resizes, [(120, 32, 1000, 700)]);
+
+    await adapter.close();
+  });
+
   test('syncs terminal size that was measured before attach', () async {
     final terminal = Terminal();
     terminal.resize(110, 30, 900, 600);
@@ -204,7 +220,7 @@ void main() {
     adapter.attach();
     await Future<void>.delayed(const Duration(milliseconds: 120));
 
-    expect(session.resizes, [(110, 30, 0, 0)]);
+    expect(session.resizes, [(110, 30, 900, 600)]);
 
     await adapter.close();
   });

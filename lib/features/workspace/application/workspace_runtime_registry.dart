@@ -28,7 +28,11 @@ class WorkspaceRuntimeRegistry {
     bool echoInput = false,
     int maxLines = 10000,
   }) {
-    final terminal = Terminal(maxLines: maxLines, platform: terminalPlatform);
+    final terminal = Terminal(
+      maxLines: maxLines,
+      platform: terminalPlatform,
+      reflowEnabled: false,
+    );
     if (echoInput) {
       terminal.write(r'$ ');
       terminal.onOutput = (data) {

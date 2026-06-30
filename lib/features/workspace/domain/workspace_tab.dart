@@ -44,11 +44,33 @@ sealed class WorkspaceTabContent {
   WorkspaceTabKind get kind;
 }
 
+enum TerminalPaneEndpointKind { remote, local }
+
+class TerminalPaneEndpoint {
+  const TerminalPaneEndpoint.remote({
+    required this.hostId,
+    required this.sftpDefaultDirectory,
+  }) : kind = TerminalPaneEndpointKind.remote;
+
+  const TerminalPaneEndpoint.local()
+    : kind = TerminalPaneEndpointKind.local,
+      hostId = null,
+      sftpDefaultDirectory = '/';
+
+  final TerminalPaneEndpointKind kind;
+  final HostId? hostId;
+  final String sftpDefaultDirectory;
+
+  bool get isLocal => kind == TerminalPaneEndpointKind.local;
+  bool get isRemote => kind == TerminalPaneEndpointKind.remote;
+}
+
 class TerminalPaneState {
   const TerminalPaneState({
     required this.sessionId,
     required this.title,
     required this.lifecycle,
+    this.endpoint,
     this.failure,
     this.displaySettings,
   });
@@ -56,6 +78,7 @@ class TerminalPaneState {
   final SessionId sessionId;
   final String title;
   final SessionLifecycleState lifecycle;
+  final TerminalPaneEndpoint? endpoint;
   final AppFailure? failure;
   final TerminalDisplaySettings? displaySettings;
 
@@ -65,6 +88,7 @@ class TerminalPaneState {
     SessionId? sessionId,
     String? title,
     SessionLifecycleState? lifecycle,
+    TerminalPaneEndpoint? endpoint,
     AppFailure? failure,
     bool clearFailure = false,
     TerminalDisplaySettings? displaySettings,
@@ -74,6 +98,7 @@ class TerminalPaneState {
       sessionId: sessionId ?? this.sessionId,
       title: title ?? this.title,
       lifecycle: lifecycle ?? this.lifecycle,
+      endpoint: endpoint ?? this.endpoint,
       failure: clearFailure ? null : failure ?? this.failure,
       displaySettings: clearDisplaySettings
           ? null
@@ -93,9 +118,13 @@ sealed class TerminalPaneLayout {
 
   TerminalPaneLayout replaceLeaf(int paneIndex, TerminalPaneLayout replacement);
 
+  TerminalPaneLayout updateSplitRatio(List<int> path, double ratio);
+
   TerminalPaneLayout? removeLeaf(int paneIndex);
 
   TerminalPaneLayout reindexAfterRemoving(int removedPaneIndex);
+
+  TerminalPaneLayout swapLeafIndexes(int firstPaneIndex, int secondPaneIndex);
 
   TerminalPaneLayout withRootAxis(Axis axis);
 }
@@ -117,6 +146,9 @@ class TerminalPaneLeaf extends TerminalPaneLayout {
   }
 
   @override
+  TerminalPaneLayout updateSplitRatio(List<int> path, double ratio) => this;
+
+  @override
   TerminalPaneLayout? removeLeaf(int paneIndex) {
     return this.paneIndex == paneIndex ? null : this;
   }
@@ -130,6 +162,17 @@ class TerminalPaneLeaf extends TerminalPaneLayout {
   }
 
   @override
+  TerminalPaneLayout swapLeafIndexes(int firstPaneIndex, int secondPaneIndex) {
+    if (paneIndex == firstPaneIndex) {
+      return TerminalPaneLeaf(secondPaneIndex);
+    }
+    if (paneIndex == secondPaneIndex) {
+      return TerminalPaneLeaf(firstPaneIndex);
+    }
+    return this;
+  }
+
+  @override
   TerminalPaneLayout withRootAxis(Axis axis) => this;
 }
 
@@ -138,11 +181,13 @@ class TerminalPaneSplit extends TerminalPaneLayout {
     required this.axis,
     required this.first,
     required this.second,
+    this.ratio = 0.5,
   });
 
   final Axis axis;
   final TerminalPaneLayout first;
   final TerminalPaneLayout second;
+  final double ratio;
 
   @override
   Axis get rootAxis => axis;
@@ -159,6 +204,31 @@ class TerminalPaneSplit extends TerminalPaneLayout {
       axis: axis,
       first: first.replaceLeaf(paneIndex, replacement),
       second: second.replaceLeaf(paneIndex, replacement),
+      ratio: ratio,
+    );
+  }
+
+  @override
+  TerminalPaneLayout updateSplitRatio(List<int> path, double ratio) {
+    final clampedRatio = ratio.clamp(0.1, 0.9).toDouble();
+    if (path.isEmpty) {
+      return TerminalPaneSplit(
+        axis: axis,
+        first: first,
+        second: second,
+        ratio: clampedRatio,
+      );
+    }
+    final branch = path.first;
+    return TerminalPaneSplit(
+      axis: axis,
+      first: branch == 0
+          ? first.updateSplitRatio(path.skip(1).toList(), ratio)
+          : first,
+      second: branch == 1
+          ? second.updateSplitRatio(path.skip(1).toList(), ratio)
+          : second,
+      ratio: this.ratio,
     );
   }
 
@@ -175,7 +245,12 @@ class TerminalPaneSplit extends TerminalPaneLayout {
     if (nextSecond == null) {
       return nextFirst;
     }
-    return TerminalPaneSplit(axis: axis, first: nextFirst, second: nextSecond);
+    return TerminalPaneSplit(
+      axis: axis,
+      first: nextFirst,
+      second: nextSecond,
+      ratio: ratio,
+    );
   }
 
   @override
@@ -184,12 +259,28 @@ class TerminalPaneSplit extends TerminalPaneLayout {
       axis: axis,
       first: first.reindexAfterRemoving(removedPaneIndex),
       second: second.reindexAfterRemoving(removedPaneIndex),
+      ratio: ratio,
+    );
+  }
+
+  @override
+  TerminalPaneLayout swapLeafIndexes(int firstPaneIndex, int secondPaneIndex) {
+    return TerminalPaneSplit(
+      axis: axis,
+      first: first.swapLeafIndexes(firstPaneIndex, secondPaneIndex),
+      second: second.swapLeafIndexes(firstPaneIndex, secondPaneIndex),
+      ratio: ratio,
     );
   }
 
   @override
   TerminalPaneLayout withRootAxis(Axis axis) {
-    return TerminalPaneSplit(axis: axis, first: first, second: second);
+    return TerminalPaneSplit(
+      axis: axis,
+      first: first,
+      second: second,
+      ratio: ratio,
+    );
   }
 }
 

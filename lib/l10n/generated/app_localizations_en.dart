@@ -1392,7 +1392,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get terminalSplitDownTooltip => 'Split down';
 
   @override
-  String get terminalClosePaneTooltip => 'Close active pane';
+  String get terminalClosePaneTooltip => 'Close pane';
+
+  @override
+  String terminalPaneSessionLabel(int index) {
+    return 'Session $index';
+  }
 
   @override
   String get terminalSettingsTitle => 'Terminal Settings';

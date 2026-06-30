@@ -68,6 +68,7 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
                           tab: tab,
                           selected: tab.id == active.id,
                           onTap: () => controller.setActiveTab(tab.id),
+                          onDragEnter: () => controller.setActiveTab(tab.id),
                           onClose: () => controller.closeTab(tab.id),
                         ),
                         const SizedBox(width: 6),
@@ -127,12 +128,14 @@ class _TabPill extends StatelessWidget {
     required this.tab,
     required this.selected,
     required this.onTap,
+    required this.onDragEnter,
     required this.onClose,
   });
 
   final WorkspaceTabState tab;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onDragEnter;
   final VoidCallback onClose;
 
   @override
@@ -160,7 +163,7 @@ class _TabPill extends StatelessWidget {
       _ => t.statusWarning,
     };
 
-    return DecoratedBox(
+    final pill = DecoratedBox(
       decoration: BoxDecoration(
         color: selected ? t.accentPrimary.withValues(alpha: 0.16) : null,
         borderRadius: SerlinkRadii.control,
@@ -214,7 +217,53 @@ class _TabPill extends StatelessWidget {
         ),
       ),
     );
+    if (!_tabCanReceivePaneDrop(tab)) {
+      return pill;
+    }
+    if (!_tabCanDragPane(tab)) {
+      return _TabDragTarget(onDragEnter: onDragEnter, child: pill);
+    }
+    return Draggable<_TerminalTabDragData>(
+      data: _TerminalTabDragData(tabId: tab.id),
+      feedback: _TerminalDragFeedback(label: tab.title),
+      allowedButtonsFilter: _primaryPointerButton,
+      childWhenDragging: Opacity(opacity: 0.5, child: pill),
+      child: _TabDragTarget(onDragEnter: onDragEnter, child: pill),
+    );
   }
+}
+
+class _TabDragTarget extends StatelessWidget {
+  const _TabDragTarget({required this.onDragEnter, required this.child});
+
+  final VoidCallback onDragEnter;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DragTarget<_TerminalTabDragData>(
+      onWillAcceptWithDetails: (_) {
+        onDragEnter();
+        return false;
+      },
+      builder: (context, _, _) => child,
+    );
+  }
+}
+
+bool _tabCanDragPane(WorkspaceTabState tab) {
+  return switch (tab.content) {
+    TerminalTabContent(:final panes) ||
+    LocalTerminalTabContent(:final panes) => panes.length == 1,
+    SftpTabContent() => false,
+  };
+}
+
+bool _tabCanReceivePaneDrop(WorkspaceTabState tab) {
+  return switch (tab.content) {
+    TerminalTabContent() || LocalTerminalTabContent() => true,
+    SftpTabContent() => false,
+  };
 }
 
 class _TabCloseButton extends StatelessWidget {
@@ -290,9 +339,13 @@ class _ActiveTabView extends ConsumerWidget {
     final compactFailureBanner = ref.watch(
       platformCapabilitiesProvider.select((capabilities) => capabilities.isIOS),
     );
+    final terminalContent =
+        tab.content is TerminalTabContent ||
+        tab.content is LocalTerminalTabContent;
     final showBanner =
-        tab.lifecycle == SessionLifecycleState.disconnected ||
-        tab.lifecycle == SessionLifecycleState.failed;
+        !terminalContent &&
+        (tab.lifecycle == SessionLifecycleState.disconnected ||
+            tab.lifecycle == SessionLifecycleState.failed);
     final banner = showBanner
         ? _RecoverableFailureBanner(
             message:
@@ -334,9 +387,8 @@ class _ActiveTabView extends ConsumerWidget {
                 layout: layout,
                 activePane: activePane,
                 local: false,
-                onOpenSftp: tab.hostId == null
-                    ? null
-                    : () => controller.openSftpFromTab(tab.id),
+                onOpenSftp: () =>
+                    controller.openSftpFromTerminalPane(tab.id, activePane),
                 onToolbarSnapshotChanged: onTerminalToolbarChanged,
               ),
             LocalTerminalTabContent(
@@ -357,7 +409,8 @@ class _ActiveTabView extends ConsumerWidget {
                 layout: layout,
                 activePane: activePane,
                 local: true,
-                onOpenSftp: null,
+                onOpenSftp: () =>
+                    controller.openSftpFromTerminalPane(tab.id, activePane),
                 onToolbarSnapshotChanged: onTerminalToolbarChanged,
               ),
             SftpTabContent(

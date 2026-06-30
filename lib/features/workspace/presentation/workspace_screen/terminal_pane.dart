@@ -34,14 +34,16 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
   late final WorkspaceRuntimeRegistry _runtimeRegistry;
   late final TextEditingController _searchTextController;
   late List<TerminalController> _terminalControllers;
+  late List<FocusNode> _terminalFocusNodes;
   late List<TerminalBufferSearchController> _searchControllers;
   late List<Terminal> _cachedTerminals;
+  BoxConstraints? _terminalViewportConstraints;
   var _showSearch = false;
   var _searchResult = const TerminalSearchResult.empty();
-  _LocalForwardDraft? _activeLocalForward;
-  _RemoteForwardDraft? _activeRemoteForward;
-  _DynamicForwardDraft? _activeDynamicForward;
-  bool _forwardBusy = false;
+  final Map<SessionId, _LocalForwardDraft> _localForwards = {};
+  final Map<SessionId, _RemoteForwardDraft> _remoteForwards = {};
+  final Map<SessionId, _DynamicForwardDraft> _dynamicForwards = {};
+  final Set<SessionId> _forwardBusySessions = {};
   bool _ctrlLatched = false;
   bool _altLatched = false;
   bool _shiftLatched = false;
@@ -62,6 +64,9 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     for (final controller in _searchControllers) {
       controller.clear();
     }
+    for (final focusNode in _terminalFocusNodes) {
+      focusNode.dispose();
+    }
     _searchTextController.dispose();
     super.dispose();
   }
@@ -69,16 +74,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
   @override
   void didUpdateWidget(_TerminalPane oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.panes.every(
-          (pane) => pane.lifecycle != SessionLifecycleState.connected,
-        ) &&
-        (_activeLocalForward != null ||
-            _activeRemoteForward != null ||
-            _activeDynamicForward != null)) {
-      _activeLocalForward = null;
-      _activeRemoteForward = null;
-      _activeDynamicForward = null;
-    }
+    _pruneForwardingState();
     if (oldWidget.panes.length != widget.panes.length ||
         !_samePaneSessions(oldWidget.panes, widget.panes)) {
       for (final terminal in _terminals(oldWidget.panes)) {
@@ -86,6 +82,9 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
       }
       for (final controller in _searchControllers) {
         controller.clear();
+      }
+      for (final focusNode in _terminalFocusNodes) {
+        focusNode.dispose();
       }
       _buildPaneControllers();
     }
@@ -109,7 +108,6 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         widget.panes[widget.activePane.clamp(0, widget.panes.length - 1)];
     final settings = activePaneState.displaySettings ?? globalSettings;
     final capabilities = ref.watch(platformCapabilitiesProvider);
-    _scheduleToolbarSnapshot(activePaneState);
     return Column(
       children: [
         if (_showSearch)
@@ -122,28 +120,46 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
             onClose: _closeSearch,
           ),
         Expanded(
-          child: ClipRect(
-            key: const ValueKey('terminal-viewport-clip'),
-            child: widget.showSplit
-                ? _SplitTerminalViewport(
-                    panes: widget.panes,
-                    terminals: _terminals(),
-                    controllers: _terminalControllers,
-                    globalSettings: globalSettings,
-                    layout: widget.layout,
-                    activePane: widget.activePane,
-                    local: widget.local,
-                    onActivatePane: _setActivePane,
-                    onKeyEvent: _terminalViewKeyHandler,
-                    onInsertText: _handleTerminalTextInsert,
-                  )
-                : _SingleTerminalViewport(
-                    terminal: _terminals().first,
-                    controller: _terminalControllers.first,
-                    settings: settings,
-                    onKeyEvent: _terminalViewKeyHandler,
-                    onInsertText: _handleTerminalTextInsert,
-                  ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              _terminalViewportConstraints = constraints;
+              _scheduleToolbarSnapshot(activePaneState);
+              return ClipRect(
+                key: const ValueKey('terminal-viewport-clip'),
+                child: widget.showSplit
+                    ? _SplitTerminalViewport(
+                        tabId: widget.tabId,
+                        panes: widget.panes,
+                        terminals: _terminals(),
+                        controllers: _terminalControllers,
+                        focusNodes: _terminalFocusNodes,
+                        globalSettings: globalSettings,
+                        layout: widget.layout,
+                        activePane: widget.activePane,
+                        local: widget.local,
+                        onActivatePane: _setActivePane,
+                        onClosePane: _closePane,
+                        onReconnectPane: _reconnectPane,
+                        onSwapPanes: _swapPanes,
+                        onDropTabPane: _dropTabPane,
+                        onResizeSplit: _resizeSplit,
+                        onKeyEvent: _terminalViewKeyHandler,
+                        onInsertText: _handleTerminalTextInsert,
+                      )
+                    : _SingleTerminalViewport(
+                        terminal: _terminals().first,
+                        controller: _terminalControllers.first,
+                        focusNode: _terminalFocusNodes.first,
+                        settings: settings,
+                        pane: activePaneState,
+                        local:
+                            activePaneState.endpoint?.isLocal ?? widget.local,
+                        onReconnect: () => _reconnectPane(0),
+                        onKeyEvent: _terminalViewKeyHandler,
+                        onInsertText: _handleTerminalTextInsert,
+                      ),
+              );
+            },
           ),
         ),
         if (capabilities.mobileTerminalAccessory)
@@ -166,30 +182,40 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
   }
 
   void _scheduleToolbarSnapshot(TerminalPaneState activePaneState) {
+    final activePaneSize = _activePaneApproximateSize();
+    final activeEndpoint = activePaneState.endpoint;
+    final activeSessionId = activePaneState.sessionId;
+    final activeLocal = activeEndpoint?.isLocal ?? widget.local;
+    final activeHostId = activeEndpoint?.hostId ?? widget.hostId;
     final snapshot = _TerminalToolbarSnapshot(
       tabId: widget.tabId,
+      activePane: widget.activePane,
+      activeHostId: activeHostId,
       searchActive: _showSearch,
-      activeLocalForward: _activeLocalForward,
-      activeRemoteForward: _activeRemoteForward,
-      activeDynamicForward: _activeDynamicForward,
-      forwardBusy: _forwardBusy,
+      activeLocalForward: _localForwards[activeSessionId],
+      activeRemoteForward: _remoteForwards[activeSessionId],
+      activeDynamicForward: _dynamicForwards[activeSessionId],
+      forwardBusy: _forwardBusySessions.contains(activeSessionId),
       forwardEnabled:
-          !widget.local &&
-          widget.hostId != null &&
+          !activeLocal &&
+          activeHostId != null &&
           activePaneState.lifecycle == SessionLifecycleState.connected,
-      showForwarding: !widget.local,
-      showOpenSftp: !widget.local && widget.onOpenSftp != null,
+      showForwarding: !activeLocal,
+      showOpenSftp: !activeLocal && widget.onOpenSftp != null,
+      showSplitControls:
+          !activeLocal || ref.read(platformCapabilitiesProvider).localTerminal,
       onToggleSearch: _toggleSearch,
       onManageForwarding: _manageForwarding,
       onOpenSftp: widget.onOpenSftp,
-      showSplit: widget.showSplit,
+      canSplitRight: activePaneSize.width >= _terminalMinPaneWidth * 2,
+      canSplitDown: activePaneSize.height >= _terminalMinPaneHeight * 2,
       onSplitRight: _splitRight,
       onSplitDown: _splitDown,
-      onCloseActivePane: _closeActivePane,
       onSettings: () => _showTerminalSettingsDialog(
         context,
         tabId: widget.tabId,
-        hostId: widget.hostId,
+        hostId: activeHostId,
+        paneIndex: widget.activePane,
       ),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -212,10 +238,52 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         .enableTerminalSplit(widget.tabId, axis: Axis.vertical);
   }
 
-  void _closeActivePane() {
+  void _closePane(int paneIndex) {
     ref
         .read(workspaceTabControllerProvider.notifier)
-        .closeActiveTerminalPane(widget.tabId);
+        .closeTerminalPane(widget.tabId, paneIndex);
+  }
+
+  void _reconnectPane(int paneIndex) {
+    ref
+        .read(workspaceTabControllerProvider.notifier)
+        .reconnectTerminalPane(widget.tabId, paneIndex);
+  }
+
+  void _resizeSplit(List<int> splitPath, double ratio) {
+    ref
+        .read(workspaceTabControllerProvider.notifier)
+        .resizeTerminalSplit(widget.tabId, splitPath, ratio);
+  }
+
+  void _swapPanes(int fromPaneIndex, int toPaneIndex) {
+    ref
+        .read(workspaceTabControllerProvider.notifier)
+        .swapTerminalPanes(widget.tabId, fromPaneIndex, toPaneIndex);
+  }
+
+  void _dropTabPane(
+    WorkspaceTabId sourceTabId,
+    int targetPaneIndex,
+    _TerminalPaneDropPlacement placement,
+  ) {
+    final axis =
+        placement == _TerminalPaneDropPlacement.left ||
+            placement == _TerminalPaneDropPlacement.right
+        ? Axis.horizontal
+        : Axis.vertical;
+    final before =
+        placement == _TerminalPaneDropPlacement.left ||
+        placement == _TerminalPaneDropPlacement.top;
+    ref
+        .read(workspaceTabControllerProvider.notifier)
+        .mergeSinglePaneTabIntoSplit(
+          sourceTabId: sourceTabId,
+          targetTabId: widget.tabId,
+          targetPaneIndex: targetPaneIndex,
+          axis: axis,
+          before: before,
+        );
   }
 
   void _sendActiveTerminalInput(String text) {
@@ -316,9 +384,14 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
   }
 
   void _setActivePane(int index) {
+    final normalizedIndex = index.clamp(0, widget.panes.length - 1);
+    if (normalizedIndex < _terminalFocusNodes.length &&
+        !_terminalFocusNodes[normalizedIndex].hasFocus) {
+      _terminalFocusNodes[normalizedIndex].requestFocus();
+    }
     ref
         .read(workspaceTabControllerProvider.notifier)
-        .setActiveTerminalPane(widget.tabId, index);
+        .setActiveTerminalPane(widget.tabId, normalizedIndex);
   }
 
   void _toggleSearch() {
@@ -360,49 +433,54 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
   }
 
   Future<void> _manageForwarding() async {
-    if (_forwardBusy ||
-        widget.hostId == null ||
-        _activePaneState.lifecycle != SessionLifecycleState.connected) {
+    final pane = _activePaneState;
+    final sessionId = pane.sessionId;
+    if (_forwardBusySessions.contains(sessionId) ||
+        _activePaneHostId == null ||
+        pane.lifecycle != SessionLifecycleState.connected) {
       return;
     }
     final action = await showSerlinkDialog<_ForwardDialogAction>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _ForwardingDialog(
-        activeLocalForward: _activeLocalForward,
-        activeRemoteForward: _activeRemoteForward,
-        activeDynamicForward: _activeDynamicForward,
+        activeLocalForward: _localForwards[sessionId],
+        activeRemoteForward: _remoteForwards[sessionId],
+        activeDynamicForward: _dynamicForwards[sessionId],
       ),
     );
-    if (action == null) {
+    if (action == null || !_paneSessionConnected(sessionId)) {
       return;
     }
     switch (action.kind) {
       case _ForwardDialogActionKind.startLocal:
-        await _startLocalForward(action.localDraft!);
+        await _startLocalForward(sessionId, action.localDraft!);
       case _ForwardDialogActionKind.stopLocal:
-        await _stopLocalForward();
+        await _stopLocalForward(sessionId);
       case _ForwardDialogActionKind.startRemote:
-        await _startRemoteForward(action.remoteDraft!);
+        await _startRemoteForward(sessionId, action.remoteDraft!);
       case _ForwardDialogActionKind.stopRemote:
-        await _stopRemoteForward();
+        await _stopRemoteForward(sessionId);
       case _ForwardDialogActionKind.startDynamic:
-        await _startDynamicForward(action.dynamicDraft!);
+        await _startDynamicForward(sessionId, action.dynamicDraft!);
       case _ForwardDialogActionKind.stopDynamic:
-        await _stopDynamicForward();
+        await _stopDynamicForward(sessionId);
     }
   }
 
-  Future<void> _startLocalForward(_LocalForwardDraft draft) async {
+  Future<void> _startLocalForward(
+    SessionId sessionId,
+    _LocalForwardDraft draft,
+  ) async {
     final l10n = context.l10n;
     setState(() {
-      _forwardBusy = true;
+      _forwardBusySessions.add(sessionId);
     });
     try {
       await ref
           .read(sshSessionServiceProvider)
           .startLocalForward(
-            sessionId: _activePaneState.sessionId,
+            sessionId: sessionId,
             localPort: draft.localPort,
             remoteHost: draft.remoteHost,
             remotePort: draft.remotePort,
@@ -411,8 +489,10 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         return;
       }
       setState(() {
-        _activeLocalForward = draft;
-        _forwardBusy = false;
+        if (_paneSessionConnected(sessionId)) {
+          _localForwards[sessionId] = draft;
+        }
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingLocalStartedSnack);
     } on Object {
@@ -420,27 +500,27 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         return;
       }
       setState(() {
-        _forwardBusy = false;
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingLocalStartFailedSnack);
     }
   }
 
-  Future<void> _stopLocalForward() async {
+  Future<void> _stopLocalForward(SessionId sessionId) async {
     final l10n = context.l10n;
     setState(() {
-      _forwardBusy = true;
+      _forwardBusySessions.add(sessionId);
     });
     try {
       await ref
           .read(sshSessionServiceProvider)
-          .stopLocalForward(sessionId: _activePaneState.sessionId);
+          .stopLocalForward(sessionId: sessionId);
       if (!mounted) {
         return;
       }
       setState(() {
-        _activeLocalForward = null;
-        _forwardBusy = false;
+        _localForwards.remove(sessionId);
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingLocalStoppedSnack);
     } on Object {
@@ -448,22 +528,25 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         return;
       }
       setState(() {
-        _forwardBusy = false;
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingLocalStopFailedSnack);
     }
   }
 
-  Future<void> _startRemoteForward(_RemoteForwardDraft draft) async {
+  Future<void> _startRemoteForward(
+    SessionId sessionId,
+    _RemoteForwardDraft draft,
+  ) async {
     final l10n = context.l10n;
     setState(() {
-      _forwardBusy = true;
+      _forwardBusySessions.add(sessionId);
     });
     try {
       final binding = await ref
           .read(sshSessionServiceProvider)
           .startRemoteForward(
-            sessionId: _activePaneState.sessionId,
+            sessionId: sessionId,
             bindHost: draft.bindHost,
             bindPort: draft.bindPort,
             localHost: draft.localHost,
@@ -473,13 +556,15 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         return;
       }
       setState(() {
-        _activeRemoteForward = _RemoteForwardDraft(
-          bindHost: binding.bindHost,
-          bindPort: binding.bindPort,
-          localHost: binding.localHost,
-          localPort: binding.localPort,
-        );
-        _forwardBusy = false;
+        if (_paneSessionConnected(sessionId)) {
+          _remoteForwards[sessionId] = _RemoteForwardDraft(
+            bindHost: binding.bindHost,
+            bindPort: binding.bindPort,
+            localHost: binding.localHost,
+            localPort: binding.localPort,
+          );
+        }
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingRemoteStartedSnack);
     } on Object {
@@ -487,27 +572,27 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         return;
       }
       setState(() {
-        _forwardBusy = false;
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingRemoteStartFailedSnack);
     }
   }
 
-  Future<void> _stopRemoteForward() async {
+  Future<void> _stopRemoteForward(SessionId sessionId) async {
     final l10n = context.l10n;
     setState(() {
-      _forwardBusy = true;
+      _forwardBusySessions.add(sessionId);
     });
     try {
       await ref
           .read(sshSessionServiceProvider)
-          .stopRemoteForward(sessionId: _activePaneState.sessionId);
+          .stopRemoteForward(sessionId: sessionId);
       if (!mounted) {
         return;
       }
       setState(() {
-        _activeRemoteForward = null;
-        _forwardBusy = false;
+        _remoteForwards.remove(sessionId);
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingRemoteStoppedSnack);
     } on Object {
@@ -515,22 +600,25 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         return;
       }
       setState(() {
-        _forwardBusy = false;
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingRemoteStopFailedSnack);
     }
   }
 
-  Future<void> _startDynamicForward(_DynamicForwardDraft draft) async {
+  Future<void> _startDynamicForward(
+    SessionId sessionId,
+    _DynamicForwardDraft draft,
+  ) async {
     final l10n = context.l10n;
     setState(() {
-      _forwardBusy = true;
+      _forwardBusySessions.add(sessionId);
     });
     try {
       final binding = await ref
           .read(sshSessionServiceProvider)
           .startDynamicForward(
-            sessionId: _activePaneState.sessionId,
+            sessionId: sessionId,
             bindHost: draft.bindHost,
             bindPort: draft.bindPort,
           );
@@ -538,11 +626,13 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         return;
       }
       setState(() {
-        _activeDynamicForward = _DynamicForwardDraft(
-          bindHost: binding.bindHost,
-          bindPort: binding.bindPort,
-        );
-        _forwardBusy = false;
+        if (_paneSessionConnected(sessionId)) {
+          _dynamicForwards[sessionId] = _DynamicForwardDraft(
+            bindHost: binding.bindHost,
+            bindPort: binding.bindPort,
+          );
+        }
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingSocksStartedSnack);
     } on Object {
@@ -550,27 +640,27 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         return;
       }
       setState(() {
-        _forwardBusy = false;
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingSocksStartFailedSnack);
     }
   }
 
-  Future<void> _stopDynamicForward() async {
+  Future<void> _stopDynamicForward(SessionId sessionId) async {
     final l10n = context.l10n;
     setState(() {
-      _forwardBusy = true;
+      _forwardBusySessions.add(sessionId);
     });
     try {
       await ref
           .read(sshSessionServiceProvider)
-          .stopDynamicForward(sessionId: _activePaneState.sessionId);
+          .stopDynamicForward(sessionId: sessionId);
       if (!mounted) {
         return;
       }
       setState(() {
-        _activeDynamicForward = null;
-        _forwardBusy = false;
+        _dynamicForwards.remove(sessionId);
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingSocksStoppedSnack);
     } on Object {
@@ -578,7 +668,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         return;
       }
       setState(() {
-        _forwardBusy = false;
+        _forwardBusySessions.remove(sessionId);
       });
       _showSnackBar(context, l10n.forwardingSocksStopFailedSnack);
     }
@@ -649,6 +739,51 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     return widget.panes[widget.activePane.clamp(0, widget.panes.length - 1)];
   }
 
+  void _pruneForwardingState() {
+    final connectedSessionIds = {
+      for (final pane in widget.panes)
+        if (pane.lifecycle == SessionLifecycleState.connected) pane.sessionId,
+    };
+    _localForwards.removeWhere(
+      (sessionId, _) => !connectedSessionIds.contains(sessionId),
+    );
+    _remoteForwards.removeWhere(
+      (sessionId, _) => !connectedSessionIds.contains(sessionId),
+    );
+    _dynamicForwards.removeWhere(
+      (sessionId, _) => !connectedSessionIds.contains(sessionId),
+    );
+    _forwardBusySessions.removeWhere(
+      (sessionId) => !connectedSessionIds.contains(sessionId),
+    );
+  }
+
+  bool _paneSessionConnected(SessionId sessionId) {
+    final tab = ref
+        .read(workspaceTabControllerProvider)
+        .tabs
+        .where((candidate) => candidate.id == widget.tabId)
+        .firstOrNull;
+    final panes = switch (tab?.content) {
+      TerminalTabContent(:final panes) => panes,
+      LocalTerminalTabContent(:final panes) => panes,
+      _ => widget.panes,
+    };
+    return panes.any(
+      (pane) =>
+          pane.sessionId == sessionId &&
+          pane.lifecycle == SessionLifecycleState.connected,
+    );
+  }
+
+  HostId? get _activePaneHostId {
+    final endpoint = _activePaneState.endpoint;
+    if (endpoint?.isLocal == true) {
+      return null;
+    }
+    return endpoint?.hostId ?? widget.hostId;
+  }
+
   Terminal get _activeTerminal {
     final terminals = _terminals();
     return terminals[widget.activePane.clamp(0, terminals.length - 1)];
@@ -668,6 +803,11 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
             Terminal(maxLines: 10000),
     ];
     _terminalControllers = [for (final _ in widget.panes) TerminalController()];
+    _terminalFocusNodes = [
+      for (var i = 0; i < widget.panes.length; i += 1)
+        FocusNode(debugLabel: 'terminal-pane-$i')
+          ..addListener(() => _handlePaneFocusChanged(i)),
+    ];
     _searchControllers = [
       for (var i = 0; i < widget.panes.length; i += 1)
         TerminalBufferSearchController(
@@ -678,6 +818,84 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     for (final terminal in _cachedTerminals) {
       terminal.addListener(_refreshSearchAfterTerminalChange);
     }
+  }
+
+  void _handlePaneFocusChanged(int paneIndex) {
+    if (!mounted || paneIndex >= _terminalFocusNodes.length) {
+      return;
+    }
+    if (_terminalFocusNodes[paneIndex].hasFocus &&
+        widget.activePane != paneIndex) {
+      ref
+          .read(workspaceTabControllerProvider.notifier)
+          .setActiveTerminalPane(widget.tabId, paneIndex);
+    }
+  }
+
+  Size _activePaneApproximateSize() {
+    final constraints = _terminalViewportConstraints;
+    if (constraints == null) {
+      return const Size(_terminalMinPaneWidth * 2, _terminalMinPaneHeight * 2);
+    }
+    if (!widget.showSplit || widget.panes.length <= 1) {
+      return Size(constraints.maxWidth, constraints.maxHeight);
+    }
+    final viewportSize = Size(
+      math.max(0, constraints.maxWidth - _terminalPaneGap * 2),
+      math.max(0, constraints.maxHeight - _terminalPaneGap * 2),
+    );
+    return _paneApproximateSizeForLayout(
+      widget.layout,
+      widget.activePane.clamp(0, widget.panes.length - 1),
+      viewportSize,
+    );
+  }
+
+  Size _paneApproximateSizeForLayout(
+    TerminalPaneLayout layout,
+    int targetPaneIndex,
+    Size size,
+  ) {
+    return switch (layout) {
+      TerminalPaneLeaf() => size,
+      TerminalPaneSplit(
+        :final axis,
+        :final ratio,
+        :final first,
+        :final second,
+      ) =>
+        _paneApproximateSizeForSplit(
+          axis: axis,
+          ratio: ratio,
+          first: first,
+          second: second,
+          targetPaneIndex: targetPaneIndex,
+          size: size,
+        ),
+    };
+  }
+
+  Size _paneApproximateSizeForSplit({
+    required Axis axis,
+    required double ratio,
+    required TerminalPaneLayout first,
+    required TerminalPaneLayout second,
+    required int targetPaneIndex,
+    required Size size,
+  }) {
+    final firstSide = first.paneIndexes.contains(targetPaneIndex);
+    final totalExtent = axis == Axis.horizontal ? size.width : size.height;
+    final availableExtent = math.max(0, totalExtent - _terminalDividerHitSize);
+    final firstExtent = availableExtent * ratio.clamp(0.1, 0.9).toDouble();
+    final secondExtent = math.max(0, availableExtent - firstExtent).toDouble();
+    final childSize = axis == Axis.horizontal
+        ? Size(firstSide ? firstExtent : secondExtent, size.height)
+        : Size(size.width, firstSide ? firstExtent : secondExtent);
+    return _paneApproximateSizeForLayout(
+      firstSide ? first : second,
+      targetPaneIndex,
+      childSize,
+    );
   }
 
   List<Terminal> _terminals([List<TerminalPaneState>? panes]) {

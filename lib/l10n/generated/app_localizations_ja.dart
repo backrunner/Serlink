@@ -1329,7 +1329,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get terminalSplitDownTooltip => '下に分割';
 
   @override
-  String get terminalClosePaneTooltip => 'アクティブペインを閉じる';
+  String get terminalClosePaneTooltip => 'ペインを閉じる';
+
+  @override
+  String terminalPaneSessionLabel(int index) {
+    return 'セッション $index';
+  }
 
   @override
   String get terminalSettingsTitle => '端末設定';

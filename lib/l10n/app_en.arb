@@ -637,7 +637,15 @@
   "terminalOpenSftpTooltip": "Open SFTP tab",
   "terminalSplitRightTooltip": "Split right",
   "terminalSplitDownTooltip": "Split down",
-  "terminalClosePaneTooltip": "Close active pane",
+  "terminalClosePaneTooltip": "Close pane",
+  "terminalPaneSessionLabel": "Session {index}",
+  "@terminalPaneSessionLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
   "terminalSettingsTitle": "Terminal Settings",
   "terminalForwardingUpdating": "Updating port forwarding",
   "terminalForwardingManage": "Manage port forwarding",

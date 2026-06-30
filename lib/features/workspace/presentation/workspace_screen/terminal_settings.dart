@@ -111,18 +111,28 @@ Future<void> _showTerminalSettingsDialog(
   BuildContext context, {
   required WorkspaceTabId tabId,
   required HostId? hostId,
+  required int paneIndex,
 }) {
   return showSerlinkDialog<void>(
     context: context,
-    builder: (context) => _TerminalSettingsDialog(tabId: tabId, hostId: hostId),
+    builder: (context) => _TerminalSettingsDialog(
+      tabId: tabId,
+      hostId: hostId,
+      paneIndex: paneIndex,
+    ),
   );
 }
 
 class _TerminalSettingsDialog extends ConsumerStatefulWidget {
-  const _TerminalSettingsDialog({required this.tabId, required this.hostId});
+  const _TerminalSettingsDialog({
+    required this.tabId,
+    required this.hostId,
+    required this.paneIndex,
+  });
 
   final WorkspaceTabId tabId;
   final HostId? hostId;
+  final int paneIndex;
 
   @override
   ConsumerState<_TerminalSettingsDialog> createState() =>
@@ -152,6 +162,7 @@ class _TerminalSettingsDialogState
     final hostSettings = _terminalDisplaySettingsForTab(
       workspaceState,
       widget.tabId,
+      widget.paneIndex,
     );
     final globalSettings =
         ref.watch(terminalDisplaySettingsProvider).value ??
@@ -171,6 +182,7 @@ class _TerminalSettingsDialogState
         workspaceController.saveTerminalDisplaySettingsForHost(
           widget.tabId,
           next,
+          paneIndex: widget.paneIndex,
         );
       } else {
         globalController.setSettings(next);
@@ -213,14 +225,21 @@ class _TerminalSettingsDialogState
       actions: [
         if (widget.hostId != null && hostSettings == null)
           SerlinkTextButton(
-            onPressed: () => workspaceController
-                .saveTerminalDisplaySettingsForHost(widget.tabId, settings),
+            onPressed: () =>
+                workspaceController.saveTerminalDisplaySettingsForHost(
+                  widget.tabId,
+                  settings,
+                  paneIndex: widget.paneIndex,
+                ),
             child: Text(l10n.terminalSaveForHostAction),
           ),
         if (widget.hostId != null && hostSettings != null)
           SerlinkTextButton(
-            onPressed: () => workspaceController
-                .resetTerminalDisplaySettingsForHost(widget.tabId),
+            onPressed: () =>
+                workspaceController.resetTerminalDisplaySettingsForHost(
+                  widget.tabId,
+                  paneIndex: widget.paneIndex,
+                ),
             child: Text(l10n.terminalUseGlobalAction),
           ),
         SerlinkFilledButton(
@@ -574,15 +593,21 @@ class _TerminalFontPreview extends StatelessWidget {
 TerminalDisplaySettings? _terminalDisplaySettingsForTab(
   WorkspaceState state,
   WorkspaceTabId tabId,
+  int paneIndex,
 ) {
   final tab = state.tabs
       .where((candidate) => candidate.id == tabId)
       .firstOrNull;
   final content = tab?.content;
-  return content is TerminalTabContent
-      ? content.activePaneState?.displaySettings ??
-            content.primaryPane.displaySettings
-      : null;
+  final panes = switch (content) {
+    TerminalTabContent(:final panes) => panes,
+    LocalTerminalTabContent(:final panes) => panes,
+    _ => null,
+  };
+  if (panes == null || panes.isEmpty) {
+    return null;
+  }
+  return panes[paneIndex.clamp(0, panes.length - 1)].displaySettings;
 }
 
 class _SettingsSlider extends StatelessWidget {

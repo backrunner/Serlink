@@ -2533,8 +2533,14 @@ abstract class AppLocalizations {
   /// No description provided for @terminalClosePaneTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Close active pane'**
+  /// **'Close pane'**
   String get terminalClosePaneTooltip;
+
+  /// No description provided for @terminalPaneSessionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Session {index}'**
+  String terminalPaneSessionLabel(int index);
 
   /// No description provided for @terminalSettingsTitle.
   ///

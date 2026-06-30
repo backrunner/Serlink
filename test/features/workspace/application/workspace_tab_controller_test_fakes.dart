@@ -32,6 +32,8 @@ Future<void> _drainMicrotasks() async {
 
 class _FakeSshSessionService implements SshSessionService {
   final List<_FakeShellSession> shells = [];
+  final List<ConnectionProfileSnapshot> shellProfiles = [];
+  final List<ConnectionProfileSnapshot> sftpProfiles = [];
   final List<Object> shellFailures = [];
   var openShellCount = 0;
   var openSftpCount = 0;
@@ -39,6 +41,7 @@ class _FakeSshSessionService implements SshSessionService {
   @override
   Future<SshShellSession> openShell(ConnectionProfileSnapshot profile) async {
     openShellCount += 1;
+    shellProfiles.add(profile);
     if (shellFailures.isNotEmpty) {
       throw shellFailures.removeAt(0);
     }
@@ -50,6 +53,7 @@ class _FakeSshSessionService implements SshSessionService {
   @override
   Future<SftpConnection> openSftp(ConnectionProfileSnapshot profile) async {
     openSftpCount += 1;
+    sftpProfiles.add(profile);
     return _FakeSftpConnection();
   }
 

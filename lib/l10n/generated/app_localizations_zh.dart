@@ -1312,7 +1312,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get terminalSplitDownTooltip => '向下拆分';
 
   @override
-  String get terminalClosePaneTooltip => '关闭活动窗格';
+  String get terminalClosePaneTooltip => '关闭窗格';
+
+  @override
+  String terminalPaneSessionLabel(int index) {
+    return '会话 $index';
+  }
 
   @override
   String get terminalSettingsTitle => '终端设置';

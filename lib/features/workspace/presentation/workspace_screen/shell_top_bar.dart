@@ -1,35 +1,15 @@
 part of '../workspace_screen.dart';
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.showLocalTerminal,
-    required this.onOpenLocalTerminal,
-  });
+  const _TopBar();
 
-  final bool showLocalTerminal;
-  final VoidCallback onOpenLocalTerminal;
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
     return SurfaceToolbar(
       child: Row(
         children: [
           const Expanded(child: _WindowDragRegion()),
-          if (showLocalTerminal)
-            SerlinkTooltip(
-              message: l10n.openLocalTerminalTooltip,
-              child: SerlinkIconButton(
-                constraints: const BoxConstraints.tightFor(
-                  width: 30,
-                  height: 30,
-                ),
-                padding: EdgeInsets.zero,
-                onPressed: onOpenLocalTerminal,
-                icon: const Icon(Icons.terminal_outlined, size: 18),
-              ),
-            ),
           if (AppWindow.usesTrailingWindowControls) ...[
-            const SizedBox(width: 6),
             const _WindowControls(),
           ],
         ],

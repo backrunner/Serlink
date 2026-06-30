@@ -16,6 +16,7 @@ import 'package:serlink/features/terminal/application/terminal_display_settings.
 import 'package:serlink/features/workspace/application/workspace_tab_controller.dart';
 import 'package:serlink/features/workspace/domain/workspace_tab.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
+import 'package:xterm/xterm.dart';
 
 part 'workspace_tab_controller_test_fakes.dart';
 
@@ -158,6 +159,30 @@ void main() {
       expect(service.openShellCount, 1);
     },
   );
+
+  test('creates terminals with the active platform capabilities', () async {
+    final service = _FakeSshSessionService();
+    final container = _container(
+      service: service,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    controller.openTerminal(_host);
+    await _drainMicrotasks();
+
+    final tab = container.read(workspaceTabControllerProvider).activeTab!;
+    final content = tab.content as TerminalTabContent;
+    final terminal = container
+        .read(workspaceRuntimeRegistryProvider)
+        .terminalFor(content.primaryPane.sessionId)!;
+
+    expect(terminal.platform, TerminalTargetPlatform.ios);
+  });
 
   test('background suspend leaves desktop sessions alone', () async {
     final service = _FakeSshSessionService();

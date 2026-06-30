@@ -29,10 +29,7 @@ class WorkspaceScreen extends ConsumerWidget {
     if (capabilities.prefersMobileWorkspaceShell) {
       return const MobileWorkspaceScreen();
     }
-    final showLocalTerminal =
-        capabilities.localTerminal && _showsLocalTerminalAction(state.area);
-    final showTopBar =
-        showLocalTerminal || AppWindow.usesTrailingWindowControls;
+    final showTopBar = AppWindow.usesTrailingWindowControls;
 
     return Scaffold(
       body: DecoratedBox(
@@ -72,12 +69,7 @@ class WorkspaceScreen extends ConsumerWidget {
                         ),
                         child: Column(
                           children: [
-                            if (showTopBar)
-                              _TopBar(
-                                showLocalTerminal: showLocalTerminal,
-                                onOpenLocalTerminal:
-                                    controller.openLocalTerminal,
-                              ),
+                            if (showTopBar) const _TopBar(),
                             Expanded(child: _MainSurface(state: state)),
                           ],
                         ),
@@ -148,15 +140,6 @@ bool _showsMobileWorkspaceSearch(WorkspaceArea area) {
     WorkspaceArea.transfers ||
     WorkspaceArea.snippets => true,
     WorkspaceArea.sessions || WorkspaceArea.settings => false,
-  };
-}
-
-bool _showsLocalTerminalAction(WorkspaceArea area) {
-  return switch (area) {
-    WorkspaceArea.hosts || WorkspaceArea.snippets => true,
-    WorkspaceArea.sessions ||
-    WorkspaceArea.transfers ||
-    WorkspaceArea.settings => false,
   };
 }
 

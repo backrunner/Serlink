@@ -123,6 +123,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get snippetsAddTooltip => '添加片段';
 
   @override
+  String get snippetsEmptyTitle => '没有片段';
+
+  @override
+  String get snippetsEmptyBody => '添加命令片段以复用常用终端命令。';
+
+  @override
   String get snippetsAddAction => '添加片段';
 
   @override
@@ -774,7 +780,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostKeyPassphraseLabel => '密钥密码短语';
 
   @override
-  String get hostAdvancedConnectionTitle => '高级连接';
+  String get hostAdvancedConnectionTitle => '连接选项';
 
   @override
   String get hostPortForwardingLocalHint => '每次启动 SSH 会话时启动这些本地转发。';

@@ -93,6 +93,64 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   });
 
+  testWidgets('detects repeated software keyboard backspace when enabled', (
+    tester,
+  ) async {
+    final output = <String>[];
+    final terminal = Terminal(onOutput: output.add);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(terminal, autofocus: true, deleteDetection: true),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TerminalView));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    for (var i = 0; i < 3; i += 1) {
+      binding.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: ' ',
+          selection: TextSelection.collapsed(offset: 1),
+        ),
+      );
+      await binding.idle();
+    }
+
+    expect(output.join(), '\x7f\x7f\x7f');
+    await tester.pump(const Duration(milliseconds: 400));
+  });
+
+  testWidgets('keeps software keyboard delete detection opt-in', (
+    tester,
+  ) async {
+    final output = <String>[];
+    final terminal = Terminal(onOutput: output.add);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: TerminalView(terminal, autofocus: true)),
+      ),
+    );
+
+    await tester.tap(find.byType(TerminalView));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    binding.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      ),
+    );
+    await binding.idle();
+
+    expect(output.join(), isNot(contains('\x7f')));
+    await tester.pump(const Duration(milliseconds: 400));
+  });
+
   testWidgets('does not apply safe area padding inside TerminalView', (
     tester,
   ) async {
@@ -135,5 +193,31 @@ void main() {
     terminal.keyInput(TerminalKey.arrowUp);
 
     expect(output, ['\x1b[A', '\x1bOA']);
+  });
+
+  test('uses Apple option-arrow sequences on iOS hardware keyboards', () {
+    final output = <String>[];
+    final terminal = Terminal(
+      onOutput: output.add,
+      platform: TerminalTargetPlatform.ios,
+    );
+
+    terminal.keyInput(TerminalKey.arrowRight, alt: true);
+    terminal.keyInput(TerminalKey.arrowLeft, alt: true);
+
+    expect(output, ['\x1bf', '\x1bb']);
+  });
+
+  test('does not synthesize escape-prefixed option characters on iOS', () {
+    final output = <String>[];
+    final terminal = Terminal(
+      onOutput: output.add,
+      platform: TerminalTargetPlatform.ios,
+    );
+
+    final handled = terminal.charInput('a'.codeUnitAt(0), alt: true);
+
+    expect(handled, isFalse);
+    expect(output, isEmpty);
   });
 }

@@ -85,13 +85,20 @@ class DocumentGateway {
     if (!capabilities.documentExport) {
       return false;
     }
-    final location = await getSaveLocation(
-      suggestedName: suggestedName ?? p.basename(path),
-    );
+    final exportName = suggestedName ?? p.basename(path);
+    if (!capabilities.stableLocalFilePaths) {
+      return exportBytes(
+        bytes: await File(path).readAsBytes(),
+        suggestedName: exportName,
+        restrictPermissions: false,
+      );
+    }
+    final location = await getSaveLocation(suggestedName: exportName);
     if (location == null || location.path.isEmpty) {
       return false;
     }
-    await File(path).copy(location.path);
+    final file = await File(path).copy(location.path);
+    await LocalFileSecurity.restrictExistingFile(file);
     return true;
   }
 

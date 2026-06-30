@@ -26,16 +26,20 @@ import 'package:serlink/features/sync/application/sync_delete_tombstone_reposito
 import 'package:serlink/features/sync/application/sync_device_service.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
 import 'package:serlink/features/sync/domain/sync_provider.dart';
+import 'package:serlink/features/terminal/application/local_terminal_service.dart';
 import 'package:serlink/features/terminal/application/terminal_modifier_latch.dart';
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
 import 'package:serlink/features/vault/application/vault_service.dart';
 import 'package:serlink/features/vault/data/drift_vault_repository.dart';
 import 'package:serlink/features/workspace/application/workspace_tab_controller.dart';
+import 'package:serlink/features/workspace/domain/workspace_tab.dart';
+import 'package:serlink/features/workspace/presentation/workspace_screen.dart';
 import 'package:serlink/features/settings/application/app_language_settings.dart';
 import 'package:serlink/l10n/l10n.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
+import 'package:xterm/xterm.dart';
 
 part 'workspace_smoke_test_fakes.dart';
 
@@ -260,6 +264,7 @@ void main() {
       find.byKey(const ValueKey('host-username-field')),
       'ops',
     );
+    await _expandHostStartupSection(tester);
     await tester.enterText(
       find.byKey(const ValueKey('host-startup-commands-field')),
       'tmux attach || tmux',
@@ -357,6 +362,7 @@ void main() {
       find.byKey(const ValueKey('host-username-field')),
       'ops',
     );
+    await _expandHostStartupSection(tester);
     await tester.enterText(
       find.byKey(const ValueKey('host-startup-commands-field')),
       'tmux attach || tmux',
@@ -1218,6 +1224,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('add-snippet-button')), findsOneWidget);
+    expect(find.text('No Snippets'), findsOneWidget);
+    expect(
+      find.text('Add command snippets to reuse frequent terminal commands.'),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('empty-add-snippet-button')),
       findsOneWidget,
@@ -1560,6 +1571,67 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('iOS terminal soft keyboard backspace reaches shell', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final sshService = _FakeSshSessionService();
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+      sshService: sshService,
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await _tapAddHost(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('host-display-name-field')),
+      'Mobile Backspace',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'backspace.internal',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'ops',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-password-field')),
+      'server-password',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(_byTooltipLabel('Terminal'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(TerminalView));
+    await tester.pump(const Duration(milliseconds: 200));
+    sshService.shell.writes.clear();
+
+    for (var i = 0; i < 2; i += 1) {
+      tester.testTextInput.updateEditingValue(
+        const TextEditingValue(
+          text: ' ',
+          selection: TextSelection.collapsed(offset: 1),
+        ),
+      );
+      await tester.idle();
+    }
+    await tester.pump();
+
+    expect(sshService.shell.writes, ['\x7f', '\x7f']);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('compact iOS terminal disables right split', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
@@ -1861,6 +1933,119 @@ void main() {
     ]);
   });
 
+  testWidgets('desktop hosts header orders search, filter, terminal, and add', (
+    tester,
+  ) async {
+    final hosts = _DelayedHostRepository([
+      _hostConfig(
+        id: 'alpha',
+        displayName: 'Alpha Bastion',
+        hostname: 'alpha.internal',
+        createdAt: DateTime.utc(2026, 6, 18, 10),
+      ),
+    ]);
+
+    await _pumpLockedVaultApp(tester, hostRepository: hosts);
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _pumpUntil(tester, () => hosts.listRequested);
+    hosts.completeList();
+    await _pumpUntilFound(tester, find.text('Alpha Bastion'));
+
+    final search = tester.getRect(
+      find.byKey(const ValueKey('workspace-search-field')),
+    );
+    final filter = tester.getRect(
+      find.byKey(const ValueKey('sort-hosts-button')),
+    );
+    final localTerminal = tester.getRect(
+      find.byKey(const ValueKey('open-local-terminal-button')),
+    );
+    final add = tester.getRect(find.byKey(const ValueKey('add-host-button')));
+    final mainSurface = tester.getRect(find.byType(WorkspaceScreen));
+
+    expect(search.center.dx, lessThan(filter.center.dx));
+    expect(filter.center.dx, lessThan(localTerminal.center.dx));
+    expect(localTerminal.center.dx, lessThan(add.center.dx));
+    expect(mainSurface.right - add.right, lessThanOrEqualTo(28));
+  });
+
+  testWidgets('terminal tab drag can merge into another tab viewport', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1200, 800);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final localTerminal = _FakeLocalTerminalService();
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'macos',
+        targetPlatform: TargetPlatform.macOS,
+      ),
+      localTerminal: localTerminal,
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SerlinkApp)),
+    );
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    await controller.openLocalTerminal();
+    await controller.openLocalTerminal();
+    await _pumpUntil(tester, () => localTerminal.shells.length == 2);
+    await tester.pumpAndSettle();
+
+    var state = container.read(workspaceTabControllerProvider);
+    final targetTab = state.tabs.first;
+    final sourceTab = state.tabs.last;
+
+    final sourceTabFinder = find.byKey(
+      ValueKey('workspace-tab-${sourceTab.id.value}'),
+    );
+    final targetTabFinder = find.byKey(
+      ValueKey('workspace-tab-${targetTab.id.value}'),
+    );
+    expect(sourceTabFinder, findsOneWidget);
+    expect(targetTabFinder, findsOneWidget);
+
+    final sourceCenter = tester.getCenter(sourceTabFinder);
+    final targetCenter = tester.getCenter(targetTabFinder);
+    final gesture = await tester.startGesture(sourceCenter);
+    await tester.pump();
+    await gesture.moveTo(targetCenter);
+    await _pumpUntil(
+      tester,
+      () =>
+          container.read(workspaceTabControllerProvider).activeTabId ==
+          targetTab.id,
+    );
+    await tester.pump();
+
+    final viewport = tester.getRect(
+      find.byKey(const ValueKey('terminal-viewport-clip')),
+    );
+    final dropPoint = viewport.centerRight - const Offset(32, 0);
+    await gesture.moveTo(dropPoint);
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('terminal-pane-drop-preview-right')),
+      findsOneWidget,
+    );
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    state = container.read(workspaceTabControllerProvider);
+    expect(state.tabs, hasLength(1));
+    expect(state.activeTabId, targetTab.id);
+    final content = state.tabs.single.content as LocalTerminalTabContent;
+    expect(content.panes, hasLength(2));
+    expect(content.activePane, 1);
+    expect(content.layout, isA<TerminalPaneSplit>());
+  });
+
   testWidgets('vault unlock error resets after switching workspace tabs', (
     tester,
   ) async {
@@ -1897,6 +2082,7 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   WidgetTester tester, {
   PlatformCapabilities? capabilities,
   _FakeSshSessionService? sshService,
+  LocalTerminalService? localTerminal,
   HostRepository? hostRepository,
   List<SyncDeviceMetadata>? syncDevices,
   bool protectBackground = false,
@@ -1953,6 +2139,8 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
         if (syncDevices != null)
           syncKnownDevicesProvider.overrideWith((ref) async => syncDevices),
         sshSessionServiceProvider.overrideWithValue(resolvedSshService),
+        if (localTerminal != null)
+          localTerminalServiceProvider.overrideWithValue(localTerminal),
         transferQueueControllerProvider.overrideWithValue(transferQueue),
         secretStoreProvider.overrideWithValue(secretStore),
         appPrivacySettingsRepositoryProvider.overrideWithValue(privacySettings),
@@ -2027,6 +2215,20 @@ Future<void> _tapAddHost(WidgetTester tester) async {
   await tester.tap(
     headerAddHost.evaluate().isNotEmpty ? headerAddHost : emptyAddHost,
   );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _expandHostStartupSection(WidgetTester tester) async {
+  if (find
+      .byKey(const ValueKey('host-startup-commands-field'))
+      .evaluate()
+      .isNotEmpty) {
+    return;
+  }
+  final startup = find.text('Startup');
+  await tester.ensureVisible(startup);
+  await tester.pumpAndSettle();
+  await tester.tap(startup);
   await tester.pumpAndSettle();
 }
 

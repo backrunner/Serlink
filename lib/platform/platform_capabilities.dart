@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:forui/forui.dart';
+import 'package:xterm/xterm.dart';
 
 const _distributionName = String.fromEnvironment(
   'SERLINK_DISTRIBUTION',
@@ -83,6 +84,30 @@ class PlatformCapabilities {
   bool get documentExport => true;
 
   bool get mobileTerminalAccessory => prefersTouchUi;
+
+  bool get terminalSoftwareKeyboardDeleteDetection => isIOS;
+
+  TerminalTargetPlatform get terminalTargetPlatform {
+    if (isIOS) {
+      return TerminalTargetPlatform.ios;
+    }
+    if (isMacOS) {
+      return TerminalTargetPlatform.macos;
+    }
+    if (isWindows) {
+      return TerminalTargetPlatform.windows;
+    }
+    if (isLinux) {
+      return TerminalTargetPlatform.linux;
+    }
+    if (operatingSystem == 'android') {
+      return TerminalTargetPlatform.android;
+    }
+    if (operatingSystem == 'fuchsia') {
+      return TerminalTargetPlatform.fuchsia;
+    }
+    return TerminalTargetPlatform.unknown;
+  }
 
   FPlatformVariant get foruiPlatformVariant {
     if (isIOS) {

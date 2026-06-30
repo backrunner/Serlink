@@ -187,7 +187,7 @@ Future<void> _confirmDeleteHost(
   }
 }
 
-class _HostsHeader extends StatelessWidget {
+class _HostsHeader extends ConsumerWidget {
   const _HostsHeader({
     required this.count,
     required this.sortOrder,
@@ -201,9 +201,17 @@ class _HostsHeader extends StatelessWidget {
   final VoidCallback onAddHost;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final t = context.tokens;
+    final showLocalTerminal = ref.watch(
+      platformCapabilitiesProvider.select(
+        (capabilities) => capabilities.localTerminal,
+      ),
+    );
+    final workspaceController = ref.read(
+      workspaceTabControllerProvider.notifier,
+    );
     return SurfaceToolbar(
       child: Row(
         children: [
@@ -217,16 +225,32 @@ class _HostsHeader extends StatelessWidget {
           const SizedBox(width: 8),
           _CountBadge(count: count),
           const Spacer(),
-          _HostSortMenuButton(
-            selectedOrder: sortOrder,
-            onSelected: onSortOrderChanged,
-          ),
-          const SizedBox(width: 8),
           Flexible(
             child: _WorkspaceHeaderSearch(
               placeholder: l10n.searchHostsPlaceholder,
             ),
           ),
+          const SizedBox(width: 8),
+          _HostSortMenuButton(
+            selectedOrder: sortOrder,
+            onSelected: onSortOrderChanged,
+          ),
+          if (showLocalTerminal) ...[
+            const SizedBox(width: 8),
+            SerlinkTooltip(
+              message: l10n.openLocalTerminalTooltip,
+              child: SerlinkIconButton(
+                key: const ValueKey('open-local-terminal-button'),
+                constraints: const BoxConstraints.tightFor(
+                  width: 30,
+                  height: 30,
+                ),
+                padding: EdgeInsets.zero,
+                onPressed: workspaceController.openLocalTerminal,
+                icon: const Icon(Icons.terminal_outlined, size: 18),
+              ),
+            ),
+          ],
           const SizedBox(width: 8),
           SerlinkTooltip(
             message: l10n.hostsAddTooltip,

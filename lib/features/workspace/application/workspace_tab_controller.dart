@@ -54,6 +54,7 @@ final workspaceRuntimeRegistryProvider = Provider<WorkspaceRuntimeRegistry>((
 ) {
   final capabilities = ref.watch(platformCapabilitiesProvider);
   final registry = WorkspaceRuntimeRegistry(
+    terminalPlatform: capabilities.terminalTargetPlatform,
     confirmMultilinePaste: ref
         .watch(securityModalServiceProvider)
         .confirmMultilinePaste,

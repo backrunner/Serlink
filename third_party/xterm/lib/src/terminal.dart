@@ -289,7 +289,9 @@ class Terminal with Observable implements TerminalState, EscapeHandler {
       }
     }
 
-    if (alt && platform != TerminalTargetPlatform.macos) {
+    if (alt &&
+        platform != TerminalTargetPlatform.macos &&
+        platform != TerminalTargetPlatform.ios) {
       if (charCode >= Ascii.a && charCode <= Ascii.z) {
         final code = charCode - Ascii.a + 65;
         final input = [0x1b, code];

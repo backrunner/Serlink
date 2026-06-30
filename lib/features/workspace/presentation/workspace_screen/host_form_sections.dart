@@ -74,13 +74,85 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final fieldGap = compact ? 10.0 : 14.0;
+    final inlineGap = compact ? 8.0 : 12.0;
+    return _HostCollapsibleSection(
+      title: l10n.hostAdvancedConnectionTitle,
+      icon: Icons.tune_rounded,
+      expanded: expanded,
+      compact: compact,
+      onToggle: onToggle,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _ConnectionNumberField(
+                  key: const ValueKey('host-connect-timeout-field'),
+                  controller: connectTimeoutController,
+                  label: l10n.hostTimeoutLabel,
+                ),
+              ),
+              SizedBox(width: inlineGap),
+              Expanded(
+                child: _ConnectionNumberField(
+                  key: const ValueKey('host-keepalive-interval-field'),
+                  controller: keepAliveIntervalController,
+                  label: l10n.hostKeepaliveLabel,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: fieldGap),
+          Row(
+            children: [
+              Expanded(
+                child: _ConnectionNumberField(
+                  key: const ValueKey('host-reconnect-attempts-field'),
+                  controller: reconnectAttemptsController,
+                  label: l10n.hostAutoReconnectLabel,
+                ),
+              ),
+              SizedBox(width: inlineGap),
+              Expanded(
+                child: _ConnectionNumberField(
+                  key: const ValueKey('host-reconnect-backoff-field'),
+                  controller: reconnectBackoffController,
+                  label: l10n.hostBackoffLabel,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HostCollapsibleSection extends StatelessWidget {
+  const _HostCollapsibleSection({
+    required this.title,
+    required this.icon,
+    required this.expanded,
+    required this.compact,
+    required this.onToggle,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final bool expanded;
+  final bool compact;
+  final VoidCallback onToggle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     final t = context.tokens;
     final headerPadding = compact
         ? const EdgeInsets.fromLTRB(12, 10, 10, 10)
         : const EdgeInsets.fromLTRB(14, 12, 12, 12);
     final contentPadding = EdgeInsets.all(compact ? 10 : 14);
-    final fieldGap = compact ? 10.0 : 14.0;
-    final inlineGap = compact ? 8.0 : 12.0;
     return SurfacePanel(
       padding: EdgeInsets.zero,
       child: Column(
@@ -93,11 +165,11 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
               padding: headerPadding,
               child: Row(
                 children: [
-                  Icon(Icons.tune_rounded, size: 18, color: t.textSecondary),
+                  Icon(icon, size: 18, color: t.textSecondary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      l10n.hostAdvancedConnectionTitle,
+                      title,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: t.textPrimary,
                         fontWeight: FontWeight.w700,
@@ -117,52 +189,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
           ),
           if (expanded) ...[
             Divider(height: 1, color: t.borderSubtle),
-            Padding(
-              padding: contentPadding,
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ConnectionNumberField(
-                          key: const ValueKey('host-connect-timeout-field'),
-                          controller: connectTimeoutController,
-                          label: l10n.hostTimeoutLabel,
-                        ),
-                      ),
-                      SizedBox(width: inlineGap),
-                      Expanded(
-                        child: _ConnectionNumberField(
-                          key: const ValueKey('host-keepalive-interval-field'),
-                          controller: keepAliveIntervalController,
-                          label: l10n.hostKeepaliveLabel,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: fieldGap),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ConnectionNumberField(
-                          key: const ValueKey('host-reconnect-attempts-field'),
-                          controller: reconnectAttemptsController,
-                          label: l10n.hostAutoReconnectLabel,
-                        ),
-                      ),
-                      SizedBox(width: inlineGap),
-                      Expanded(
-                        child: _ConnectionNumberField(
-                          key: const ValueKey('host-reconnect-backoff-field'),
-                          controller: reconnectBackoffController,
-                          label: l10n.hostBackoffLabel,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            Padding(padding: contentPadding, child: child),
           ],
         ],
       ),

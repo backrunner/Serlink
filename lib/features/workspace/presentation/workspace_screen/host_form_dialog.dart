@@ -71,6 +71,9 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   List<HostLocalPortForward> _localForwards = const [];
   List<HostRemotePortForward> _remoteForwards = const [];
   List<HostDynamicPortForward> _dynamicForwards = const [];
+  bool _showStartup = false;
+  bool _showPortForwarding = false;
+  bool _showSftp = false;
   bool _showAdvancedConnection = false;
   bool _passwordVisible = false;
   bool _loadingOptions = true;
@@ -242,9 +245,16 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
               ),
             ),
             SizedBox(height: layout.sectionGap),
-            _HostFormSection(
+            _HostCollapsibleSection(
               title: l10n.hostSectionStartup,
-              padding: layout.sectionPadding,
+              icon: Icons.rocket_launch_outlined,
+              expanded: _showStartup,
+              compact: layout.compact,
+              onToggle: () {
+                setState(() {
+                  _showStartup = !_showStartup;
+                });
+              },
               child: Column(
                 children: [
                   SerlinkTextField(
@@ -280,9 +290,16 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
               ),
             ],
             SizedBox(height: layout.sectionGap),
-            _HostFormSection(
+            _HostCollapsibleSection(
               title: l10n.hostSectionPortForwarding,
-              padding: layout.sectionPadding,
+              icon: Icons.settings_ethernet,
+              expanded: _showPortForwarding,
+              compact: layout.compact,
+              onToggle: () {
+                setState(() {
+                  _showPortForwarding = !_showPortForwarding;
+                });
+              },
               child: _HostPortForwardingSection(
                 localForwards: _localForwards,
                 remoteForwards: _remoteForwards,
@@ -305,9 +322,16 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
               ),
             ),
             SizedBox(height: layout.sectionGap),
-            _HostFormSection(
-              title: 'SFTP',
-              padding: layout.sectionPadding,
+            _HostCollapsibleSection(
+              title: l10n.hostSftpAction,
+              icon: Icons.folder_open_outlined,
+              expanded: _showSftp,
+              compact: layout.compact,
+              onToggle: () {
+                setState(() {
+                  _showSftp = !_showSftp;
+                });
+              },
               child: SerlinkTextField(
                 key: const ValueKey('host-sftp-default-directory-field'),
                 controller: _sftpDefaultDirectoryController,
@@ -593,6 +617,16 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
           _localForwards = [...hostConfig.portForwarding.localForwards];
           _remoteForwards = [...hostConfig.portForwarding.remoteForwards];
           _dynamicForwards = [...hostConfig.portForwarding.dynamicForwards];
+          _showStartup =
+              hostConfig.startupCommands.isNotEmpty ||
+              hostConfig.tags.isNotEmpty;
+          _showSftp = hostConfig.sftpDefaultDirectory != '/';
+          _showPortForwarding =
+              hostConfig.portForwarding.localForwards.isNotEmpty ||
+              hostConfig.portForwarding.remoteForwards.isNotEmpty ||
+              hostConfig.portForwarding.dynamicForwards.isNotEmpty;
+          _showAdvancedConnection =
+              hostConfig.connectionSettings != const HostConnectionSettings();
         }
         _loadingOptions = false;
       });

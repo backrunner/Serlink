@@ -137,6 +137,8 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
                         layout: widget.layout,
                         activePane: widget.activePane,
                         local: widget.local,
+                        detectSoftwareKeyboardDelete: capabilities
+                            .terminalSoftwareKeyboardDeleteDetection,
                         onActivatePane: _setActivePane,
                         onClosePane: _closePane,
                         onReconnectPane: _reconnectPane,
@@ -147,6 +149,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
                         onInsertText: _handleTerminalTextInsert,
                       )
                     : _SingleTerminalViewport(
+                        tabId: widget.tabId,
                         terminal: _terminals().first,
                         controller: _terminalControllers.first,
                         focusNode: _terminalFocusNodes.first,
@@ -154,7 +157,11 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
                         pane: activePaneState,
                         local:
                             activePaneState.endpoint?.isLocal ?? widget.local,
+                        detectSoftwareKeyboardDelete: capabilities
+                            .terminalSoftwareKeyboardDeleteDetection,
                         onReconnect: () => _reconnectPane(0),
+                        onDropTabPane: (sourceTabId, placement) =>
+                            _dropTabPane(sourceTabId, 0, placement),
                         onKeyEvent: _terminalViewKeyHandler,
                         onInsertText: _handleTerminalTextInsert,
                       ),

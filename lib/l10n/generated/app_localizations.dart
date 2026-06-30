@@ -328,6 +328,18 @@ abstract class AppLocalizations {
   /// **'Add snippet'**
   String get snippetsAddTooltip;
 
+  /// No description provided for @snippetsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No Snippets'**
+  String get snippetsEmptyTitle;
+
+  /// No description provided for @snippetsEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Add command snippets to reuse frequent terminal commands.'**
+  String get snippetsEmptyBody;
+
   /// No description provided for @snippetsAddAction.
   ///
   /// In en, this message translates to:
@@ -1519,7 +1531,7 @@ abstract class AppLocalizations {
   /// No description provided for @hostAdvancedConnectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Advanced connection'**
+  /// **'Connection options'**
   String get hostAdvancedConnectionTitle;
 
   /// No description provided for @hostPortForwardingLocalHint.

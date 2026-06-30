@@ -216,12 +216,38 @@ class _SnippetsEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final t = context.tokens;
     return Center(
-      child: SerlinkFilledButton.icon(
-        key: const ValueKey('empty-add-snippet-button'),
-        onPressed: onAdd,
-        icon: const Icon(Icons.add, size: 18),
-        label: Text(context.l10n.snippetsAddAction),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              l10n.snippetsEmptyTitle,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: t.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.snippetsEmptyBody,
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: t.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            SerlinkFilledButton.icon(
+              key: const ValueKey('empty-add-snippet-button'),
+              onPressed: onAdd,
+              icon: const Icon(Icons.add, size: 18),
+              label: Text(l10n.snippetsAddAction),
+            ),
+          ],
+        ),
       ),
     );
   }

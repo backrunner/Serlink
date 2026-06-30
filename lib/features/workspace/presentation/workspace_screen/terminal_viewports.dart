@@ -5,53 +5,202 @@ const double _terminalMinPaneWidth = 320;
 const double _terminalMinPaneHeight = 220;
 const double _terminalPaneGap = 8;
 const double _terminalDividerHitSize = 8;
+const Duration _terminalDividerRevealDelay = Duration(milliseconds: 360);
 
-class _SingleTerminalViewport extends StatelessWidget {
+class _SingleTerminalViewport extends StatefulWidget {
   const _SingleTerminalViewport({
+    required this.tabId,
     required this.terminal,
     required this.controller,
     required this.focusNode,
     required this.settings,
     required this.pane,
     required this.local,
+    required this.detectSoftwareKeyboardDelete,
     required this.onReconnect,
+    required this.onDropTabPane,
     this.onKeyEvent,
     this.onInsertText,
   });
 
+  final WorkspaceTabId tabId;
   final Terminal terminal;
   final TerminalController controller;
   final FocusNode focusNode;
   final TerminalDisplaySettings settings;
   final TerminalPaneState pane;
   final bool local;
+  final bool detectSoftwareKeyboardDelete;
   final VoidCallback onReconnect;
+  final void Function(WorkspaceTabId sourceTabId, _TerminalPaneDropPlacement)
+  onDropTabPane;
   final FocusOnKeyEventCallback? onKeyEvent;
   final TerminalInsertTextInterceptor? onInsertText;
 
   @override
+  State<_SingleTerminalViewport> createState() =>
+      _SingleTerminalViewportState();
+}
+
+class _SingleTerminalViewportState extends State<_SingleTerminalViewport> {
+  _TerminalPaneDropPlacement? _dropPlacement;
+
+  bool _acceptsTabDrop(_TerminalTabDragData data) {
+    return data.tabId != widget.tabId;
+  }
+
+  void _updateDropPlacement(Offset globalOffset) {
+    final next = _terminalPaneDropPlacementForOffset(context, globalOffset);
+    if (_dropPlacement != next) {
+      setState(() => _dropPlacement = next);
+    }
+  }
+
+  void _clearDropPlacement() {
+    if (_dropPlacement != null) {
+      setState(() => _dropPlacement = null);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        TerminalView(
-          terminal,
-          controller: controller,
-          focusNode: focusNode,
-          autofocus: true,
-          padding: _terminalViewportPadding,
-          theme: settings.terminalTheme,
-          textStyle: settings.textStyle,
-          onKeyEvent: onKeyEvent,
-          onInsertText: onInsertText,
-        ),
-        if (_terminalPaneNeedsOverlay(pane.lifecycle))
-          _TerminalPaneRecoveryOverlay(
-            pane: pane,
-            local: local,
-            onReconnect: onReconnect,
-            onClose: null,
+    return DragTarget<_TerminalTabDragData>(
+      onWillAcceptWithDetails: (details) {
+        final accepted = _acceptsTabDrop(details.data);
+        if (accepted) {
+          _updateDropPlacement(details.offset);
+        }
+        return accepted;
+      },
+      onMove: (details) => _updateDropPlacement(details.offset),
+      onLeave: (_) => _clearDropPlacement(),
+      onAcceptWithDetails: (details) {
+        final placement =
+            _dropPlacement ??
+            _terminalPaneDropPlacementForOffset(context, details.offset);
+        _clearDropPlacement();
+        widget.onDropTabPane(details.data.tabId, placement);
+      },
+      builder: (context, candidates, _) {
+        final dropActive = candidates.isNotEmpty;
+        return Stack(
+          children: [
+            TerminalView(
+              widget.terminal,
+              controller: widget.controller,
+              focusNode: widget.focusNode,
+              autofocus: true,
+              padding: _terminalViewportPadding,
+              theme: widget.settings.terminalTheme,
+              textStyle: widget.settings.textStyle,
+              deleteDetection: widget.detectSoftwareKeyboardDelete,
+              onKeyEvent: widget.onKeyEvent,
+              onInsertText: widget.onInsertText,
+            ),
+            if (_terminalPaneNeedsOverlay(widget.pane.lifecycle))
+              _TerminalPaneRecoveryOverlay(
+                pane: widget.pane,
+                local: widget.local,
+                onReconnect: widget.onReconnect,
+                onClose: null,
+              ),
+            if (dropActive) _TerminalPaneDropScrim(placement: _dropPlacement),
+          ],
+        );
+      },
+    );
+  }
+}
+
+_TerminalPaneDropPlacement _terminalPaneDropPlacementForOffset(
+  BuildContext context,
+  Offset globalOffset,
+) {
+  final box = context.findRenderObject() as RenderBox?;
+  if (box == null || !box.hasSize) {
+    return _TerminalPaneDropPlacement.right;
+  }
+  final localOffset = box.globalToLocal(globalOffset);
+  final horizontalEdge = math.min(
+    localOffset.dx,
+    box.size.width - localOffset.dx,
+  );
+  final verticalEdge = math.min(
+    localOffset.dy,
+    box.size.height - localOffset.dy,
+  );
+  if (horizontalEdge < verticalEdge) {
+    return localOffset.dx < box.size.width / 2
+        ? _TerminalPaneDropPlacement.left
+        : _TerminalPaneDropPlacement.right;
+  }
+  return localOffset.dy < box.size.height / 2
+      ? _TerminalPaneDropPlacement.top
+      : _TerminalPaneDropPlacement.bottom;
+}
+
+class _TerminalPaneDropScrim extends StatelessWidget {
+  const _TerminalPaneDropScrim({required this.placement});
+
+  final _TerminalPaneDropPlacement? placement;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final preview = placement;
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: t.accentPrimary.withValues(alpha: 0.06),
+            border: Border.all(color: t.accentPrimary.withValues(alpha: 0.72)),
           ),
-      ],
+          child: preview == null
+              ? const SizedBox.expand()
+              : _TerminalPaneDropPlacementPreview(placement: preview),
+        ),
+      ),
+    );
+  }
+}
+
+class _TerminalPaneDropPlacementPreview extends StatelessWidget {
+  const _TerminalPaneDropPlacementPreview({required this.placement});
+
+  final _TerminalPaneDropPlacement placement;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final alignment = switch (placement) {
+      _TerminalPaneDropPlacement.left => Alignment.centerLeft,
+      _TerminalPaneDropPlacement.right => Alignment.centerRight,
+      _TerminalPaneDropPlacement.top => Alignment.topCenter,
+      _TerminalPaneDropPlacement.bottom => Alignment.bottomCenter,
+    };
+    final widthFactor = switch (placement) {
+      _TerminalPaneDropPlacement.left ||
+      _TerminalPaneDropPlacement.right => 0.45,
+      _ => 1.0,
+    };
+    final heightFactor = switch (placement) {
+      _TerminalPaneDropPlacement.top ||
+      _TerminalPaneDropPlacement.bottom => 0.45,
+      _ => 1.0,
+    };
+    return Align(
+      key: ValueKey('terminal-pane-drop-preview-${placement.name}'),
+      alignment: alignment,
+      child: FractionallySizedBox(
+        widthFactor: widthFactor,
+        heightFactor: heightFactor,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: t.accentPrimary.withValues(alpha: 0.16),
+            border: Border.all(color: t.accentPrimary.withValues(alpha: 0.86)),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -67,6 +216,7 @@ class _SplitTerminalViewport extends StatelessWidget {
     required this.layout,
     required this.activePane,
     required this.local,
+    required this.detectSoftwareKeyboardDelete,
     required this.onActivatePane,
     required this.onClosePane,
     required this.onReconnectPane,
@@ -86,6 +236,7 @@ class _SplitTerminalViewport extends StatelessWidget {
   final TerminalPaneLayout layout;
   final int activePane;
   final bool local;
+  final bool detectSoftwareKeyboardDelete;
   final ValueChanged<int> onActivatePane;
   final ValueChanged<int> onClosePane;
   final ValueChanged<int> onReconnectPane;
@@ -156,6 +307,7 @@ class _SplitTerminalViewport extends StatelessWidget {
     final pane = panes[index];
     final paneLocal = pane.endpoint?.isLocal ?? local;
     return _TerminalViewportPane(
+      tabId: tabId,
       terminal: terminals[index],
       controller: controllers[index],
       focusNode: focusNodes[index],
@@ -167,6 +319,7 @@ class _SplitTerminalViewport extends StatelessWidget {
       local: paneLocal,
       pane: pane,
       canClose: panes.length > 1,
+      detectSoftwareKeyboardDelete: detectSoftwareKeyboardDelete,
       onKeyEvent: onKeyEvent,
       onInsertText: onInsertText,
       onTap: () => onActivatePane(index),
@@ -252,30 +405,103 @@ class _ResizableTerminalSplit extends StatelessWidget {
   }
 }
 
-class _TerminalSplitDivider extends StatelessWidget {
+class _TerminalSplitDivider extends StatefulWidget {
   const _TerminalSplitDivider({required this.axis, required this.onDragDelta});
 
   final Axis axis;
   final ValueChanged<Offset> onDragDelta;
 
   @override
+  State<_TerminalSplitDivider> createState() => _TerminalSplitDividerState();
+}
+
+class _TerminalSplitDividerState extends State<_TerminalSplitDivider> {
+  Timer? _revealTimer;
+  bool _hovered = false;
+  bool _revealed = false;
+  bool _dragging = false;
+
+  bool get _visible => _revealed || _dragging;
+
+  @override
+  void dispose() {
+    _revealTimer?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleReveal() {
+    _hovered = true;
+    _revealTimer?.cancel();
+    _revealTimer = Timer(_terminalDividerRevealDelay, () {
+      if (mounted) {
+        setState(() => _revealed = true);
+      }
+    });
+  }
+
+  void _hide() {
+    _hovered = false;
+    _revealTimer?.cancel();
+    if (_revealed || _dragging) {
+      setState(() {
+        _revealed = false;
+        _dragging = false;
+      });
+    }
+  }
+
+  void _showForDrag() {
+    _revealTimer?.cancel();
+    if (!_revealed || !_dragging) {
+      setState(() {
+        _revealed = true;
+        _dragging = true;
+      });
+    }
+  }
+
+  void _endDrag() {
+    if (_dragging) {
+      setState(() {
+        _dragging = false;
+        _revealed = _hovered;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     return MouseRegion(
-      cursor: axis == Axis.horizontal
+      cursor: widget.axis == Axis.horizontal
           ? SystemMouseCursors.resizeColumn
           : SystemMouseCursors.resizeRow,
+      onEnter: (_) => _scheduleReveal(),
+      onExit: (_) => _hide(),
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onPanUpdate: (details) => onDragDelta(details.delta),
+        onPanStart: (_) => _showForDrag(),
+        onPanUpdate: (details) {
+          _showForDrag();
+          widget.onDragDelta(details.delta);
+        },
+        onPanEnd: (_) => _endDrag(),
+        onPanCancel: _endDrag,
         child: SizedBox(
-          width: axis == Axis.horizontal ? _terminalDividerHitSize : null,
-          height: axis == Axis.vertical ? _terminalDividerHitSize : null,
+          width: widget.axis == Axis.horizontal
+              ? _terminalDividerHitSize
+              : null,
+          height: widget.axis == Axis.vertical ? _terminalDividerHitSize : null,
           child: Center(
-            child: Container(
-              width: axis == Axis.horizontal ? 1 : double.infinity,
-              height: axis == Axis.horizontal ? double.infinity : 1,
-              color: t.borderSubtle,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOut,
+              opacity: _visible ? 1 : 0,
+              child: Container(
+                width: widget.axis == Axis.horizontal ? 1 : double.infinity,
+                height: widget.axis == Axis.horizontal ? double.infinity : 1,
+                color: t.accentPrimary.withValues(alpha: 0.5),
+              ),
             ),
           ),
         ),
@@ -284,8 +510,9 @@ class _TerminalSplitDivider extends StatelessWidget {
   }
 }
 
-class _TerminalViewportPane extends StatelessWidget {
+class _TerminalViewportPane extends StatefulWidget {
   const _TerminalViewportPane({
+    required this.tabId,
     required this.terminal,
     required this.controller,
     required this.focusNode,
@@ -297,6 +524,7 @@ class _TerminalViewportPane extends StatelessWidget {
     required this.local,
     required this.pane,
     required this.canClose,
+    required this.detectSoftwareKeyboardDelete,
     this.onKeyEvent,
     this.onInsertText,
     required this.onTap,
@@ -317,6 +545,7 @@ class _TerminalViewportPane extends StatelessWidget {
   final bool local;
   final TerminalPaneState pane;
   final bool canClose;
+  final bool detectSoftwareKeyboardDelete;
   final FocusOnKeyEventCallback? onKeyEvent;
   final TerminalInsertTextInterceptor? onInsertText;
   final VoidCallback onTap;
@@ -325,86 +554,142 @@ class _TerminalViewportPane extends StatelessWidget {
   final ValueChanged<int> onSwapPanes;
   final void Function(WorkspaceTabId sourceTabId, _TerminalPaneDropPlacement)
   onDropTabPane;
+  final WorkspaceTabId tabId;
+
+  @override
+  State<_TerminalViewportPane> createState() => _TerminalViewportPaneState();
+}
+
+class _TerminalViewportPaneState extends State<_TerminalViewportPane> {
+  _TerminalPaneDropPlacement? _dropPlacement;
+
+  bool _acceptsPaneDrop(Object? data) {
+    if (data is _TerminalPaneDragData) {
+      return data.paneIndex != widget.paneIndex;
+    }
+    if (data is _TerminalTabDragData) {
+      return data.tabId != widget.tabId;
+    }
+    return false;
+  }
+
+  void _updateDropPlacement(Object? data, Offset globalOffset) {
+    final next = data is _TerminalTabDragData
+        ? _terminalPaneDropPlacementForOffset(context, globalOffset)
+        : null;
+    if (_dropPlacement != next) {
+      setState(() => _dropPlacement = next);
+    }
+  }
+
+  void _clearDropPlacement() {
+    if (_dropPlacement != null) {
+      setState(() => _dropPlacement = null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final status = _terminalPaneStatusLabel(context.l10n, lifecycle, local);
+    final status = _terminalPaneStatusLabel(
+      context.l10n,
+      widget.lifecycle,
+      widget.local,
+    );
     return DragTarget<Object>(
-      onWillAcceptWithDetails: (details) => _acceptsPaneDrop(details.data),
+      onWillAcceptWithDetails: (details) {
+        final accepted = _acceptsPaneDrop(details.data);
+        if (accepted) {
+          _updateDropPlacement(details.data, details.offset);
+        }
+        return accepted;
+      },
+      onMove: (details) => _updateDropPlacement(details.data, details.offset),
+      onLeave: (_) => _clearDropPlacement(),
       onAcceptWithDetails: (details) {
         final data = details.data;
-        if (data is _TerminalPaneDragData && data.paneIndex != paneIndex) {
-          onSwapPanes(data.paneIndex);
+        final placement =
+            _dropPlacement ??
+            _terminalPaneDropPlacementForOffset(context, details.offset);
+        _clearDropPlacement();
+        if (data is _TerminalPaneDragData &&
+            data.paneIndex != widget.paneIndex) {
+          widget.onSwapPanes(data.paneIndex);
         } else if (data is _TerminalTabDragData) {
-          onDropTabPane(
-            data.tabId,
-            _placementForOffset(context, details.offset),
-          );
+          widget.onDropTabPane(data.tabId, placement);
         }
       },
       builder: (context, candidates, _) {
         final dropActive = candidates.isNotEmpty;
+        final paneBorderColor = dropActive
+            ? t.accentPrimary.withValues(alpha: 0.72)
+            : widget.active
+            ? t.accentPrimary.withValues(alpha: 0.5)
+            : t.borderSubtle;
         return Material(
           color: t.surfaceSunken,
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: SerlinkRadii.dialog,
-            side: BorderSide(
-              color: dropActive || active ? t.accentPrimary : t.borderSubtle,
-              width: dropActive || active ? 1.5 : 1,
-            ),
+            side: BorderSide(color: paneBorderColor),
           ),
           child: SerlinkPressable(
-            onTap: onTap,
+            onTap: widget.onTap,
             borderRadius: SerlinkRadii.dialog,
-            hoverColor: t.accentPrimary.withValues(alpha: 0.05),
+            hoverColor: widget.active
+                ? Colors.transparent
+                : t.accentPrimary.withValues(alpha: 0.06),
+            pressedColor: widget.active
+                ? Colors.transparent
+                : t.accentPrimary.withValues(alpha: 0.1),
             child: Column(
               children: [
                 Draggable<_TerminalPaneDragData>(
-                  data: _TerminalPaneDragData(paneIndex: paneIndex),
-                  feedback: _TerminalDragFeedback(label: label),
+                  data: _TerminalPaneDragData(paneIndex: widget.paneIndex),
+                  feedback: _TerminalDragFeedback(label: widget.label),
                   allowedButtonsFilter: _primaryPointerButton,
                   childWhenDragging: Opacity(
                     opacity: 0.5,
                     child: _TerminalPaneHeader(
-                      label: label,
+                      label: widget.label,
                       status: status,
-                      active: active,
-                      canClose: canClose,
-                      onClose: onClose,
+                      active: widget.active,
+                      canClose: widget.canClose,
+                      onClose: widget.onClose,
                     ),
                   ),
                   child: _TerminalPaneHeader(
-                    label: label,
+                    label: widget.label,
                     status: status,
-                    active: active,
-                    canClose: canClose,
-                    onClose: onClose,
+                    active: widget.active,
+                    canClose: widget.canClose,
+                    onClose: widget.onClose,
                   ),
                 ),
                 Expanded(
                   child: Stack(
                     children: [
                       TerminalView(
-                        terminal,
-                        controller: controller,
-                        focusNode: focusNode,
-                        autofocus: active,
+                        widget.terminal,
+                        controller: widget.controller,
+                        focusNode: widget.focusNode,
+                        autofocus: widget.active,
                         padding: _terminalViewportPadding,
-                        theme: settings.terminalTheme,
-                        textStyle: settings.textStyle,
-                        onKeyEvent: onKeyEvent,
-                        onInsertText: onInsertText,
+                        theme: widget.settings.terminalTheme,
+                        textStyle: widget.settings.textStyle,
+                        deleteDetection: widget.detectSoftwareKeyboardDelete,
+                        onKeyEvent: widget.onKeyEvent,
+                        onInsertText: widget.onInsertText,
                       ),
-                      if (_terminalPaneNeedsOverlay(lifecycle))
+                      if (_terminalPaneNeedsOverlay(widget.lifecycle))
                         _TerminalPaneRecoveryOverlay(
-                          pane: pane,
-                          local: local,
-                          onReconnect: onReconnect,
-                          onClose: canClose ? onClose : null,
+                          pane: widget.pane,
+                          local: widget.local,
+                          onReconnect: widget.onReconnect,
+                          onClose: widget.canClose ? widget.onClose : null,
                         ),
-                      if (dropActive) const _TerminalPaneDropScrim(),
+                      if (dropActive)
+                        _TerminalPaneDropScrim(placement: _dropPlacement),
                     ],
                   ),
                 ),
@@ -414,40 +699,6 @@ class _TerminalViewportPane extends StatelessWidget {
         );
       },
     );
-  }
-
-  bool _acceptsPaneDrop(Object? data) {
-    if (data is _TerminalPaneDragData) {
-      return data.paneIndex != paneIndex;
-    }
-    return data is _TerminalTabDragData;
-  }
-
-  _TerminalPaneDropPlacement _placementForOffset(
-    BuildContext context,
-    Offset globalOffset,
-  ) {
-    final box = context.findRenderObject() as RenderBox?;
-    if (box == null || !box.hasSize) {
-      return _TerminalPaneDropPlacement.right;
-    }
-    final localOffset = box.globalToLocal(globalOffset);
-    final horizontalEdge = math.min(
-      localOffset.dx,
-      box.size.width - localOffset.dx,
-    );
-    final verticalEdge = math.min(
-      localOffset.dy,
-      box.size.height - localOffset.dy,
-    );
-    if (horizontalEdge < verticalEdge) {
-      return localOffset.dx < box.size.width / 2
-          ? _TerminalPaneDropPlacement.left
-          : _TerminalPaneDropPlacement.right;
-    }
-    return localOffset.dy < box.size.height / 2
-        ? _TerminalPaneDropPlacement.top
-        : _TerminalPaneDropPlacement.bottom;
   }
 }
 
@@ -472,9 +723,9 @@ class _TerminalPaneHeader extends StatelessWidget {
     return Container(
       height: 32,
       width: double.infinity,
-      padding: const EdgeInsets.only(left: 10, right: 6),
+      padding: const EdgeInsets.only(left: 10, right: 8),
       decoration: BoxDecoration(
-        color: active ? t.accentPrimary.withValues(alpha: 0.12) : t.surfaceBase,
+        color: active ? t.accentPrimary.withValues(alpha: 0.16) : t.surfaceBase,
         border: Border(bottom: BorderSide(color: t.borderSubtle)),
       ),
       child: Row(
@@ -495,35 +746,18 @@ class _TerminalPaneHeader extends StatelessWidget {
               message: context.l10n.terminalClosePaneTooltip,
               child: SerlinkIconButton(
                 constraints: const BoxConstraints.tightFor(
-                  width: 24,
-                  height: 24,
+                  width: 20,
+                  height: 20,
                 ),
                 padding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
                 onPressed: onClose,
-                icon: Icon(Icons.close, size: 15, color: t.textSecondary),
+                iconSize: 13,
+                color: t.textSecondary,
+                icon: const Icon(Icons.close),
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _TerminalPaneDropScrim extends StatelessWidget {
-  const _TerminalPaneDropScrim();
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: t.accentPrimary.withValues(alpha: 0.10),
-            border: Border.all(color: t.accentPrimary),
-          ),
-        ),
       ),
     );
   }

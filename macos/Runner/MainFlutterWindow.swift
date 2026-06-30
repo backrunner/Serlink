@@ -36,6 +36,7 @@ class MainFlutterWindow: NSWindow {
     titleVisibility = .hidden
     titlebarAppearsTransparent = true
     styleMask.insert(.fullSizeContentView)
+    isMovable = false
     isMovableByWindowBackground = false
     isOpaque = true
     minSize = Self.minimumWindowSize
@@ -75,6 +76,11 @@ class MainFlutterWindow: NSWindow {
         result(nil)
       case "startDrag":
         if let event = NSApp.currentEvent {
+          let wasMovable = self.isMovable
+          self.isMovable = true
+          defer {
+            self.isMovable = wasMovable
+          }
           self.performDrag(with: event)
         }
         result(nil)

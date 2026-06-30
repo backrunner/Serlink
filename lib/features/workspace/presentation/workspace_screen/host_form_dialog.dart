@@ -56,7 +56,6 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   bool _saving = false;
   String? _errorMessage;
 
-  bool get _isEditing => widget.mode == _HostFormMode.edit;
   bool get _usesSavedCredentialPicker =>
       widget.mode == _HostFormMode.edit ||
       widget.mode == _HostFormMode.duplicate;

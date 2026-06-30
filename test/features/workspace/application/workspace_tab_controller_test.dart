@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -185,67 +184,50 @@ void main() {
 
   test(
     'auto reconnect retries terminal sessions up to the configured limit',
-    () {
-      fakeAsync((async) {
-        final service = _FakeSshSessionService();
-        final container = _container(
-          service: service,
-          profile: StaticConnectionProfile(
-            hostId: _host.id,
-            hostname: _host.hostname,
-            port: _host.port,
-            username: _host.username,
-            authMethods: [staticPasswordAuth('secret')],
-            reconnectPolicy: const SshReconnectPolicy(
-              maxAttempts: 2,
-              backoff: Duration(seconds: 1),
-            ),
+    () async {
+      final service = _FakeSshSessionService();
+      final container = _container(
+        service: service,
+        profile: StaticConnectionProfile(
+          hostId: _host.id,
+          hostname: _host.hostname,
+          port: _host.port,
+          username: _host.username,
+          authMethods: [staticPasswordAuth('secret')],
+          reconnectPolicy: const SshReconnectPolicy(
+            maxAttempts: 2,
+            backoff: Duration.zero,
           ),
-        );
-        addTearDown(container.dispose);
+        ),
+      );
+      addTearDown(container.dispose);
 
-        final controller = container.read(
-          workspaceTabControllerProvider.notifier,
-        );
-        controller.openTerminal(_host);
-        async.flushMicrotasks();
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openTerminal(_host);
+      await _drainMicrotasks();
 
-        final tab = container.read(workspaceTabControllerProvider).activeTab!;
-        expect(service.openShellCount, 1);
+      final tab = container.read(workspaceTabControllerProvider).activeTab!;
+      expect(service.openShellCount, 1);
 
-        service.shells.single.completeDone();
-        async.flushMicrotasks();
+      service.shells.single.completeDone();
+      await _drainMicrotasks();
 
-        expect(
-          container.read(workspaceTabControllerProvider).activeTab!.lifecycle,
-          SessionLifecycleState.disconnected,
-        );
+      expect(service.openShellCount, 2);
 
-        async.elapse(const Duration(milliseconds: 999));
-        async.flushMicrotasks();
-        expect(service.openShellCount, 1);
+      service.shells.last.completeDone();
+      await _drainMicrotasks();
+      expect(service.openShellCount, 3);
 
-        async.elapse(const Duration(milliseconds: 1));
-        async.flushMicrotasks();
-        expect(service.openShellCount, 2);
+      service.shells.last.completeDone();
+      await _drainMicrotasks();
+      expect(service.openShellCount, 3);
 
-        service.shells.last.completeDone();
-        async.flushMicrotasks();
-        async.elapse(const Duration(seconds: 1));
-        async.flushMicrotasks();
-        expect(service.openShellCount, 3);
-
-        service.shells.last.completeDone();
-        async.flushMicrotasks();
-        async.elapse(const Duration(seconds: 1));
-        async.flushMicrotasks();
-        expect(service.openShellCount, 3);
-
-        expect(
-          container.read(workspaceTabControllerProvider).activeTab!.id,
-          tab.id,
-        );
-      });
+      expect(
+        container.read(workspaceTabControllerProvider).activeTab!.id,
+        tab.id,
+      );
     },
   );
 
@@ -564,6 +546,35 @@ void main() {
     expect(service.shells.every((shell) => shell._done.isCompleted), isTrue);
   });
 
+  test('closing inactive split pane preserves active pane', () async {
+    final service = _FakeSshSessionService();
+    final container = _container(service: service);
+    addTearDown(container.dispose);
+
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    controller.openTerminal(_host);
+    await _drainMicrotasks();
+
+    final tabId = container.read(workspaceTabControllerProvider).activeTab!.id;
+    controller.enableTerminalSplit(tabId);
+    await _drainMicrotasks();
+    controller.setActiveTerminalPane(tabId, 0);
+    controller.enableTerminalSplit(tabId, axis: Axis.vertical);
+    await _drainMicrotasks();
+    controller.setActiveTerminalPane(tabId, 0);
+
+    controller.closeTerminalPane(tabId, 2);
+    await _drainMicrotasks();
+
+    final content =
+        container.read(workspaceTabControllerProvider).activeTab!.content
+            as TerminalTabContent;
+    expect(content.panes, hasLength(2));
+    expect(content.activePane, 0);
+    expect(service.shells[0]._done.isCompleted, isFalse);
+    expect(service.shells[2]._done.isCompleted, isTrue);
+  });
+
   test('inserts snippet into active connected terminal', () async {
     final service = _FakeSshSessionService();
     final container = _container(service: service);
@@ -596,6 +607,42 @@ void main() {
     expect(inserted, isTrue);
     expect(service.shells.single.writes, ['systemctl restart api\n']);
   });
+
+  test(
+    'inserts into active split pane while another pane is disconnected',
+    () async {
+      final service = _FakeSshSessionService();
+      final container = _container(service: service);
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openTerminal(_host);
+      await _drainMicrotasks();
+      final tabId = container
+          .read(workspaceTabControllerProvider)
+          .activeTab!
+          .id;
+      controller.enableTerminalSplit(tabId);
+      await _drainMicrotasks();
+      controller.setActiveTerminalPane(tabId, 1);
+
+      service.shells.first.completeDone();
+      await _drainMicrotasks();
+
+      final tab = container.read(workspaceTabControllerProvider).activeTab!;
+      final content = tab.content as TerminalTabContent;
+      expect(tab.lifecycle, SessionLifecycleState.disconnected);
+      expect(content.panes[1].lifecycle, SessionLifecycleState.connected);
+
+      final inserted = controller.insertIntoActiveTerminal('still alive');
+
+      expect(inserted, isTrue);
+      expect(service.shells[0].writes, isEmpty);
+      expect(service.shells[1].writes, ['still alive']);
+    },
+  );
 
   test('enables, configures, and disables terminal split state', () async {
     final service = _FakeSshSessionService();
@@ -807,6 +854,311 @@ void main() {
     expect(content.primaryPane.displaySettings, isNull);
     expect(profileRepository.profiles.containsKey(_host.id), isFalse);
   });
+
+  test('moves single-pane terminal tab into another split layout', () async {
+    final service = _FakeSshSessionService();
+    final container = _container(
+      service: service,
+      profiles: {
+        _host.id: _profileFor(_host),
+        _secondHost.id: _profileFor(_secondHost),
+      },
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    controller.openTerminal(_host);
+    await _drainMicrotasks();
+    final targetTab = container.read(workspaceTabControllerProvider).activeTab!;
+    controller.openTerminal(_secondHost);
+    await _drainMicrotasks();
+    final sourceTab = container.read(workspaceTabControllerProvider).activeTab!;
+    final sourceContent = sourceTab.content as TerminalTabContent;
+    final movedSessionId = sourceContent.primaryPane.sessionId;
+
+    controller.mergeSinglePaneTabIntoSplit(
+      sourceTabId: sourceTab.id,
+      targetTabId: targetTab.id,
+      targetPaneIndex: 0,
+      axis: Axis.horizontal,
+      before: false,
+    );
+    await _drainMicrotasks();
+
+    var state = container.read(workspaceTabControllerProvider);
+    expect(state.tabs, hasLength(1));
+    expect(state.activeTab!.id, targetTab.id);
+    var content = state.activeTab!.content as TerminalTabContent;
+    expect(content.panes, hasLength(2));
+    expect(content.activePane, 1);
+    expect(content.panes[1].sessionId, movedSessionId);
+    expect(content.panes[1].endpoint?.hostId, _secondHost.id);
+    final split = _expectSplit(content.layout, Axis.horizontal);
+    _expectLeaf(split.first, 0);
+    _expectLeaf(split.second, 1);
+
+    service.shells.last.completeDone();
+    await _drainMicrotasks();
+
+    state = container.read(workspaceTabControllerProvider);
+    content = state.activeTab!.content as TerminalTabContent;
+    expect(content.panes[1].lifecycle, SessionLifecycleState.disconnected);
+    expect(state.activeTab!.lifecycle, SessionLifecycleState.disconnected);
+  });
+
+  test('opens sftp from the active split pane host', () async {
+    final service = _FakeSshSessionService();
+    final container = _container(
+      service: service,
+      profiles: {
+        _host.id: _profileFor(_host),
+        _secondHost.id: _profileFor(_secondHost),
+      },
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    controller.openTerminal(_host);
+    await _drainMicrotasks();
+    final targetTab = container.read(workspaceTabControllerProvider).activeTab!;
+    controller.openTerminal(_secondHost);
+    await _drainMicrotasks();
+    final sourceTab = container.read(workspaceTabControllerProvider).activeTab!;
+
+    controller.mergeSinglePaneTabIntoSplit(
+      sourceTabId: sourceTab.id,
+      targetTabId: targetTab.id,
+      targetPaneIndex: 0,
+      axis: Axis.horizontal,
+      before: false,
+    );
+    controller.openSftpFromTerminalPane(targetTab.id, 1);
+    await _drainMicrotasks();
+
+    final state = container.read(workspaceTabControllerProvider);
+    final sftpTab = state.activeTab!;
+    final sftpContent = sftpTab.content as SftpTabContent;
+    expect(sftpTab.hostId, _secondHost.id);
+    expect(sftpContent.rootPath, '/var/www');
+    expect(service.sftpProfiles.single.hostId, _secondHost.id);
+  });
+
+  test(
+    'saves terminal display settings for the active split pane host',
+    () async {
+      final service = _FakeSshSessionService();
+      final profileRepository = _FakeTerminalHostDisplaySettingsRepository();
+      final container = _container(
+        service: service,
+        terminalProfiles: profileRepository,
+        profiles: {
+          _host.id: _profileFor(_host),
+          _secondHost.id: _profileFor(_secondHost),
+        },
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openTerminal(_host);
+      await _drainMicrotasks();
+      final targetTab = container
+          .read(workspaceTabControllerProvider)
+          .activeTab!;
+      controller.openTerminal(_secondHost);
+      await _drainMicrotasks();
+      final sourceTab = container
+          .read(workspaceTabControllerProvider)
+          .activeTab!;
+
+      controller.mergeSinglePaneTabIntoSplit(
+        sourceTabId: sourceTab.id,
+        targetTabId: targetTab.id,
+        targetPaneIndex: 0,
+        axis: Axis.horizontal,
+        before: false,
+      );
+      const profile = TerminalDisplaySettings(
+        themeId: SerlinkTerminalThemeId.serlinkLight,
+        fontSize: 17,
+        lineHeight: 1.2,
+        scrollbackLines: 32000,
+      );
+
+      controller.saveTerminalDisplaySettingsForHost(
+        targetTab.id,
+        profile,
+        paneIndex: 1,
+      );
+      await _drainMicrotasks();
+
+      final content =
+          container.read(workspaceTabControllerProvider).tabs.single.content
+              as TerminalTabContent;
+      expect(profileRepository.profiles.containsKey(_host.id), isFalse);
+      expect(profileRepository.profiles[_secondHost.id], profile);
+      expect(content.panes[0].displaySettings, isNull);
+      expect(content.panes[1].displaySettings, profile);
+
+      controller.resetTerminalDisplaySettingsForHost(
+        targetTab.id,
+        paneIndex: 1,
+      );
+      await _drainMicrotasks();
+
+      final resetContent =
+          container.read(workspaceTabControllerProvider).tabs.single.content
+              as TerminalTabContent;
+      expect(profileRepository.profiles.containsKey(_secondHost.id), isFalse);
+      expect(resetContent.panes[1].displaySettings, isNull);
+    },
+  );
+
+  test(
+    'splits remote pane inside local tab by opening another ssh shell',
+    () async {
+      final service = _FakeSshSessionService();
+      final localTerminal = _FakeLocalTerminalService();
+      final container = _container(
+        service: service,
+        localTerminal: localTerminal,
+        profiles: {
+          _host.id: _profileFor(_host),
+          _secondHost.id: _profileFor(_secondHost),
+        },
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openLocalTerminal();
+      await _drainMicrotasks();
+      final localTab = container
+          .read(workspaceTabControllerProvider)
+          .activeTab!;
+
+      controller.openTerminal(_secondHost);
+      await _drainMicrotasks();
+      final remoteTab = container
+          .read(workspaceTabControllerProvider)
+          .activeTab!;
+
+      controller.mergeSinglePaneTabIntoSplit(
+        sourceTabId: remoteTab.id,
+        targetTabId: localTab.id,
+        targetPaneIndex: 0,
+        axis: Axis.horizontal,
+        before: false,
+      );
+      controller.enableTerminalSplit(localTab.id, axis: Axis.vertical);
+      await _drainMicrotasks();
+
+      final content =
+          container.read(workspaceTabControllerProvider).activeTab!.content
+              as LocalTerminalTabContent;
+      expect(content.panes, hasLength(3));
+      expect(content.panes[2].endpoint?.hostId, _secondHost.id);
+      expect(localTerminal.openShellCount, 1);
+      expect(service.openShellCount, 2);
+      expect(service.shellProfiles.last.hostId, _secondHost.id);
+    },
+  );
+
+  test('reconnects mixed local tab panes with their own transports', () async {
+    final service = _FakeSshSessionService();
+    final localTerminal = _FakeLocalTerminalService();
+    final container = _container(
+      service: service,
+      localTerminal: localTerminal,
+      profiles: {
+        _host.id: _profileFor(_host),
+        _secondHost.id: _profileFor(_secondHost),
+      },
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    controller.openLocalTerminal();
+    await _drainMicrotasks();
+    final localTab = container.read(workspaceTabControllerProvider).activeTab!;
+
+    controller.openTerminal(_secondHost);
+    await _drainMicrotasks();
+    final remoteTab = container.read(workspaceTabControllerProvider).activeTab!;
+
+    controller.mergeSinglePaneTabIntoSplit(
+      sourceTabId: remoteTab.id,
+      targetTabId: localTab.id,
+      targetPaneIndex: 0,
+      axis: Axis.horizontal,
+      before: false,
+    );
+
+    controller.reconnect(localTab.id);
+    await _drainMicrotasks();
+
+    final content =
+        container.read(workspaceTabControllerProvider).activeTab!.content
+            as LocalTerminalTabContent;
+    expect(content.panes.map((pane) => pane.lifecycle), [
+      SessionLifecycleState.connected,
+      SessionLifecycleState.connected,
+    ]);
+    expect(localTerminal.openShellCount, 2);
+    expect(service.openShellCount, 2);
+    expect(service.shellProfiles.last.hostId, _secondHost.id);
+  });
+
+  test('remote pane reconnect failure does not fail local sibling', () async {
+    final service = _FakeSshSessionService();
+    final localTerminal = _FakeLocalTerminalService();
+    final container = _container(
+      service: service,
+      localTerminal: localTerminal,
+      profiles: {
+        _host.id: _profileFor(_host),
+        _secondHost.id: _profileFor(_secondHost),
+      },
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    controller.openLocalTerminal();
+    await _drainMicrotasks();
+    final localTab = container.read(workspaceTabControllerProvider).activeTab!;
+
+    controller.openTerminal(_secondHost);
+    await _drainMicrotasks();
+    final remoteTab = container.read(workspaceTabControllerProvider).activeTab!;
+
+    controller.mergeSinglePaneTabIntoSplit(
+      sourceTabId: remoteTab.id,
+      targetTabId: localTab.id,
+      targetPaneIndex: 0,
+      axis: Axis.horizontal,
+      before: false,
+    );
+    service.shellFailures.add(StateError('remote down'));
+
+    controller.reconnect(localTab.id);
+    await _drainMicrotasks();
+
+    final tab = container.read(workspaceTabControllerProvider).activeTab!;
+    final content = tab.content as LocalTerminalTabContent;
+    expect(tab.lifecycle, SessionLifecycleState.failed);
+    expect(content.panes[0].lifecycle, SessionLifecycleState.connected);
+    expect(content.panes[1].lifecycle, SessionLifecycleState.failed);
+    expect(localTerminal.openShellCount, 2);
+    expect(service.openShellCount, 2);
+
+    controller.setActiveTerminalPane(localTab.id, 0);
+    final inserted = controller.insertIntoActiveTerminal('local ok');
+
+    expect(inserted, isTrue);
+    expect(localTerminal.shells.last.writes, ['local ok']);
+  });
 }
 
 TerminalPaneSplit _expectSplit(TerminalPaneLayout layout, Axis axis) {
@@ -832,6 +1184,19 @@ final _host = HostSummary(
   createdAt: DateTime.utc(2026),
 );
 
+final _secondHost = HostSummary(
+  id: HostId('host-2'),
+  displayName: 'Second Host',
+  hostname: 'second.internal',
+  username: 'deploy',
+  port: 2222,
+  authKinds: const {HostAuthKind.password},
+  tags: const {},
+  trustState: HostTrustState.trusted,
+  createdAt: DateTime.utc(2026),
+  sftpDefaultDirectory: '/var/www',
+);
+
 HostSummary _hostWithSftpDefault(String path) {
   return HostSummary(
     id: _host.id,
@@ -847,11 +1212,22 @@ HostSummary _hostWithSftpDefault(String path) {
   );
 }
 
+StaticConnectionProfile _profileFor(HostSummary host) {
+  return StaticConnectionProfile(
+    hostId: host.id,
+    hostname: host.hostname,
+    port: host.port,
+    username: host.username,
+    authMethods: [staticPasswordAuth('secret')],
+  );
+}
+
 ProviderContainer _container({
   required _FakeSshSessionService service,
   LocalTerminalService? localTerminal,
   _FakeTerminalHostDisplaySettingsRepository? terminalProfiles,
   StaticConnectionProfile? profile,
+  Map<HostId, StaticConnectionProfile>? profiles,
   PlatformCapabilities? capabilities,
 }) {
   return ProviderContainer(
@@ -862,17 +1238,9 @@ ProviderContainer _container({
       if (localTerminal != null)
         localTerminalServiceProvider.overrideWithValue(localTerminal),
       connectionProfileResolverProvider.overrideWithValue(
-        StaticConnectionProfileResolver({
-          _host.id:
-              profile ??
-              StaticConnectionProfile(
-                hostId: _host.id,
-                hostname: _host.hostname,
-                port: _host.port,
-                username: _host.username,
-                authMethods: [staticPasswordAuth('secret')],
-              ),
-        }),
+        StaticConnectionProfileResolver(
+          profiles ?? {_host.id: profile ?? _profileFor(_host)},
+        ),
       ),
       terminalHostDisplaySettingsRepositoryProvider.overrideWithValue(
         terminalProfiles ?? _FakeTerminalHostDisplaySettingsRepository(),

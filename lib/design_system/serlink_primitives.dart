@@ -836,6 +836,7 @@ class SurfaceToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Container(
+      width: double.infinity,
       height: height,
       padding: padding,
       decoration: BoxDecoration(

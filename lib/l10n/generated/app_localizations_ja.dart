@@ -123,6 +123,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get snippetsAddTooltip => 'スニペットを追加';
 
   @override
+  String get snippetsEmptyTitle => 'スニペットがありません';
+
+  @override
+  String get snippetsEmptyBody => 'よく使う端末コマンドを再利用できるように、コマンドスニペットを追加します。';
+
+  @override
   String get snippetsAddAction => 'スニペットを追加';
 
   @override
@@ -783,7 +789,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostKeyPassphraseLabel => '鍵のパスフレーズ';
 
   @override
-  String get hostAdvancedConnectionTitle => '詳細接続';
+  String get hostAdvancedConnectionTitle => '接続オプション';
 
   @override
   String get hostPortForwardingLocalHint => 'SSH セッションの開始時にこれらのローカル転送を開始します。';

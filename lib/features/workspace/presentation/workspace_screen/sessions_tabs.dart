@@ -164,6 +164,7 @@ class _TabPill extends StatelessWidget {
     };
 
     final pill = DecoratedBox(
+      key: ValueKey('workspace-tab-${tab.id.value}'),
       decoration: BoxDecoration(
         color: selected ? t.accentPrimary.withValues(alpha: 0.16) : null,
         borderRadius: SerlinkRadii.control,
@@ -233,20 +234,38 @@ class _TabPill extends StatelessWidget {
   }
 }
 
-class _TabDragTarget extends StatelessWidget {
+class _TabDragTarget extends StatefulWidget {
   const _TabDragTarget({required this.onDragEnter, required this.child});
 
   final VoidCallback onDragEnter;
   final Widget child;
 
   @override
+  State<_TabDragTarget> createState() => _TabDragTargetState();
+}
+
+class _TabDragTargetState extends State<_TabDragTarget> {
+  var _hovering = false;
+
+  @override
   Widget build(BuildContext context) {
     return DragTarget<_TerminalTabDragData>(
       onWillAcceptWithDetails: (_) {
-        onDragEnter();
-        return false;
+        if (!_hovering) {
+          _hovering = true;
+          widget.onDragEnter();
+        }
+        return true;
       },
-      builder: (context, _, _) => child,
+      onMove: (_) {
+        if (!_hovering) {
+          _hovering = true;
+          widget.onDragEnter();
+        }
+      },
+      onLeave: (_) => _hovering = false,
+      onAcceptWithDetails: (_) => _hovering = false,
+      builder: (context, _, _) => widget.child,
     );
   }
 }

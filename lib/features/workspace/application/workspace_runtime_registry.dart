@@ -11,10 +11,12 @@ import '../../terminal/application/terminal_zmodem_transfer.dart';
 
 class WorkspaceRuntimeRegistry {
   WorkspaceRuntimeRegistry({
+    this.terminalPlatform = TerminalTargetPlatform.unknown,
     this.confirmMultilinePaste,
     this.zmodemTransferHandler,
   });
 
+  final TerminalTargetPlatform terminalPlatform;
   final MultilinePasteConfirmation? confirmMultilinePaste;
   final TerminalZModemTransferHandler? zmodemTransferHandler;
   final Map<SessionId, Terminal> _terminals = {};
@@ -26,7 +28,7 @@ class WorkspaceRuntimeRegistry {
     bool echoInput = false,
     int maxLines = 10000,
   }) {
-    final terminal = Terminal(maxLines: maxLines);
+    final terminal = Terminal(maxLines: maxLines, platform: terminalPlatform);
     if (echoInput) {
       terminal.write(r'$ ');
       terminal.onOutput = (data) {

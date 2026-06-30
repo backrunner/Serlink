@@ -119,7 +119,8 @@ class KeytabInputHandler implements TerminalInputHandler {
       appCursorKeys: event.state.cursorKeysMode,
       appKeyPad: event.state.appKeypadMode,
       appScreen: event.altBuffer,
-      macos: event.platform == TerminalTargetPlatform.macos,
+      macos: event.platform == TerminalTargetPlatform.macos ||
+          event.platform == TerminalTargetPlatform.ios,
     );
 
     if (record == null) {
@@ -192,7 +193,8 @@ class AltInputHandler implements TerminalInputHandler {
       return null;
     }
 
-    if (event.platform == TerminalTargetPlatform.macos) {
+    if (event.platform == TerminalTargetPlatform.macos ||
+        event.platform == TerminalTargetPlatform.ios) {
       return null;
     }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
+import 'package:xterm/xterm.dart';
 
 void main() {
   test('iOS enables CloudKit and disables desktop-only capabilities', () {
@@ -20,6 +21,8 @@ void main() {
     expect(capabilities.suspendSessionsOnBackground, isTrue);
     expect(capabilities.sshAgentAuth, isFalse);
     expect(capabilities.hardwareKeyAuth, isFalse);
+    expect(capabilities.terminalSoftwareKeyboardDeleteDetection, isTrue);
+    expect(capabilities.terminalTargetPlatform, TerminalTargetPlatform.ios);
   });
 
   test('macOS keeps the existing desktop surface area', () {
@@ -39,6 +42,8 @@ void main() {
     expect(capabilities.suspendSessionsOnBackground, isFalse);
     expect(capabilities.sshAgentAuth, isTrue);
     expect(capabilities.hardwareKeyAuth, isFalse);
+    expect(capabilities.terminalSoftwareKeyboardDeleteDetection, isFalse);
+    expect(capabilities.terminalTargetPlatform, TerminalTargetPlatform.macos);
   });
 
   test('macOS App Store distribution disables unsandboxed local features', () {

@@ -143,6 +143,17 @@ class _FakeSshSessionService implements SshSessionService {
   Future<void> testConnection(ConnectionProfileSnapshot profile) async {}
 }
 
+class _FakeLocalTerminalService implements LocalTerminalService {
+  final List<_FakeShellSession> shells = [];
+
+  @override
+  Future<SshShellSession> openShell({int columns = 80, int rows = 24}) async {
+    final shell = _FakeShellSession();
+    shells.add(shell);
+    return shell;
+  }
+}
+
 class _FakeShellSession implements SshShellSession {
   final List<String> writes = [];
   final Completer<void> _done = Completer<void>();

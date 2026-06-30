@@ -129,6 +129,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get snippetsAddTooltip => 'Add snippet';
 
   @override
+  String get snippetsEmptyTitle => 'No Snippets';
+
+  @override
+  String get snippetsEmptyBody =>
+      'Add command snippets to reuse frequent terminal commands.';
+
+  @override
   String get snippetsAddAction => 'Add Snippet';
 
   @override
@@ -840,7 +847,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostKeyPassphraseLabel => 'Key passphrase';
 
   @override
-  String get hostAdvancedConnectionTitle => 'Advanced connection';
+  String get hostAdvancedConnectionTitle => 'Connection options';
 
   @override
   String get hostPortForwardingLocalHint =>

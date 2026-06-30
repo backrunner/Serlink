@@ -233,7 +233,7 @@ class _BrandHeader extends StatelessWidget {
             child: const _BrandMark(),
           );
 
-    if (!AppWindow.usesCustomChrome || AppWindow.usesMacStyleChrome) {
+    if (!AppWindow.usesCustomChrome) {
       return content;
     }
     return GestureDetector(

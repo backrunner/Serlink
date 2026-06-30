@@ -163,7 +163,7 @@ class _TabPill extends StatelessWidget {
       _ => t.statusWarning,
     };
 
-    final pill = DecoratedBox(
+    Widget pill = DecoratedBox(
       key: ValueKey('workspace-tab-${tab.id.value}'),
       decoration: BoxDecoration(
         color: selected ? t.accentPrimary.withValues(alpha: 0.16) : null,
@@ -218,6 +218,9 @@ class _TabPill extends StatelessWidget {
         ),
       ),
     );
+    if (AppWindow.usesMacStyleChrome) {
+      pill = _MacTabWindowDragExclusion(child: pill);
+    }
     if (!_tabCanReceivePaneDrop(tab)) {
       return pill;
     }
@@ -230,6 +233,73 @@ class _TabPill extends StatelessWidget {
       allowedButtonsFilter: _primaryPointerButton,
       childWhenDragging: Opacity(opacity: 0.5, child: pill),
       child: _TabDragTarget(onDragEnter: onDragEnter, child: pill),
+    );
+  }
+}
+
+class _MacTabWindowDragExclusion extends StatefulWidget {
+  const _MacTabWindowDragExclusion({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_MacTabWindowDragExclusion> createState() =>
+      _MacTabWindowDragExclusionState();
+}
+
+class _MacTabWindowDragExclusionState
+    extends State<_MacTabWindowDragExclusion> {
+  final Set<int> _activePointers = {};
+  bool _hovered = false;
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if (!_primaryPointerButton(event.buttons)) {
+      return;
+    }
+    _activePointers.add(event.pointer);
+    unawaited(AppWindow.setWindowDraggingEnabled(false));
+  }
+
+  void _handlePointerFinished(PointerEvent event) {
+    if (!_activePointers.remove(event.pointer) ||
+        _activePointers.isNotEmpty ||
+        _hovered) {
+      return;
+    }
+    unawaited(AppWindow.setWindowDraggingEnabled(true));
+  }
+
+  void _handleEnter(PointerEnterEvent event) {
+    _hovered = true;
+    unawaited(AppWindow.setWindowDraggingEnabled(false));
+  }
+
+  void _handleExit(PointerExitEvent event) {
+    _hovered = false;
+    if (_activePointers.isEmpty) {
+      unawaited(AppWindow.setWindowDraggingEnabled(true));
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_hovered || _activePointers.isNotEmpty) {
+      unawaited(AppWindow.setWindowDraggingEnabled(true));
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: _handleEnter,
+      onExit: _handleExit,
+      child: Listener(
+        onPointerDown: _handlePointerDown,
+        onPointerUp: _handlePointerFinished,
+        onPointerCancel: _handlePointerFinished,
+        child: widget.child,
+      ),
     );
   }
 }

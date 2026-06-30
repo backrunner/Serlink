@@ -47,12 +47,16 @@ class AppWindow {
     await _invoke<void>('startDrag');
   }
 
-  static Future<T?> _invoke<T>(String method) async {
+  static Future<void> setWindowDraggingEnabled(bool enabled) async {
+    await _invoke<void>('setWindowDraggingEnabled', enabled);
+  }
+
+  static Future<T?> _invoke<T>(String method, [Object? arguments]) async {
     if (!isSupported) {
       return null;
     }
     try {
-      return await _channel.invokeMethod<T>(method);
+      return await _channel.invokeMethod<T>(method, arguments);
     } on MissingPluginException {
       return null;
     }

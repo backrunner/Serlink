@@ -1218,89 +1218,89 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabsNewConnectionTooltip => '新建连接';
 
   @override
-  String get localShellInactive => '本地 shell 未运行。';
+  String get localShellInactive => '本地 shell 未运行';
 
   @override
-  String get connectionInactive => '连接未激活。';
+  String get connectionInactive => '连接未激活';
 
   @override
-  String get sessionDisconnectedMessage => '连接已中断。重新连接会启动新的会话。';
+  String get sessionDisconnectedMessage => '连接已中断，重新连接会启动新的会话';
 
   @override
-  String get sessionBackgroundedMessage => 'Serlink 进入后台时已断开会话。重新连接会启动新的会话。';
+  String get sessionBackgroundedMessage => 'Serlink 进入后台时已断开会话，重新连接会启动新的会话';
 
   @override
-  String get connectionFailedMessage => '连接失败。';
+  String get connectionFailedMessage => '连接失败';
 
   @override
-  String get connectionProfileVaultLockedMessage => '请先解锁保险库，再启动新的连接。';
+  String get connectionProfileVaultLockedMessage => '请先解锁保险库，再启动新的连接';
 
   @override
-  String get connectionProfileNotFoundMessage => '找不到连接配置。';
+  String get connectionProfileNotFoundMessage => '找不到连接配置';
 
   @override
-  String get connectionProfileHostNotFoundMessage => '找不到主机。';
+  String get connectionProfileHostNotFoundMessage => '找不到主机';
 
   @override
-  String get connectionProfileIdentityNotFoundMessage => '找不到身份。';
+  String get connectionProfileIdentityNotFoundMessage => '找不到身份';
 
   @override
-  String get connectionProfileNoAuthMethodsMessage => '此主机尚未配置身份。';
+  String get connectionProfileNoAuthMethodsMessage => '此主机尚未配置身份';
 
   @override
-  String get connectionProfileJumpChainTooDeepMessage => '跳板主机链路跳数过多。';
+  String get connectionProfileJumpChainTooDeepMessage => '跳板主机链路跳数过多';
 
   @override
-  String get connectionProfileJumpCycleMessage => '跳板主机链路存在循环。';
+  String get connectionProfileJumpCycleMessage => '跳板主机链路存在循环';
 
   @override
   String get connectionProfileSshAgentUnsupportedMessage =>
-      '此平台不可用 SSH agent 认证。';
+      '此平台不可用 SSH agent 认证';
 
   @override
-  String get connectionProfileHardwareKeyUnsupportedMessage => '此平台不可用硬件密钥认证。';
+  String get connectionProfileHardwareKeyUnsupportedMessage => '此平台不可用硬件密钥认证';
 
   @override
-  String get connectionProfileIdentitySecretMissingMessage => '身份未关联密钥记录。';
+  String get connectionProfileIdentitySecretMissingMessage => '身份未关联密钥记录';
 
   @override
-  String get connectionProfileSecretNotFoundMessage => '找不到密钥记录。';
+  String get connectionProfileSecretNotFoundMessage => '找不到密钥记录';
 
   @override
-  String get connectionProfilePasswordMissingMessage => '身份不包含密码。';
+  String get connectionProfilePasswordMissingMessage => '身份不包含密码';
 
   @override
-  String get connectionProfilePrivateKeyMissingMessage => '身份不包含私钥。';
+  String get connectionProfilePrivateKeyMissingMessage => '身份不包含私钥';
 
   @override
-  String get connectionProfileCertificateMissingMessage => '身份不包含 OpenSSH 证书。';
+  String get connectionProfileCertificateMissingMessage => '身份不包含 OpenSSH 证书';
 
   @override
-  String get sshAuthAgentUnavailableMessage => 'SSH agent 不可用。';
+  String get sshAuthAgentUnavailableMessage => 'SSH agent 不可用';
 
   @override
-  String get sshAuthHardwareKeyUnsupportedMessage => '硬件安全密钥认证需要平台支持。';
+  String get sshAuthHardwareKeyUnsupportedMessage => '硬件安全密钥认证需要平台支持';
 
   @override
-  String get sshAuthAgentEmptyMessage => 'SSH agent 中没有已加载的身份。';
+  String get sshAuthAgentEmptyMessage => 'SSH agent 中没有已加载的身份';
 
   @override
-  String get sshAuthEmptyMessage => '连接配置不包含受支持的认证方式。';
+  String get sshAuthEmptyMessage => '连接配置不包含受支持的认证方式';
 
   @override
-  String get sshAuthCertificateInvalidMessage => 'OpenSSH 证书内容无效。';
+  String get sshAuthCertificateInvalidMessage => 'OpenSSH 证书内容无效';
 
   @override
-  String get localTerminalExitedMessage => '本地 shell 已退出。重新启动会打开新的 shell。';
+  String get localTerminalExitedMessage => '本地 shell 已退出，重新启动会打开新的 shell';
 
   @override
-  String get localTerminalFailedMessage => '本地终端失败。';
+  String get localTerminalFailedMessage => '本地终端失败';
 
   @override
-  String get localTerminalShellMissingMessage => '找不到本地 shell 可执行文件。';
+  String get localTerminalShellMissingMessage => '找不到本地 shell 可执行文件';
 
   @override
-  String get localTerminalStartFailedMessage => '无法启动本地终端。';
+  String get localTerminalStartFailedMessage => '无法启动本地终端';
 
   @override
   String get localShellTitle => '本地 Shell';

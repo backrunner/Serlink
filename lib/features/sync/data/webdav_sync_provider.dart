@@ -193,7 +193,8 @@ SyncProviderException _mapWebDavException(
     ),
     DioExceptionType.connectionTimeout ||
     DioExceptionType.sendTimeout ||
-    DioExceptionType.receiveTimeout => const SyncProviderException(
+    DioExceptionType.receiveTimeout ||
+    DioExceptionType.transformTimeout => const SyncProviderException(
       'sync.provider.timeout',
       'WebDAV sync timed out.',
     ),

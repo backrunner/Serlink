@@ -275,33 +275,47 @@ void main() {
   );
 
   test('webdav provider maps provider errors to stable sync errors', () async {
-    final client = _FakeWebDavClient(
-      readError: DioException(
-        requestOptions: RequestOptions(path: '/serlink/manifest.json'),
-        response: Response<void>(
+    final cases = <(DioException, String)>[
+      (
+        DioException(
           requestOptions: RequestOptions(path: '/serlink/manifest.json'),
-          statusCode: 401,
+          response: Response<void>(
+            requestOptions: RequestOptions(path: '/serlink/manifest.json'),
+            statusCode: 401,
+          ),
+          type: DioExceptionType.badResponse,
         ),
-        type: DioExceptionType.badResponse,
+        'sync.provider.authentication_failed',
       ),
-    );
-    final provider = WebDavSyncProvider(
-      endpoint: Uri.parse('https://example.test/webdav'),
-      username: 'u',
-      password: 'p',
-      client: client,
-    );
+      (
+        DioException(
+          requestOptions: RequestOptions(path: '/serlink/manifest.json'),
+          type: DioExceptionType.transformTimeout,
+        ),
+        'sync.provider.timeout',
+      ),
+    ];
 
-    await expectLater(
-      provider.readManifest(),
-      throwsA(
-        isA<SyncProviderException>().having(
-          (error) => error.code,
-          'code',
-          'sync.provider.authentication_failed',
+    for (final (error, expectedCode) in cases) {
+      final client = _FakeWebDavClient(readError: error);
+      final provider = WebDavSyncProvider(
+        endpoint: Uri.parse('https://example.test/webdav'),
+        username: 'u',
+        password: 'p',
+        client: client,
+      );
+
+      await expectLater(
+        provider.readManifest(),
+        throwsA(
+          isA<SyncProviderException>().having(
+            (error) => error.code,
+            'code',
+            expectedCode,
+          ),
         ),
-      ),
-    );
+      );
+    }
   });
 
   test(

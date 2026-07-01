@@ -201,16 +201,16 @@ class _MacWindowControlGlyphPainter extends CustomPainter {
   void _paintClose(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 1.25
+      ..strokeWidth = 1.45
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(
-      Offset(size.width * 0.34, size.height * 0.34),
-      Offset(size.width * 0.66, size.height * 0.66),
+      Offset(size.width * 0.29, size.height * 0.29),
+      Offset(size.width * 0.71, size.height * 0.71),
       paint,
     );
     canvas.drawLine(
-      Offset(size.width * 0.66, size.height * 0.34),
-      Offset(size.width * 0.34, size.height * 0.66),
+      Offset(size.width * 0.71, size.height * 0.29),
+      Offset(size.width * 0.29, size.height * 0.71),
       paint,
     );
   }
@@ -218,11 +218,11 @@ class _MacWindowControlGlyphPainter extends CustomPainter {
   void _paintMinimize(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 1.35
+      ..strokeWidth = 1.55
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(
-      Offset(size.width * 0.30, size.height * 0.56),
-      Offset(size.width * 0.70, size.height * 0.56),
+      Offset(size.width * 0.25, size.height * 0.56),
+      Offset(size.width * 0.75, size.height * 0.56),
       paint,
     );
   }
@@ -230,14 +230,14 @@ class _MacWindowControlGlyphPainter extends CustomPainter {
   void _paintZoom(Canvas canvas, Size size) {
     final paint = Paint()..color = color;
     final first = Path()
-      ..moveTo(size.width * 0.30, size.height * 0.30)
-      ..lineTo(size.width * 0.66, size.height * 0.30)
-      ..lineTo(size.width * 0.30, size.height * 0.66)
+      ..moveTo(size.width * 0.25, size.height * 0.25)
+      ..lineTo(size.width * 0.71, size.height * 0.25)
+      ..lineTo(size.width * 0.25, size.height * 0.71)
       ..close();
     final second = Path()
-      ..moveTo(size.width * 0.70, size.height * 0.70)
-      ..lineTo(size.width * 0.34, size.height * 0.70)
-      ..lineTo(size.width * 0.70, size.height * 0.34)
+      ..moveTo(size.width * 0.75, size.height * 0.75)
+      ..lineTo(size.width * 0.29, size.height * 0.75)
+      ..lineTo(size.width * 0.75, size.height * 0.29)
       ..close();
     canvas.drawPath(first, paint);
     canvas.drawPath(second, paint);

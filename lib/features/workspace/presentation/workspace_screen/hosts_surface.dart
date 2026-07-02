@@ -5,6 +5,23 @@ final _hostSortOrderProvider =
       _HostSortOrderController.new,
     );
 
+final _hostListEntranceTrackerProvider = Provider<_HostListEntranceTracker>(
+  (ref) => _HostListEntranceTracker(),
+);
+
+const _hostListEntranceDurationMs = 420;
+const _hostListEntranceDuration = Duration(
+  milliseconds: _hostListEntranceDurationMs,
+);
+const _hostListEntranceStaggerMs = 40;
+const _hostListEntranceMaxStaggerItems = 8;
+const _hostListEntranceSettleDelay = Duration(
+  milliseconds:
+      _hostListEntranceDurationMs +
+      _hostListEntranceStaggerMs * _hostListEntranceMaxStaggerItems +
+      40,
+);
+
 enum _HostSortOrder { addedAt, name, lastConnectedAt }
 
 class _HostSortOrderController extends Notifier<_HostSortOrder> {
@@ -13,6 +30,18 @@ class _HostSortOrderController extends Notifier<_HostSortOrder> {
 
   void setOrder(_HostSortOrder order) {
     state = order;
+  }
+}
+
+class _HostListEntranceTracker {
+  int? _unlockGeneration;
+
+  bool claim(int unlockGeneration) {
+    if (_unlockGeneration == unlockGeneration) {
+      return false;
+    }
+    _unlockGeneration = unlockGeneration;
+    return true;
   }
 }
 
@@ -26,7 +55,6 @@ class _HostsSurface extends ConsumerWidget {
     final session = vaultSession.value;
     final vaultBusyReason =
         session?.busyReason ?? ref.watch(vaultSessionBusyReasonProvider);
-    final controller = ref.read(workspaceTabControllerProvider.notifier);
     final searchQuery = ref.watch(_workspaceSearchQueryProvider);
     final sortOrder = ref.watch(_hostSortOrderProvider);
     final mobile = ref.watch(
@@ -89,35 +117,10 @@ class _HostsSurface extends ConsumerWidget {
                           title: l10n.hostsNoMatchesTitle,
                           body: l10n.hostsNoMatchesBody,
                         )
-                      : ListView.separated(
-                          key: const PageStorageKey('hosts-list'),
-                          padding: mobile
-                              ? _mobileSurfaceListPadding
-                              : const EdgeInsets.all(16),
-                          itemCount: filteredHosts.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(height: 8),
-                          itemBuilder: (context, index) {
-                            final host = filteredHosts[index];
-                            return EntranceFade(
-                              key: ValueKey('host-row-${host.id.value}'),
-                              delay: Duration(
-                                milliseconds: 40 * (index.clamp(0, 8)),
-                              ),
-                              child: _HostRow(
-                                mobile: mobile,
-                                host: host,
-                                onTerminal: () => controller.openTerminal(host),
-                                onSftp: () => controller.openSftp(host),
-                                onEdit: () =>
-                                    _showEditHostDialog(context, host),
-                                onDuplicate: () =>
-                                    _showDuplicateHostDialog(context, host),
-                                onDelete: () =>
-                                    _confirmDeleteHost(context, ref, host),
-                              ),
-                            );
-                          },
+                      : _HostList(
+                          hosts: filteredHosts,
+                          unlockGeneration: session.unlockGeneration,
+                          mobile: mobile,
                         ),
                 ),
               ],
@@ -129,6 +132,99 @@ class _HostsSurface extends ConsumerWidget {
           return content;
         }
         return _RecoveryKeyDialogGate(recoveryKey: recoveryKey, child: content);
+      },
+    );
+  }
+}
+
+class _HostList extends ConsumerStatefulWidget {
+  const _HostList({
+    required this.hosts,
+    required this.unlockGeneration,
+    required this.mobile,
+  });
+
+  final List<HostSummary> hosts;
+  final int unlockGeneration;
+  final bool mobile;
+
+  @override
+  ConsumerState<_HostList> createState() => _HostListState();
+}
+
+class _HostListState extends ConsumerState<_HostList> {
+  Timer? _settleTimer;
+  bool _playEntrance = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _claimEntrance(widget.unlockGeneration);
+  }
+
+  @override
+  void didUpdateWidget(covariant _HostList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.unlockGeneration != widget.unlockGeneration) {
+      _claimEntrance(widget.unlockGeneration);
+    }
+  }
+
+  @override
+  void dispose() {
+    _settleTimer?.cancel();
+    super.dispose();
+  }
+
+  void _claimEntrance(int unlockGeneration) {
+    _settleTimer?.cancel();
+    _playEntrance = ref
+        .read(_hostListEntranceTrackerProvider)
+        .claim(unlockGeneration);
+    if (!_playEntrance) {
+      return;
+    }
+    _settleTimer = Timer(_hostListEntranceSettleDelay, () {
+      if (mounted) {
+        setState(() => _playEntrance = false);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = ref.read(workspaceTabControllerProvider.notifier);
+    return ListView.separated(
+      key: const PageStorageKey('hosts-list'),
+      padding: widget.mobile
+          ? _mobileSurfaceListPadding
+          : const EdgeInsets.all(16),
+      itemCount: widget.hosts.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final host = widget.hosts[index];
+        final row = _HostRow(
+          mobile: widget.mobile,
+          host: host,
+          onTerminal: () => controller.openTerminal(host),
+          onSftp: () => controller.openSftp(host),
+          onEdit: () => _showEditHostDialog(context, host),
+          onDuplicate: () => _showDuplicateHostDialog(context, host),
+          onDelete: () => _confirmDeleteHost(context, ref, host),
+        );
+        if (!_playEntrance) {
+          return row;
+        }
+        return EntranceFade(
+          key: ValueKey('host-row-${host.id.value}'),
+          duration: _hostListEntranceDuration,
+          delay: Duration(
+            milliseconds:
+                _hostListEntranceStaggerMs *
+                math.min(index, _hostListEntranceMaxStaggerItems),
+          ),
+          child: row,
+        );
       },
     );
   }

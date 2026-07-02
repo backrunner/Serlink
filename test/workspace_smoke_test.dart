@@ -1874,6 +1874,41 @@ void main() {
     },
   );
 
+  testWidgets('hosts entrance animation plays once per unlock', (tester) async {
+    final now = DateTime.utc(2026);
+    final hosts = _DelayedHostRepository([
+      _hostConfig(
+        id: 'animated-host',
+        displayName: 'Animated Bastion',
+        hostname: 'animated.internal',
+        createdAt: now,
+      ),
+      _hostConfig(
+        id: 'animated-db',
+        displayName: 'Animated Database',
+        hostname: 'db.internal',
+        createdAt: now.subtract(const Duration(days: 1)),
+      ),
+    ])..completeList();
+
+    await _pumpLockedVaultApp(tester, hostRepository: hosts);
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _pumpUntilFound(tester, find.text('Animated Bastion'));
+
+    expect(find.byType(EntranceFade), findsNWidgets(2));
+
+    await tester.tap(find.text('Sessions'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EntranceFade), findsNothing);
+
+    await tester.tap(find.text('Hosts'));
+    await tester.pump();
+
+    expect(find.text('Animated Bastion'), findsOneWidget);
+    expect(find.text('Animated Database'), findsOneWidget);
+    expect(find.byType(EntranceFade), findsNothing);
+  });
+
   testWidgets('hosts can be sorted from the header menu', (tester) async {
     final hosts = _DelayedHostRepository([
       _hostConfig(

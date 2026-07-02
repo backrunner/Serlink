@@ -20,6 +20,11 @@ void main() {
       tags: {'prod', 'api'},
       identityIds: [IdentityId('identity-secret')],
       startupCommands: ['cd /srv/app'],
+      remoteSessionSettings: const HostRemoteSessionSettings(
+        enabled: true,
+        manager: HostRemoteSessionManager.tmux,
+        sessionName: 'ops',
+      ),
       jumpHostIds: [jumpHost.id],
     );
     final service = HostMetadataExportService(
@@ -36,6 +41,9 @@ void main() {
     expect(exported.username, 'deploy');
     expect(exported.tags, ['api', 'prod']);
     expect(exported.startupCommands, ['cd /srv/app']);
+    expect(exported.remoteSessionSettings['enabled'], isTrue);
+    expect(exported.remoteSessionSettings['manager'], 'tmux');
+    expect(exported.remoteSessionSettings['sessionName'], 'ops');
     expect(exported.jumpHosts.single.displayName, 'Jump Box');
     expect(exported.toJson().toString(), isNot(contains('identity-secret')));
   });
@@ -72,6 +80,8 @@ HostConfig _host({
   Set<String> tags = const {},
   List<IdentityId> identityIds = const [],
   List<String> startupCommands = const [],
+  HostRemoteSessionSettings remoteSessionSettings =
+      const HostRemoteSessionSettings(),
   List<HostId> jumpHostIds = const [],
 }) {
   return HostConfig(
@@ -85,6 +95,7 @@ HostConfig _host({
     trustState: HostTrustState.trusted,
     identityIds: identityIds,
     startupCommands: startupCommands,
+    remoteSessionSettings: remoteSessionSettings,
     jumpHostIds: jumpHostIds,
     createdAt: DateTime.utc(2026),
     updatedAt: DateTime.utc(2026),

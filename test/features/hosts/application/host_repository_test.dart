@@ -60,6 +60,13 @@ void main() {
           reconnectAttempts: 3,
           reconnectBackoffSeconds: 9,
         ),
+        remoteSessionSettings: const HostRemoteSessionSettings(
+          enabled: true,
+          manager: HostRemoteSessionManager.tmux,
+          sessionName: 'ops',
+          createIfMissing: true,
+          fallbackToShell: false,
+        ),
         createdAt: DateTime.utc(2026, 5, 27),
         updatedAt: DateTime.utc(2026, 5, 27, 1),
       );
@@ -86,6 +93,7 @@ void main() {
         host.connectionSettings.toJson(),
       );
       expect(restored.portForwarding, host.portForwarding);
+      expect(restored.remoteSessionSettings, host.remoteSessionSettings);
 
       await vault.lock();
 
@@ -121,5 +129,6 @@ void main() {
 
     expect(host.portForwarding, const HostPortForwardingSettings());
     expect(host.portForwarding.isEmpty, isTrue);
+    expect(host.remoteSessionSettings, const HostRemoteSessionSettings());
   });
 }

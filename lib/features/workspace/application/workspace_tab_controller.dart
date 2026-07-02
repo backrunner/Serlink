@@ -1376,6 +1376,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
               _ensureOpenPaneCurrent(pane.sessionId, paneToken);
               runtime.attachTerminal(sessionId: pane.sessionId, session: shell);
               await _runStartupCommands(shell, profile.startupCommands);
+              await _runRemoteSession(shell, profile.remoteSession);
               _setTerminalPaneLifecycleByOpenSession(
                 pane.sessionId,
                 SessionLifecycleState.connected,
@@ -1525,6 +1526,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       _ensureOpenPaneCurrent(pane.sessionId, token);
       runtime.attachTerminal(sessionId: pane.sessionId, session: shell);
       await _runStartupCommands(shell, profile.startupCommands);
+      await _runRemoteSession(shell, profile.remoteSession);
       _setTerminalPaneLifecycleByOpenSession(
         pane.sessionId,
         SessionLifecycleState.connected,
@@ -2175,6 +2177,136 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       await shell.write(utf8.encode('$command\n'));
     }
   }
+
+  Future<void> _runRemoteSession(
+    SshShellSession shell,
+    SshRemoteSessionProfile remoteSession,
+  ) async {
+    final command = _remoteSessionCommand(remoteSession);
+    if (command == null) {
+      return;
+    }
+    await shell.write(utf8.encode('$command\n'));
+  }
+}
+
+String? _remoteSessionCommand(SshRemoteSessionProfile remoteSession) {
+  if (!remoteSession.enabled) {
+    return null;
+  }
+  final sessionName = remoteSession.sessionName.trim();
+  if (sessionName.isEmpty) {
+    return null;
+  }
+  final quotedName = _singleQuoteShell(sessionName);
+  final exitOnFallback = !remoteSession.fallbackToShell;
+  final unavailable = _remoteSessionStatusCommand(
+    'Serlink: tmux/screen is not available on this host.',
+    exitShell: exitOnFallback,
+  );
+  final missing = _remoteSessionStatusCommand(
+    'Serlink: remote session was not found.',
+    exitShell: exitOnFallback,
+  );
+  final tmuxMissing = _remoteSessionStatusCommand(
+    'Serlink: tmux session was not found.',
+    exitShell: exitOnFallback,
+  );
+  final screenMissing = _remoteSessionStatusCommand(
+    'Serlink: screen session was not found.',
+    exitShell: exitOnFallback,
+  );
+  final alreadyInside = r'[ -n "${TMUX:-}" ] || [ -n "${STY:-}" ]';
+  final tmux = _tmuxRemoteSessionCommand(
+    quotedName,
+    createIfMissing: remoteSession.createIfMissing,
+    fallbackCommand: tmuxMissing,
+  );
+  final screen = _screenRemoteSessionCommand(
+    quotedName,
+    createIfMissing: remoteSession.createIfMissing,
+    fallbackCommand: screenMissing,
+  );
+
+  return switch (remoteSession.manager) {
+    SshRemoteSessionManager.auto => _autoRemoteSessionCommand(
+      quotedName,
+      alreadyInside: alreadyInside,
+      createIfMissing: remoteSession.createIfMissing,
+      unavailableCommand: unavailable,
+      missingCommand: missing,
+    ),
+    SshRemoteSessionManager.tmux =>
+      'if $alreadyInside; then :; '
+          'elif command -v tmux >/dev/null 2>&1; then $tmux; '
+          'else $unavailable; fi',
+    SshRemoteSessionManager.screen =>
+      'if $alreadyInside; then :; '
+          'elif command -v screen >/dev/null 2>&1; then $screen; '
+          'else $unavailable; fi',
+  };
+}
+
+String _autoRemoteSessionCommand(
+  String quotedName, {
+  required String alreadyInside,
+  required bool createIfMissing,
+  required String unavailableCommand,
+  required String missingCommand,
+}) {
+  final screen = _screenRemoteSessionCommand(
+    quotedName,
+    createIfMissing: createIfMissing,
+    fallbackCommand: missingCommand,
+  );
+  if (createIfMissing) {
+    return 'if $alreadyInside; then :; '
+        'elif command -v tmux >/dev/null 2>&1; then '
+        'exec tmux new-session -A -s $quotedName; '
+        'elif command -v screen >/dev/null 2>&1; then $screen; '
+        'else $unavailableCommand; fi';
+  }
+  return 'if $alreadyInside; then :; '
+      'elif command -v tmux >/dev/null 2>&1 && '
+      'tmux has-session -t $quotedName 2>/dev/null; then '
+      'exec tmux attach-session -t $quotedName; '
+      'elif command -v screen >/dev/null 2>&1; then $screen; '
+      'elif command -v tmux >/dev/null 2>&1; then $missingCommand; '
+      'else $unavailableCommand; fi';
+}
+
+String _tmuxRemoteSessionCommand(
+  String quotedName, {
+  required bool createIfMissing,
+  required String fallbackCommand,
+}) {
+  if (createIfMissing) {
+    return 'exec tmux new-session -A -s $quotedName';
+  }
+  return 'if tmux has-session -t $quotedName 2>/dev/null; then '
+      'exec tmux attach-session -t $quotedName; else $fallbackCommand; fi';
+}
+
+String _screenRemoteSessionCommand(
+  String quotedName, {
+  required bool createIfMissing,
+  required String fallbackCommand,
+}) {
+  if (createIfMissing) {
+    return 'exec screen -S $quotedName -xRR';
+  }
+  return 'screen -x $quotedName && exit 0; '
+      'screen -r $quotedName && exit 0; '
+      '$fallbackCommand';
+}
+
+String _remoteSessionStatusCommand(String message, {required bool exitShell}) {
+  final command = "printf '\\r\\n$message\\r\\n'";
+  return exitShell ? '$command; exit 127' : command;
+}
+
+String _singleQuoteShell(String value) {
+  return "'${value.replaceAll("'", r"'\''")}'";
 }
 
 String _ensureTrailingNewline(String text) {

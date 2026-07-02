@@ -31,6 +31,8 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       TextEditingController();
   final TextEditingController _startupCommandsController =
       TextEditingController();
+  final TextEditingController _remoteSessionNameController =
+      TextEditingController(text: 'serlink');
   final TextEditingController _tagsController = TextEditingController();
   final TextEditingController _sftpDefaultDirectoryController =
       TextEditingController(text: '/');
@@ -71,10 +73,16 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   List<HostLocalPortForward> _localForwards = const [];
   List<HostRemotePortForward> _remoteForwards = const [];
   List<HostDynamicPortForward> _dynamicForwards = const [];
+  HostRemoteSessionManager _remoteSessionManager =
+      HostRemoteSessionManager.auto;
   bool _showStartup = false;
+  bool _showRemoteSession = false;
   bool _showPortForwarding = false;
   bool _showSftp = false;
   bool _showAdvancedConnection = false;
+  bool _remoteSessionEnabled = false;
+  bool _remoteSessionCreateIfMissing = true;
+  bool _remoteSessionFallbackToShell = true;
   bool _passwordVisible = false;
   bool _loadingOptions = true;
   bool _saving = false;
@@ -117,6 +125,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     _privateKeyController.dispose();
     _keyPassphraseController.dispose();
     _startupCommandsController.dispose();
+    _remoteSessionNameController.dispose();
     _tagsController.dispose();
     _sftpDefaultDirectoryController.dispose();
     _connectTimeoutController.dispose();
@@ -276,6 +285,46 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                 ],
               ),
             ),
+            SizedBox(height: layout.sectionGap),
+            _HostCollapsibleSection(
+              title: l10n.hostRemoteSessionTitle,
+              icon: Icons.terminal_outlined,
+              expanded: _showRemoteSession,
+              compact: layout.compact,
+              onToggle: () {
+                setState(() {
+                  _showRemoteSession = !_showRemoteSession;
+                });
+              },
+              child: _RemoteSessionSection(
+                enabled: _remoteSessionEnabled,
+                manager: _remoteSessionManager,
+                sessionNameController: _remoteSessionNameController,
+                createIfMissing: _remoteSessionCreateIfMissing,
+                fallbackToShell: _remoteSessionFallbackToShell,
+                compact: layout.compact,
+                onEnabledChanged: (value) {
+                  setState(() {
+                    _remoteSessionEnabled = value;
+                  });
+                },
+                onManagerChanged: (value) {
+                  setState(() {
+                    _remoteSessionManager = value;
+                  });
+                },
+                onCreateIfMissingChanged: (value) {
+                  setState(() {
+                    _remoteSessionCreateIfMissing = value;
+                  });
+                },
+                onFallbackToShellChanged: (value) {
+                  setState(() {
+                    _remoteSessionFallbackToShell = value;
+                  });
+                },
+              ),
+            ),
             if (_jumpHostOptions.isNotEmpty) ...[
               SizedBox(height: layout.sectionGap),
               _HostFormSection(
@@ -406,6 +455,13 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       final startupCommands = _parseStartupCommands(
         _startupCommandsController.text,
       );
+      final remoteSessionSettings = HostRemoteSessionSettings(
+        enabled: _remoteSessionEnabled,
+        manager: _remoteSessionManager,
+        sessionName: _remoteSessionNameController.text,
+        createIfMissing: _remoteSessionCreateIfMissing,
+        fallbackToShell: _remoteSessionFallbackToShell,
+      );
       final jumpHostIds = _selectedJumpHostIds.toList(growable: false);
       if (widget.mode == _HostFormMode.edit && host != null) {
         await service.updateHostMetadata(
@@ -422,6 +478,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
+            remoteSessionSettings: remoteSessionSettings,
           ),
         );
       } else if (widget.mode == _HostFormMode.duplicate && host != null) {
@@ -439,6 +496,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
+            remoteSessionSettings: remoteSessionSettings,
           ),
         );
       } else if (_authMode == _HostAuthInputMode.password) {
@@ -455,6 +513,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
+            remoteSessionSettings: remoteSessionSettings,
           ),
         );
       } else if (_authMode == _HostAuthInputMode.privateKey) {
@@ -472,6 +531,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
+            remoteSessionSettings: remoteSessionSettings,
           ),
         );
       } else if (_authMode == _HostAuthInputMode.sshAgent &&
@@ -488,6 +548,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
+            remoteSessionSettings: remoteSessionSettings,
           ),
         );
       } else {
@@ -504,6 +565,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             sftpDefaultDirectory: _sftpDefaultDirectoryController.text,
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
+            remoteSessionSettings: remoteSessionSettings,
           ),
         );
       }
@@ -596,6 +658,12 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
           _startupCommandsController.text = hostConfig.startupCommands.join(
             '\n',
           );
+          final remoteSessionSettings = hostConfig.remoteSessionSettings;
+          _remoteSessionEnabled = remoteSessionSettings.enabled;
+          _remoteSessionManager = remoteSessionSettings.manager;
+          _remoteSessionNameController.text = remoteSessionSettings.sessionName;
+          _remoteSessionCreateIfMissing = remoteSessionSettings.createIfMissing;
+          _remoteSessionFallbackToShell = remoteSessionSettings.fallbackToShell;
           _sftpDefaultDirectoryController.text =
               hostConfig.sftpDefaultDirectory;
           _connectTimeoutController.text = hostConfig
@@ -620,6 +688,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
           _showStartup =
               hostConfig.startupCommands.isNotEmpty ||
               hostConfig.tags.isNotEmpty;
+          _showRemoteSession = hostConfig.remoteSessionSettings.enabled;
           _showSftp = hostConfig.sftpDefaultDirectory != '/';
           _showPortForwarding =
               hostConfig.portForwarding.localForwards.isNotEmpty ||

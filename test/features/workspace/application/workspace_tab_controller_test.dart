@@ -282,6 +282,81 @@ void main() {
     ]);
   });
 
+  test('runs remote session command after startup commands', () async {
+    final service = _FakeSshSessionService();
+    final container = _container(
+      service: service,
+      profile: StaticConnectionProfile(
+        hostId: _host.id,
+        hostname: _host.hostname,
+        port: _host.port,
+        username: _host.username,
+        authMethods: [staticPasswordAuth('secret')],
+        startupCommands: const ['cd /srv/app'],
+        remoteSession: const SshRemoteSessionProfile(
+          enabled: true,
+          manager: SshRemoteSessionManager.auto,
+          sessionName: 'ops',
+          createIfMissing: true,
+          fallbackToShell: true,
+        ),
+      ),
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    controller.openTerminal(_host);
+    await _drainMicrotasks();
+
+    expect(service.shells.single.writes, hasLength(2));
+    expect(service.shells.single.writes.first, 'cd /srv/app\n');
+    final remoteSessionCommand = service.shells.single.writes.last;
+    expect(remoteSessionCommand, contains('command -v tmux'));
+    expect(remoteSessionCommand, contains('command -v screen'));
+    expect(remoteSessionCommand, contains("exec tmux new-session -A -s 'ops'"));
+    expect(remoteSessionCommand, contains("exec screen -S 'ops' -xRR"));
+  });
+
+  test(
+    'auto remote session tries screen when tmux session is missing',
+    () async {
+      final service = _FakeSshSessionService();
+      final container = _container(
+        service: service,
+        profile: StaticConnectionProfile(
+          hostId: _host.id,
+          hostname: _host.hostname,
+          port: _host.port,
+          username: _host.username,
+          authMethods: [staticPasswordAuth('secret')],
+          remoteSession: const SshRemoteSessionProfile(
+            enabled: true,
+            manager: SshRemoteSessionManager.auto,
+            sessionName: 'ops',
+            createIfMissing: false,
+            fallbackToShell: true,
+          ),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openTerminal(_host);
+      await _drainMicrotasks();
+
+      final command = service.shells.single.writes.single;
+      expect(command, contains("tmux has-session -t 'ops'"));
+      expect(command, contains('elif command -v screen'));
+      expect(
+        command,
+        contains("screen -x 'ops' && exit 0; screen -r 'ops' && exit 0"),
+      );
+      expect(command, isNot(contains('tmux session was not found')));
+    },
+  );
+
   test(
     'opens sftp connection and stores runtime in same tab container',
     () async {

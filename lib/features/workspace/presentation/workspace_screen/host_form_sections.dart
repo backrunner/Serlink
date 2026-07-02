@@ -218,6 +218,105 @@ class _ConnectionNumberField extends StatelessWidget {
   }
 }
 
+class _RemoteSessionSection extends StatelessWidget {
+  const _RemoteSessionSection({
+    required this.enabled,
+    required this.manager,
+    required this.sessionNameController,
+    required this.createIfMissing,
+    required this.fallbackToShell,
+    required this.compact,
+    required this.onEnabledChanged,
+    required this.onManagerChanged,
+    required this.onCreateIfMissingChanged,
+    required this.onFallbackToShellChanged,
+  });
+
+  final bool enabled;
+  final HostRemoteSessionManager manager;
+  final TextEditingController sessionNameController;
+  final bool createIfMissing;
+  final bool fallbackToShell;
+  final bool compact;
+  final ValueChanged<bool> onEnabledChanged;
+  final ValueChanged<HostRemoteSessionManager> onManagerChanged;
+  final ValueChanged<bool> onCreateIfMissingChanged;
+  final ValueChanged<bool> onFallbackToShellChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final fieldGap = compact ? 10.0 : 14.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SerlinkSwitchListTile(
+          value: enabled,
+          onChanged: onEnabledChanged,
+          title: Text(l10n.hostRemoteSessionEnableTitle),
+          contentPadding: EdgeInsets.zero,
+        ),
+        SizedBox(height: fieldGap),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: SerlinkSegmentedControl<HostRemoteSessionManager>(
+            value: manager,
+            enabled: enabled,
+            compact: compact,
+            onChanged: onManagerChanged,
+            segments: [
+              SerlinkSegment(
+                value: HostRemoteSessionManager.auto,
+                label: l10n.hostRemoteSessionManagerAuto,
+                icon: Icons.auto_awesome_outlined,
+              ),
+              SerlinkSegment(
+                value: HostRemoteSessionManager.tmux,
+                label: l10n.hostRemoteSessionManagerTmux,
+                icon: Icons.view_column_outlined,
+              ),
+              SerlinkSegment(
+                value: HostRemoteSessionManager.screen,
+                label: l10n.hostRemoteSessionManagerScreen,
+                icon: Icons.screenshot_monitor_outlined,
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: fieldGap),
+        SerlinkTextField(
+          key: const ValueKey('host-remote-session-name-field'),
+          controller: sessionNameController,
+          enabled: enabled,
+          maxLength: 64,
+          decoration: InputDecoration(
+            labelText: l10n.hostRemoteSessionNameLabel,
+            counterText: '',
+          ),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9_.-]')),
+          ],
+          textInputAction: TextInputAction.next,
+        ),
+        SizedBox(height: fieldGap),
+        SerlinkSwitchListTile(
+          value: createIfMissing,
+          onChanged: enabled ? onCreateIfMissingChanged : null,
+          title: Text(l10n.hostRemoteSessionCreateIfMissing),
+          contentPadding: EdgeInsets.zero,
+        ),
+        SizedBox(height: fieldGap),
+        SerlinkSwitchListTile(
+          value: fallbackToShell,
+          onChanged: enabled ? onFallbackToShellChanged : null,
+          title: Text(l10n.hostRemoteSessionFallbackToShell),
+          contentPadding: EdgeInsets.zero,
+        ),
+      ],
+    );
+  }
+}
+
 class _HostPortForwardingSection extends StatelessWidget {
   const _HostPortForwardingSection({
     required this.localForwards,

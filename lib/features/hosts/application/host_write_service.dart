@@ -37,6 +37,7 @@ class PasswordHostDraft {
     this.sftpDefaultDirectory = '/',
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
+    this.remoteSessionSettings = const HostRemoteSessionSettings(),
   });
 
   final String displayName;
@@ -50,6 +51,7 @@ class PasswordHostDraft {
   final String sftpDefaultDirectory;
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
+  final HostRemoteSessionSettings remoteSessionSettings;
 }
 
 class PrivateKeyHostDraft {
@@ -66,6 +68,7 @@ class PrivateKeyHostDraft {
     this.sftpDefaultDirectory = '/',
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
+    this.remoteSessionSettings = const HostRemoteSessionSettings(),
   });
 
   final String displayName;
@@ -80,6 +83,7 @@ class PrivateKeyHostDraft {
   final String sftpDefaultDirectory;
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
+  final HostRemoteSessionSettings remoteSessionSettings;
 }
 
 class ExistingIdentitiesHostDraft {
@@ -95,6 +99,7 @@ class ExistingIdentitiesHostDraft {
     this.sftpDefaultDirectory = '/',
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
+    this.remoteSessionSettings = const HostRemoteSessionSettings(),
   });
 
   final String displayName;
@@ -108,6 +113,7 @@ class ExistingIdentitiesHostDraft {
   final String sftpDefaultDirectory;
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
+  final HostRemoteSessionSettings remoteSessionSettings;
 }
 
 class SshAgentHostDraft {
@@ -122,6 +128,7 @@ class SshAgentHostDraft {
     this.sftpDefaultDirectory = '/',
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
+    this.remoteSessionSettings = const HostRemoteSessionSettings(),
   });
 
   final String displayName;
@@ -134,6 +141,7 @@ class SshAgentHostDraft {
   final String sftpDefaultDirectory;
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
+  final HostRemoteSessionSettings remoteSessionSettings;
 }
 
 class HostMetadataDraft {
@@ -150,6 +158,7 @@ class HostMetadataDraft {
     this.sftpDefaultDirectory = '/',
     this.portForwarding,
     this.connectionSettings = const HostConnectionSettings(),
+    this.remoteSessionSettings,
   });
 
   final HostId id;
@@ -164,6 +173,7 @@ class HostMetadataDraft {
   final String sftpDefaultDirectory;
   final HostPortForwardingSettings? portForwarding;
   final HostConnectionSettings connectionSettings;
+  final HostRemoteSessionSettings? remoteSessionSettings;
 }
 
 class DuplicateHostDraft {
@@ -180,6 +190,7 @@ class DuplicateHostDraft {
     this.sftpDefaultDirectory = '/',
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
+    this.remoteSessionSettings = const HostRemoteSessionSettings(),
   });
 
   final HostId sourceHostId;
@@ -194,6 +205,7 @@ class DuplicateHostDraft {
   final String sftpDefaultDirectory;
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
+  final HostRemoteSessionSettings remoteSessionSettings;
 }
 
 class HostWriteService {
@@ -238,6 +250,9 @@ class HostWriteService {
       draft.sftpDefaultDirectory,
     );
     final portForwarding = _normalizePortForwarding(draft.portForwarding);
+    final remoteSessionSettings = _normalizeRemoteSessionSettings(
+      draft.remoteSessionSettings,
+    );
     final password = draft.password;
     if (password.isEmpty) {
       throw const HostWriteException(
@@ -285,6 +300,7 @@ class HostWriteService {
       sftpDefaultDirectory: sftpDefaultDirectory,
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
+      remoteSessionSettings: remoteSessionSettings,
       createdAt: now,
       updatedAt: now,
     );
@@ -306,6 +322,9 @@ class HostWriteService {
       draft.sftpDefaultDirectory,
     );
     final portForwarding = _normalizePortForwarding(draft.portForwarding);
+    final remoteSessionSettings = _normalizeRemoteSessionSettings(
+      draft.remoteSessionSettings,
+    );
     final privateKeyPem = draft.privateKeyPem.trim();
     if (!_looksLikePrivateKey(privateKeyPem)) {
       throw const HostWriteException(
@@ -357,6 +376,7 @@ class HostWriteService {
       sftpDefaultDirectory: sftpDefaultDirectory,
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
+      remoteSessionSettings: remoteSessionSettings,
       createdAt: now,
       updatedAt: now,
     );
@@ -380,6 +400,9 @@ class HostWriteService {
       draft.sftpDefaultDirectory,
     );
     final portForwarding = _normalizePortForwarding(draft.portForwarding);
+    final remoteSessionSettings = _normalizeRemoteSessionSettings(
+      draft.remoteSessionSettings,
+    );
     final now = DateTime.now().toUtc();
     final hostId = HostId(_uuid.v4());
     final identityIds = _normalizeIdentityIds(draft.identityIds);
@@ -400,6 +423,7 @@ class HostWriteService {
       sftpDefaultDirectory: sftpDefaultDirectory,
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
+      remoteSessionSettings: remoteSessionSettings,
       createdAt: now,
       updatedAt: now,
     );
@@ -421,6 +445,9 @@ class HostWriteService {
       draft.sftpDefaultDirectory,
     );
     final portForwarding = _normalizePortForwarding(draft.portForwarding);
+    final remoteSessionSettings = _normalizeRemoteSessionSettings(
+      draft.remoteSessionSettings,
+    );
     final now = DateTime.now().toUtc();
     final hostId = HostId(_uuid.v4());
     final identityId = IdentityId(_uuid.v4());
@@ -451,6 +478,7 @@ class HostWriteService {
       sftpDefaultDirectory: sftpDefaultDirectory,
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
+      remoteSessionSettings: remoteSessionSettings,
       createdAt: now,
       updatedAt: now,
     );
@@ -478,6 +506,9 @@ class HostWriteService {
       draft.sftpDefaultDirectory,
     );
     final portForwarding = _normalizePortForwarding(draft.portForwarding);
+    final remoteSessionSettings = _normalizeRemoteSessionSettings(
+      draft.remoteSessionSettings,
+    );
     final now = DateTime.now().toUtc();
     final hostId = HostId(_uuid.v4());
     final duplicated = HostConfig(
@@ -495,6 +526,7 @@ class HostWriteService {
       sftpDefaultDirectory: sftpDefaultDirectory,
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
+      remoteSessionSettings: remoteSessionSettings,
       groupId: source.groupId,
       createdAt: now,
       updatedAt: now,
@@ -525,6 +557,9 @@ class HostWriteService {
     final portForwarding = _normalizePortForwarding(
       draft.portForwarding ?? existing.portForwarding,
     );
+    final remoteSessionSettings = _normalizeRemoteSessionSettings(
+      draft.remoteSessionSettings ?? existing.remoteSessionSettings,
+    );
     final updated = HostConfig(
       id: existing.id,
       displayName: normalized.displayName,
@@ -543,6 +578,7 @@ class HostWriteService {
       sftpDefaultDirectory: sftpDefaultDirectory,
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
+      remoteSessionSettings: remoteSessionSettings,
       groupId: existing.groupId,
       lastConnectedAt: existing.lastConnectedAt,
       createdAt: existing.createdAt,
@@ -577,6 +613,7 @@ class HostWriteService {
       ),
       portForwarding: existing.portForwarding,
       connectionSettings: existing.connectionSettings,
+      remoteSessionSettings: existing.remoteSessionSettings,
       groupId: existing.groupId,
       lastConnectedAt: existing.lastConnectedAt,
       createdAt: existing.createdAt,
@@ -757,6 +794,40 @@ HostPortForwardingSettings _normalizePortForwarding(
           bindPort: _normalizeForwardPort(forward.bindPort),
         ),
     ],
+  );
+}
+
+HostRemoteSessionSettings _normalizeRemoteSessionSettings(
+  HostRemoteSessionSettings settings,
+) {
+  final sessionName = settings.sessionName.trim();
+  if (!settings.enabled) {
+    return HostRemoteSessionSettings(
+      manager: settings.manager,
+      sessionName: sessionName.isEmpty ? 'serlink' : sessionName,
+      createIfMissing: settings.createIfMissing,
+      fallbackToShell: settings.fallbackToShell,
+    );
+  }
+  if (sessionName.isEmpty) {
+    throw const HostWriteException(
+      'host.remote_session_name_required',
+      'Remote session name is required.',
+    );
+  }
+  if (sessionName.length > 64 ||
+      !RegExp(r'^[A-Za-z0-9_.-]+$').hasMatch(sessionName)) {
+    throw const HostWriteException(
+      'host.remote_session_name_invalid',
+      'Remote session name can use letters, numbers, dots, underscores, and dashes.',
+    );
+  }
+  return HostRemoteSessionSettings(
+    enabled: true,
+    manager: settings.manager,
+    sessionName: sessionName,
+    createIfMissing: settings.createIfMissing,
+    fallbackToShell: settings.fallbackToShell,
   );
 }
 

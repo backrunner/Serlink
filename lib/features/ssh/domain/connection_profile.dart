@@ -15,6 +15,7 @@ class ConnectionProfileSnapshot {
     this.connectTimeout = const Duration(seconds: 20),
     this.keepAliveInterval = const Duration(seconds: 10),
     this.reconnectPolicy = const SshReconnectPolicy(),
+    this.remoteSession = const SshRemoteSessionProfile(),
     this.terminalColumns = 80,
     this.terminalRows = 24,
   });
@@ -31,8 +32,27 @@ class ConnectionProfileSnapshot {
   final Duration connectTimeout;
   final Duration? keepAliveInterval;
   final SshReconnectPolicy reconnectPolicy;
+  final SshRemoteSessionProfile remoteSession;
   final int terminalColumns;
   final int terminalRows;
+}
+
+enum SshRemoteSessionManager { auto, tmux, screen }
+
+class SshRemoteSessionProfile {
+  const SshRemoteSessionProfile({
+    this.enabled = false,
+    this.manager = SshRemoteSessionManager.auto,
+    this.sessionName = 'serlink',
+    this.createIfMissing = true,
+    this.fallbackToShell = true,
+  });
+
+  final bool enabled;
+  final SshRemoteSessionManager manager;
+  final String sessionName;
+  final bool createIfMissing;
+  final bool fallbackToShell;
 }
 
 class SshJumpHostSnapshot {

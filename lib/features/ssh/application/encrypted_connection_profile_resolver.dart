@@ -76,6 +76,23 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
         maxAttempts: host.connectionSettings.reconnectAttempts,
         backoff: host.connectionSettings.reconnectBackoff,
       ),
+      remoteSession: _remoteSessionProfileFor(host.remoteSessionSettings),
+    );
+  }
+
+  SshRemoteSessionProfile _remoteSessionProfileFor(
+    HostRemoteSessionSettings settings,
+  ) {
+    return SshRemoteSessionProfile(
+      enabled: settings.enabled,
+      manager: switch (settings.manager) {
+        HostRemoteSessionManager.auto => SshRemoteSessionManager.auto,
+        HostRemoteSessionManager.tmux => SshRemoteSessionManager.tmux,
+        HostRemoteSessionManager.screen => SshRemoteSessionManager.screen,
+      },
+      sessionName: settings.sessionName,
+      createIfMissing: settings.createIfMissing,
+      fallbackToShell: settings.fallbackToShell,
     );
   }
 

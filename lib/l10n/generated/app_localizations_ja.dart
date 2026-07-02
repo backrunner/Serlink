@@ -744,6 +744,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostSectionStartup => '起動';
 
   @override
+  String get hostRemoteSessionTitle => 'リモートセッション';
+
+  @override
   String get hostSectionRouting => 'ルーティング';
 
   @override
@@ -772,6 +775,27 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get hostStartupCommandsLabel => '起動コマンド';
+
+  @override
+  String get hostRemoteSessionEnableTitle => 'tmux/screen に接続';
+
+  @override
+  String get hostRemoteSessionManagerAuto => '自動';
+
+  @override
+  String get hostRemoteSessionManagerTmux => 'tmux';
+
+  @override
+  String get hostRemoteSessionManagerScreen => 'screen';
+
+  @override
+  String get hostRemoteSessionNameLabel => 'セッション名';
+
+  @override
+  String get hostRemoteSessionCreateIfMissing => '未作成なら作成';
+
+  @override
+  String get hostRemoteSessionFallbackToShell => '利用不可なら shell';
 
   @override
   String get hostTagsLabel => 'タグ';

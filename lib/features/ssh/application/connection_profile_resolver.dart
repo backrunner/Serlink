@@ -61,6 +61,7 @@ class StaticConnectionProfile {
     this.connectTimeout = const Duration(seconds: 20),
     this.keepAliveInterval = const Duration(seconds: 10),
     this.reconnectPolicy = const SshReconnectPolicy(),
+    this.remoteSession = const SshRemoteSessionProfile(),
   });
 
   final HostId hostId;
@@ -74,6 +75,7 @@ class StaticConnectionProfile {
   final Duration connectTimeout;
   final Duration? keepAliveInterval;
   final SshReconnectPolicy reconnectPolicy;
+  final SshRemoteSessionProfile remoteSession;
 
   ConnectionProfileSnapshot toSnapshot({required SessionId sessionId}) {
     return ConnectionProfileSnapshot(
@@ -89,6 +91,7 @@ class StaticConnectionProfile {
       connectTimeout: connectTimeout,
       keepAliveInterval: keepAliveInterval,
       reconnectPolicy: reconnectPolicy,
+      remoteSession: remoteSession,
     );
   }
 }

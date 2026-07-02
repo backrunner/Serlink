@@ -801,6 +801,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostSectionStartup => 'Startup';
 
   @override
+  String get hostRemoteSessionTitle => 'Remote session';
+
+  @override
   String get hostSectionRouting => 'Routing';
 
   @override
@@ -830,6 +833,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hostStartupCommandsLabel => 'Startup commands';
+
+  @override
+  String get hostRemoteSessionEnableTitle => 'Attach to tmux/screen';
+
+  @override
+  String get hostRemoteSessionManagerAuto => 'Auto';
+
+  @override
+  String get hostRemoteSessionManagerTmux => 'tmux';
+
+  @override
+  String get hostRemoteSessionManagerScreen => 'screen';
+
+  @override
+  String get hostRemoteSessionNameLabel => 'Session name';
+
+  @override
+  String get hostRemoteSessionCreateIfMissing => 'Create when missing';
+
+  @override
+  String get hostRemoteSessionFallbackToShell => 'Fall back to shell';
 
   @override
   String get hostTagsLabel => 'Tags';

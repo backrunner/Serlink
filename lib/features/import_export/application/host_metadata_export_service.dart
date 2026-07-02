@@ -54,6 +54,7 @@ class HostMetadataExportRecord {
     required this.tags,
     required this.trustState,
     required this.startupCommands,
+    required this.remoteSessionSettings,
     required this.jumpHosts,
     required this.connectionSettings,
     required this.createdAt,
@@ -71,6 +72,7 @@ class HostMetadataExportRecord {
   final List<String> tags;
   final String trustState;
   final List<String> startupCommands;
+  final Map<String, Object?> remoteSessionSettings;
   final List<HostMetadataExportJumpHost> jumpHosts;
   final Map<String, Object?> connectionSettings;
   final DateTime createdAt;
@@ -89,6 +91,7 @@ class HostMetadataExportRecord {
       'tags': tags,
       'trustState': trustState,
       'startupCommands': startupCommands,
+      'remoteSessionSettings': remoteSessionSettings,
       'jumpHosts': [for (final host in jumpHosts) host.toJson()],
       'connectionSettings': connectionSettings,
       'groupId': groupId,
@@ -116,6 +119,10 @@ class HostMetadataExportRecord {
         for (final value in json['startupCommands'] as List<Object?>)
           value as String,
       ],
+      remoteSessionSettings: switch (json['remoteSessionSettings']) {
+        final Map<Object?, Object?> value => Map<String, Object?>.from(value),
+        _ => const HostRemoteSessionSettings().toJson(),
+      },
       jumpHosts: [
         for (final value in json['jumpHosts'] as List<Object?>)
           HostMetadataExportJumpHost.fromJson(value as Map<String, Object?>),
@@ -204,6 +211,7 @@ class HostMetadataExportService {
       tags: tags,
       trustState: host.trustState.name,
       startupCommands: List<String>.unmodifiable(host.startupCommands),
+      remoteSessionSettings: host.remoteSessionSettings.toJson(),
       jumpHosts: [
         for (final jumpHostId in host.jumpHostIds)
           HostMetadataExportJumpHost(

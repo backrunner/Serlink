@@ -735,6 +735,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostSectionStartup => '启动';
 
   @override
+  String get hostRemoteSessionTitle => '远端会话';
+
+  @override
   String get hostSectionRouting => '路由';
 
   @override
@@ -763,6 +766,27 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hostStartupCommandsLabel => '启动命令';
+
+  @override
+  String get hostRemoteSessionEnableTitle => '关联到 tmux/screen';
+
+  @override
+  String get hostRemoteSessionManagerAuto => '自动';
+
+  @override
+  String get hostRemoteSessionManagerTmux => 'tmux';
+
+  @override
+  String get hostRemoteSessionManagerScreen => 'screen';
+
+  @override
+  String get hostRemoteSessionNameLabel => '会话名称';
+
+  @override
+  String get hostRemoteSessionCreateIfMissing => '不存在时创建';
+
+  @override
+  String get hostRemoteSessionFallbackToShell => '不可用时进入 shell';
 
   @override
   String get hostTagsLabel => '标签';

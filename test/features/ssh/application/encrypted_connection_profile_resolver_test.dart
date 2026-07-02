@@ -52,7 +52,18 @@ void main() {
           updatedAt: DateTime.utc(2026, 5, 27),
         ),
       );
-      await hosts.save(_host(identityIds: [IdentityId('ops-password')]));
+      await hosts.save(
+        _host(
+          identityIds: [IdentityId('ops-password')],
+          remoteSessionSettings: const HostRemoteSessionSettings(
+            enabled: true,
+            manager: HostRemoteSessionManager.screen,
+            sessionName: 'ops',
+            createIfMissing: true,
+            fallbackToShell: false,
+          ),
+        ),
+      );
 
       final profile = await resolver.resolve(
         hostId: HostId('production'),
@@ -62,6 +73,11 @@ void main() {
       expect(profile.hostname, 'bastion.internal');
       expect(profile.username, 'ops');
       expect(profile.startupCommands, ['tmux attach || tmux']);
+      expect(profile.remoteSession.enabled, isTrue);
+      expect(profile.remoteSession.manager, SshRemoteSessionManager.screen);
+      expect(profile.remoteSession.sessionName, 'ops');
+      expect(profile.remoteSession.createIfMissing, isTrue);
+      expect(profile.remoteSession.fallbackToShell, isFalse);
       expect(profile.authMethods, hasLength(1));
       final auth = profile.authMethods.single as SshPasswordAuth;
       expect(
@@ -478,6 +494,8 @@ HostConfig _host({
   List<HostId> jumpHostIds = const [],
   HostPortForwardingSettings portForwarding =
       const HostPortForwardingSettings(),
+  HostRemoteSessionSettings remoteSessionSettings =
+      const HostRemoteSessionSettings(),
 }) {
   return HostConfig(
     id: id ?? HostId('production'),
@@ -492,6 +510,7 @@ HostConfig _host({
     startupCommands: startupCommands,
     jumpHostIds: jumpHostIds,
     portForwarding: portForwarding,
+    remoteSessionSettings: remoteSessionSettings,
     createdAt: DateTime.utc(2026, 5, 27),
     updatedAt: DateTime.utc(2026, 5, 27),
   );

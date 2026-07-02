@@ -110,6 +110,7 @@ class SyncFieldMergeService {
       _field('trustState', 'Trust', local, remote),
       _field('identityIds', 'Identities', local, remote),
       _field('startupCommands', 'Startup', local, remote),
+      _field('remoteSessionSettings', 'Remote session', local, remote),
       _field('jumpHostIds', 'Jump hosts', local, remote),
       _field('groupId', 'Group', local, remote),
       _field('lastConnectedAt', 'Last connected', local, remote),

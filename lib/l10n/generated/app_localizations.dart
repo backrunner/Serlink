@@ -1438,6 +1438,12 @@ abstract class AppLocalizations {
   /// **'Startup'**
   String get hostSectionStartup;
 
+  /// No description provided for @hostRemoteSessionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote session'**
+  String get hostRemoteSessionTitle;
+
   /// No description provided for @hostSectionRouting.
   ///
   /// In en, this message translates to:
@@ -1497,6 +1503,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Startup commands'**
   String get hostStartupCommandsLabel;
+
+  /// No description provided for @hostRemoteSessionEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach to tmux/screen'**
+  String get hostRemoteSessionEnableTitle;
+
+  /// No description provided for @hostRemoteSessionManagerAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get hostRemoteSessionManagerAuto;
+
+  /// No description provided for @hostRemoteSessionManagerTmux.
+  ///
+  /// In en, this message translates to:
+  /// **'tmux'**
+  String get hostRemoteSessionManagerTmux;
+
+  /// No description provided for @hostRemoteSessionManagerScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'screen'**
+  String get hostRemoteSessionManagerScreen;
+
+  /// No description provided for @hostRemoteSessionNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Session name'**
+  String get hostRemoteSessionNameLabel;
+
+  /// No description provided for @hostRemoteSessionCreateIfMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Create when missing'**
+  String get hostRemoteSessionCreateIfMissing;
+
+  /// No description provided for @hostRemoteSessionFallbackToShell.
+  ///
+  /// In en, this message translates to:
+  /// **'Fall back to shell'**
+  String get hostRemoteSessionFallbackToShell;
 
   /// No description provided for @hostTagsLabel.
   ///

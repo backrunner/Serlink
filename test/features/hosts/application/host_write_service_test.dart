@@ -50,6 +50,13 @@ void main() {
         password: 'server-password',
         tags: {'prod'},
         startupCommands: ['tmux attach || tmux'],
+        remoteSessionSettings: HostRemoteSessionSettings(
+          enabled: true,
+          manager: HostRemoteSessionManager.auto,
+          sessionName: 'ops',
+          createIfMissing: true,
+          fallbackToShell: false,
+        ),
       ),
     );
 
@@ -58,6 +65,16 @@ void main() {
     expect(storedHosts.single.displayName, summary.displayName);
     expect(storedHosts.single.identityIds, hasLength(1));
     expect(storedHosts.single.startupCommands, ['tmux attach || tmux']);
+    expect(
+      storedHosts.single.remoteSessionSettings,
+      const HostRemoteSessionSettings(
+        enabled: true,
+        manager: HostRemoteSessionManager.auto,
+        sessionName: 'ops',
+        createIfMissing: true,
+        fallbackToShell: false,
+      ),
+    );
 
     final resolver = EncryptedConnectionProfileResolver(
       hosts: hosts,
@@ -70,6 +87,10 @@ void main() {
       sessionId: SessionId('session-1'),
     );
     expect(profile.hostname, 'bastion.internal');
+    expect(profile.remoteSession.enabled, isTrue);
+    expect(profile.remoteSession.manager, SshRemoteSessionManager.auto);
+    expect(profile.remoteSession.sessionName, 'ops');
+    expect(profile.remoteSession.fallbackToShell, isFalse);
     final auth = profile.authMethods.single as SshPasswordAuth;
     expect(String.fromCharCodes(auth.password.copyBytes()), 'server-password');
 
@@ -410,6 +431,56 @@ void main() {
     expect(await hosts.list(), isEmpty);
   });
 
+  test('rejects unsafe remote session names', () async {
+    final vault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    final records = InMemoryVaultRecordRepository();
+    final hosts = EncryptedHostRepository(vault: vault, records: records);
+    final identities = EncryptedIdentityRepository(
+      vault: vault,
+      records: records,
+    );
+    await vault.initialize(passphrase: 'good passphrase');
+
+    final service = HostWriteService(
+      hosts: hosts,
+      identities: identities,
+      knownHosts: EncryptedKnownHostRepository(vault: vault, records: records),
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ),
+      records: records,
+      vault: vault,
+    );
+
+    await expectLater(
+      service.createPasswordHost(
+        const PasswordHostDraft(
+          displayName: 'Bad Remote Session',
+          hostname: 'bad-session.internal',
+          port: 22,
+          username: 'ops',
+          password: 'server-password',
+          tags: {},
+          remoteSessionSettings: HostRemoteSessionSettings(
+            enabled: true,
+            sessionName: 'ops; rm -rf /',
+          ),
+        ),
+      ),
+      throwsA(
+        isA<HostWriteException>().having(
+          (error) => error.code,
+          'code',
+          'host.remote_session_name_invalid',
+        ),
+      ),
+    );
+    expect(await hosts.list(), isEmpty);
+  });
+
   test('creates private key host and resolves private key auth', () async {
     final vault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),
@@ -509,6 +580,13 @@ void main() {
         password: 'server-password',
         tags: {},
         startupCommands: ['pwd'],
+        remoteSessionSettings: HostRemoteSessionSettings(
+          enabled: true,
+          manager: HostRemoteSessionManager.tmux,
+          sessionName: 'ops',
+          createIfMissing: false,
+          fallbackToShell: true,
+        ),
       ),
     );
     final before = await hosts.read(summary.id);
@@ -531,6 +609,7 @@ void main() {
     expect(after!.hostname, 'new.internal');
     expect(after.identityIds, before.identityIds);
     expect(after.startupCommands, ['tmux attach -t ops']);
+    expect(after.remoteSessionSettings, before.remoteSessionSettings);
     expect(after.jumpHostIds, isEmpty);
 
     final resolver = EncryptedConnectionProfileResolver(

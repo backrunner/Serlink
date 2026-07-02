@@ -11,6 +11,8 @@ enum HostAuthKind {
   hardwareKey,
 }
 
+enum HostRemoteSessionManager { auto, tmux, screen }
+
 class HostSummary {
   const HostSummary({
     required this.id,
@@ -57,6 +59,7 @@ class HostConfig {
     this.sftpDefaultDirectory = '/',
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
+    this.remoteSessionSettings = const HostRemoteSessionSettings(),
     this.groupId,
     this.lastConnectedAt,
   });
@@ -75,6 +78,7 @@ class HostConfig {
   final String sftpDefaultDirectory;
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
+  final HostRemoteSessionSettings remoteSessionSettings;
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? groupId;
@@ -112,6 +116,7 @@ class HostConfig {
       'sftpDefaultDirectory': sftpDefaultDirectory,
       'portForwarding': portForwarding.toJson(),
       'connectionSettings': connectionSettings.toJson(),
+      'remoteSessionSettings': remoteSessionSettings.toJson(),
       'groupId': groupId,
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
@@ -160,6 +165,12 @@ class HostConfig {
         ),
         _ => const HostConnectionSettings(),
       },
+      remoteSessionSettings: switch (json['remoteSessionSettings']) {
+        final Map<Object?, Object?> value => HostRemoteSessionSettings.fromJson(
+          Map<String, Object?>.from(value),
+        ),
+        _ => const HostRemoteSessionSettings(),
+      },
       groupId: json['groupId'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
@@ -167,6 +178,65 @@ class HostConfig {
         final String value => DateTime.parse(value),
         _ => null,
       },
+    );
+  }
+}
+
+class HostRemoteSessionSettings {
+  const HostRemoteSessionSettings({
+    this.enabled = false,
+    this.manager = HostRemoteSessionManager.auto,
+    this.sessionName = 'serlink',
+    this.createIfMissing = true,
+    this.fallbackToShell = true,
+  });
+
+  final bool enabled;
+  final HostRemoteSessionManager manager;
+  final String sessionName;
+  final bool createIfMissing;
+  final bool fallbackToShell;
+
+  bool get isDefault => this == const HostRemoteSessionSettings();
+
+  Map<String, Object?> toJson() {
+    return {
+      'enabled': enabled,
+      'manager': manager.name,
+      'sessionName': sessionName,
+      'createIfMissing': createIfMissing,
+      'fallbackToShell': fallbackToShell,
+    };
+  }
+
+  factory HostRemoteSessionSettings.fromJson(Map<String, Object?> json) {
+    return HostRemoteSessionSettings(
+      enabled: _boolFromJson(json['enabled'], fallback: false),
+      manager: _remoteSessionManagerFromJson(json['manager']),
+      sessionName: _stringFromJson(json['sessionName'], fallback: 'serlink'),
+      createIfMissing: _boolFromJson(json['createIfMissing'], fallback: true),
+      fallbackToShell: _boolFromJson(json['fallbackToShell'], fallback: true),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is HostRemoteSessionSettings &&
+        other.enabled == enabled &&
+        other.manager == manager &&
+        other.sessionName == sessionName &&
+        other.createIfMissing == createIfMissing &&
+        other.fallbackToShell == fallbackToShell;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+      enabled,
+      manager,
+      sessionName,
+      createIfMissing,
+      fallbackToShell,
     );
   }
 }
@@ -454,6 +524,21 @@ int _intFromJson(Object? value, {required int fallback}) {
 
 String _stringFromJson(Object? value, {required String fallback}) {
   return value is String ? value : fallback;
+}
+
+bool _boolFromJson(Object? value, {required bool fallback}) {
+  return value is bool ? value : fallback;
+}
+
+HostRemoteSessionManager _remoteSessionManagerFromJson(Object? value) {
+  if (value is String) {
+    for (final manager in HostRemoteSessionManager.values) {
+      if (manager.name == value) {
+        return manager;
+      }
+    }
+  }
+  return HostRemoteSessionManager.auto;
 }
 
 List<Object?> _listFromJson(Object? value) {

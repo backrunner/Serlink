@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png" width="96" height="96" alt="Serlink app icon">
+  <img src="docs/assets/serlink-readme-icon.png" width="96" height="96" alt="Serlink app icon">
 </p>
 
 <h1 align="center">Serlink</h1>

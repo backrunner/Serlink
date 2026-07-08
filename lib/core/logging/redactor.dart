@@ -1,5 +1,3 @@
-import 'package:sentry_flutter/sentry_flutter.dart';
-
 class Redactor {
   const Redactor._();
 
@@ -25,20 +23,5 @@ class Redactor {
       output = output.replaceAll(pattern, '[redacted]');
     }
     return output;
-  }
-
-  static SentryEvent redactSentryEvent(SentryEvent event) {
-    event.message = event.message == null
-        ? null
-        : SentryMessage(Redactor.redact(event.message!.formatted));
-    event.request = null;
-    event.breadcrumbs = event.breadcrumbs?.map((breadcrumb) {
-      breadcrumb.message = breadcrumb.message == null
-          ? null
-          : Redactor.redact(breadcrumb.message!);
-      breadcrumb.data = const <String, dynamic>{'redacted': true};
-      return breadcrumb;
-    }).toList();
-    return event;
   }
 }

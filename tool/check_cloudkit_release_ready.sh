@@ -196,8 +196,27 @@ plist_requires_aps_environment "ios/Runner/Release.entitlements" "production" "i
 check_script_contains "ios/Runner/Info.plist" "remote-notification" "iOS Info.plist"
 check_script_contains "ios/Runner/Info.plist" "SERLINK_IOS_BUILD_NUMBER" "iOS Info.plist"
 check_script_contains "ios/Runner/Configs/AppInfo.xcconfig" "SERLINK_IOS_BUILD_NUMBER" "iOS build number config"
+plutil -lint "ios/Runner/PrivacyInfo.xcprivacy" >/dev/null
+plist_requires_bool "ios/Runner/PrivacyInfo.xcprivacy" "NSPrivacyTracking" "false" "iOS privacy manifest"
+plist_requires_value \
+  "ios/Runner/PrivacyInfo.xcprivacy" \
+  "NSPrivacyAccessedAPITypes:0:NSPrivacyAccessedAPIType" \
+  "NSPrivacyAccessedAPICategoryFileTimestamp" \
+  "iOS privacy manifest"
+check_script_contains "ios/Runner.xcodeproj/project.pbxproj" "PrivacyInfo.xcprivacy in Resources" "iOS Xcode project"
+ok "iOS privacy manifest is bundled"
+if grep -Riq "sentry" pubspec.yaml pubspec.lock ios/Podfile.lock macos/Podfile.lock; then
+  fail "Sentry is not enabled for this release; remove Sentry dependencies before submitting"
+fi
+ok "Sentry dependencies are disabled for this release"
 
 if [[ "$DISTRIBUTION" == "ios_app_store" || "$DISTRIBUTION" == "all" ]]; then
+  check_script_contains "ios/Podfile" "SERLINK_IOS_EXCLUDED_PLUGIN_PODS" "iOS Podfile"
+  check_script_contains "ios/Podfile" "'flutter_pty'" "iOS Podfile"
+  if grep -q "flutter_pty" "ios/Podfile.lock"; then
+    fail "iOS Podfile.lock still includes flutter_pty; run cd ios && pod install"
+  fi
+  ok "iOS App Store pod surface excludes flutter_pty"
   check_script_contains "tool/upload_ios_testflight.sh" "--dart-define=SERLINK_DISTRIBUTION=app_store" "iOS TestFlight upload script"
   check_script_contains "tool/upload_ios_testflight.sh" "tool/bump_build_number.sh" "iOS TestFlight upload script"
   check_script_contains "tool/upload_ios_testflight.sh" "--platform ios" "iOS TestFlight upload script"

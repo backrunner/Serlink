@@ -209,12 +209,19 @@ void main() {
 
   test('iOS TestFlight upload uses App Store Connect export options', () {
     final script = File('tool/upload_ios_testflight.sh').readAsStringSync();
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final pubspecLock = File('pubspec.lock').readAsStringSync();
     final appInfo = File(
       'ios/Runner/Configs/AppInfo.xcconfig',
     ).readAsStringSync();
     final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
     final project = File(
       'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsStringSync();
+    final podfile = File('ios/Podfile').readAsStringSync();
+    final podfileLock = File('ios/Podfile.lock').readAsStringSync();
+    final privacyManifest = File(
+      'ios/Runner/PrivacyInfo.xcprivacy',
     ).readAsStringSync();
     final buildNumberScript = File(
       'tool/bump_build_number.sh',
@@ -241,6 +248,19 @@ void main() {
     expect(script, contains('xcodebuild archive'));
     expect(script, contains('xcodebuild -exportArchive'));
     expect(script, contains('ExportOptionsAppStore.plist'));
+    expect(podfile, contains('SERLINK_IOS_EXCLUDED_PLUGIN_PODS'));
+    expect(podfile, contains("'flutter_pty'"));
+    expect(podfileLock, isNot(contains('flutter_pty')));
+    expect(pubspec.toLowerCase(), isNot(contains('sentry')));
+    expect(pubspecLock.toLowerCase(), isNot(contains('sentry')));
+    expect(podfileLock.toLowerCase(), isNot(contains('sentry')));
+    expect(privacyManifest, contains('NSPrivacyTracking'));
+    expect(privacyManifest, contains('<false/>'));
+    expect(
+      privacyManifest,
+      contains('NSPrivacyAccessedAPICategoryFileTimestamp'),
+    );
+    expect(project, contains('PrivacyInfo.xcprivacy in Resources'));
     expect(signingCheck, contains('Apple Distribution'));
     expect(signingCheck, contains('get-task-allow'));
     expect(signingCheck, contains('iCloud.com.alkinum.serlink'));

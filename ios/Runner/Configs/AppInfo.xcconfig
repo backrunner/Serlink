@@ -1,4 +1,4 @@
 // Application-level settings for the iOS Runner target.
 
 // iOS App Store Connect build number. Keep this independent from macOS.
-SERLINK_IOS_BUILD_NUMBER = 6
+SERLINK_IOS_BUILD_NUMBER = 7

@@ -160,6 +160,7 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
       _connection!.show();
     } else {
       final config = TextInputConfiguration(
+        viewId: View.of(context).viewId,
         inputType: widget.inputType,
         inputAction: widget.inputAction,
         keyboardAppearance: widget.keyboardAppearance,
@@ -197,6 +198,8 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
 
   late var _currentEditingState = _initEditingState.copyWith();
 
+  late var _seenText = _initEditingState.text;
+
   @override
   TextEditingValue? get currentTextEditingValue {
     return _currentEditingState;
@@ -221,21 +224,27 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
 
     widget.onComposing(null);
 
-    if (_currentEditingState.text.length < _initEditingState.text.length) {
-      widget.onDelete();
-    } else {
-      final textDelta = _currentEditingState.text.substring(
-        _initEditingState.text.length,
-      );
+    if (widget.deleteDetection) {
+      if (_currentEditingState.text.length < _initEditingState.text.length) {
+        widget.onDelete();
+      } else {
+        widget.onInsert(
+          _currentEditingState.text.substring(_initEditingState.text.length),
+        );
+      }
 
-      widget.onInsert(textDelta);
+      if (_currentEditingState.text != _initEditingState.text) {
+        setEditingState(_initEditingState);
+      }
+      _seenText = _initEditingState.text;
+      return;
     }
 
-    // Reset editing state if composing is done
-    if (_currentEditingState.composing.isCollapsed &&
-        _currentEditingState.text != _initEditingState.text) {
-      setEditingState(_initEditingState);
+    final newText = _currentEditingState.text;
+    if (newText.length > _seenText.length) {
+      widget.onInsert(newText.substring(_seenText.length));
     }
+    _seenText = newText;
   }
 
   @override

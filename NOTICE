@@ -9,6 +9,6 @@ branding materials are not licensed under the AGPL. See TRADEMARKS.md for the
 brand and trademark policy.
 
 This product includes a local copy of xterm.dart 4.0.0 with Serlink-specific
-rendering changes. The bundled xterm.dart code is licensed under the MIT
-License. See third_party/xterm/LICENSE for its license text and
-third_party/xterm/README.serlink.md for the local patch note.
+rendering and terminal compatibility changes. The bundled xterm.dart code is
+licensed under the MIT License. See third_party/xterm/LICENSE for its license
+text and third_party/xterm/README.serlink.md for the local patch note.

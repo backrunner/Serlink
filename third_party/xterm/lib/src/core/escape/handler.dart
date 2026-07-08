@@ -11,6 +11,10 @@ abstract class EscapeHandler {
 
   void tab();
 
+  void cursorForwardTab(int amount);
+
+  void cursorBackwardTab(int amount);
+
   void lineFeed();
 
   void carriageReturn();

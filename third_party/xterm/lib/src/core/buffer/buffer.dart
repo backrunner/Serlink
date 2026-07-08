@@ -208,7 +208,7 @@ class Buffer {
   void scrollDown(int lines) {
     for (var i = absoluteMarginBottom; i >= absoluteMarginTop; i--) {
       if (i >= absoluteMarginTop + lines) {
-        this.lines[i] = this.lines[i - lines];
+        this.lines[i] = this.lines.swap(i - lines, _newEmptyLine());
       } else {
         this.lines[i] = _newEmptyLine();
       }
@@ -218,7 +218,7 @@ class Buffer {
   void scrollUp(int lines) {
     for (var i = absoluteMarginTop; i <= absoluteMarginBottom; i++) {
       if (i <= absoluteMarginBottom - lines) {
-        this.lines[i] = this.lines[i + lines];
+        this.lines[i] = this.lines.swap(i + lines, _newEmptyLine());
       } else {
         this.lines[i] = _newEmptyLine();
       }

@@ -67,6 +67,68 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   });
 
+  testWidgets('does not duplicate committed composing text', (tester) async {
+    final output = <String>[];
+    final terminal = Terminal(onOutput: output.add);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: TerminalView(terminal, autofocus: true)),
+      ),
+    );
+
+    await tester.tap(find.byType(TerminalView));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    binding.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: "'",
+        selection: TextSelection.collapsed(offset: 1),
+        composing: TextRange(start: 0, end: 1),
+      ),
+    );
+    binding.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: "'",
+        selection: TextSelection.collapsed(offset: 1),
+      ),
+    );
+    binding.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: "'d",
+        selection: TextSelection.collapsed(offset: 2),
+      ),
+    );
+    await binding.idle();
+
+    expect(output.join(), "'d");
+    await tester.pump(const Duration(milliseconds: 400));
+  });
+
+  testWidgets('passes Flutter view id to text input configuration', (
+    tester,
+  ) async {
+    final terminal = Terminal();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: TerminalView(terminal, autofocus: true)),
+      ),
+    );
+
+    await tester.tap(find.byType(TerminalView));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    final setClientCall = binding.testTextInput.log.lastWhere(
+      (call) => call.method == 'TextInput.setClient',
+    );
+    final args = setClientCall.arguments! as List<Object?>;
+    final config = args[1]! as Map<String, Object?>;
+
+    expect(config['viewId'], isNotNull);
+    await tester.pump(const Duration(milliseconds: 400));
+  });
+
   testWidgets('allows software keyboard insert interception', (tester) async {
     final output = <String>[];
     final terminal = Terminal(onOutput: output.add);
@@ -195,6 +257,38 @@ void main() {
     expect(output, ['\x1b[A', '\x1bOA']);
   });
 
+  test('reports cursor position using one-based CPR coordinates', () {
+    final output = <String>[];
+    final terminal = Terminal(onOutput: output.add);
+
+    terminal.write('\x1b[2;3H\x1b[6n');
+
+    expect(output, ['\x1b[2;3R']);
+  });
+
+  test('handles forward and backward cursor tab CSI sequences', () {
+    final terminal = Terminal();
+    terminal.resize(40, 8);
+
+    terminal.write('\x1b[2I');
+    expect(terminal.buffer.cursorX, 16);
+
+    terminal.write('\x1b[12G\x1b[Z');
+    expect(terminal.buffer.cursorX, 8);
+  });
+
+  test('keeps scroll-region buffer lines attached after scroll moves', () {
+    final terminal = Terminal(maxLines: 100);
+    terminal.resize(20, 8);
+    terminal.setMargins(1, 6);
+
+    terminal.scrollUp(1);
+    _expectAllBufferLinesAttached(terminal);
+
+    terminal.scrollDown(1);
+    _expectAllBufferLinesAttached(terminal);
+  });
+
   test('uses Apple option-arrow sequences on iOS hardware keyboards', () {
     final output = <String>[];
     final terminal = Terminal(
@@ -220,4 +314,11 @@ void main() {
     expect(handled, isFalse);
     expect(output, isEmpty);
   });
+}
+
+void _expectAllBufferLinesAttached(Terminal terminal) {
+  final lines = terminal.buffer.lines as dynamic;
+  for (var i = 0; i < terminal.buffer.height; i += 1) {
+    expect(lines[i].attached, isTrue, reason: 'line $i should stay attached');
+  }
 }

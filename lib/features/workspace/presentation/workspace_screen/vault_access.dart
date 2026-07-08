@@ -17,8 +17,12 @@ class _VaultAccessSurface extends ConsumerStatefulWidget {
 class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     with TickerProviderStateMixin {
   final TextEditingController _passphraseController = TextEditingController();
+  final FocusNode _passphraseFocusNode = FocusNode(
+    debugLabel: 'vault-passphrase-field',
+  );
   String? _localErrorMessage;
   VaultSessionNotice? _lastShownNotice;
+  bool _didRequestInitialPassphraseFocus = false;
 
   late final AnimationController _shakeController = AnimationController(
     vsync: this,
@@ -29,6 +33,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
   @override
   void dispose() {
     _passphraseController.dispose();
+    _passphraseFocusNode.dispose();
     _shakeController.dispose();
     super.dispose();
   }
@@ -57,6 +62,15 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     };
     _showSnackBar(context, message);
     ref.read(vaultSessionControllerProvider.notifier).dismissNotice(notice);
+  }
+
+  void _requestInitialPassphraseFocus() {
+    if (_didRequestInitialPassphraseFocus ||
+        _passphraseFocusNode.context == null) {
+      return;
+    }
+    _didRequestInitialPassphraseFocus = true;
+    _passphraseFocusNode.requestFocus();
   }
 
   @override
@@ -91,6 +105,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
       }
       _triggerShake(errorMessage);
       _showOneShotNotice(session?.notice);
+      _requestInitialPassphraseFocus();
     });
 
     return Center(
@@ -144,6 +159,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                     SerlinkTextField(
                       key: const ValueKey('vault-passphrase-field'),
                       controller: _passphraseController,
+                      focusNode: _passphraseFocusNode,
                       obscureText: true,
                       autofocus: true,
                       decoration: InputDecoration(

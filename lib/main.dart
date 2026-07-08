@@ -10,6 +10,7 @@ import 'app/serlink_app.dart';
 import 'core/logging/redactor.dart';
 import 'features/transfers/application/transfer_task_repository.dart';
 import 'features/transfers/data/encrypted_transfer_task_repository.dart';
+import 'platform/app_window.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,7 +66,7 @@ Future<void> main() async {
       0.1;
 
   if (dsn.isEmpty) {
-    runApp(app);
+    _runSerlinkApp(app);
     return;
   }
 
@@ -78,7 +79,14 @@ Future<void> main() async {
         ..beforeSend = (event, hint) async => Redactor.redactSentryEvent(event);
     },
     appRunner: () {
-      runApp(app);
+      _runSerlinkApp(app);
     },
   );
+}
+
+void _runSerlinkApp(Widget app) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(AppWindow.activate());
+  });
+  runApp(app);
 }

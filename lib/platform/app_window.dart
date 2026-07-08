@@ -27,6 +27,10 @@ class AppWindow {
     return Platform.isLinux;
   }
 
+  static Future<void> activate() async {
+    await _invoke<void>('activate');
+  }
+
   static Future<void> minimize() async {
     await _invoke<void>('minimize');
   }

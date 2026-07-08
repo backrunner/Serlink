@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../../core/logging/offline_diagnostic_logger.dart';
 import '../../../core/logging/redactor.dart';
@@ -11,7 +10,7 @@ import '../../../core/runtime/runtime_mode.dart';
 import '../../vault/application/vault_service.dart';
 
 typedef PackageInfoLoader = Future<PackageInfo> Function();
-typedef SentryLastEventIdReader = SentryId Function();
+typedef CrashLastEventIdReader = String Function();
 typedef DiagnosticLogTailReader = Future<List<String>> Function();
 typedef DiagnosticLogFileReader = Future<List<DiagnosticLogFile>> Function();
 
@@ -44,14 +43,14 @@ class DiagnosticBundleService {
     required VaultService vault,
     RuntimeCapabilities runtime = RuntimeCapabilities.current,
     PackageInfoLoader packageInfoLoader = PackageInfo.fromPlatform,
-    SentryLastEventIdReader sentryLastEventId = _readSentryLastEventId,
+    CrashLastEventIdReader crashLastEventId = _readCrashLastEventId,
     DiagnosticLogTailReader? logTailReader,
     DiagnosticLogFileReader? logFileReader,
   }) : this._(
          vault,
          runtime,
          packageInfoLoader,
-         sentryLastEventId,
+         crashLastEventId,
          logTailReader,
          logFileReader,
        );
@@ -60,7 +59,7 @@ class DiagnosticBundleService {
     this._vault,
     this._runtime,
     this._packageInfoLoader,
-    this._sentryLastEventId,
+    this._crashLastEventId,
     this._logTailReader,
     this._logFileReader,
   );
@@ -68,18 +67,18 @@ class DiagnosticBundleService {
   final VaultService _vault;
   final RuntimeCapabilities _runtime;
   final PackageInfoLoader _packageInfoLoader;
-  final SentryLastEventIdReader _sentryLastEventId;
+  final CrashLastEventIdReader _crashLastEventId;
   final DiagnosticLogTailReader? _logTailReader;
   final DiagnosticLogFileReader? _logFileReader;
 
   Future<DiagnosticBundle> buildRedactedBundle() async {
     final createdAt = DateTime.now().toUtc();
     final packageInfo = await _loadPackageInfo();
-    final sentryEventId = _lastNonEmptySentryEventId();
+    final crashEventId = _lastNonEmptyCrashEventId();
     final logFiles = await _readDiagnosticLogFiles(createdAt: createdAt);
-    final sentryEventEntry = sentryEventId == null
+    final crashEventEntry = crashEventId == null
         ? null
-        : <String, Object?>{'lastSentryEventId': sentryEventId};
+        : <String, Object?>{'lastCrashEventId': crashEventId};
     final manifest = <String, Object?>{
       'formatVersion': 1,
       'createdAt': createdAt.toIso8601String(),
@@ -106,7 +105,7 @@ class DiagnosticBundleService {
       'includedData': const [
         'app version and build metadata',
         'redacted runtime metadata',
-        'last Sentry event id when available',
+        'last crash event id when available',
         'rotated redacted offline diagnostic logs',
       ],
       'excludedData': const [
@@ -118,7 +117,7 @@ class DiagnosticBundleService {
         'credentials',
         'private keys',
       ],
-      ...?sentryEventEntry,
+      ...?crashEventEntry,
     };
     final manifestBytes = utf8.encode(
       const JsonEncoder.withIndent('  ').convert(manifest),
@@ -173,10 +172,12 @@ class DiagnosticBundleService {
     }
   }
 
-  String? _lastNonEmptySentryEventId() {
+  String? _lastNonEmptyCrashEventId() {
     try {
-      final eventId = _sentryLastEventId().toString();
-      return RegExp(r'^0+$').hasMatch(eventId) ? null : eventId;
+      final eventId = _crashLastEventId().trim();
+      return eventId.isEmpty || RegExp(r'^0+$').hasMatch(eventId)
+          ? null
+          : eventId;
     } on Object {
       return null;
     }
@@ -429,4 +430,4 @@ class DiagnosticAppInfo {
   }
 }
 
-SentryId _readSentryLastEventId() => Sentry.lastEventId;
+String _readCrashLastEventId() => '';

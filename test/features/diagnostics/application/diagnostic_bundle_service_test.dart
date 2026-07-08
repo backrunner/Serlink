@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:serlink/core/logging/offline_diagnostic_logger.dart';
 import 'package:serlink/core/runtime/runtime_mode.dart';
 import 'package:serlink/features/diagnostics/application/diagnostic_bundle_service.dart';
@@ -32,8 +31,7 @@ void main() {
           version: '1.0.0',
           buildNumber: '42',
         ),
-        sentryLastEventId: () =>
-            SentryId.fromId('1234567890abcdef1234567890abcdef'),
+        crashLastEventId: () => '1234567890abcdef1234567890abcdef',
       ).buildRedactedBundle();
 
       final entries = _readStoredZipEntries(bundle.bytes);
@@ -50,7 +48,7 @@ void main() {
       expect(app['version'], '1.0.0');
       expect(app['buildNumber'], '42');
       expect(manifest['runtimeMode'], 'release');
-      expect(manifest['lastSentryEventId'], '1234567890abcdef1234567890abcdef');
+      expect(manifest['lastCrashEventId'], '1234567890abcdef1234567890abcdef');
       expect(manifest['files'].toString(), contains('logs/runtime-debug.log'));
       expect(manifest['excludedData'], contains('terminal output'));
       expect(manifest['excludedData'], contains('private keys'));
@@ -64,7 +62,7 @@ void main() {
     },
   );
 
-  test('omits empty Sentry event id', () async {
+  test('omits empty crash event id', () async {
     final vault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),
     );
@@ -77,14 +75,14 @@ void main() {
         version: '1.0.0',
         buildNumber: '42',
       ),
-      sentryLastEventId: () => const SentryId.empty(),
+      crashLastEventId: () => '',
     ).buildRedactedBundle();
     final entries = _readStoredZipEntries(bundle.bytes);
     final manifest =
         jsonDecode(utf8.decode(entries['manifest.json']!))
             as Map<String, Object?>;
 
-    expect(manifest.containsKey('lastSentryEventId'), isFalse);
+    expect(manifest.containsKey('lastCrashEventId'), isFalse);
   });
 
   test('exports redacted offline logs inside diagnostic zip', () async {

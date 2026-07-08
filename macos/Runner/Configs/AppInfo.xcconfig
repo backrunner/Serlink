@@ -11,7 +11,7 @@ PRODUCT_NAME = serlink
 PRODUCT_BUNDLE_IDENTIFIER = com.alkinum.serlink
 
 // macOS App Store Connect build number. Keep this independent from iOS.
-SERLINK_MACOS_BUILD_NUMBER = 8
+SERLINK_MACOS_BUILD_NUMBER = 9
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 BackRunner. All rights reserved.

@@ -146,6 +146,15 @@ void main() {
     await _pumpUntilFound(tester, find.text('Create Vault'));
 
     expect(find.text('Create Vault'), findsWidgets);
+    expect(
+      tester
+          .widget<SerlinkTextField>(
+            find.byKey(const ValueKey('vault-passphrase-field')),
+          )
+          .focusNode
+          ?.hasFocus,
+      isTrue,
+    );
 
     await tester.enterText(
       find.byKey(const ValueKey('vault-passphrase-field')),

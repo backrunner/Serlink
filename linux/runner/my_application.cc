@@ -44,7 +44,15 @@ static void window_method_call_cb(FlMethodChannel* channel,
   const gchar* method = fl_method_call_get_name(method_call);
   g_autoptr(FlMethodResponse) response = nullptr;
 
-  if (g_strcmp0(method, "minimize") == 0) {
+  if (g_strcmp0(method, "activate") == 0) {
+    gtk_window_deiconify(window);
+    gtk_window_present(window);
+    GtkWidget* child = gtk_bin_get_child(GTK_BIN(window));
+    if (child != nullptr) {
+      gtk_widget_grab_focus(child);
+    }
+    response = success_response();
+  } else if (g_strcmp0(method, "minimize") == 0) {
     gtk_window_iconify(window);
     response = success_response();
   } else if (g_strcmp0(method, "toggleMaximize") == 0) {

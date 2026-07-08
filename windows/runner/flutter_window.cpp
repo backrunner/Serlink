@@ -91,6 +91,22 @@ void FlutterWindow::RegisterWindowChannel() {
         }
 
         const std::string& method = call.method_name();
+        if (method == "activate") {
+          if (IsIconic(hwnd)) {
+            ShowWindow(hwnd, SW_RESTORE);
+          } else {
+            ShowWindow(hwnd, SW_SHOW);
+          }
+          SetForegroundWindow(hwnd);
+          SetActiveWindow(hwnd);
+          HWND child =
+              flutter_controller_->view() == nullptr
+                  ? nullptr
+                  : flutter_controller_->view()->GetNativeWindow();
+          SetFocus(child == nullptr ? hwnd : child);
+          result->Success();
+          return;
+        }
         if (method == "minimize") {
           ShowWindow(hwnd, SW_MINIMIZE);
           result->Success();

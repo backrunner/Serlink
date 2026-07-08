@@ -62,6 +62,13 @@ class MainFlutterWindow: NSWindow {
       }
 
       switch call.method {
+      case "activate":
+        NSApp.activate(ignoringOtherApps: true)
+        self.makeKeyAndOrderFront(nil)
+        if let flutterView = self.contentViewController?.view {
+          self.makeFirstResponder(flutterView)
+        }
+        result(nil)
       case "minimize":
         self.miniaturize(nil)
         result(nil)

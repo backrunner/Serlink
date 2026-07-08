@@ -441,6 +441,31 @@ class Terminal with Observable implements TerminalState, EscapeHandler {
   }
 
   @override
+  void cursorForwardTab(int amount) {
+    for (var i = 0; i < amount; i++) {
+      tab();
+    }
+  }
+
+  @override
+  void cursorBackwardTab(int amount) {
+    var count = amount <= 0 ? 1 : amount;
+    var x = _buffer.cursorX;
+
+    while (count > 0 && x > 0) {
+      final previousStop = _tabStops.findBackward(x - 1);
+      if (previousStop == null) {
+        x = 0;
+        break;
+      }
+      x = previousStop;
+      count -= 1;
+    }
+
+    _buffer.setCursorX(x);
+  }
+
+  @override
   void lineFeed() {
     _buffer.lineFeed();
   }

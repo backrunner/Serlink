@@ -53,7 +53,7 @@ dependencies:
   webdav_client: ^1.2.2
   dio: ^5.9.2
   xterm: ^4.0.0
-  dartssh2: ^2.17.1
+  dartssh2: ^2.22.2
   json_annotation: ^4.12.0
   freezed_annotation: ^3.1.0
   flutter_pty: ^0.4.2

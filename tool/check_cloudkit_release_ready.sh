@@ -119,10 +119,11 @@ plist_requires_development_environment() {
 
 plist_requires_aps_environment() {
   local plist="$1"
-  local expected="$2"
-  local label="$3"
+  local key="$2"
+  local expected="$3"
+  local label="$4"
   local actual
-  actual="$(plist_value "$plist" "com.apple.developer.aps-environment")"
+  actual="$(plist_value "$plist" "$key")"
   [[ "$actual" == "$expected" ]] || fail "$label requires APS $expected, found '${actual:-missing}'"
   ok "$label uses APS $expected"
 }
@@ -188,12 +189,13 @@ cd "$ROOT_DIR"
 
 check_cloudkit_entitlements "ios/Runner/DebugProfile.entitlements" "iOS Debug/Profile entitlements"
 plist_requires_development_environment "ios/Runner/DebugProfile.entitlements" "iOS Debug/Profile entitlements"
-plist_requires_aps_environment "ios/Runner/DebugProfile.entitlements" "development" "iOS Debug/Profile entitlements"
+plist_requires_aps_environment "ios/Runner/DebugProfile.entitlements" "aps-environment" "development" "iOS Debug/Profile entitlements"
 
 check_cloudkit_entitlements "ios/Runner/Release.entitlements" "iOS Release entitlements"
 plist_rejects_development_environment "ios/Runner/Release.entitlements" "iOS Release entitlements"
-plist_requires_aps_environment "ios/Runner/Release.entitlements" "production" "iOS Release entitlements"
+plist_requires_aps_environment "ios/Runner/Release.entitlements" "aps-environment" "production" "iOS Release entitlements"
 check_script_contains "ios/Runner/Info.plist" "remote-notification" "iOS Info.plist"
+check_script_contains "ios/Runner.xcodeproj/project.pbxproj" "com.apple.Push" "iOS Xcode project"
 check_script_contains "ios/Runner/Info.plist" "SERLINK_IOS_BUILD_NUMBER" "iOS Info.plist"
 check_script_contains "ios/Runner/Configs/AppInfo.xcconfig" "SERLINK_IOS_BUILD_NUMBER" "iOS build number config"
 plutil -lint "ios/Runner/PrivacyInfo.xcprivacy" >/dev/null
@@ -231,14 +233,14 @@ fi
 
 check_cloudkit_entitlements "macos/Runner/DebugProfile.entitlements" "macOS Debug/Profile entitlements"
 plist_requires_development_environment "macos/Runner/DebugProfile.entitlements" "macOS Debug/Profile entitlements"
-plist_requires_aps_environment "macos/Runner/DebugProfile.entitlements" "development" "macOS Debug/Profile entitlements"
+plist_requires_aps_environment "macos/Runner/DebugProfile.entitlements" "com.apple.developer.aps-environment" "development" "macOS Debug/Profile entitlements"
 check_script_contains "macos/Runner/Info.plist" "SERLINK_MACOS_BUILD_NUMBER" "macOS Info.plist"
 check_script_contains "macos/Runner/Configs/AppInfo.xcconfig" "SERLINK_MACOS_BUILD_NUMBER" "macOS build number config"
 
 if [[ "$DISTRIBUTION" == "app_store" || "$DISTRIBUTION" == "all" ]]; then
   check_cloudkit_entitlements "macos/Runner/Release.entitlements" "macOS App Store entitlements"
   plist_rejects_development_environment "macos/Runner/Release.entitlements" "macOS App Store entitlements"
-  plist_requires_aps_environment "macos/Runner/Release.entitlements" "production" "macOS App Store entitlements"
+  plist_requires_aps_environment "macos/Runner/Release.entitlements" "com.apple.developer.aps-environment" "production" "macOS App Store entitlements"
   plist_requires_bool "macos/Runner/Release.entitlements" "com.apple.security.app-sandbox" "true" "macOS App Store entitlements"
   plist_requires_bool "macos/Runner/Release.entitlements" "com.apple.security.network.client" "true" "macOS App Store entitlements"
   plist_requires_bool "macos/Runner/Release.entitlements" "com.apple.security.network.server" "true" "macOS App Store entitlements"
@@ -257,7 +259,7 @@ fi
 if [[ "$DISTRIBUTION" == "direct" || "$DISTRIBUTION" == "all" ]]; then
   check_cloudkit_entitlements "macos/Runner/Direct.entitlements" "macOS Direct entitlements"
   plist_rejects_development_environment "macos/Runner/Direct.entitlements" "macOS Direct entitlements"
-  plist_requires_aps_environment "macos/Runner/Direct.entitlements" "production" "macOS Direct entitlements"
+  plist_requires_aps_environment "macos/Runner/Direct.entitlements" "com.apple.developer.aps-environment" "production" "macOS Direct entitlements"
   if [[ "$(plist_value "macos/Runner/Direct.entitlements" "com.apple.security.app-sandbox")" == "true" ]]; then
     fail "macOS Direct entitlements should not enable the App Sandbox"
   fi

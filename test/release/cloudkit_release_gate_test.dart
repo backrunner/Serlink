@@ -48,7 +48,9 @@ void main() {
         );
         final apsEnvironment = _plistValue(
           entitlement,
-          'com.apple.developer.aps-environment',
+          entitlement.startsWith('ios/')
+              ? 'aps-environment'
+              : 'com.apple.developer.aps-environment',
         );
 
         expect(services, contains('CloudKit'), reason: entitlement);
@@ -60,6 +62,11 @@ void main() {
         );
         expect(apsEnvironment, contains('production'), reason: entitlement);
       }
+
+      final iosProject = File(
+        'ios/Runner.xcodeproj/project.pbxproj',
+      ).readAsStringSync();
+      expect(iosProject, contains('com.apple.Push'));
 
       for (final bridge in const [
         'ios/Runner/CloudKitSyncChannel.swift',

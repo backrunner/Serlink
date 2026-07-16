@@ -19,11 +19,9 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final active = state.activeTab ?? state.tabs.firstOrNull;
     final toolbar = _toolbarFor(active);
-    final mobile = ref.watch(
-      platformCapabilitiesProvider.select(
-        (capabilities) => capabilities.prefersMobileWorkspaceShell,
-      ),
-    );
+    final capabilities = ref.watch(platformCapabilitiesProvider);
+    final mobile = capabilities.prefersMobileWorkspaceShell;
+    final tabDragEnabled = !capabilities.isIOS && state.tabs.length > 1;
 
     void openNewConnection() {
       ref.read(_workspaceSearchQueryProvider.notifier).clear();
@@ -51,6 +49,7 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
             children: [
               Expanded(
                 child: ListView.separated(
+                  key: const ValueKey('workspace-tab-strip'),
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -67,6 +66,7 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
                         _TabPill(
                           tab: tab,
                           selected: tab.id == active.id,
+                          dragEnabled: tabDragEnabled,
                           onTap: () => controller.setActiveTab(tab.id),
                           onDragEnter: () => controller.setActiveTab(tab.id),
                           onClose: () => controller.closeTab(tab.id),
@@ -127,6 +127,7 @@ class _TabPill extends StatelessWidget {
   const _TabPill({
     required this.tab,
     required this.selected,
+    required this.dragEnabled,
     required this.onTap,
     required this.onDragEnter,
     required this.onClose,
@@ -134,6 +135,7 @@ class _TabPill extends StatelessWidget {
 
   final WorkspaceTabState tab;
   final bool selected;
+  final bool dragEnabled;
   final VoidCallback onTap;
   final VoidCallback onDragEnter;
   final VoidCallback onClose;
@@ -220,6 +222,9 @@ class _TabPill extends StatelessWidget {
     );
     if (AppWindow.usesMacStyleChrome) {
       pill = _MacTabWindowDragExclusion(child: pill);
+    }
+    if (!dragEnabled) {
+      return pill;
     }
     if (!_tabCanReceivePaneDrop(tab)) {
       return pill;

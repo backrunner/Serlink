@@ -1253,6 +1253,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get tabsNewConnectionTooltip => '新しい接続';
 
   @override
+  String get terminalToolbarMoreActionsTooltip => 'その他の端末操作';
+
+  @override
   String get localShellInactive => 'ローカルシェルは実行されていません。';
 
   @override

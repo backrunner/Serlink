@@ -2392,6 +2392,12 @@ abstract class AppLocalizations {
   /// **'New connection'**
   String get tabsNewConnectionTooltip;
 
+  /// No description provided for @terminalToolbarMoreActionsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'More terminal actions'**
+  String get terminalToolbarMoreActionsTooltip;
+
   /// No description provided for @localShellInactive.
   ///
   /// In en, this message translates to:

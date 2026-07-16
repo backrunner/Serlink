@@ -382,6 +382,7 @@
   "hostTrustChanged": "已变更",
   "tabsCloseTooltip": "关闭标签页",
   "tabsNewConnectionTooltip": "新建连接",
+  "terminalToolbarMoreActionsTooltip": "更多终端操作",
   "localShellInactive": "本地 shell 未运行",
   "connectionInactive": "连接未激活",
   "sessionDisconnectedMessage": "连接已中断，重新连接会启动新的会话",

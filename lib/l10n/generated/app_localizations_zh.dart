@@ -1242,6 +1242,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tabsNewConnectionTooltip => '新建连接';
 
   @override
+  String get terminalToolbarMoreActionsTooltip => '更多终端操作';
+
+  @override
   String get localShellInactive => '本地 shell 未运行';
 
   @override

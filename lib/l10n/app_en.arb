@@ -614,6 +614,7 @@
   "hostTrustChanged": "changed",
   "tabsCloseTooltip": "Close tab",
   "tabsNewConnectionTooltip": "New connection",
+  "terminalToolbarMoreActionsTooltip": "More terminal actions",
   "localShellInactive": "Local shell is not running.",
   "connectionInactive": "Connection is not active.",
   "sessionDisconnectedMessage": "Connection interrupted. Reconnect starts a new session.",

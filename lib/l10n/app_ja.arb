@@ -382,6 +382,7 @@
   "hostTrustChanged": "変更あり",
   "tabsCloseTooltip": "タブを閉じる",
   "tabsNewConnectionTooltip": "新しい接続",
+  "terminalToolbarMoreActionsTooltip": "その他の端末操作",
   "localShellInactive": "ローカルシェルは実行されていません。",
   "connectionInactive": "接続はアクティブではありません。",
   "sessionDisconnectedMessage": "接続が中断されました。再接続すると新しいセッションが開始されます。",

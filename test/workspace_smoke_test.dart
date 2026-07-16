@@ -1641,57 +1641,99 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('compact iOS terminal disables right split', (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'iOS terminal tabs scroll without drag and use overflow actions',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    await _pumpLockedVaultApp(
-      tester,
-      capabilities: const PlatformCapabilities(
-        operatingSystem: 'ios',
-        targetPlatform: TargetPlatform.iOS,
-      ),
-    );
-    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+      await _pumpLockedVaultApp(
+        tester,
+        capabilities: const PlatformCapabilities(
+          operatingSystem: 'ios',
+          targetPlatform: TargetPlatform.iOS,
+        ),
+      );
+      await _submitVaultPassphrase(tester, 'correct horse battery staple');
 
-    await _tapAddHost(tester);
-    await tester.enterText(
-      find.byKey(const ValueKey('host-display-name-field')),
-      'Mobile Split',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('host-hostname-field')),
-      'split.internal',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('host-username-field')),
-      'ops',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('host-password-field')),
-      'server-password',
-    );
-    await tester.tap(find.byKey(const ValueKey('host-save-button')));
-    await tester.pumpAndSettle();
+      await _tapAddHost(tester);
+      await tester.enterText(
+        find.byKey(const ValueKey('host-display-name-field')),
+        'Mobile Split',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('host-hostname-field')),
+        'split.internal',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('host-username-field')),
+        'ops',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('host-password-field')),
+        'server-password',
+      );
+      await tester.tap(find.byKey(const ValueKey('host-save-button')));
+      await tester.pumpAndSettle();
 
-    await tester.tap(_byTooltipLabel('Terminal'));
-    await tester.pumpAndSettle();
+      await tester.tap(_byTooltipLabel('Terminal'));
+      await tester.pumpAndSettle();
 
-    final splitRight = find.byKey(
-      const ValueKey('terminal-split-right-button'),
-    );
-    final splitDown = find.byKey(const ValueKey('terminal-split-down-button'));
-    expect(splitRight, findsOneWidget);
-    expect(splitDown, findsOneWidget);
-    expect(_byTooltipLabel('Close pane'), findsNothing);
+      await tester.tap(find.text('Hosts'));
+      await tester.pumpAndSettle();
+      await tester.tap(_byTooltipLabel('Terminal'));
+      await tester.pumpAndSettle();
 
-    await tester.tap(_byTooltipLabel('Split right'));
-    await tester.pumpAndSettle();
-    expect(_byTooltipLabel('Close pane'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+      final tabStrip = tester.widget<ListView>(
+        find.byKey(const ValueKey('workspace-tab-strip')),
+      );
+      expect(tabStrip.scrollDirection, Axis.horizontal);
+      final tabFinders = find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value != 'workspace-tab-strip' &&
+            (widget.key! as ValueKey<String>).value.startsWith(
+              'workspace-tab-',
+            ),
+      );
+      expect(tabFinders, findsNWidgets(2));
+      for (final tab in tabFinders.evaluate()) {
+        expect(
+          find.ancestor(
+            of: find.byWidget(tab.widget),
+            matching: find.byWidgetPredicate((widget) => widget is Draggable),
+          ),
+          findsNothing,
+        );
+      }
+
+      final overflowButton = find.byKey(
+        const ValueKey('terminal-toolbar-overflow-button'),
+      );
+      expect(overflowButton, findsOneWidget);
+      final splitRight = find.byKey(
+        const ValueKey('terminal-split-right-button'),
+      );
+      final splitDown = find.byKey(
+        const ValueKey('terminal-split-down-button'),
+      );
+      expect(splitRight, findsNothing);
+      expect(splitDown, findsNothing);
+      expect(_byTooltipLabel('Close pane'), findsNothing);
+
+      await tester.tap(overflowButton);
+      await tester.pumpAndSettle();
+      expect(splitRight, findsOneWidget);
+      expect(splitDown, findsOneWidget);
+
+      await tester.tap(splitRight);
+      await tester.pumpAndSettle();
+      expect(_byTooltipLabel('Close pane'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('iOS terminal accessory arranges navigation keys in two rows', (
     tester,
@@ -2037,11 +2079,27 @@ void main() {
     );
     final controller = container.read(workspaceTabControllerProvider.notifier);
     await controller.openLocalTerminal();
+    await _pumpUntil(tester, () => localTerminal.shells.length == 1);
+    await tester.pumpAndSettle();
+
+    var state = container.read(workspaceTabControllerProvider);
+    final onlyTabFinder = find.byKey(
+      ValueKey('workspace-tab-${state.tabs.single.id.value}'),
+    );
+    expect(onlyTabFinder, findsOneWidget);
+    expect(
+      find.ancestor(
+        of: onlyTabFinder,
+        matching: find.byWidgetPredicate((widget) => widget is Draggable),
+      ),
+      findsNothing,
+    );
+
     await controller.openLocalTerminal();
     await _pumpUntil(tester, () => localTerminal.shells.length == 2);
     await tester.pumpAndSettle();
 
-    var state = container.read(workspaceTabControllerProvider);
+    state = container.read(workspaceTabControllerProvider);
     final targetTab = state.tabs.first;
     final sourceTab = state.tabs.last;
 

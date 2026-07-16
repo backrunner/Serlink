@@ -8,6 +8,12 @@ class _TerminalToolbar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
+    final compact = ref.watch(
+      platformCapabilitiesProvider.select((capabilities) => capabilities.isIOS),
+    );
+    if (compact) {
+      return _TerminalToolbarOverflowMenu(snapshot: snapshot);
+    }
     return SizedBox(
       height: 44,
       child: Padding(
@@ -75,6 +81,127 @@ class _TerminalToolbar extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _TerminalToolbarOverflowMenu extends StatelessWidget {
+  const _TerminalToolbarOverflowMenu({required this.snapshot});
+
+  final _TerminalToolbarSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final actions = <_TerminalToolbarMenuAction>[
+      _TerminalToolbarMenuAction(
+        key: const ValueKey('terminal-search-button'),
+        label: l10n.terminalSearchTooltip,
+        icon: Icons.search,
+        selected: snapshot.searchActive,
+        onPressed: snapshot.onToggleSearch,
+      ),
+      if (snapshot.showForwarding)
+        _TerminalToolbarMenuAction(
+          key: const ValueKey('terminal-forwarding-button'),
+          label: _forwardingTooltip(
+            l10n,
+            snapshot.activeLocalForward,
+            snapshot.activeRemoteForward,
+            snapshot.activeDynamicForward,
+            busy: snapshot.forwardBusy,
+          ),
+          icon: Icons.settings_ethernet_outlined,
+          selected:
+              snapshot.activeLocalForward != null ||
+              snapshot.activeRemoteForward != null ||
+              snapshot.activeDynamicForward != null,
+          onPressed: snapshot.forwardEnabled && !snapshot.forwardBusy
+              ? snapshot.onManageForwarding
+              : null,
+        ),
+      if (snapshot.showOpenSftp)
+        _TerminalToolbarMenuAction(
+          key: const ValueKey('terminal-open-sftp-button'),
+          label: l10n.terminalOpenSftpTooltip,
+          icon: Icons.folder_open_outlined,
+          onPressed: snapshot.onOpenSftp,
+        ),
+      if (snapshot.showSplitControls) ...[
+        _TerminalToolbarMenuAction(
+          key: const ValueKey('terminal-split-right-button'),
+          label: l10n.terminalSplitRightTooltip,
+          icon: Icons.view_column_outlined,
+          onPressed: snapshot.canSplitRight ? snapshot.onSplitRight : null,
+        ),
+        _TerminalToolbarMenuAction(
+          key: const ValueKey('terminal-split-down-button'),
+          label: l10n.terminalSplitDownTooltip,
+          icon: Icons.view_agenda_outlined,
+          onPressed: snapshot.canSplitDown ? snapshot.onSplitDown : null,
+        ),
+      ],
+      _TerminalToolbarMenuAction(
+        key: const ValueKey('terminal-settings-button'),
+        label: l10n.terminalSettingsTitle,
+        icon: Icons.tune_outlined,
+        onPressed: snapshot.onSettings,
+      ),
+    ];
+
+    return SizedBox(
+      height: 44,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: FPopoverMenu(
+          menuBuilder: (context, controller, _) => [
+            FItemGroup(
+              children: [
+                for (final action in actions)
+                  FItem(
+                    key: action.key,
+                    title: Text(action.label),
+                    prefix: Icon(action.icon, size: 16),
+                    enabled: action.onPressed != null,
+                    selected: action.selected,
+                    onPress: action.onPressed == null
+                        ? null
+                        : () {
+                            controller.hide();
+                            action.onPressed!();
+                          },
+                  ),
+              ],
+            ),
+          ],
+          builder: (context, controller, _) => Center(
+            child: SerlinkIconButton(
+              key: const ValueKey('terminal-toolbar-overflow-button'),
+              tooltip: l10n.terminalToolbarMoreActionsTooltip,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.more_horiz, size: 20),
+              onPressed: controller.toggle,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TerminalToolbarMenuAction {
+  const _TerminalToolbarMenuAction({
+    required this.key,
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.selected = false,
+  });
+
+  final Key key;
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool selected;
 }
 
 class _TerminalToolbarSnapshot {

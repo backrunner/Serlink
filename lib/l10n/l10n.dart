@@ -55,7 +55,6 @@ String localizedSessionFailureMessage(
 ) {
   return switch (failure.code) {
     'session.disconnected' => l10n.sessionDisconnectedMessage,
-    'session.backgrounded' => l10n.sessionBackgroundedMessage,
     'connection.failed' => l10n.connectionFailedMessage,
     'connection_profile.vault_locked' =>
       l10n.connectionProfileVaultLockedMessage,

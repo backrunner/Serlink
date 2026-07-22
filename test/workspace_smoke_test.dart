@@ -19,6 +19,7 @@ import 'package:serlink/features/identities/application/identity_repository.dart
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
 import 'package:serlink/features/sftp/application/sftp_failure.dart';
 import 'package:serlink/features/sftp/domain/sftp_entry.dart';
+import 'package:serlink/features/ssh/application/connection_profile_resolver.dart';
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
 import 'package:serlink/features/ssh/application/known_host_repository.dart';
@@ -1076,6 +1077,62 @@ void main() {
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
+  });
+
+  testWidgets('iOS keeps an SSH session open across brief backgrounding', (
+    tester,
+  ) async {
+    final sshService = _FakeSshSessionService();
+    final host = HostSummary(
+      id: HostId('background-host'),
+      displayName: 'Background Host',
+      hostname: 'background.internal',
+      username: 'ops',
+      port: 22,
+      authKinds: const {HostAuthKind.password},
+      tags: const {},
+      trustState: HostTrustState.trusted,
+      createdAt: DateTime.utc(2026),
+    );
+    final resolver = StaticConnectionProfileResolver({
+      host.id: StaticConnectionProfile(
+        hostId: host.id,
+        hostname: host.hostname,
+        port: host.port,
+        username: host.username,
+        authMethods: [staticPasswordAuth('secret')],
+      ),
+    });
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const _IOSWithoutCloudKitCapabilities(),
+      sshService: sshService,
+      connectionProfileResolver: resolver,
+    );
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SerlinkApp)),
+    );
+    final controller = container.read(workspaceTabControllerProvider.notifier);
+    await controller.openTerminal(host);
+    await _pumpUntil(
+      tester,
+      () =>
+          container.read(workspaceTabControllerProvider).activeTab?.lifecycle ==
+          SessionLifecycleState.connected,
+    );
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+
+    expect(
+      container.read(workspaceTabControllerProvider).activeTab?.lifecycle,
+      SessionLifecycleState.connected,
+    );
+    expect(sshService.shell._done.isCompleted, isFalse);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump(const Duration(milliseconds: 100));
   });
 
   testWidgets('settings runtime exports diagnostic logs', (tester) async {
@@ -2184,6 +2241,7 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   WidgetTester tester, {
   PlatformCapabilities? capabilities,
   _FakeSshSessionService? sshService,
+  ConnectionProfileResolver? connectionProfileResolver,
   LocalTerminalService? localTerminal,
   HostRepository? hostRepository,
   List<SyncDeviceMetadata>? syncDevices,
@@ -2241,6 +2299,10 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
         if (syncDevices != null)
           syncKnownDevicesProvider.overrideWith((ref) async => syncDevices),
         sshSessionServiceProvider.overrideWithValue(resolvedSshService),
+        if (connectionProfileResolver != null)
+          connectionProfileResolverProvider.overrideWithValue(
+            connectionProfileResolver,
+          ),
         if (localTerminal != null)
           localTerminalServiceProvider.overrideWithValue(localTerminal),
         transferQueueControllerProvider.overrideWithValue(transferQueue),

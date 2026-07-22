@@ -1265,10 +1265,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sessionDisconnectedMessage => '接続が中断されました。再接続すると新しいセッションが開始されます。';
 
   @override
-  String get sessionBackgroundedMessage =>
-      'Serlink がバックグラウンドに入ったためセッションが切断されました。再接続すると新しいセッションが開始されます。';
-
-  @override
   String get connectionFailedMessage => '接続に失敗しました。';
 
   @override

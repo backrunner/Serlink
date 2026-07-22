@@ -2416,12 +2416,6 @@ abstract class AppLocalizations {
   /// **'Connection interrupted. Reconnect starts a new session.'**
   String get sessionDisconnectedMessage;
 
-  /// No description provided for @sessionBackgroundedMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Session was disconnected when Serlink entered the background. Reconnect starts a new session.'**
-  String get sessionBackgroundedMessage;
-
   /// No description provided for @connectionFailedMessage.
   ///
   /// In en, this message translates to:

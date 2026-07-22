@@ -18,7 +18,6 @@ void main() {
     expect(capabilities.terminalZmodemTransfers, isFalse);
     expect(capabilities.localDirectoryTransfer, isFalse);
     expect(capabilities.openLocalFile, isFalse);
-    expect(capabilities.suspendSessionsOnBackground, isTrue);
     expect(capabilities.sshAgentAuth, isFalse);
     expect(capabilities.hardwareKeyAuth, isFalse);
     expect(capabilities.terminalSoftwareKeyboardDeleteDetection, isTrue);
@@ -39,7 +38,6 @@ void main() {
     expect(capabilities.terminalZmodemTransfers, isTrue);
     expect(capabilities.localDirectoryTransfer, isTrue);
     expect(capabilities.openLocalFile, isTrue);
-    expect(capabilities.suspendSessionsOnBackground, isFalse);
     expect(capabilities.sshAgentAuth, isTrue);
     expect(capabilities.hardwareKeyAuth, isFalse);
     expect(capabilities.terminalSoftwareKeyboardDeleteDetection, isFalse);

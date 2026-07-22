@@ -1346,10 +1346,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Connection interrupted. Reconnect starts a new session.';
 
   @override
-  String get sessionBackgroundedMessage =>
-      'Session was disconnected when Serlink entered the background. Reconnect starts a new session.';
-
-  @override
   String get connectionFailedMessage => 'Connection failed.';
 
   @override

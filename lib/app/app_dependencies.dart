@@ -9,6 +9,7 @@ import '../database/database_recovery.dart';
 import '../core/logging/offline_diagnostic_logger.dart';
 import '../core/logging/redactor.dart';
 import '../core/runtime/app_profile_lock.dart';
+import '../core/ids/entity_id.dart';
 import '../features/diagnostics/application/diagnostic_bundle_service.dart';
 import '../features/hosts/application/host_repository.dart';
 import '../features/identities/application/identity_repository.dart';
@@ -543,7 +544,69 @@ final cloudKitEncryptedSnapshotPrefetchControllerProvider =
       CloudKitEncryptedSnapshotPrefetchNotifier.new,
     );
 
-enum _CloudKitUnlockSyncOutcome { skipped, synced, remoteReset }
+enum _CloudKitUnlockSyncOutcome { skipped, deferred, synced, remoteReset }
+
+class _CancelledCloudKitUnlockSync implements Exception {
+  const _CancelledCloudKitUnlockSync();
+}
+
+class _CancellableVaultRecordRepository implements VaultRecordRepository {
+  _CancellableVaultRecordRepository({
+    required this.inner,
+    required this.isActive,
+  });
+
+  final VaultRecordRepository inner;
+  final bool Function() isActive;
+
+  void _checkActive() {
+    if (!isActive()) {
+      throw const _CancelledCloudKitUnlockSync();
+    }
+  }
+
+  @override
+  Future<void> upsert(VaultRecordEnvelope envelope) async {
+    _checkActive();
+    await inner.upsert(envelope);
+    _checkActive();
+  }
+
+  @override
+  Future<VaultRecordEnvelope?> read(VaultRecordId id) async {
+    _checkActive();
+    final record = await inner.read(id);
+    _checkActive();
+    return record;
+  }
+
+  @override
+  Future<List<VaultRecordEnvelope>> list({String? type}) async {
+    _checkActive();
+    final records = await inner.list(type: type);
+    _checkActive();
+    return records;
+  }
+
+  @override
+  Future<void> delete(VaultRecordId id) async {
+    _checkActive();
+    await inner.delete(id);
+    _checkActive();
+  }
+
+  @override
+  Future<void> clear() async {
+    _checkActive();
+    await inner.clear();
+    _checkActive();
+  }
+}
+
+typedef _CloudKitUnlockSyncPlan = ({
+  bool runsInBackground,
+  _CloudKitUnlockSyncOutcome outcome,
+});
 
 enum VaultSessionBusyReason { waitingForICloud }
 
@@ -1520,6 +1583,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   InMemoryVaultService? _service;
   Future<void>? _localUnlockFuture;
   bool _cloudKitHeaderDiscovered = false;
+  var _postUnlockSyncToken = 0;
 
   VaultService get service {
     return _service ??= _createService();
@@ -1527,6 +1591,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
 
   @override
   Future<VaultSessionState> build() {
+    ref.onDispose(() {
+      _postUnlockSyncToken += 1;
+    });
     return _loadInitialState();
   }
 
@@ -1791,7 +1858,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlock(passphrase: passphrase);
-      final cloudKitSync = await _pullCloudKitSnapshotAfterUnlockIfNeeded();
+      final sync = await _prepareCloudKitSyncForUnlock();
+      final cloudKitSync = sync.outcome;
       if (cloudKitSync == _CloudKitUnlockSyncOutcome.remoteReset) {
         _recordVaultEvent(
           'vault.unlock.success',
@@ -1800,16 +1868,16 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         _clearBusyReason();
         return;
       }
-      state = AsyncData(await _unlockedState(previous));
-      _invalidateSyncStateProviders();
-      unawaited(
-        ref.read(transferQueueControllerProvider).restorePersistedTasks(),
+      final unlocked = await _unlockedState(
+        previous,
+        syncingAfterUnlock: sync.runsInBackground,
       );
+      state = AsyncData(unlocked);
       _recordVaultEvent(
         'vault.unlock.success',
         details: {'method': 'passphrase', 'cloudKitSync': cloudKitSync.name},
       );
-      _clearBusyReason();
+      _completePublishedUnlock(unlocked, sync: sync);
     } on Object catch (error) {
       _clearBusyReason();
       await _lockServiceIfUnlocked();
@@ -1853,7 +1921,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlockWithRecoveryKey(VaultRecoveryKey(recoveryCode));
-      final cloudKitSync = await _pullCloudKitSnapshotAfterUnlockIfNeeded();
+      final sync = await _prepareCloudKitSyncForUnlock();
+      final cloudKitSync = sync.outcome;
       if (cloudKitSync == _CloudKitUnlockSyncOutcome.remoteReset) {
         _recordVaultEvent(
           'vault.unlock.success',
@@ -1865,16 +1934,16 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         _clearBusyReason();
         return null;
       }
-      state = AsyncData(await _unlockedState(previous));
-      _invalidateSyncStateProviders();
-      unawaited(
-        ref.read(transferQueueControllerProvider).restorePersistedTasks(),
+      final unlocked = await _unlockedState(
+        previous,
+        syncingAfterUnlock: sync.runsInBackground,
       );
+      state = AsyncData(unlocked);
       _recordVaultEvent(
         'vault.unlock.success',
         details: {'method': 'recoveryCode', 'cloudKitSync': cloudKitSync.name},
       );
-      _clearBusyReason();
+      _completePublishedUnlock(unlocked, sync: sync);
       return null;
     } on Object catch (error) {
       _clearBusyReason();
@@ -1941,7 +2010,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlockWithLocalKey(secrets: ref.read(secretStoreProvider));
-      final cloudKitSync = await _pullCloudKitSnapshotAfterUnlockIfNeeded();
+      final sync = await _prepareCloudKitSyncForUnlock();
+      final cloudKitSync = sync.outcome;
       if (cloudKitSync == _CloudKitUnlockSyncOutcome.remoteReset) {
         _recordVaultEvent(
           'vault.unlock.success',
@@ -1950,21 +2020,17 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         _clearBusyReason();
         return;
       }
-      state = AsyncData(
-        await _unlockedState(
-          previous,
-          localUnlockStatus: (supported: true, available: true),
-        ),
+      final unlocked = await _unlockedState(
+        previous,
+        localUnlockStatus: (supported: true, available: true),
+        syncingAfterUnlock: sync.runsInBackground,
       );
-      _invalidateSyncStateProviders();
-      unawaited(
-        ref.read(transferQueueControllerProvider).restorePersistedTasks(),
-      );
+      state = AsyncData(unlocked);
       _recordVaultEvent(
         'vault.unlock.success',
         details: {'method': 'localKey', 'cloudKitSync': cloudKitSync.name},
       );
-      _clearBusyReason();
+      _completePublishedUnlock(unlocked, sync: sync);
     } on Object catch (error) {
       _clearBusyReason();
       await _lockServiceIfUnlocked();
@@ -2001,7 +2067,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await service.unlockWithLocalKey(secrets: ref.read(secretStoreProvider));
-      final cloudKitSync = await _pullCloudKitSnapshotAfterUnlockIfNeeded();
+      final sync = await _prepareCloudKitSyncForUnlock();
+      final cloudKitSync = sync.outcome;
       if (cloudKitSync == _CloudKitUnlockSyncOutcome.remoteReset) {
         _recordVaultEvent(
           'vault.unlock.success',
@@ -2017,10 +2084,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       final next = await _unlockedState(
         previous,
         localUnlockStatus: (supported: true, available: true),
-      );
-      _invalidateSyncStateProviders();
-      unawaited(
-        ref.read(transferQueueControllerProvider).restorePersistedTasks(),
+        syncingAfterUnlock: sync.runsInBackground,
       );
       _recordVaultEvent(
         'vault.unlock.success',
@@ -2030,7 +2094,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           'cloudKitSync': cloudKitSync.name,
         },
       );
-      _clearBusyReason();
+      _completePublishedUnlock(next, sync: sync);
       return next;
     } on Object catch (error) {
       _clearBusyReason();
@@ -2100,8 +2164,101 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     }
   }
 
-  Future<_CloudKitUnlockSyncOutcome>
-  _pullCloudKitSnapshotAfterUnlockIfNeeded() async {
+  bool get _shouldSyncCloudKitAfterUnlockInBackground {
+    final capabilities = ref.read(platformCapabilitiesProvider);
+    return capabilities.isIOS &&
+        capabilities.cloudKitSync &&
+        !_cloudKitHeaderDiscovered;
+  }
+
+  Future<_CloudKitUnlockSyncPlan> _prepareCloudKitSyncForUnlock() async {
+    if (_shouldSyncCloudKitAfterUnlockInBackground) {
+      return (
+        runsInBackground: true,
+        outcome: _CloudKitUnlockSyncOutcome.deferred,
+      );
+    }
+    return (
+      runsInBackground: false,
+      outcome: await _pullCloudKitSnapshotAfterUnlockIfNeeded(),
+    );
+  }
+
+  void _completePublishedUnlock(
+    VaultSessionState unlocked, {
+    required _CloudKitUnlockSyncPlan sync,
+  }) {
+    _invalidateSyncStateProviders();
+    unawaited(
+      ref.read(transferQueueControllerProvider).restorePersistedTasks(),
+    );
+    if (sync.runsInBackground) {
+      _startCloudKitSyncAfterUnlock(
+        unlockGeneration: unlocked.unlockGeneration,
+      );
+    } else {
+      _clearBusyReason();
+    }
+  }
+
+  void _startCloudKitSyncAfterUnlock({required int unlockGeneration}) {
+    final token = ++_postUnlockSyncToken;
+    bool isActive() =>
+        ref.mounted &&
+        token == _postUnlockSyncToken &&
+        service.state == VaultState.unlocked;
+    _markWaitingForICloud();
+    unawaited(
+      Future<void>.delayed(Duration.zero, () async {
+        if (!ref.mounted || token != _postUnlockSyncToken) {
+          return;
+        }
+        try {
+          final outcome = await _pullCloudKitSnapshotAfterUnlockIfNeeded(
+            shouldContinue: isActive,
+          );
+          if (!isActive()) {
+            return;
+          }
+          _recordVaultEvent(
+            'vault.unlock.cloudkit_sync.complete',
+            details: {'outcome': outcome.name},
+          );
+        } on _CancelledCloudKitUnlockSync {
+          return;
+        } on Object catch (error) {
+          if (!isActive()) {
+            return;
+          }
+          _recordVaultEvent(
+            'vault.unlock.cloudkit_sync.failure',
+            level: DiagnosticLogLevel.warning,
+            details: _vaultSessionErrorDetails(error),
+          );
+        } finally {
+          if (isActive()) {
+            final current = state.value;
+            if (current?.vaultState == VaultState.unlocked &&
+                current?.unlockGeneration == unlockGeneration) {
+              state = AsyncData(
+                current!.copyWith(isBusy: false, clearBusyReason: true),
+              );
+              _invalidateSyncStateProviders();
+            }
+            _clearBusyReason();
+          }
+        }
+      }),
+    );
+  }
+
+  Future<_CloudKitUnlockSyncOutcome> _pullCloudKitSnapshotAfterUnlockIfNeeded({
+    bool Function()? shouldContinue,
+  }) async {
+    bool isActive() => shouldContinue?.call() ?? true;
+    if (!isActive()) {
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
     if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
       return _CloudKitUnlockSyncOutcome.skipped;
     }
@@ -2117,15 +2274,23 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     final vaultId = syncVaultId(header);
     if (!requireInitialPull) {
       if (await _cloudKitSyncExplicitlyDisabledForUnlockedVault()) {
+        if (!isActive()) {
+          return _CloudKitUnlockSyncOutcome.skipped;
+        }
         await _clearCloudKitLockedCache(vaultId);
         return _CloudKitUnlockSyncOutcome.skipped;
       }
     }
-    final pendingReset = await _pendingCloudKitRemoteReset();
+    final pendingReset = await _pendingCloudKitRemoteReset(
+      shouldContinue: isActive,
+    );
     if (pendingReset == _CloudKitUnlockSyncOutcome.remoteReset) {
       return pendingReset;
     }
-    final reset = await _existingCloudKitRemoteReset(provider);
+    final reset = await _existingCloudKitRemoteReset(
+      provider,
+      shouldContinue: isActive,
+    );
     if (reset == _CloudKitUnlockSyncOutcome.remoteReset) {
       return reset;
     }
@@ -2133,11 +2298,15 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       header: header,
       records: records,
       requireInitialPull: requireInitialPull,
+      shouldContinue: isActive,
     );
     if (staged != _CloudKitUnlockSyncOutcome.skipped) {
       return staged;
     }
     final RemoteManifest? manifest;
+    if (!isActive()) {
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
     try {
       manifest = await provider.readManifest();
     } on Object {
@@ -2184,6 +2353,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         records: restoredRecords,
         diagnosticLogger: ref.read(offlineDiagnosticLoggerProvider),
       ).pullEncryptedSnapshot(provider);
+      if (!isActive()) {
+        return _CloudKitUnlockSyncOutcome.skipped;
+      }
       await _commitCloudKitBootstrapSnapshot(
         header: header,
         records: await restoredRecords.list(),
@@ -2192,10 +2364,14 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       final outcome = await _pullExistingCloudKitSnapshotAfterUnlock(
         records,
         provider,
+        shouldContinue: isActive,
       );
       if (outcome != _CloudKitUnlockSyncOutcome.synced) {
         return outcome;
       }
+    }
+    if (!isActive()) {
+      return _CloudKitUnlockSyncOutcome.skipped;
     }
     _cloudKitHeaderDiscovered = false;
     ref.invalidate(webDavSyncSettingsProvider);
@@ -2248,7 +2424,10 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     }
   }
 
-  Future<_CloudKitUnlockSyncOutcome> _pendingCloudKitRemoteReset() async {
+  Future<_CloudKitUnlockSyncOutcome> _pendingCloudKitRemoteReset({
+    bool Function()? shouldContinue,
+  }) async {
+    bool isActive() => shouldContinue?.call() ?? true;
     final header = service.header;
     if (header == null) {
       return _CloudKitUnlockSyncOutcome.skipped;
@@ -2262,10 +2441,19 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         vaultId: vaultId,
       );
     } on Object {
+      if (!isActive()) {
+        return _CloudKitUnlockSyncOutcome.skipped;
+      }
       await _tryClearCloudKitLockedCache(vaultId);
       return _CloudKitUnlockSyncOutcome.skipped;
     }
+    if (!isActive()) {
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
     if (pending == null) {
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
+    if (!isActive()) {
       return _CloudKitUnlockSyncOutcome.skipped;
     }
     await _handleCloudKitRemoteReset(vaultId: vaultId);
@@ -2276,7 +2464,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     required VaultHeader header,
     required VaultRecordRepository records,
     required bool requireInitialPull,
+    bool Function()? shouldContinue,
   }) async {
+    bool isActive() => shouldContinue?.call() ?? true;
     final vaultId = syncVaultId(header);
     final staging = ref.read(encryptedSnapshotStagingRepositoryProvider);
     final StagedEncryptedSnapshot? staged;
@@ -2286,16 +2476,28 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         vaultId: vaultId,
       );
     } on Object {
+      if (!isActive()) {
+        return _CloudKitUnlockSyncOutcome.skipped;
+      }
       await _tryClearCloudKitLockedCache(vaultId);
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
+    if (!isActive()) {
       return _CloudKitUnlockSyncOutcome.skipped;
     }
     if (staged == null || staged.manifest.vaultId != vaultId) {
       if (staged != null) {
+        if (!isActive()) {
+          return _CloudKitUnlockSyncOutcome.skipped;
+        }
         await _tryClearCloudKitLockedCache(vaultId);
       }
       return _CloudKitUnlockSyncOutcome.skipped;
     }
     if (!_stagedSnapshotContainsManifestObjects(staged)) {
+      if (!isActive()) {
+        return _CloudKitUnlockSyncOutcome.skipped;
+      }
       await _tryClearCloudKitLockedCache(vaultId);
       return _CloudKitUnlockSyncOutcome.skipped;
     }
@@ -2310,6 +2512,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
           liveManifest.headerPath == staged.manifest.headerPath &&
           manifestFingerprint(liveManifest) == staged.manifestFingerprint;
       if (!liveManifestMatches) {
+        if (!isActive()) {
+          return _CloudKitUnlockSyncOutcome.skipped;
+        }
         await staging.clear(
           providerKind: SyncProviderKind.cloudKit,
           vaultId: vaultId,
@@ -2329,7 +2534,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         : await _pullExistingCloudKitSnapshotAfterUnlock(
             records,
             stagedProvider,
+            shouldContinue: isActive,
           );
+    if (!isActive()) {
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
     if (outcome == _CloudKitUnlockSyncOutcome.synced) {
       await staging.clear(
         providerKind: SyncProviderKind.cloudKit,
@@ -2387,14 +2596,19 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<_CloudKitUnlockSyncOutcome> _existingCloudKitRemoteReset(
-    SyncProvider provider,
-  ) async {
+    SyncProvider provider, {
+    bool Function()? shouldContinue,
+  }) async {
+    bool isActive() => shouldContinue?.call() ?? true;
     try {
       if (await SyncRunService(
         vault: service,
         records: ref.read(vaultRecordRepositoryProvider),
         diagnosticLogger: ref.read(offlineDiagnosticLoggerProvider),
       ).isRemoteReset(provider)) {
+        if (!isActive()) {
+          return _CloudKitUnlockSyncOutcome.skipped;
+        }
         final header = service.header;
         await _handleCloudKitRemoteReset(
           vaultId: header == null ? null : syncVaultId(header),
@@ -2410,13 +2624,19 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
 
   Future<_CloudKitUnlockSyncOutcome> _pullExistingCloudKitSnapshotAfterUnlock(
     VaultRecordRepository records,
-    SyncProvider provider,
-  ) async {
+    SyncProvider provider, {
+    bool Function()? shouldContinue,
+  }) async {
+    bool isActive() => shouldContinue?.call() ?? true;
+    final guardedRecords = _CancellableVaultRecordRepository(
+      inner: records,
+      isActive: isActive,
+    );
     try {
       final pull =
           await SyncRunService(
             vault: service,
-            records: records,
+            records: guardedRecords,
             diagnosticLogger: ref.read(offlineDiagnosticLoggerProvider),
           ).pullEncryptedSnapshot(
             provider,
@@ -2424,11 +2644,20 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
             reportConflicts: true,
           );
       if (pull.hasConflicts) {
+        if (!isActive()) {
+          return _CloudKitUnlockSyncOutcome.skipped;
+        }
         ref
             .read(syncConflictControllerProvider.notifier)
             .setConflicts(pull.conflicts);
       } else {
+        if (!isActive()) {
+          return _CloudKitUnlockSyncOutcome.skipped;
+        }
         ref.read(syncConflictControllerProvider.notifier).clear();
+      }
+      if (!isActive()) {
+        return _CloudKitUnlockSyncOutcome.skipped;
       }
       ref.invalidate(webDavSyncSettingsProvider);
       ref.invalidate(cloudKitSyncSettingsProvider);
@@ -2436,6 +2665,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       return _CloudKitUnlockSyncOutcome.synced;
     } on SyncRunException catch (error) {
       if (error.code == 'sync.remote_vault_reset') {
+        if (!isActive()) {
+          return _CloudKitUnlockSyncOutcome.skipped;
+        }
         final header = service.header;
         await _handleCloudKitRemoteReset(
           vaultId: header == null ? null : syncVaultId(header),
@@ -2578,6 +2810,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   Future<VaultSessionState> _unlockedState(
     VaultSessionState previous, {
     ({bool supported, bool available})? localUnlockStatus,
+    bool syncingAfterUnlock = false,
   }) async {
     await _migrateUnlockedSyncSettings();
     await _refreshCloudKitShadowSetting();
@@ -2601,8 +2834,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       clearNotice: true,
       clearUnlockFailures: true,
       unlockGeneration: previous.unlockGeneration + 1,
-      isBusy: false,
-      clearBusyReason: true,
+      isBusy: syncingAfterUnlock,
+      busyReason: syncingAfterUnlock
+          ? VaultSessionBusyReason.waitingForICloud
+          : null,
+      clearBusyReason: !syncingAfterUnlock,
     );
   }
 
@@ -2707,6 +2943,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<void> lock() async {
+    _postUnlockSyncToken += 1;
+    _clearBusyReason();
     await service.lock();
     final localUnlockStatus = await _localUnlockStatus();
     state = AsyncData(
@@ -2719,6 +2957,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<String?> resetVault() async {
+    _postUnlockSyncToken += 1;
+    _clearBusyReason();
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
     state = AsyncData(
@@ -2758,6 +2998,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<void> applyRemoteReset() async {
+    _postUnlockSyncToken += 1;
+    _clearBusyReason();
     final previous = state.value;
     if (previous == null || previous.vaultState == VaultState.uninitialized) {
       return;
@@ -2786,6 +3028,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<String?> restoreLatestAutomaticBackup() async {
+    _postUnlockSyncToken += 1;
+    _clearBusyReason();
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
     state = AsyncData(
@@ -2822,6 +3066,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<String?> restoreFromBackupBytes(List<int> bytes) async {
+    _postUnlockSyncToken += 1;
+    _clearBusyReason();
     final previous =
         state.value ?? const VaultSessionState(vaultState: VaultState.locked);
     state = AsyncData(
@@ -3070,6 +3316,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<void> _clearLocalVaultAfterReset() async {
+    _postUnlockSyncToken += 1;
+    _clearBusyReason();
     final header = service.header;
     final vaultId = header == null ? null : syncVaultId(header);
     await _clearLocalUnlockSecrets();

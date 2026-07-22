@@ -11,6 +11,8 @@ import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/database/database_recovery.dart';
 import 'package:serlink/database/serlink_database.dart';
+import 'package:serlink/features/hosts/application/host_store.dart';
+import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/sync/application/auto_sync_controller.dart';
 import 'package:serlink/features/sync/application/encrypted_snapshot_staging.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
@@ -1334,7 +1336,7 @@ void main() {
   );
 
   test(
-    'locked Apple device reports iCloud wait while pulling pending changes',
+    'iOS unlock exposes local vault while pending CloudKit changes load in background',
     () async {
       final sourceDatabase = SerlinkDatabase(NativeDatabase.memory());
       final sourceTransferQueue = TransferQueueController();
@@ -1407,19 +1409,43 @@ void main() {
       await targetContainer
           .read(vaultSessionControllerProvider.notifier)
           .unlock(passphrase: 'passphrase');
+      final now = DateTime.utc(2026, 6, 21);
+      final localHost = HostConfig(
+        id: HostId('local-before-sync'),
+        displayName: 'Local Host',
+        hostname: 'local.example.test',
+        username: 'ops',
+        port: 22,
+        authKinds: const {HostAuthKind.password},
+        tags: const {},
+        trustState: HostTrustState.trusted,
+        identityIds: const [],
+        startupCommands: const [],
+        jumpHostIds: const [],
+        createdAt: now,
+        updatedAt: now,
+      );
+      await targetContainer.read(hostRepositoryProvider).save(localHost);
       await targetContainer
           .read(vaultSessionControllerProvider.notifier)
           .lock();
 
-      final sourceVault =
-          sourceContainer.read(vaultSessionControllerProvider.notifier).service
-              as InMemoryVaultService;
-      final host = await sourceVault.encryptRecord(
-        id: VaultRecordId('host:icloud-wait'),
-        type: 'host',
-        plaintext: utf8.encode('{"hostname":"wait.example.test"}'),
+      final host = HostConfig(
+        id: HostId('icloud-wait'),
+        displayName: 'iCloud Host',
+        hostname: 'wait.example.test',
+        username: 'ops',
+        port: 22,
+        authKinds: const {HostAuthKind.password},
+        tags: const {},
+        trustState: HostTrustState.trusted,
+        identityIds: const [],
+        startupCommands: const [],
+        jumpHostIds: const [],
+        createdAt: now,
+        updatedAt: now,
       );
-      await sourceContainer.read(vaultRecordRepositoryProvider).upsert(host);
+      await sourceContainer.read(hostRepositoryProvider).save(host);
       await sourceContainer
           .read(syncRunServiceProvider)
           .syncEncryptedSnapshot(LocalDirectorySyncProvider(remoteDir));
@@ -1428,21 +1454,54 @@ void main() {
       final unlock = targetContainer
           .read(vaultSessionControllerProvider.notifier)
           .unlock(passphrase: 'passphrase');
+      await unlock;
       await provider.waitForBlockedRead();
 
       final waiting = targetContainer
           .read(vaultSessionControllerProvider)
           .requireValue;
-      expect(waiting.vaultState, VaultState.locked);
+      expect(waiting.vaultState, VaultState.unlocked);
       expect(waiting.isBusy, isTrue);
       expect(waiting.busyReason, VaultSessionBusyReason.waitingForICloud);
+      expect(
+        targetContainer
+            .read(vaultSessionControllerProvider.notifier)
+            .service
+            .state,
+        VaultState.unlocked,
+      );
+      expect(
+        await DriftVaultRecordRepository(
+          targetDatabase,
+        ).read(VaultRecordId('host:icloud-wait')),
+        isNull,
+      );
+      final localHosts = await targetContainer.read(
+        hostSummariesProvider(waiting.unlockGeneration).future,
+      );
+      expect(localHosts.map((host) => host.id), [localHost.id]);
       expect(
         targetContainer.read(vaultSessionBusyReasonProvider),
         VaultSessionBusyReason.waitingForICloud,
       );
 
       provider.releaseBlockedRead();
-      await unlock;
+      await provider.waitForBlockedReadToComplete();
+      await _waitForRecord(targetDatabase, VaultRecordId('host:icloud-wait'));
+      await _waitForHostSummary(
+        targetContainer,
+        waiting.unlockGeneration,
+        host.id,
+      );
+      expect(
+        targetContainer
+            .read(hostSummariesProvider(waiting.unlockGeneration))
+            .requireValue
+            .map((host) => host.id)
+            .toSet(),
+        {localHost.id, host.id},
+      );
+      await _waitForVaultIdle(targetContainer);
 
       final unlocked = targetContainer
           .read(vaultSessionControllerProvider)
@@ -1451,6 +1510,64 @@ void main() {
       expect(unlocked.isBusy, isFalse);
       expect(unlocked.busyReason, isNull);
       expect(targetContainer.read(vaultSessionBusyReasonProvider), isNull);
+
+      await targetContainer
+          .read(vaultSessionControllerProvider.notifier)
+          .lock();
+      final lateHost = HostConfig(
+        id: HostId('icloud-after-lock'),
+        displayName: 'Late iCloud Host',
+        hostname: 'late.example.test',
+        username: 'ops',
+        port: 22,
+        authKinds: const {HostAuthKind.password},
+        tags: const {},
+        trustState: HostTrustState.trusted,
+        identityIds: const [],
+        startupCommands: const [],
+        jumpHostIds: const [],
+        createdAt: now,
+        updatedAt: now,
+      );
+      await sourceContainer.read(hostRepositoryProvider).save(lateHost);
+      await sourceContainer
+          .read(syncRunServiceProvider)
+          .syncEncryptedSnapshot(LocalDirectorySyncProvider(remoteDir));
+
+      final lateHostRef = await _manifestRecordRef(
+        provider: LocalDirectorySyncProvider(remoteDir),
+        vault:
+            sourceContainer
+                    .read(vaultSessionControllerProvider.notifier)
+                    .service
+                as InMemoryVaultService,
+        id: VaultRecordId('host:icloud-after-lock'),
+      );
+      provider.armObjectRead(lateHostRef);
+      final cancelledUnlock = targetContainer
+          .read(vaultSessionControllerProvider.notifier)
+          .unlock(passphrase: 'passphrase');
+      await cancelledUnlock;
+      await provider.waitForBlockedRead();
+      await targetContainer
+          .read(vaultSessionControllerProvider.notifier)
+          .lock();
+      provider.releaseBlockedRead();
+      await provider.waitForBlockedReadToComplete();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        targetContainer
+            .read(vaultSessionControllerProvider)
+            .requireValue
+            .vaultState,
+        VaultState.locked,
+      );
+      expect(
+        await DriftVaultRecordRepository(
+          targetDatabase,
+        ).read(VaultRecordId('host:icloud-after-lock')),
+        isNull,
+      );
     },
   );
 
@@ -3066,6 +3183,36 @@ Future<void> _waitForVaultState(
   );
 }
 
+Future<void> _waitForVaultIdle(ProviderContainer container) async {
+  for (var attempt = 0; attempt < 300; attempt += 1) {
+    final state = container.read(vaultSessionControllerProvider).value;
+    if (state?.vaultState == VaultState.unlocked && !state!.isBusy) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  final state = container.read(vaultSessionControllerProvider).value;
+  fail(
+    'Expected unlocked vault to finish background work but found '
+    '${state?.vaultState}, busy: ${state?.isBusy}.',
+  );
+}
+
+Future<void> _waitForHostSummary(
+  ProviderContainer container,
+  int unlockGeneration,
+  HostId hostId,
+) async {
+  for (var attempt = 0; attempt < 300; attempt += 1) {
+    final hosts = container.read(hostSummariesProvider(unlockGeneration)).value;
+    if (hosts?.any((host) => host.id == hostId) == true) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  fail('Expected host ${hostId.value} to appear after background sync.');
+}
+
 Future<void> _waitForRecord(SerlinkDatabase database, VaultRecordId id) async {
   for (var attempt = 0; attempt < 300; attempt += 1) {
     if (await DriftVaultRecordRepository(database).read(id) != null) {
@@ -3236,9 +3383,19 @@ class _BlockingObjectReadSyncProvider implements SyncProvider {
   Completer<void>? _release;
   Completer<void>? _completed;
   var _armed = false;
+  String? _blockedPath;
 
   void armNextNonResetObjectRead() {
+    _armObjectRead();
+  }
+
+  void armObjectRead(RemoteObjectRef ref) {
+    _armObjectRead(blockedPath: ref.path);
+  }
+
+  void _armObjectRead({String? blockedPath}) {
     _armed = true;
+    _blockedPath = blockedPath;
     _blocked = Completer<void>();
     _release = Completer<void>();
     _completed = Completer<void>();
@@ -3297,8 +3454,11 @@ class _BlockingObjectReadSyncProvider implements SyncProvider {
 
   @override
   Future<List<int>> readObject(RemoteObjectRef ref) async {
-    if (_armed && ref.path != resetMarkerRef.path) {
+    if (_armed &&
+        ref.path != resetMarkerRef.path &&
+        (_blockedPath == null || ref.path == _blockedPath)) {
       _armed = false;
+      _blockedPath = null;
       _blocked?.complete();
       await _release!.future;
       try {

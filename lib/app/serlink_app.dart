@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 
 import '../features/settings/application/app_language_settings.dart';
-import '../features/workspace/application/workspace_tab_controller.dart';
 import '../l10n/l10n.dart';
 import '../platform/app_window.dart';
 import 'app_dependencies.dart';
@@ -90,7 +89,6 @@ class _LifecycleOverlay extends ConsumerStatefulWidget {
 class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
     with WidgetsBindingObserver {
   var _hidden = false;
-  var _suspendedForBackground = false;
 
   @override
   void initState() {
@@ -112,16 +110,7 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
       AppLifecycleState.hidden => true,
       AppLifecycleState.resumed || AppLifecycleState.detached => false,
     };
-    if (hidden && !_suspendedForBackground) {
-      final capabilities = ref.read(platformCapabilitiesProvider);
-      if (capabilities.suspendSessionsOnBackground) {
-        _suspendedForBackground = true;
-        ref
-            .read(workspaceTabControllerProvider.notifier)
-            .suspendForBackground();
-      }
-    } else if (!hidden) {
-      _suspendedForBackground = false;
+    if (!hidden) {
       ref.read(cloudKitVaultDiscoveryControllerProvider.notifier).refreshNow();
       ref
           .read(cloudKitEncryptedSnapshotPrefetchControllerProvider.notifier)

@@ -65,8 +65,6 @@ class PlatformCapabilities {
 
   bool get backgroundTransfers => false;
 
-  bool get suspendSessionsOnBackground => isIOS;
-
   bool get terminalSplit => isDesktop;
 
   bool get terminalZmodemTransfers => isDesktop;

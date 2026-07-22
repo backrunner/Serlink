@@ -121,45 +121,6 @@ void main() {
     },
   );
 
-  test(
-    'suspends remote terminal sessions when iOS enters background',
-    () async {
-      final service = _FakeSshSessionService();
-      final container = _container(
-        service: service,
-        capabilities: const PlatformCapabilities(
-          operatingSystem: 'ios',
-          targetPlatform: TargetPlatform.iOS,
-        ),
-      );
-      addTearDown(container.dispose);
-
-      final controller = container.read(
-        workspaceTabControllerProvider.notifier,
-      );
-      controller.openTerminal(_host);
-      await _drainMicrotasks();
-
-      final tab = container.read(workspaceTabControllerProvider).activeTab!;
-      expect(tab.lifecycle, SessionLifecycleState.connected);
-      expect(service.openShellCount, 1);
-
-      controller.suspendForBackground();
-      await _drainMicrotasks();
-
-      final suspended = container
-          .read(workspaceTabControllerProvider)
-          .activeTab!;
-      final content = suspended.content as TerminalTabContent;
-      expect(suspended.id, tab.id);
-      expect(suspended.lifecycle, SessionLifecycleState.disconnected);
-      expect(suspended.failure?.code, 'session.backgrounded');
-      expect(content.primaryPane.failure?.code, 'session.backgrounded');
-      expect(service.shells.single._done.isCompleted, isTrue);
-      expect(service.openShellCount, 1);
-    },
-  );
-
   test('creates terminals with the active platform capabilities', () async {
     final service = _FakeSshSessionService();
     final container = _container(
@@ -183,29 +144,6 @@ void main() {
 
     expect(terminal.platform, TerminalTargetPlatform.ios);
     expect(terminal.reflowEnabled, isFalse);
-  });
-
-  test('background suspend leaves desktop sessions alone', () async {
-    final service = _FakeSshSessionService();
-    final container = _container(
-      service: service,
-      capabilities: const PlatformCapabilities(
-        operatingSystem: 'macos',
-        targetPlatform: TargetPlatform.macOS,
-      ),
-    );
-    addTearDown(container.dispose);
-
-    final controller = container.read(workspaceTabControllerProvider.notifier);
-    controller.openTerminal(_host);
-    await _drainMicrotasks();
-
-    controller.suspendForBackground();
-    await _drainMicrotasks();
-
-    final tab = container.read(workspaceTabControllerProvider).activeTab!;
-    expect(tab.lifecycle, SessionLifecycleState.connected);
-    expect(service.shells.single._done.isCompleted, isFalse);
   });
 
   test(

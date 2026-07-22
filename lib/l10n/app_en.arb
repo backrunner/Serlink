@@ -618,7 +618,6 @@
   "localShellInactive": "Local shell is not running.",
   "connectionInactive": "Connection is not active.",
   "sessionDisconnectedMessage": "Connection interrupted. Reconnect starts a new session.",
-  "sessionBackgroundedMessage": "Session was disconnected when Serlink entered the background. Reconnect starts a new session.",
   "connectionFailedMessage": "Connection failed.",
   "connectionProfileVaultLockedMessage": "Unlock the vault before starting a new connection.",
   "connectionProfileNotFoundMessage": "Connection profile could not be found.",

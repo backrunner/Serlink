@@ -386,7 +386,6 @@
   "localShellInactive": "ローカルシェルは実行されていません。",
   "connectionInactive": "接続はアクティブではありません。",
   "sessionDisconnectedMessage": "接続が中断されました。再接続すると新しいセッションが開始されます。",
-  "sessionBackgroundedMessage": "Serlink がバックグラウンドに入ったためセッションが切断されました。再接続すると新しいセッションが開始されます。",
   "connectionFailedMessage": "接続に失敗しました。",
   "connectionProfileVaultLockedMessage": "新しい接続を開始する前にボールトを解除してください。",
   "connectionProfileNotFoundMessage": "接続プロファイルが見つかりません。",

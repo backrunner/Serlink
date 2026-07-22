@@ -1254,9 +1254,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sessionDisconnectedMessage => '连接已中断，重新连接会启动新的会话';
 
   @override
-  String get sessionBackgroundedMessage => 'Serlink 进入后台时已断开会话，重新连接会启动新的会话';
-
-  @override
   String get connectionFailedMessage => '连接失败';
 
   @override

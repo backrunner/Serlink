@@ -386,7 +386,6 @@
   "localShellInactive": "本地 shell 未运行",
   "connectionInactive": "连接未激活",
   "sessionDisconnectedMessage": "连接已中断，重新连接会启动新的会话",
-  "sessionBackgroundedMessage": "Serlink 进入后台时已断开会话，重新连接会启动新的会话",
   "connectionFailedMessage": "连接失败",
   "connectionProfileVaultLockedMessage": "请先解锁保险库，再启动新的连接",
   "connectionProfileNotFoundMessage": "找不到连接配置",

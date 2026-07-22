@@ -70,11 +70,6 @@ void main() {
         code: 'session.disconnected',
         message: 'Connection interrupted. Reconnect starts a new session.',
       ),
-      AppFailure(
-        code: 'session.backgrounded',
-        message:
-            'Session was disconnected when Serlink entered the background. Reconnect starts a new session.',
-      ),
       AppFailure(code: 'connection.failed', message: 'Connection failed.'),
       AppFailure(
         code: 'connection_profile.vault_locked',

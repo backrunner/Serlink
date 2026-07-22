@@ -70,11 +70,6 @@ final workspaceRuntimeRegistryProvider = Provider<WorkspaceRuntimeRegistry>((
 
 class WorkspaceTabController extends Notifier<WorkspaceState> {
   static const _uuid = Uuid();
-  static const _backgroundFailure = AppFailure(
-    code: 'session.backgrounded',
-    message:
-        'Session was disconnected when Serlink entered the background. Reconnect starts a new session.',
-  );
   final Map<WorkspaceTabId, int> _connectionTokens = {};
   final Map<SessionId, int> _paneConnectionTokens = {};
   final Map<WorkspaceTabId, Timer> _reconnectTimers = {};
@@ -585,40 +580,6 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
           tab,
     ];
     state = state.copyWith(tabs: updated);
-  }
-
-  void suspendForBackground() {
-    final capabilities = ref.read(platformCapabilitiesProvider);
-    if (!capabilities.suspendSessionsOnBackground) {
-      return;
-    }
-    final runtime = ref.read(workspaceRuntimeRegistryProvider);
-    final tabsToClose = <WorkspaceTabState>[];
-    final updatedTabs = <WorkspaceTabState>[];
-    for (final tab in state.tabs) {
-      if (!_tabHasLiveSessions(tab)) {
-        updatedTabs.add(tab);
-        continue;
-      }
-      tabsToClose.add(tab);
-      _clearReconnectState(tab.id);
-      _connectionTokens.remove(tab.id);
-      final panes = _terminalPanesOf(tab.content);
-      if (panes != null) {
-        for (final pane in panes) {
-          _paneConnectionTokens.remove(pane.sessionId);
-        }
-      }
-      _writeBackgroundNotice(runtime, tab);
-      updatedTabs.add(_backgroundSuspendedTab(tab));
-    }
-    if (tabsToClose.isEmpty) {
-      return;
-    }
-    for (final tab in tabsToClose) {
-      unawaited(_closeTabSessions(tab));
-    }
-    state = state.copyWith(tabs: updatedTabs);
   }
 
   void saveTerminalDisplaySettingsForHost(
@@ -2001,79 +1962,6 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         panes
             .map((pane) => pane.failure)
             .firstWhere((failure) => failure != null, orElse: () => null);
-  }
-
-  bool _tabHasLiveSessions(WorkspaceTabState tab) {
-    return switch (tab.content) {
-      TerminalTabContent(:final panes) ||
-      LocalTerminalTabContent(
-        :final panes,
-      ) => panes.any((pane) => pane.lifecycle.keepsTerminalAlive),
-      SftpTabContent() => tab.lifecycle.keepsTerminalAlive,
-    };
-  }
-
-  WorkspaceTabState _backgroundSuspendedTab(WorkspaceTabState tab) {
-    return switch (tab.content) {
-      TerminalTabContent(:final panes) => _backgroundSuspendedTerminalTab(
-        tab,
-        tab.content,
-        panes,
-      ),
-      LocalTerminalTabContent(:final panes) => _backgroundSuspendedTerminalTab(
-        tab,
-        tab.content,
-        panes,
-      ),
-      SftpTabContent() => tab.copyWith(
-        lifecycle: SessionLifecycleState.disconnected,
-        failure: _backgroundFailure,
-        lastActivityAt: DateTime.now(),
-      ),
-    };
-  }
-
-  WorkspaceTabState _backgroundSuspendedTerminalTab(
-    WorkspaceTabState tab,
-    WorkspaceTabContent content,
-    List<TerminalPaneState> panes,
-  ) {
-    final nextContent = _copyTerminalPaneContent(
-      content,
-      panes: [
-        for (final pane in panes)
-          pane.lifecycle.keepsTerminalAlive
-              ? pane.copyWith(
-                  lifecycle: SessionLifecycleState.disconnected,
-                  failure: _backgroundFailure,
-                )
-              : pane,
-      ],
-    );
-    return tab.copyWith(
-      content: nextContent,
-      lifecycle: _aggregateLifecycle(nextContent),
-      failure: _aggregateFailure(nextContent),
-      lastActivityAt: DateTime.now(),
-    );
-  }
-
-  void _writeBackgroundNotice(
-    WorkspaceRuntimeRegistry runtime,
-    WorkspaceTabState tab,
-  ) {
-    final panes = _terminalPanesOf(tab.content);
-    if (panes == null) {
-      return;
-    }
-    for (final pane in panes) {
-      if (pane.lifecycle.keepsTerminalAlive) {
-        runtime.writeTerminal(
-          pane.sessionId,
-          '\r\n${_backgroundFailure.message}\r\n',
-        );
-      }
-    }
   }
 
   Future<void> _closeTabSessions(WorkspaceTabState tab) async {

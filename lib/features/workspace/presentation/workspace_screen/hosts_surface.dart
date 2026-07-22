@@ -21,6 +21,7 @@ const _hostListEntranceSettleDelay = Duration(
       _hostListEntranceStaggerMs * _hostListEntranceMaxStaggerItems +
       40,
 );
+const _hostListChangeDuration = Duration(milliseconds: 240);
 
 enum _HostSortOrder { addedAt, name, lastConnectedAt }
 
@@ -96,6 +97,10 @@ class _HostsSurface extends ConsumerWidget {
               filterHostSummaries(hosts, searchQuery),
               sortOrder,
             );
+            final contentChangeDuration =
+                MediaQuery.maybeOf(context)?.disableAnimations == true
+                ? Duration.zero
+                : const Duration(milliseconds: 180);
             return Column(
               children: [
                 if (!mobile)
@@ -108,20 +113,34 @@ class _HostsSurface extends ConsumerWidget {
                     onAddHost: () => _showAddHostDialog(context),
                   ),
                 Expanded(
-                  child: hosts.isEmpty
-                      ? _HostsEmptyState(
-                          onAddHost: () => _showAddHostDialog(context),
-                        )
-                      : filteredHosts.isEmpty
-                      ? _PlaceholderSurface(
-                          title: l10n.hostsNoMatchesTitle,
-                          body: l10n.hostsNoMatchesBody,
-                        )
-                      : _HostList(
-                          hosts: filteredHosts,
-                          unlockGeneration: session.unlockGeneration,
-                          mobile: mobile,
-                        ),
+                  child: AnimatedSwitcher(
+                    duration: contentChangeDuration,
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: hosts.isEmpty
+                        ? KeyedSubtree(
+                            key: const ValueKey('hosts-empty'),
+                            child: _HostsEmptyState(
+                              onAddHost: () => _showAddHostDialog(context),
+                            ),
+                          )
+                        : filteredHosts.isEmpty
+                        ? KeyedSubtree(
+                            key: const ValueKey('hosts-no-matches'),
+                            child: _PlaceholderSurface(
+                              title: l10n.hostsNoMatchesTitle,
+                              body: l10n.hostsNoMatchesBody,
+                            ),
+                          )
+                        : _HostList(
+                            key: PageStorageKey(
+                              'hosts-list-${session.unlockGeneration}',
+                            ),
+                            hosts: filteredHosts,
+                            unlockGeneration: session.unlockGeneration,
+                            mobile: mobile,
+                          ),
+                  ),
                 ),
               ],
             );
@@ -139,6 +158,7 @@ class _HostsSurface extends ConsumerWidget {
 
 class _HostList extends ConsumerStatefulWidget {
   const _HostList({
+    super.key,
     required this.hosts,
     required this.unlockGeneration,
     required this.mobile,
@@ -153,12 +173,16 @@ class _HostList extends ConsumerStatefulWidget {
 }
 
 class _HostListState extends ConsumerState<_HostList> {
+  final _listKey = GlobalKey<AnimatedListState>();
   Timer? _settleTimer;
+  late List<HostSummary> _displayedHosts;
+  Set<HostId> _entranceHostIds = const {};
   bool _playEntrance = false;
 
   @override
   void initState() {
     super.initState();
+    _displayedHosts = List.of(widget.hosts);
     _claimEntrance(widget.unlockGeneration);
   }
 
@@ -166,8 +190,11 @@ class _HostListState extends ConsumerState<_HostList> {
   void didUpdateWidget(covariant _HostList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.unlockGeneration != widget.unlockGeneration) {
+      _displayedHosts = List.of(widget.hosts);
       _claimEntrance(widget.unlockGeneration);
+      return;
     }
+    _reconcileHosts(widget.hosts);
   }
 
   @override
@@ -181,51 +208,165 @@ class _HostListState extends ConsumerState<_HostList> {
     _playEntrance = ref
         .read(_hostListEntranceTrackerProvider)
         .claim(unlockGeneration);
+    _entranceHostIds = _playEntrance
+        ? {for (final host in _displayedHosts) host.id}
+        : const {};
     if (!_playEntrance) {
       return;
     }
     _settleTimer = Timer(_hostListEntranceSettleDelay, () {
       if (mounted) {
-        setState(() => _playEntrance = false);
+        setState(() {
+          _playEntrance = false;
+          _entranceHostIds = const {};
+        });
       }
     });
   }
 
+  void _reconcileHosts(List<HostSummary> nextHosts) {
+    final listState = _listKey.currentState;
+    if (listState == null) {
+      _displayedHosts = List.of(nextHosts);
+      return;
+    }
+
+    final nextIds = {for (final host in nextHosts) host.id};
+    final previousIds = {for (final host in _displayedHosts) host.id};
+    final duration = MediaQuery.maybeOf(context)?.disableAnimations == true
+        ? Duration.zero
+        : _hostListChangeDuration;
+
+    for (var index = _displayedHosts.length - 1; index >= 0; index -= 1) {
+      final host = _displayedHosts[index];
+      if (nextIds.contains(host.id)) {
+        continue;
+      }
+      _displayedHosts.removeAt(index);
+      listState.removeItem(
+        index,
+        (context, animation) =>
+            _buildAnimatedHost(context, host, index, animation, removing: true),
+        duration: duration,
+      );
+    }
+
+    final nextById = {for (final host in nextHosts) host.id: host};
+    for (var index = 0; index < _displayedHosts.length; index += 1) {
+      _displayedHosts[index] = nextById[_displayedHosts[index].id]!;
+    }
+    for (var index = 0; index < nextHosts.length; index += 1) {
+      final host = nextHosts[index];
+      if (previousIds.contains(host.id)) {
+        continue;
+      }
+      _displayedHosts.insert(index, host);
+      listState.insertItem(index, duration: duration);
+    }
+
+    if (!_sameHostOrder(_displayedHosts, nextHosts)) {
+      _displayedHosts = List.of(nextHosts);
+    }
+  }
+
+  bool _sameHostOrder(List<HostSummary> left, List<HostSummary> right) {
+    if (left.length != right.length) {
+      return false;
+    }
+    for (var index = 0; index < left.length; index += 1) {
+      if (left[index].id != right[index].id) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final controller = ref.read(workspaceTabControllerProvider.notifier);
-    return ListView.separated(
-      key: const PageStorageKey('hosts-list'),
+    return AnimatedList(
+      key: _listKey,
       padding: widget.mobile
           ? _mobileSurfaceListPadding
           : const EdgeInsets.all(16),
-      itemCount: widget.hosts.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final host = widget.hosts[index];
-        final row = _HostRow(
-          mobile: widget.mobile,
-          host: host,
-          onTerminal: () => controller.openTerminal(host),
-          onSftp: () => controller.openSftp(host),
-          onEdit: () => _showEditHostDialog(context, host),
-          onDuplicate: () => _showDuplicateHostDialog(context, host),
-          onDelete: () => _confirmDeleteHost(context, ref, host),
-        );
-        if (!_playEntrance) {
-          return row;
-        }
-        return EntranceFade(
-          key: ValueKey('host-row-${host.id.value}'),
-          duration: _hostListEntranceDuration,
-          delay: Duration(
-            milliseconds:
-                _hostListEntranceStaggerMs *
-                math.min(index, _hostListEntranceMaxStaggerItems),
-          ),
-          child: row,
-        );
-      },
+      initialItemCount: _displayedHosts.length,
+      itemBuilder: (context, index, animation) =>
+          _buildAnimatedHost(context, _displayedHosts[index], index, animation),
+    );
+  }
+
+  Widget _buildAnimatedHost(
+    BuildContext context,
+    HostSummary host,
+    int index,
+    Animation<double> animation, {
+    bool removing = false,
+  }) {
+    final controller = ref.read(workspaceTabControllerProvider.notifier);
+    Widget row = KeyedSubtree(
+      key: ValueKey('host-row-${host.id.value}'),
+      child: _HostRow(
+        mobile: widget.mobile,
+        host: host,
+        onTerminal: () => controller.openTerminal(host),
+        onSftp: () => controller.openSftp(host),
+        onEdit: () => _showEditHostDialog(context, host),
+        onDuplicate: () => _showDuplicateHostDialog(context, host),
+        onDelete: () => _confirmDeleteHost(context, ref, host),
+      ),
+    );
+    if (_playEntrance && _entranceHostIds.contains(host.id)) {
+      row = EntranceFade(
+        duration: _hostListEntranceDuration,
+        delay: Duration(
+          milliseconds:
+              _hostListEntranceStaggerMs *
+              math.min(index, _hostListEntranceMaxStaggerItems),
+        ),
+        child: row,
+      );
+    }
+    return IgnorePointer(
+      ignoring: removing,
+      child: _HostListChangeTransition(
+        animation: animation,
+        child: Padding(padding: const EdgeInsets.only(bottom: 8), child: row),
+      ),
+    );
+  }
+}
+
+class _HostListChangeTransition extends StatelessWidget {
+  const _HostListChangeTransition({
+    required this.animation,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MediaQuery.maybeOf(context)?.disableAnimations == true) {
+      return child;
+    }
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return SizeTransition(
+      sizeFactor: curved,
+      alignment: Alignment.topCenter,
+      child: FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.04),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      ),
     );
   }
 }

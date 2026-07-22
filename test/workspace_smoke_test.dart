@@ -23,6 +23,7 @@ import 'package:serlink/features/ssh/application/connection_profile_resolver.dar
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
 import 'package:serlink/features/ssh/application/known_host_repository.dart';
+import 'package:serlink/features/sync/application/auto_sync_controller.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
 import 'package:serlink/features/sync/application/sync_device_service.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
@@ -2017,6 +2018,67 @@ void main() {
     expect(find.byType(EntranceFade), findsNothing);
   });
 
+  testWidgets('synced hosts animate into the existing list', (tester) async {
+    final now = DateTime.utc(2026);
+    final hosts = _DelayedHostRepository([
+      _hostConfig(
+        id: 'local-host',
+        displayName: 'Local Bastion',
+        hostname: 'local.internal',
+        createdAt: now,
+      ),
+    ])..completeList();
+
+    await _pumpLockedVaultApp(tester, hostRepository: hosts);
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _pumpUntilFound(tester, find.text('Local Bastion'));
+    await tester.pumpAndSettle();
+
+    final syncedHost = _hostConfig(
+      id: 'synced-host',
+      displayName: 'Synced Bastion',
+      hostname: 'synced.internal',
+      createdAt: now.add(const Duration(minutes: 1)),
+    );
+    hosts.add(syncedHost);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SerlinkApp)),
+    );
+    container
+        .read(vaultRecordChangeBusProvider)
+        .notify(
+          VaultRecordChange(
+            kind: VaultRecordChangeKind.upsert,
+            id: VaultRecordId('host:${syncedHost.id.value}'),
+            type: 'host',
+            origin: VaultRecordChangeOrigin.remoteSync,
+          ),
+        );
+
+    await _pumpUntilFound(tester, find.text('Synced Bastion'));
+    final fade = tester.widget<FadeTransition>(
+      find
+          .ancestor(
+            of: find.text('Synced Bastion'),
+            matching: find.byType(FadeTransition),
+          )
+          .first,
+    );
+    expect(fade.opacity.value, greaterThan(0));
+    expect(fade.opacity.value, lessThan(1));
+    expect(find.text('Local Bastion'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('Synced Bastion'),
+        matching: find.byType(EntranceFade),
+      ),
+      findsNothing,
+    );
+
+    await tester.pump(const Duration(milliseconds: 240));
+    expect(fade.opacity.value, 1);
+  });
+
   testWidgets('hosts can be sorted from the header menu', (tester) async {
     final hosts = _DelayedHostRepository([
       _hostConfig(
@@ -2469,6 +2531,10 @@ class _DelayedHostRepository implements HostRepository {
   final Completer<void> _listRequested = Completer<void>();
 
   bool get listRequested => _listRequested.isCompleted;
+
+  void add(HostConfig host) {
+    _hosts.add(host);
+  }
 
   void completeList() {
     if (!_listReady.isCompleted) {

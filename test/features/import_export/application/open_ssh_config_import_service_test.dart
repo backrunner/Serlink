@@ -298,6 +298,7 @@ Host prod
     expect(importedHosts.single.port, 2222);
     expect(importedHosts.single.identityIds, isEmpty);
     expect(importedHosts.single.tags, contains('imported'));
+    expect(importedHosts.single.writeBackToSshConfig, isTrue);
     expect(
       importedHosts.single.portForwarding.localForwards.single,
       const HostLocalPortForward(

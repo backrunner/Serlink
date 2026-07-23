@@ -83,6 +83,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   bool _remoteSessionEnabled = false;
   bool _remoteSessionCreateIfMissing = true;
   bool _remoteSessionFallbackToShell = true;
+  bool _writeBackToSshConfig = false;
   bool _passwordVisible = false;
   bool _loadingOptions = true;
   bool _saving = false;
@@ -227,6 +228,20 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                     ),
                     textInputAction: TextInputAction.next,
                   ),
+                  if (capabilities.sshConfigImport) ...[
+                    SizedBox(height: layout.fieldGap),
+                    SerlinkSwitchListTile(
+                      key: const ValueKey('host-ssh-config-writeback-switch'),
+                      value: _writeBackToSshConfig,
+                      onChanged: (value) {
+                        setState(() {
+                          _writeBackToSshConfig = value;
+                        });
+                      },
+                      title: Text(l10n.hostWriteBackToSshConfigTitle),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -488,6 +503,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
       } else if (widget.mode == _HostFormMode.duplicate && host != null) {
@@ -506,6 +522,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
       } else if (_authMode == _HostAuthInputMode.password) {
@@ -523,6 +540,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
       } else if (_authMode == _HostAuthInputMode.privateKey) {
@@ -541,6 +559,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
       } else if (_authMode == _HostAuthInputMode.sshAgent &&
@@ -558,6 +577,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
       } else {
@@ -575,6 +595,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
       }
@@ -700,6 +721,9 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
               hostConfig.portForwarding.dynamicForwards.isNotEmpty;
           _showAdvancedConnection =
               hostConfig.connectionSettings != const HostConnectionSettings();
+          _writeBackToSshConfig =
+              widget.mode == _HostFormMode.edit &&
+              hostConfig.writeBackToSshConfig;
         }
         _loadingOptions = false;
       });

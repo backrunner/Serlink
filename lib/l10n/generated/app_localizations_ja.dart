@@ -811,6 +811,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostUsernameLabel => 'ユーザー名';
 
   @override
+  String get hostWriteBackToSshConfigTitle => 'SSH config に書き込む';
+
+  @override
   String get hostStartupCommandsLabel => '起動コマンド';
 
   @override

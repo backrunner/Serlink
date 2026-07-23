@@ -1552,6 +1552,12 @@ abstract class AppLocalizations {
   /// **'Username'**
   String get hostUsernameLabel;
 
+  /// No description provided for @hostWriteBackToSshConfigTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Write to SSH config'**
+  String get hostWriteBackToSshConfigTitle;
+
   /// No description provided for @hostStartupCommandsLabel.
   ///
   /// In en, this message translates to:

@@ -23,6 +23,7 @@ class SerlinkApp extends ConsumerWidget {
     ref.watch(cloudKitVaultDiscoveryControllerProvider);
     ref.watch(cloudKitEncryptedSnapshotPrefetchControllerProvider);
     ref.watch(autoSyncControllerProvider);
+    ref.watch(macOsSshConfigWritebackProvider);
 
     final foruiTheme = capabilities.prefersTouchUi
         ? SerlinkTheme.foruiDarkTouch()
@@ -118,6 +119,7 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
       ref
           .read(autoSyncControllerProvider.notifier)
           .requestSync(delay: Duration.zero);
+      ref.read(macOsSshConfigWritebackProvider.notifier).requestReconcile();
     }
     if (_hidden != hidden && mounted) {
       setState(() {

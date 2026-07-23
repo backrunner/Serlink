@@ -65,6 +65,7 @@ void main() {
     expect(storedHosts.single.displayName, summary.displayName);
     expect(storedHosts.single.identityIds, hasLength(1));
     expect(storedHosts.single.startupCommands, ['tmux attach || tmux']);
+    expect(storedHosts.single.writeBackToSshConfig, isFalse);
     expect(
       storedHosts.single.remoteSessionSettings,
       const HostRemoteSessionSettings(
@@ -587,6 +588,7 @@ void main() {
           createIfMissing: false,
           fallbackToShell: true,
         ),
+        writeBackToSshConfig: true,
       ),
     );
     final before = await hosts.read(summary.id);
@@ -610,6 +612,7 @@ void main() {
     expect(after.identityIds, before.identityIds);
     expect(after.startupCommands, ['tmux attach -t ops']);
     expect(after.remoteSessionSettings, before.remoteSessionSettings);
+    expect(after.writeBackToSshConfig, isTrue);
     expect(after.jumpHostIds, isEmpty);
 
     final resolver = EncryptedConnectionProfileResolver(

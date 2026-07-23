@@ -67,6 +67,7 @@ void main() {
           createIfMissing: true,
           fallbackToShell: false,
         ),
+        writeBackToSshConfig: true,
         createdAt: DateTime.utc(2026, 5, 27),
         updatedAt: DateTime.utc(2026, 5, 27, 1),
       );
@@ -94,6 +95,7 @@ void main() {
       );
       expect(restored.portForwarding, host.portForwarding);
       expect(restored.remoteSessionSettings, host.remoteSessionSettings);
+      expect(restored.writeBackToSshConfig, isTrue);
 
       await vault.lock();
 
@@ -130,5 +132,6 @@ void main() {
     expect(host.portForwarding, const HostPortForwardingSettings());
     expect(host.portForwarding.isEmpty, isTrue);
     expect(host.remoteSessionSettings, const HostRemoteSessionSettings());
+    expect(host.writeBackToSshConfig, isFalse);
   });
 }

@@ -26,6 +26,7 @@ class HostSummary {
     required this.createdAt,
     this.sftpDefaultDirectory = '/',
     this.lastConnectedAt,
+    this.writeBackToSshConfig = false,
   });
 
   final HostId id;
@@ -39,6 +40,7 @@ class HostSummary {
   final DateTime createdAt;
   final String sftpDefaultDirectory;
   final DateTime? lastConnectedAt;
+  final bool writeBackToSshConfig;
 }
 
 class HostConfig {
@@ -62,6 +64,7 @@ class HostConfig {
     this.remoteSessionSettings = const HostRemoteSessionSettings(),
     this.groupId,
     this.lastConnectedAt,
+    this.writeBackToSshConfig = false,
   });
 
   final HostId id;
@@ -83,6 +86,7 @@ class HostConfig {
   final DateTime updatedAt;
   final String? groupId;
   final DateTime? lastConnectedAt;
+  final bool writeBackToSshConfig;
 
   HostSummary toSummary() {
     return HostSummary(
@@ -97,6 +101,7 @@ class HostConfig {
       createdAt: createdAt,
       sftpDefaultDirectory: sftpDefaultDirectory,
       lastConnectedAt: lastConnectedAt,
+      writeBackToSshConfig: writeBackToSshConfig,
     );
   }
 
@@ -121,6 +126,7 @@ class HostConfig {
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
       'lastConnectedAt': lastConnectedAt?.toUtc().toIso8601String(),
+      'writeBackToSshConfig': writeBackToSshConfig,
     };
   }
 
@@ -178,6 +184,7 @@ class HostConfig {
         final String value => DateTime.parse(value),
         _ => null,
       },
+      writeBackToSshConfig: json['writeBackToSshConfig'] == true,
     );
   }
 }

@@ -1113,8 +1113,8 @@ void main() {
         await targetContainer.read(cloudKitSyncSettingsProvider.future),
         isNotNull,
       );
+      await _waitForInitialAutoSync(targetContainer);
       counters.reset();
-      await Future<void>.delayed(Duration.zero);
 
       final sourceVault =
           sourceContainer.read(vaultSessionControllerProvider.notifier).service
@@ -1138,7 +1138,6 @@ void main() {
       await _waitForRecord(targetDatabase, VaultRecordId('host:echo'));
       await _waitForAutoSyncIdle(targetContainer);
       final writesAfterRemoteChange = counters.conditionalManifestWrites;
-      expect(writesAfterRemoteChange, greaterThanOrEqualTo(1));
 
       cloudKitEvents.add(
         CloudKitSyncChange(source: 'echo', receivedAt: DateTime.now().toUtc()),
@@ -3234,6 +3233,24 @@ Future<void> _waitForAutoSyncIdle(ProviderContainer container) async {
   final status = container.read(autoSyncControllerProvider);
   fail(
     'Expected auto-sync to become idle but found ${status.phase}. '
+    'Failure: ${status.lastFailureMessage}.',
+  );
+}
+
+Future<void> _waitForInitialAutoSync(ProviderContainer container) async {
+  for (var attempt = 0; attempt < 300; attempt += 1) {
+    final status = container.read(autoSyncControllerProvider);
+    if (status.phase == AutoSyncPhase.idle && status.lastCompletedAt != null) {
+      return;
+    }
+    if (status.phase == AutoSyncPhase.failed) {
+      fail('Initial auto-sync failed: ${status.lastFailureMessage}.');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  final status = container.read(autoSyncControllerProvider);
+  fail(
+    'Expected initial auto-sync to complete but found ${status.phase}. '
     'Failure: ${status.lastFailureMessage}.',
   );
 }

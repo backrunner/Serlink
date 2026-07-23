@@ -466,6 +466,7 @@ Host prod
       expect(importedHost.identityIds, hasLength(1));
       final identity = await identities.read(importedHost.identityIds.single);
       expect(identity?.kind, IdentityKind.openSshCertificate);
+      expect(identity?.certificatePrincipal, 'deploy@prod');
 
       final resolver = EncryptedConnectionProfileResolver(
         hosts: hosts,
@@ -568,6 +569,90 @@ Host stage
   );
 
   test(
+    'reuses an existing certificate identity across incremental imports',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'serlink-ssh-config-incremental-identity-',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+      final keyFile = File('${tempDir.path}/shared_key');
+      await keyFile.writeAsString(
+        '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----',
+      );
+      final certificateFile = File('${tempDir.path}/shared_key-cert.pub');
+      await certificateFile.writeAsString(
+        'ssh-ed25519-cert-v01@openssh.com YWJj deploy@shared',
+      );
+      final configFile = File('${tempDir.path}/config');
+
+      final vault = InMemoryVaultService(
+        config: const VaultCryptoConfig.testing(),
+      );
+      await vault.initialize(passphrase: 'passphrase');
+      final records = InMemoryVaultRecordRepository();
+      final hosts = EncryptedHostRepository(vault: vault, records: records);
+      final identities = EncryptedIdentityRepository(
+        vault: vault,
+        records: records,
+      );
+      final service = OpenSshConfigImportService(
+        hosts: hosts,
+        identities: identities,
+        records: records,
+        vault: vault,
+        now: () => DateTime.utc(2026, 5, 28),
+      );
+
+      await configFile.writeAsString('''
+Host prod
+  HostName prod.example.test
+  User deploy
+  IdentityFile shared_key
+  CertificateFile shared_key-cert.pub
+''');
+      final first = await service.applyPreview(
+        service.preview(
+          await configFile.readAsString(),
+          configSourcePath: configFile.path,
+        ),
+        configSourcePath: configFile.path,
+      );
+
+      await configFile.writeAsString('''
+Host stage
+  HostName stage.example.test
+  User deploy
+  IdentityFile shared_key
+  CertificateFile shared_key-cert.pub
+''');
+      final second = await service.applyPreview(
+        service.preview(
+          await configFile.readAsString(),
+          configSourcePath: configFile.path,
+        ),
+        configSourcePath: configFile.path,
+      );
+
+      expect(first.identitiesImported, 1);
+      expect(second.identitiesImported, 0);
+      final savedIdentities = await identities.list();
+      expect(savedIdentities, hasLength(1));
+      expect(savedIdentities.single.kind, IdentityKind.openSshCertificate);
+      expect(savedIdentities.single.certificatePrincipal, 'deploy@shared');
+      final importedHosts = await hosts.list();
+      expect(importedHosts, hasLength(2));
+      expect(
+        importedHosts.map((host) => host.identityIds.single).toSet(),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
     'applies resolvable ProxyJump aliases as encrypted host links',
     () async {
       final vault = InMemoryVaultService(
@@ -646,6 +731,7 @@ Host missing-user
     expect(result.duplicateHosts, 1);
     expect(result.missingUsernames, 1);
     expect(result.hostsSkipped, 2);
+    expect(result.retryAliases, {'missing-user'});
     expect(
       result.warnings.map((warning) => warning.code),
       contains('ssh_config.username_missing'),

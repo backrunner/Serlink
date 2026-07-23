@@ -275,6 +275,43 @@ class AppLocalizationsJa extends AppLocalizations {
       'バックグラウンドのプライバシー設定を更新できませんでした。';
 
   @override
+  String get settingsSshConfigAutoImportTitle => 'SSH 設定の自動インポート';
+
+  @override
+  String get settingsSshConfigAutoImportSemantics => 'SSH 設定の新しいホストを自動的にインポート';
+
+  @override
+  String get settingsSshConfigAutoImportEnabled =>
+      'オン。~/.ssh/config の新しいホストを自動的にインポートします。';
+
+  @override
+  String get settingsSshConfigAutoImportDisabled => 'オフ。新しいホストをインポートする前に確認します。';
+
+  @override
+  String get settingsSshConfigAutoImportSaved => 'SSH 設定の自動インポートを更新しました。';
+
+  @override
+  String get settingsSshConfigAutoImportSaveFailed =>
+      'SSH 設定の自動インポートを更新できませんでした。';
+
+  @override
+  String get sshConfigNewHostsTitle => '新しい SSH 設定ホスト';
+
+  @override
+  String sshConfigNewHostsBody(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 台の新しいホスト',
+      one: '1 台の新しいホスト',
+    );
+    return '~/.ssh/config に $_temp0 が見つかりました。';
+  }
+
+  @override
+  String get sshConfigAutoImportFutureTitle => '今後の追加を自動インポート';
+
+  @override
   String get settingsCredentialsTitle => '認証情報';
 
   @override

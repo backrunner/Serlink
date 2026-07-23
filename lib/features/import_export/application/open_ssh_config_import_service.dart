@@ -71,6 +71,7 @@ class OpenSshConfigApplyResult {
     required this.duplicateHosts,
     required this.missingUsernames,
     required this.identitiesImported,
+    required this.retryAliases,
     required this.warnings,
   });
 
@@ -80,6 +81,7 @@ class OpenSshConfigApplyResult {
   final int duplicateHosts;
   final int missingUsernames;
   final int identitiesImported;
+  final Set<String> retryAliases;
   final List<OpenSshConfigImportWarning> warnings;
 }
 
@@ -319,9 +321,11 @@ class OpenSshConfigImportService {
     var duplicateHosts = 0;
     var missingUsernames = 0;
     var identitiesImported = 0;
+    final retryAliases = <String>{};
     final existingJumpHosts = _existingJumpHostLookup(existingHosts);
     final importedJumpHosts = <String, HostId>{};
     final importedIdentityFiles = <String, _ImportedOpenSshIdentity>{};
+    final importedIdentityMaterials = await _existingOpenSshIdentities();
     final importPlans = <_OpenSshConfigImportPlan>[];
 
     for (final entry in preview.entries) {
@@ -332,6 +336,7 @@ class OpenSshConfigImportService {
       final username = (entry.username ?? defaultUsername ?? '').trim();
       if (username.isEmpty) {
         missingUsernames += 1;
+        retryAliases.add(entry.alias.trim().toLowerCase());
         warnings.add(
           OpenSshConfigImportWarning(
             lineNumber: 0,
@@ -348,6 +353,7 @@ class OpenSshConfigImportService {
         certificateFiles: entry.certificateFiles,
         configSourcePath: configSourcePath,
         importedIdentityFiles: importedIdentityFiles,
+        importedIdentityMaterials: importedIdentityMaterials,
         alias: entry.alias,
         username: username,
         warnings: warnings,
@@ -411,6 +417,7 @@ class OpenSshConfigImportService {
       duplicateHosts: duplicateHosts,
       missingUsernames: missingUsernames,
       identitiesImported: identitiesImported,
+      retryAliases: Set<String>.unmodifiable(retryAliases),
       warnings: List<OpenSshConfigImportWarning>.unmodifiable(warnings),
     );
   }

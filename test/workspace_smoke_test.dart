@@ -16,6 +16,7 @@ import 'package:serlink/features/hosts/application/host_repository.dart';
 import 'package:serlink/features/hosts/application/host_write_service.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/identities/application/identity_repository.dart';
+import 'package:serlink/features/identities/domain/identity.dart';
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
 import 'package:serlink/features/sftp/application/sftp_failure.dart';
 import 'package:serlink/features/sftp/domain/sftp_entry.dart';
@@ -91,6 +92,10 @@ void main() {
     expect(find.text('iCloud'), findsOneWidget);
     expect(find.text('create a vault to start syncing'), findsOneWidget);
     expect(find.text('unlock the vault to continue syncing'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('settings-ssh-config-auto-import-switch')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('workspace creates vault and shows empty hosts', (tester) async {
@@ -560,6 +565,52 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Unlock Vault'), findsWidgets);
+  });
+
+  testWidgets('new hosts can select saved OpenSSH certificate credentials', (
+    tester,
+  ) async {
+    final hosts = _MemoryHostRepository();
+    final identity = IdentityConfig(
+      id: IdentityId('prod-certificate'),
+      displayName: 'Production certificate',
+      kind: IdentityKind.openSshCertificate,
+      usernameHint: 'deploy',
+      certificatePrincipal: 'deploy@prod',
+      createdAt: DateTime.utc(2026, 7, 23),
+      updatedAt: DateTime.utc(2026, 7, 23),
+    );
+    final identities = _MemoryIdentityRepository([identity]);
+
+    await _pumpLockedVaultApp(
+      tester,
+      hostRepository: hosts,
+      identityRepository: identities,
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _tapAddHost(tester);
+
+    await tester.tap(find.text('Saved'));
+    await tester.pumpAndSettle();
+    expect(find.text(identity.displayName), findsOneWidget);
+    expect(find.textContaining(identity.certificatePrincipal!), findsOneWidget);
+
+    await tester.ensureVisible(find.text(identity.displayName));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(identity.displayName));
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'prod.example.test',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'deploy',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    expect(hosts.hosts.single.identityIds, [identity.id]);
+    expect(hosts.hosts.single.authKinds, {HostAuthKind.openSshCertificate});
   });
 
   testWidgets('iOS offers Face ID unlock after vault creation', (tester) async {
@@ -2306,6 +2357,7 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   ConnectionProfileResolver? connectionProfileResolver,
   LocalTerminalService? localTerminal,
   HostRepository? hostRepository,
+  IdentityRepository? identityRepository,
   List<SyncDeviceMetadata>? syncDevices,
   bool protectBackground = false,
 }) async {
@@ -2358,6 +2410,8 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
         ),
         if (hostRepository != null)
           hostRepositoryProvider.overrideWithValue(hostRepository),
+        if (identityRepository != null)
+          identityRepositoryProvider.overrideWithValue(identityRepository),
         if (syncDevices != null)
           syncKnownDevicesProvider.overrideWith((ref) async => syncDevices),
         sshSessionServiceProvider.overrideWithValue(resolvedSshService),

@@ -147,6 +147,15 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<MacOsSshConfigStartupState>(macOsSshConfigStartupProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.phase == MacOsSshConfigStartupPhase.importing &&
+          next.phase == MacOsSshConfigStartupPhase.idle) {
+        unawaited(_loadOptions());
+      }
+    });
     final l10n = context.l10n;
     final capabilities = ref.watch(platformCapabilitiesProvider);
     final layout = _HostFormDialogLayout.resolve(context, capabilities);
@@ -602,12 +611,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     final file = await ref
         .read(documentGatewayProvider)
         .pickUploadFile(
-          acceptedTypeGroups: const [
-            XTypeGroup(
-              label: 'SSH Private Key',
-              extensions: ['pem', 'key', 'txt'],
-            ),
-          ],
+          acceptedTypeGroups: const [XTypeGroup(label: 'SSH Private Key')],
         );
     if (file == null) {
       return;

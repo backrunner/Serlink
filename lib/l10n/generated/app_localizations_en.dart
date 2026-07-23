@@ -304,6 +304,47 @@ class AppLocalizationsEn extends AppLocalizations {
       'Background privacy could not be updated.';
 
   @override
+  String get settingsSshConfigAutoImportTitle => 'SSH config auto-import';
+
+  @override
+  String get settingsSshConfigAutoImportSemantics =>
+      'Automatically import new SSH config hosts';
+
+  @override
+  String get settingsSshConfigAutoImportEnabled =>
+      'On. New hosts from ~/.ssh/config are imported automatically.';
+
+  @override
+  String get settingsSshConfigAutoImportDisabled =>
+      'Off. Serlink asks before importing new hosts.';
+
+  @override
+  String get settingsSshConfigAutoImportSaved =>
+      'SSH config auto-import updated.';
+
+  @override
+  String get settingsSshConfigAutoImportSaveFailed =>
+      'SSH config auto-import could not be updated.';
+
+  @override
+  String get sshConfigNewHostsTitle => 'New SSH config hosts';
+
+  @override
+  String sshConfigNewHostsBody(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count new hosts were found in ~/.ssh/config.',
+      one: '1 new host was found in ~/.ssh/config.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sshConfigAutoImportFutureTitle =>
+      'Automatically import future additions';
+
+  @override
   String get settingsCredentialsTitle => 'Credentials';
 
   @override

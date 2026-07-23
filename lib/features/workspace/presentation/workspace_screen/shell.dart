@@ -31,55 +31,62 @@ class WorkspaceScreen extends ConsumerWidget {
     }
     final showTopBar = AppWindow.usesTrailingWindowControls;
 
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: serlinkBackdrop(context.tokens),
-        child: Stack(
-          children: [
-            const Positioned.fill(child: _BackdropGlow()),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-              child: Row(
-                children: [
-                  _Sidebar(
-                    selected: state.area,
-                    onSelected: (area) {
-                      if (area != state.area) {
-                        ref
-                            .read(vaultSessionControllerProvider.notifier)
-                            .resetUnlockFailureState();
-                      }
-                      controller.selectArea(area);
-                    },
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: SerlinkRadii.card,
-                        boxShadow: serlinkShadow(context.tokens, elevation: 20),
-                      ),
-                      child: Material(
-                        color: context.tokens.surfaceRaised,
-                        elevation: 0,
-                        clipBehavior: Clip.antiAlias,
-                        shape: RoundedRectangleBorder(
+    return _SshConfigImportPromptGate(
+      child: Scaffold(
+        body: DecoratedBox(
+          decoration: serlinkBackdrop(context.tokens),
+          child: Stack(
+            children: [
+              const Positioned.fill(child: _BackdropGlow()),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+                child: Row(
+                  children: [
+                    _Sidebar(
+                      selected: state.area,
+                      onSelected: (area) {
+                        if (area != state.area) {
+                          ref
+                              .read(vaultSessionControllerProvider.notifier)
+                              .resetUnlockFailureState();
+                        }
+                        controller.selectArea(area);
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
                           borderRadius: SerlinkRadii.card,
-                          side: BorderSide(color: context.tokens.borderSubtle),
+                          boxShadow: serlinkShadow(
+                            context.tokens,
+                            elevation: 20,
+                          ),
                         ),
-                        child: Column(
-                          children: [
-                            if (showTopBar) const _TopBar(),
-                            Expanded(child: _MainSurface(state: state)),
-                          ],
+                        child: Material(
+                          color: context.tokens.surfaceRaised,
+                          elevation: 0,
+                          clipBehavior: Clip.antiAlias,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: SerlinkRadii.card,
+                            side: BorderSide(
+                              color: context.tokens.borderSubtle,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              if (showTopBar) const _TopBar(),
+                              Expanded(child: _MainSurface(state: state)),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

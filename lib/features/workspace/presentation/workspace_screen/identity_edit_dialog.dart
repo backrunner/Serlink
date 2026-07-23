@@ -237,7 +237,6 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
       controller: _privateKeyController,
       typeGroup: XTypeGroup(
         label: context.l10n.credentialSshPrivateKeyTypeLabel,
-        extensions: ['pem', 'key', 'txt'],
       ),
     );
   }
@@ -247,7 +246,6 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
       controller: _certificateController,
       typeGroup: XTypeGroup(
         label: context.l10n.credentialOpenSshCertificateTypeLabel,
-        extensions: ['pub', 'cert', 'txt'],
       ),
     );
   }

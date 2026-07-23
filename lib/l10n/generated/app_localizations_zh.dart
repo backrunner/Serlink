@@ -801,6 +801,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostUsernameLabel => '用户名';
 
   @override
+  String get hostWriteBackToSshConfigTitle => '写入 SSH config';
+
+  @override
   String get hostStartupCommandsLabel => '启动命令';
 
   @override

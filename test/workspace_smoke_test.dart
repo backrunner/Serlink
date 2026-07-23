@@ -17,6 +17,7 @@ import 'package:serlink/features/hosts/application/host_write_service.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/identities/application/identity_repository.dart';
 import 'package:serlink/features/identities/domain/identity.dart';
+import 'package:serlink/features/import_export/application/macos_ssh_config_startup_service.dart';
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
 import 'package:serlink/features/sftp/application/sftp_failure.dart';
 import 'package:serlink/features/sftp/domain/sftp_entry.dart';
@@ -1259,8 +1260,86 @@ void main() {
 
       expect(find.byKey(const ValueKey('host-password-field')), findsOneWidget);
       expect(find.text('Agent'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('host-ssh-config-writeback-switch')),
+        findsNothing,
+      );
     },
   );
+
+  testWidgets('macOS Direct add host defaults SSH config writeback off', (
+    tester,
+  ) async {
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'macos',
+        targetPlatform: TargetPlatform.macOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await _tapAddHost(tester);
+
+    final writebackSwitch = find.byKey(
+      const ValueKey('host-ssh-config-writeback-switch'),
+    );
+    expect(writebackSwitch, findsOneWidget);
+    expect(
+      tester.widget<SerlinkSwitchListTile>(writebackSwitch).value,
+      isFalse,
+    );
+  });
+
+  testWidgets('macOS Direct imported host keeps SSH config writeback on', (
+    tester,
+  ) async {
+    final hosts = _DelayedHostRepository([
+      _hostConfig(
+        id: 'imported-host',
+        displayName: 'Imported Host',
+        hostname: 'imported.example.test',
+        createdAt: DateTime.utc(2026, 7, 23),
+        writeBackToSshConfig: true,
+      ),
+    ]);
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'macos',
+        targetPlatform: TargetPlatform.macOS,
+      ),
+      hostRepository: hosts,
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _pumpUntil(tester, () => hosts.listRequested);
+    hosts.completeList();
+    await _pumpUntilFound(tester, find.text('Imported Host'));
+
+    await _openHostContextMenu(tester, 'Imported Host');
+    await tester.tap(find.text('Edit host'));
+    await _pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('host-ssh-config-writeback-switch')),
+    );
+    await _pumpUntil(
+      tester,
+      () => tester
+          .widget<SerlinkSwitchListTile>(
+            find.byKey(const ValueKey('host-ssh-config-writeback-switch')),
+          )
+          .value,
+    );
+
+    expect(
+      tester
+          .widget<SerlinkSwitchListTile>(
+            find.byKey(const ValueKey('host-ssh-config-writeback-switch')),
+          )
+          .value,
+      isTrue,
+    );
+  });
 
   testWidgets('iOS add host form uses compact wide dialog', (tester) async {
     tester.view.devicePixelRatio = 1;
@@ -2424,6 +2503,12 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
         transferQueueControllerProvider.overrideWithValue(transferQueue),
         secretStoreProvider.overrideWithValue(secretStore),
         appPrivacySettingsRepositoryProvider.overrideWithValue(privacySettings),
+        macOsSshConfigStartupProvider.overrideWith(
+          _NoopMacOsSshConfigStartupController.new,
+        ),
+        macOsSshConfigWritebackProvider.overrideWith(
+          _NoopMacOsSshConfigWritebackController.new,
+        ),
         autoSyncEnabledProvider.overrideWithValue(false),
         appPackageInfoProvider.overrideWith((ref) async {
           return _testPackageInfo();
@@ -2438,6 +2523,22 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
     database: database,
     recoveryKey: initialized.recoveryKey,
   );
+}
+
+class _NoopMacOsSshConfigStartupController
+    extends MacOsSshConfigStartupController {
+  @override
+  MacOsSshConfigStartupState build() {
+    return const MacOsSshConfigStartupState.idle();
+  }
+}
+
+class _NoopMacOsSshConfigWritebackController
+    extends MacOsSshConfigWritebackController {
+  @override
+  MacOsSshConfigWritebackState build() {
+    return const MacOsSshConfigWritebackState.idle();
+  }
 }
 
 PackageInfo _testPackageInfo() {
@@ -2558,6 +2659,7 @@ HostConfig _hostConfig({
   required String hostname,
   required DateTime createdAt,
   DateTime? lastConnectedAt,
+  bool writeBackToSshConfig = false,
 }) {
   return HostConfig(
     id: HostId(id),
@@ -2574,6 +2676,7 @@ HostConfig _hostConfig({
     createdAt: createdAt,
     updatedAt: createdAt,
     lastConnectedAt: lastConnectedAt,
+    writeBackToSshConfig: writeBackToSshConfig,
   );
 }
 

@@ -873,6 +873,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostUsernameLabel => 'Username';
 
   @override
+  String get hostWriteBackToSshConfigTitle => 'Write to SSH config';
+
+  @override
   String get hostStartupCommandsLabel => 'Startup commands';
 
   @override

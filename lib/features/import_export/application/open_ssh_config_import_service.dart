@@ -403,6 +403,7 @@ class OpenSshConfigImportService {
           startupCommands: const [],
           jumpHostIds: jumpResolution.hostIds,
           portForwarding: plan.entry.portForwarding,
+          writeBackToSshConfig: true,
           createdAt: now,
           updatedAt: now,
         ),

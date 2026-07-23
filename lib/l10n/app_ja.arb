@@ -242,6 +242,7 @@
   "hostHostnameLabel": "ホスト名",
   "hostPortLabel": "ポート",
   "hostUsernameLabel": "ユーザー名",
+  "hostWriteBackToSshConfigTitle": "SSH config に書き込む",
   "hostStartupCommandsLabel": "起動コマンド",
   "hostRemoteSessionEnableTitle": "tmux/screen に接続",
   "hostRemoteSessionManagerAuto": "自動",

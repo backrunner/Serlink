@@ -242,6 +242,7 @@
   "hostHostnameLabel": "主机名",
   "hostPortLabel": "端口",
   "hostUsernameLabel": "用户名",
+  "hostWriteBackToSshConfigTitle": "写入 SSH config",
   "hostStartupCommandsLabel": "启动命令",
   "hostRemoteSessionEnableTitle": "关联到 tmux/screen",
   "hostRemoteSessionManagerAuto": "自动",

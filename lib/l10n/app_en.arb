@@ -391,6 +391,7 @@
   "hostHostnameLabel": "Hostname",
   "hostPortLabel": "Port",
   "hostUsernameLabel": "Username",
+  "hostWriteBackToSshConfigTitle": "Write to SSH config",
   "hostStartupCommandsLabel": "Startup commands",
   "hostRemoteSessionEnableTitle": "Attach to tmux/screen",
   "hostRemoteSessionManagerAuto": "Auto",

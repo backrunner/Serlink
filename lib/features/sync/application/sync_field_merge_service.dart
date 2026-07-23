@@ -112,6 +112,7 @@ class SyncFieldMergeService {
       _field('startupCommands', 'Startup', local, remote),
       _field('remoteSessionSettings', 'Remote session', local, remote),
       _field('jumpHostIds', 'Jump hosts', local, remote),
+      _field('writeBackToSshConfig', 'Write to SSH config', local, remote),
       _field('groupId', 'Group', local, remote),
       _field('lastConnectedAt', 'Last connected', local, remote),
     ].where((field) => field.differs).toList();

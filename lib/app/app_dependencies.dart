@@ -21,6 +21,7 @@ import '../features/import_export/application/known_hosts_import_service.dart';
 import '../features/import_export/application/open_ssh_certificate_import_service.dart';
 import '../features/import_export/application/open_ssh_config_import_service.dart';
 import '../features/import_export/application/macos_ssh_config_startup_service.dart';
+import '../features/import_export/application/macos_ssh_config_writeback_service.dart';
 import '../features/import_export/application/automatic_vault_backup_service.dart';
 import '../features/import_export/application/vault_backup_service.dart';
 import '../features/import_export/application/vault_backup_restore_service.dart';
@@ -416,6 +417,131 @@ final macOsSshConfigStartupProvider =
       MacOsSshConfigStartupController,
       MacOsSshConfigStartupState
     >(MacOsSshConfigStartupController.new);
+
+final sshConfigWritebackRegistryProvider = Provider<SshConfigWritebackRegistry>(
+  (ref) {
+    return const FileSshConfigWritebackRegistry();
+  },
+);
+
+final sshConfigFileStoreProvider = Provider<SshConfigFileStore>((ref) {
+  return const LocalSshConfigFileStore();
+});
+
+final macOsSshConfigWritebackServiceProvider =
+    Provider<MacOsSshConfigWritebackService>((ref) {
+      final home = Platform.environment['HOME']?.trim();
+      return MacOsSshConfigWritebackService(
+        hosts: ref.watch(hostRepositoryProvider),
+        registry: ref.watch(sshConfigWritebackRegistryProvider),
+        files: ref.watch(sshConfigFileStoreProvider),
+        configPath: home == null || home.isEmpty ? '' : '$home/.ssh/config',
+        logger: ref.watch(offlineDiagnosticLoggerProvider),
+      );
+    });
+
+final macOsSshConfigWritebackProvider =
+    NotifierProvider<
+      MacOsSshConfigWritebackController,
+      MacOsSshConfigWritebackState
+    >(MacOsSshConfigWritebackController.new);
+
+enum MacOsSshConfigWritebackPhase { idle, reconciling, failed }
+
+class MacOsSshConfigWritebackState {
+  const MacOsSshConfigWritebackState._({required this.phase, this.error});
+
+  const MacOsSshConfigWritebackState.idle()
+    : this._(phase: MacOsSshConfigWritebackPhase.idle);
+
+  const MacOsSshConfigWritebackState.reconciling()
+    : this._(phase: MacOsSshConfigWritebackPhase.reconciling);
+
+  const MacOsSshConfigWritebackState.failed(Object error)
+    : this._(phase: MacOsSshConfigWritebackPhase.failed, error: error);
+
+  final MacOsSshConfigWritebackPhase phase;
+  final Object? error;
+}
+
+class MacOsSshConfigWritebackController
+    extends Notifier<MacOsSshConfigWritebackState> {
+  var _scheduled = false;
+  var _running = false;
+  var _rerunRequested = false;
+
+  @override
+  MacOsSshConfigWritebackState build() {
+    if (!ref.read(platformCapabilitiesProvider).sshConfigImport) {
+      return const MacOsSshConfigWritebackState.idle();
+    }
+    ref.listen<AsyncValue<VaultSessionState>>(
+      vaultSessionControllerProvider,
+      (_, _) => requestReconcile(),
+    );
+    ref.listen<AsyncValue<VaultRecordChange>>(vaultRecordChangesProvider, (
+      _,
+      change,
+    ) {
+      if (change.value?.type == EncryptedHostRepository.recordType) {
+        requestReconcile();
+      }
+    });
+    unawaited(Future<void>.microtask(requestReconcile));
+    return const MacOsSshConfigWritebackState.idle();
+  }
+
+  void requestReconcile() {
+    if (!ref.mounted) {
+      return;
+    }
+    if (!ref.read(platformCapabilitiesProvider).sshConfigImport) {
+      return;
+    }
+    if (_running) {
+      _rerunRequested = true;
+      return;
+    }
+    if (_scheduled) {
+      return;
+    }
+    _scheduled = true;
+    unawaited(_reconcileSoon());
+  }
+
+  Future<void> _reconcileSoon() async {
+    await Future<void>.delayed(Duration.zero);
+    _scheduled = false;
+    if (!ref.mounted) {
+      return;
+    }
+    final session = ref.read(vaultSessionControllerProvider).value;
+    if (session?.vaultState != VaultState.unlocked ||
+        session?.recoveryKey != null) {
+      state = const MacOsSshConfigWritebackState.idle();
+      return;
+    }
+
+    _running = true;
+    state = const MacOsSshConfigWritebackState.reconciling();
+    try {
+      await ref.read(macOsSshConfigWritebackServiceProvider).reconcile();
+      if (ref.mounted) {
+        state = const MacOsSshConfigWritebackState.idle();
+      }
+    } on Object catch (error) {
+      if (ref.mounted) {
+        state = MacOsSshConfigWritebackState.failed(error);
+      }
+    } finally {
+      _running = false;
+      if (_rerunRequested) {
+        _rerunRequested = false;
+        requestReconcile();
+      }
+    }
+  }
+}
 
 class MacOsSshConfigStartupController
     extends Notifier<MacOsSshConfigStartupState> {

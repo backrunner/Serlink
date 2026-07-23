@@ -271,6 +271,42 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsBackgroundPrivacySaveFailed => '无法更新后台隐私保护。';
 
   @override
+  String get settingsSshConfigAutoImportTitle => '自动导入 SSH 配置';
+
+  @override
+  String get settingsSshConfigAutoImportSemantics => '自动导入 SSH 配置中的新主机';
+
+  @override
+  String get settingsSshConfigAutoImportEnabled =>
+      '已开启。会自动导入 ~/.ssh/config 中的新主机。';
+
+  @override
+  String get settingsSshConfigAutoImportDisabled => '已关闭。导入新主机前会先询问。';
+
+  @override
+  String get settingsSshConfigAutoImportSaved => 'SSH 配置自动导入设置已更新。';
+
+  @override
+  String get settingsSshConfigAutoImportSaveFailed => '无法更新 SSH 配置自动导入设置。';
+
+  @override
+  String get sshConfigNewHostsTitle => '发现新的 SSH 配置主机';
+
+  @override
+  String sshConfigNewHostsBody(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count 台新主机。',
+      one: '1 台新主机。',
+    );
+    return '在 ~/.ssh/config 中发现 $_temp0';
+  }
+
+  @override
+  String get sshConfigAutoImportFutureTitle => '自动导入后续新增主机';
+
+  @override
   String get settingsCredentialsTitle => '凭据';
 
   @override

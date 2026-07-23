@@ -616,6 +616,60 @@ abstract class AppLocalizations {
   /// **'Background privacy could not be updated.'**
   String get settingsBackgroundPrivacySaveFailed;
 
+  /// No description provided for @settingsSshConfigAutoImportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH config auto-import'**
+  String get settingsSshConfigAutoImportTitle;
+
+  /// No description provided for @settingsSshConfigAutoImportSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically import new SSH config hosts'**
+  String get settingsSshConfigAutoImportSemantics;
+
+  /// No description provided for @settingsSshConfigAutoImportEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'On. New hosts from ~/.ssh/config are imported automatically.'**
+  String get settingsSshConfigAutoImportEnabled;
+
+  /// No description provided for @settingsSshConfigAutoImportDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Off. Serlink asks before importing new hosts.'**
+  String get settingsSshConfigAutoImportDisabled;
+
+  /// No description provided for @settingsSshConfigAutoImportSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH config auto-import updated.'**
+  String get settingsSshConfigAutoImportSaved;
+
+  /// No description provided for @settingsSshConfigAutoImportSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH config auto-import could not be updated.'**
+  String get settingsSshConfigAutoImportSaveFailed;
+
+  /// No description provided for @sshConfigNewHostsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New SSH config hosts'**
+  String get sshConfigNewHostsTitle;
+
+  /// No description provided for @sshConfigNewHostsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 new host was found in ~/.ssh/config.} other{{count} new hosts were found in ~/.ssh/config.}}'**
+  String sshConfigNewHostsBody(num count);
+
+  /// No description provided for @sshConfigAutoImportFutureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically import future additions'**
+  String get sshConfigAutoImportFutureTitle;
+
   /// No description provided for @settingsCredentialsTitle.
   ///
   /// In en, this message translates to:

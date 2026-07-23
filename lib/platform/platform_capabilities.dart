@@ -71,6 +71,8 @@ class PlatformCapabilities {
 
   bool get sshAgentAuth => isDesktop && !isAppStoreDistribution;
 
+  bool get sshConfigImport => isMacOS && !isAppStoreDistribution;
+
   bool get hardwareKeyAuth => false;
 
   bool get stableLocalFilePaths => !isIOS;

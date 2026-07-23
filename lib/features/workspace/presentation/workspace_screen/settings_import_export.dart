@@ -491,12 +491,7 @@ Future<void> _importOpenSshCertificate(
   final privateKeyFile = await ref
       .read(documentGatewayProvider)
       .pickUploadFile(
-        acceptedTypeGroups: const [
-          XTypeGroup(
-            label: 'SSH Private Key',
-            extensions: ['pem', 'key', 'txt'],
-          ),
-        ],
+        acceptedTypeGroups: const [XTypeGroup(label: 'SSH Private Key')],
       );
   if (privateKeyFile == null || !context.mounted) {
     return;
@@ -504,12 +499,7 @@ Future<void> _importOpenSshCertificate(
   final certificateFile = await ref
       .read(documentGatewayProvider)
       .pickUploadFile(
-        acceptedTypeGroups: const [
-          XTypeGroup(
-            label: 'OpenSSH Certificate',
-            extensions: ['pub', 'cert', 'txt'],
-          ),
-        ],
+        acceptedTypeGroups: const [XTypeGroup(label: 'OpenSSH Certificate')],
       );
   if (certificateFile == null || !context.mounted) {
     return;

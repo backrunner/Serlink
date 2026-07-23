@@ -1,5 +1,64 @@
 part of 'workspace_smoke_test.dart';
 
+class _MemoryHostRepository implements HostRepository {
+  final List<HostConfig> hosts = [];
+
+  @override
+  Future<void> delete(HostId id) async {
+    hosts.removeWhere((host) => host.id == id);
+  }
+
+  @override
+  Future<HostConfig?> read(HostId id) async {
+    for (final host in hosts) {
+      if (host.id == id) {
+        return host;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<List<HostConfig>> list() async => List.of(hosts);
+
+  @override
+  Future<void> save(HostConfig host) async {
+    hosts.removeWhere((existing) => existing.id == host.id);
+    hosts.add(host);
+  }
+}
+
+class _MemoryIdentityRepository implements IdentityRepository {
+  _MemoryIdentityRepository(List<IdentityConfig> identities)
+    : _identities = List.of(identities);
+
+  final List<IdentityConfig> _identities;
+
+  @override
+  Future<void> delete(IdentityId id) async {
+    _identities.removeWhere((identity) => identity.id == id);
+  }
+
+  @override
+  Future<IdentityConfig?> read(IdentityId id) async {
+    for (final identity in _identities) {
+      if (identity.id == id) {
+        return identity;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<List<IdentityConfig>> list() async => List.of(_identities);
+
+  @override
+  Future<void> save(IdentityConfig identity) async {
+    _identities.removeWhere((existing) => existing.id == identity.id);
+    _identities.add(identity);
+  }
+}
+
 class _LockedVaultHarness {
   const _LockedVaultHarness({
     required this.database,

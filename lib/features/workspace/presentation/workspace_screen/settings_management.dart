@@ -449,6 +449,26 @@ Future<void> _setProtectBackground(
   }
 }
 
+Future<void> _setSshConfigAutoImport(
+  BuildContext context,
+  WidgetRef ref,
+  bool enabled,
+) async {
+  final l10n = context.l10n;
+  try {
+    await ref
+        .read(appSshConfigAutoImportProvider.notifier)
+        .setAutoImport(enabled);
+    if (context.mounted) {
+      _showSnackBar(context, l10n.settingsSshConfigAutoImportSaved);
+    }
+  } on Object {
+    if (context.mounted) {
+      _showSnackBar(context, l10n.settingsSshConfigAutoImportSaveFailed);
+    }
+  }
+}
+
 String _vaultStatusPillLabel(AppLocalizations l10n, VaultState? state) {
   return switch (state) {
     VaultState.uninitialized => l10n.settingsVaultNotCreatedPill,

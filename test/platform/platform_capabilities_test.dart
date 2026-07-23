@@ -39,6 +39,7 @@ void main() {
     expect(capabilities.localDirectoryTransfer, isTrue);
     expect(capabilities.openLocalFile, isTrue);
     expect(capabilities.sshAgentAuth, isTrue);
+    expect(capabilities.sshConfigImport, isTrue);
     expect(capabilities.hardwareKeyAuth, isFalse);
     expect(capabilities.terminalSoftwareKeyboardDeleteDetection, isFalse);
     expect(capabilities.terminalTargetPlatform, TerminalTargetPlatform.macos);
@@ -53,6 +54,7 @@ void main() {
 
     expect(capabilities.localTerminal, isFalse);
     expect(capabilities.sshAgentAuth, isFalse);
+    expect(capabilities.sshConfigImport, isFalse);
     expect(capabilities.openLocalFile, isFalse);
     expect(capabilities.cloudKitSync, isTrue);
     expect(capabilities.terminalSplit, isTrue);

@@ -12,6 +12,7 @@ import '../core/runtime/app_profile_lock.dart';
 import '../core/ids/entity_id.dart';
 import '../features/diagnostics/application/diagnostic_bundle_service.dart';
 import '../features/hosts/application/host_repository.dart';
+import '../features/hosts/application/host_store.dart';
 import '../features/identities/application/identity_repository.dart';
 import '../features/import_export/application/identity_metadata_export_service.dart';
 import '../features/import_export/application/host_metadata_export_service.dart';
@@ -19,12 +20,14 @@ import '../features/import_export/application/open_ssh_config_export_service.dar
 import '../features/import_export/application/known_hosts_import_service.dart';
 import '../features/import_export/application/open_ssh_certificate_import_service.dart';
 import '../features/import_export/application/open_ssh_config_import_service.dart';
+import '../features/import_export/application/macos_ssh_config_startup_service.dart';
 import '../features/import_export/application/automatic_vault_backup_service.dart';
 import '../features/import_export/application/vault_backup_service.dart';
 import '../features/import_export/application/vault_backup_restore_service.dart';
 import '../features/security/application/security_modal_service.dart';
 import '../features/security/presentation/flutter_security_modal_service.dart';
 import '../features/settings/application/app_language_settings.dart';
+import '../features/settings/application/ssh_config_import_settings.dart';
 import '../features/snippets/application/snippet_repository.dart';
 import '../features/snippets/application/snippet_write_service.dart';
 import '../features/snippets/domain/snippet.dart';
@@ -202,6 +205,16 @@ final appProtectBackgroundProvider =
       AppProtectBackgroundController.new,
     );
 
+final sshConfigImportSettingsRepositoryProvider =
+    Provider<SshConfigImportSettingsRepository>((ref) {
+      return const FileSshConfigImportSettingsRepository();
+    });
+
+final appSshConfigAutoImportProvider =
+    AsyncNotifierProvider<AppSshConfigAutoImportController, bool>(
+      AppSshConfigAutoImportController.new,
+    );
+
 class AppLanguageController extends AsyncNotifier<AppLanguage> {
   @override
   Future<AppLanguage> build() async {
@@ -243,6 +256,32 @@ class AppProtectBackgroundController extends AsyncNotifier<bool> {
       await ref
           .read(appPrivacySettingsRepositoryProvider)
           .saveProtectBackground(enabled);
+    } on Object catch (error, stackTrace) {
+      state = previous;
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+}
+
+class AppSshConfigAutoImportController extends AsyncNotifier<bool> {
+  @override
+  Future<bool> build() async {
+    try {
+      return (await ref.watch(sshConfigImportSettingsRepositoryProvider).read())
+          .autoImport;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<void> setAutoImport(bool enabled) async {
+    final previous = state;
+    try {
+      final repository = ref.read(sshConfigImportSettingsRepositoryProvider);
+      await repository.update(
+        (settings) => settings.copyWith(autoImport: enabled),
+      );
+      state = AsyncData(enabled);
     } on Object catch (error, stackTrace) {
       state = previous;
       Error.throwWithStackTrace(error, stackTrace);
@@ -357,6 +396,235 @@ final openSshConfigImportServiceProvider = Provider<OpenSshConfigImportService>(
     );
   },
 );
+
+final macOsOpenSshConfigDocumentReaderProvider =
+    Provider<OpenSshConfigDocumentReader>((ref) {
+      return MacOsOpenSshConfigDocumentReader();
+    });
+
+final macOsSshConfigStartupServiceProvider =
+    Provider<MacOsSshConfigStartupService>((ref) {
+      return MacOsSshConfigStartupService(
+        reader: ref.watch(macOsOpenSshConfigDocumentReaderProvider),
+        importer: ref.watch(openSshConfigImportServiceProvider),
+        hosts: ref.watch(hostRepositoryProvider),
+      );
+    });
+
+final macOsSshConfigStartupProvider =
+    NotifierProvider<
+      MacOsSshConfigStartupController,
+      MacOsSshConfigStartupState
+    >(MacOsSshConfigStartupController.new);
+
+class MacOsSshConfigStartupController
+    extends Notifier<MacOsSshConfigStartupState> {
+  var _scheduled = false;
+  var _running = false;
+  var _rerunRequested = false;
+  int? _lastUnlockGeneration;
+  bool? _lastAutoImport;
+
+  @override
+  MacOsSshConfigStartupState build() {
+    if (!ref.read(platformCapabilitiesProvider).sshConfigImport) {
+      return const MacOsSshConfigStartupState.idle();
+    }
+    ref.listen<AsyncValue<VaultSessionState>>(
+      vaultSessionControllerProvider,
+      (_, _) => requestScan(),
+    );
+    ref.listen<AsyncValue<bool>>(
+      appSshConfigAutoImportProvider,
+      (_, _) => requestScan(),
+    );
+    unawaited(Future<void>.microtask(requestScan));
+    return const MacOsSshConfigStartupState.idle();
+  }
+
+  void requestScan() {
+    if (!ref.mounted) {
+      return;
+    }
+    if (_running) {
+      _rerunRequested = true;
+      return;
+    }
+    if (_scheduled) {
+      return;
+    }
+    _scheduled = true;
+    unawaited(_scanSoon());
+  }
+
+  Future<void> _scanSoon() async {
+    await Future<void>.delayed(Duration.zero);
+    _scheduled = false;
+    await _scan();
+  }
+
+  Future<void> _scan() async {
+    if (!ref.mounted) {
+      return;
+    }
+    final capabilities = ref.read(platformCapabilitiesProvider);
+    final session = ref.read(vaultSessionControllerProvider).value;
+    if (!capabilities.sshConfigImport ||
+        session?.vaultState != VaultState.unlocked ||
+        session?.recoveryKey != null) {
+      state = const MacOsSshConfigStartupState.idle();
+      return;
+    }
+
+    _running = true;
+    try {
+      final settingsRepository = ref.read(
+        sshConfigImportSettingsRepositoryProvider,
+      );
+      final settings = await settingsRepository.read();
+      final unlockGeneration = session!.unlockGeneration;
+      if (_lastUnlockGeneration == unlockGeneration &&
+          _lastAutoImport == settings.autoImport) {
+        return;
+      }
+      final scan = await ref
+          .read(macOsSshConfigStartupServiceProvider)
+          .scan(settings);
+      if (!ref.mounted) {
+        return;
+      }
+      if (scan == null) {
+        await settingsRepository.update(
+          (current) => current.copyWith(
+            initialScanCompleted: true,
+            observedAliases: const {},
+          ),
+        );
+        _rememberScan(unlockGeneration, settings.autoImport);
+        state = const MacOsSshConfigStartupState.idle();
+        return;
+      }
+      if (!scan.hasNewHosts) {
+        await settingsRepository.update(
+          (current) => current.copyWith(
+            initialScanCompleted: true,
+            observedAliases: scan.observedAliases,
+          ),
+        );
+        _rememberScan(unlockGeneration, settings.autoImport);
+        state = const MacOsSshConfigStartupState.idle();
+        return;
+      }
+
+      if (scan.shouldImportAutomatically) {
+        state = MacOsSshConfigStartupState.importing(scan);
+        await _applyScan(scan, settingsRepository);
+        _rememberScan(unlockGeneration, settings.autoImport);
+        state = const MacOsSshConfigStartupState.idle();
+        return;
+      }
+      _rememberScan(unlockGeneration, settings.autoImport);
+      state = MacOsSshConfigStartupState.pending(scan);
+    } on Object catch (error) {
+      if (ref.mounted) {
+        state = MacOsSshConfigStartupState.failed(error);
+      }
+    } finally {
+      _running = false;
+      if (_rerunRequested) {
+        _rerunRequested = false;
+        requestScan();
+      }
+    }
+  }
+
+  Future<OpenSshConfigApplyResult?> importPending({
+    required bool enableAutoImport,
+  }) async {
+    final scan = state.scan;
+    if (!state.hasPendingPrompt || scan == null || _running) {
+      return null;
+    }
+    _running = true;
+    state = MacOsSshConfigStartupState.importing(scan);
+    try {
+      final settingsRepository = ref.read(
+        sshConfigImportSettingsRepositoryProvider,
+      );
+      var settings = await settingsRepository.read();
+      if (enableAutoImport && !settings.autoImport) {
+        settings = await settingsRepository.update(
+          (current) => current.copyWith(autoImport: true),
+        );
+        ref.invalidate(appSshConfigAutoImportProvider);
+        state = MacOsSshConfigStartupState.importing(scan);
+      }
+      final result = await _applyScan(scan, settingsRepository);
+      _lastAutoImport = settings.autoImport;
+      return result;
+    } on Object {
+      _lastUnlockGeneration = null;
+      _lastAutoImport = null;
+      rethrow;
+    } finally {
+      _running = false;
+      if (ref.mounted) {
+        state = const MacOsSshConfigStartupState.idle();
+      }
+      if (_rerunRequested) {
+        _rerunRequested = false;
+        requestScan();
+      }
+    }
+  }
+
+  Future<void> dismissPending() async {
+    final scan = state.scan;
+    if (!state.hasPendingPrompt || scan == null || _running) {
+      return;
+    }
+    final settingsRepository = ref.read(
+      sshConfigImportSettingsRepositoryProvider,
+    );
+    await settingsRepository.update(
+      (settings) => settings.copyWith(
+        initialScanCompleted: true,
+        observedAliases: scan.observedAliases,
+      ),
+    );
+    if (ref.mounted) {
+      state = const MacOsSshConfigStartupState.idle();
+    }
+  }
+
+  void dismissFailure() {
+    if (state.phase == MacOsSshConfigStartupPhase.failed && ref.mounted) {
+      state = const MacOsSshConfigStartupState.idle();
+    }
+  }
+
+  Future<OpenSshConfigApplyResult> _applyScan(
+    MacOsSshConfigStartupScan scan,
+    SshConfigImportSettingsRepository settingsRepository,
+  ) async {
+    final result = await ref
+        .read(macOsSshConfigStartupServiceProvider)
+        .apply(scan, defaultUsername: Platform.environment['USER']);
+    await settingsRepository.update(
+      (settings) => settings.copyWith(
+        initialScanCompleted: true,
+        observedAliases: scan.observedAliases.difference(result.retryAliases),
+      ),
+    );
+    ref.invalidate(hostSummariesProvider);
+    return result;
+  }
+
+  void _rememberScan(int unlockGeneration, bool autoImport) {
+    _lastUnlockGeneration = unlockGeneration;
+    _lastAutoImport = autoImport;
+  }
+}
 
 final openSshCertificateImportServiceProvider =
     Provider<OpenSshCertificateImportService>((ref) {

@@ -317,8 +317,10 @@ bool _hasDuplicate(
 ) {
   return existingHosts.any(
     (host) =>
-        host.hostname.toLowerCase() == entry.hostname.toLowerCase() &&
-        host.port == entry.port,
+        host.displayName.trim().toLowerCase() ==
+            entry.alias.trim().toLowerCase() ||
+        (host.hostname.toLowerCase() == entry.hostname.toLowerCase() &&
+            host.port == entry.port),
   );
 }
 

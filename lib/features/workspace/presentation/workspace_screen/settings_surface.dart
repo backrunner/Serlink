@@ -19,9 +19,11 @@ class _SettingsSurface extends ConsumerWidget {
     final language = ref.watch(appLanguageProvider).value ?? AppLanguage.system;
     final protectBackground = ref.watch(appProtectBackgroundProvider);
     final appPackageInfo = ref.watch(appPackageInfoProvider);
-    final showInPageTitle = !ref
-        .watch(platformCapabilitiesProvider)
-        .prefersMobileWorkspaceShell;
+    final capabilities = ref.watch(platformCapabilitiesProvider);
+    final sshConfigAutoImport = capabilities.sshConfigImport
+        ? ref.watch(appSshConfigAutoImportProvider)
+        : const AsyncData<bool>(false);
+    final showInPageTitle = !capabilities.prefersMobileWorkspaceShell;
     final mobile = !showInPageTitle;
     final t = context.tokens;
 
@@ -105,6 +107,33 @@ class _SettingsSurface extends ConsumerWidget {
                           : null,
                       actionVerticalOffset: mobile ? 3 : 0,
                     ),
+                    if (capabilities.sshConfigImport)
+                      _SettingsActionRow(
+                        icon: Icons.settings_ethernet_outlined,
+                        title: l10n.settingsSshConfigAutoImportTitle,
+                        subtitle: sshConfigAutoImport.when(
+                          data: (enabled) => enabled
+                              ? l10n.settingsSshConfigAutoImportEnabled
+                              : l10n.settingsSshConfigAutoImportDisabled,
+                          loading: () =>
+                              l10n.settingsSshConfigAutoImportDisabled,
+                          error: (_, _) =>
+                              l10n.settingsSshConfigAutoImportDisabled,
+                        ),
+                        action: _SettingsSwitch(
+                          key: const ValueKey(
+                            'settings-ssh-config-auto-import-switch',
+                          ),
+                          semanticsLabel:
+                              l10n.settingsSshConfigAutoImportSemantics,
+                          value: sshConfigAutoImport.value ?? false,
+                          onChanged: sshConfigAutoImport.isLoading
+                              ? null
+                              : (value) => unawaited(
+                                  _setSshConfigAutoImport(context, ref, value),
+                                ),
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 26),

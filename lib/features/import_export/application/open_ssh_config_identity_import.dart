@@ -6,6 +6,7 @@ extension on OpenSshConfigImportService {
     required List<String> certificateFiles,
     required String? configSourcePath,
     required Map<String, _ImportedOpenSshIdentity> importedIdentityFiles,
+    required Map<String, _ImportedOpenSshIdentity> importedIdentityMaterials,
     required String alias,
     required String username,
     required List<OpenSshConfigImportWarning> warnings,
@@ -81,18 +82,31 @@ extension on OpenSshConfigImportService {
         );
       }
       final file = File(resolvedPath);
-      if (!await file.exists()) {
+      final String privateKeyPem;
+      try {
+        if (!await file.exists()) {
+          warnings.add(
+            OpenSshConfigImportWarning(
+              lineNumber: 0,
+              code: 'ssh_config.identity_file_missing',
+              message:
+                  'Host $alias references missing identity file $identityFile.',
+            ),
+          );
+          continue;
+        }
+        privateKeyPem = (await file.readAsString()).trim();
+      } on Object {
         warnings.add(
           OpenSshConfigImportWarning(
             lineNumber: 0,
-            code: 'ssh_config.identity_file_missing',
+            code: 'ssh_config.identity_file_unreadable',
             message:
-                'Host $alias references missing identity file $identityFile.',
+                'Host $alias references identity file $identityFile, but it could not be read.',
           ),
         );
         continue;
       }
-      final privateKeyPem = (await file.readAsString()).trim();
       if (!_looksLikePrivateKey(privateKeyPem)) {
         warnings.add(
           OpenSshConfigImportWarning(
@@ -109,33 +123,44 @@ extension on OpenSshConfigImportService {
       String? certificateText;
       if (certificateFile != null && resolvedCertificatePath != null) {
         final certificate = File(resolvedCertificatePath);
-        if (!await certificate.exists()) {
-          warnings.add(
-            OpenSshConfigImportWarning(
-              lineNumber: 0,
-              code: 'ssh_config.certificate_file_missing',
-              message:
-                  'Host $alias references missing certificate file $certificateFile.',
-            ),
-          );
-        } else {
-          final candidate = _normalizeCertificateText(
-            await certificate.readAsString(),
-          );
-          if (!_looksLikeOpenSshCertificate(candidate)) {
+        try {
+          if (!await certificate.exists()) {
             warnings.add(
               OpenSshConfigImportWarning(
                 lineNumber: 0,
-                code: 'ssh_config.certificate_file_invalid',
+                code: 'ssh_config.certificate_file_missing',
                 message:
-                    'Host $alias references $certificateFile, but it is not an OpenSSH certificate public key line.',
+                    'Host $alias references missing certificate file $certificateFile.',
               ),
             );
           } else {
-            certificateText = candidate;
-            identityKind = IdentityKind.openSshCertificate;
-            hostAuthKind = HostAuthKind.openSshCertificate;
+            final candidate = _normalizeCertificateText(
+              await certificate.readAsString(),
+            );
+            if (!_looksLikeOpenSshCertificate(candidate)) {
+              warnings.add(
+                OpenSshConfigImportWarning(
+                  lineNumber: 0,
+                  code: 'ssh_config.certificate_file_invalid',
+                  message:
+                      'Host $alias references $certificateFile, but it is not an OpenSSH certificate public key line.',
+                ),
+              );
+            } else {
+              certificateText = candidate;
+              identityKind = IdentityKind.openSshCertificate;
+              hostAuthKind = HostAuthKind.openSshCertificate;
+            }
           }
+        } on Object {
+          warnings.add(
+            OpenSshConfigImportWarning(
+              lineNumber: 0,
+              code: 'ssh_config.certificate_file_unreadable',
+              message:
+                  'Host $alias references certificate file $certificateFile, but it could not be read.',
+            ),
+          );
         }
       }
       final cacheKey = _identityImportCacheKey(
@@ -146,6 +171,17 @@ extension on OpenSshConfigImportService {
       if (existingIdentity != null) {
         identityIds.add(existingIdentity.id);
         authKinds.add(existingIdentity.authKind);
+        continue;
+      }
+      final materialKey = _identityMaterialCacheKey(
+        privateKeyPem,
+        certificateText,
+      );
+      final reusableIdentity = importedIdentityMaterials[materialKey];
+      if (reusableIdentity != null) {
+        importedIdentityFiles[cacheKey] = reusableIdentity;
+        identityIds.add(reusableIdentity.id);
+        authKinds.add(reusableIdentity.authKind);
         continue;
       }
 
@@ -170,6 +206,9 @@ extension on OpenSshConfigImportService {
           kind: identityKind,
           usernameHint: username,
           secretRecordId: secretRecordId,
+          certificatePrincipal: certificateText == null
+              ? null
+              : _certificateComment(certificateText),
           createdAt: now,
           updatedAt: now,
         ),
@@ -178,6 +217,7 @@ extension on OpenSshConfigImportService {
         id: identityId,
         authKind: hostAuthKind,
       );
+      importedIdentityMaterials[materialKey] = importedIdentityFiles[cacheKey]!;
       identityIds.add(identityId);
       authKinds.add(hostAuthKind);
       importedCount += 1;
@@ -187,6 +227,58 @@ extension on OpenSshConfigImportService {
       authKinds: Set<HostAuthKind>.unmodifiable(authKinds),
       importedCount: importedCount,
     );
+  }
+
+  Future<Map<String, _ImportedOpenSshIdentity>>
+  _existingOpenSshIdentities() async {
+    final identities = _identities;
+    final records = _records;
+    final vault = _vault;
+    if (identities == null || records == null || vault == null) {
+      return <String, _ImportedOpenSshIdentity>{};
+    }
+    final existing = <String, _ImportedOpenSshIdentity>{};
+    for (final identity in await identities.list()) {
+      final authKind = switch (identity.kind) {
+        IdentityKind.privateKey => HostAuthKind.privateKey,
+        IdentityKind.openSshCertificate => HostAuthKind.openSshCertificate,
+        _ => null,
+      };
+      final secretRecordId = identity.secretRecordId;
+      if (authKind == null || secretRecordId == null) {
+        continue;
+      }
+      final envelope = await records.read(secretRecordId);
+      if (envelope == null) {
+        continue;
+      }
+      try {
+        final secret = IdentitySecretMaterial.fromBytes(
+          await vault.decryptRecord(envelope),
+        );
+        final privateKeyPem = secret.privateKeyPem?.trim();
+        if (privateKeyPem == null || privateKeyPem.isEmpty) {
+          continue;
+        }
+        final certificateText = switch (secret.openSshCertificate?.trim()) {
+          final String value when value.isNotEmpty => _normalizeCertificateText(
+            value,
+          ),
+          _ => null,
+        };
+        if ((authKind == HostAuthKind.openSshCertificate) !=
+            (certificateText != null)) {
+          continue;
+        }
+        existing.putIfAbsent(
+          _identityMaterialCacheKey(privateKeyPem, certificateText),
+          () => _ImportedOpenSshIdentity(id: identity.id, authKind: authKind),
+        );
+      } on Object {
+        continue;
+      }
+    }
+    return existing;
   }
 }
 
@@ -344,6 +436,13 @@ String _identityImportCacheKey(
       : '$identityFilePath\n$certificateFilePath';
 }
 
+String _identityMaterialCacheKey(
+  String privateKeyPem,
+  String? certificateText,
+) {
+  return '${privateKeyPem.length}:$privateKeyPem\n${certificateText ?? ''}';
+}
+
 String _normalizeCertificateText(String value) {
   return value.trim().split(RegExp(r'\s*\n\s*')).join(' ');
 }
@@ -359,4 +458,9 @@ bool _looksLikeOpenSshCertificate(String value) {
   } on FormatException {
     return false;
   }
+}
+
+String? _certificateComment(String value) {
+  final parts = value.split(RegExp(r'\s+'));
+  return parts.length > 2 ? parts.skip(2).join(' ') : null;
 }

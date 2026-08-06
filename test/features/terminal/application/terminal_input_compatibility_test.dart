@@ -213,6 +213,119 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   });
 
+  testWidgets('deferred keyboard activation waits for a completed tap', (
+    tester,
+  ) async {
+    final terminal = Terminal();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(terminal, deferKeyboardActivation: true),
+        ),
+      ),
+    );
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(TerminalView)),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(tester.testTextInput.isVisible, isFalse);
+
+    await gesture.up();
+    await tester.pump();
+
+    expect(tester.testTextInput.isVisible, isTrue);
+    await tester.pump(const Duration(milliseconds: 400));
+  });
+
+  testWidgets('long press selects text without opening the keyboard', (
+    tester,
+  ) async {
+    final terminal = Terminal(maxLines: 200)
+      ..write(
+        [for (var i = 0; i < 80; i += 1) 'copy terminal line $i\r\n'].join(),
+      );
+    final controller = TerminalController();
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 240,
+            child: TerminalView(
+              terminal,
+              controller: controller,
+              scrollController: scrollController,
+              deferKeyboardActivation: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    tester.testTextInput.log.clear();
+
+    final terminalFinder = find.byType(TerminalView);
+    final terminalRect = tester.getRect(terminalFinder);
+    expect(scrollController.position.maxScrollExtent, greaterThan(0));
+    scrollController.jumpTo(scrollController.position.maxScrollExtent / 2);
+    await tester.pump();
+    final scrollOffsetBeforeLongPress = scrollController.offset;
+
+    await tester.longPressAt(terminalRect.centerLeft + const Offset(24, 0));
+    await tester.pump();
+
+    expect(controller.selection, isNotNull);
+    expect(scrollController.offset, closeTo(scrollOffsetBeforeLongPress, 0.01));
+    expect(tester.testTextInput.isVisible, isFalse);
+    expect(
+      tester.testTextInput.log.map((call) => call.method),
+      isNot(contains('TextInput.show')),
+    );
+  });
+
+  testWidgets('short and long swipes do not open the keyboard', (tester) async {
+    final terminal = Terminal(maxLines: 200)
+      ..write([for (var i = 0; i < 80; i += 1) 'line $i\r\n'].join());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 240,
+            child: TerminalView(terminal, deferKeyboardActivation: true),
+          ),
+        ),
+      ),
+    );
+
+    final terminalFinder = find.byType(TerminalView);
+    await tester.timedDrag(
+      terminalFinder,
+      const Offset(0, -32),
+      const Duration(milliseconds: 80),
+    );
+    await tester.pump();
+
+    expect(tester.testTextInput.isVisible, isFalse);
+
+    await tester.timedDrag(
+      terminalFinder,
+      const Offset(0, 140),
+      const Duration(milliseconds: 700),
+    );
+    await tester.pump();
+
+    expect(tester.testTextInput.isVisible, isFalse);
+    expect(
+      tester.testTextInput.log.map((call) => call.method),
+      isNot(contains('TextInput.show')),
+    );
+  });
+
   testWidgets('does not apply safe area padding inside TerminalView', (
     tester,
   ) async {

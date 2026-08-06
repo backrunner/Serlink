@@ -23,7 +23,7 @@ void main() {
         lookupSerlinkLocalizations(AppLanguage.simplifiedChinese),
         error,
       ),
-      '密码短语无法解锁保险库。',
+      '密码无法解锁保险库。',
     );
     expect(
       localizedVaultExceptionMessage(

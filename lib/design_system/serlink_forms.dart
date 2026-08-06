@@ -259,9 +259,9 @@ class SerlinkSelect<T> extends StatelessWidget {
       fieldStyles: FVariantsDelta.delta([
         FVariantOperation.all(
           FTextFieldStyleDelta.delta(
-            constraints: const BoxConstraints(minHeight: 32),
+            constraints: const BoxConstraints(minHeight: 36),
             contentPadding: const EdgeInsetsGeometryDelta.value(
-              EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              EdgeInsets.symmetric(horizontal: 10, vertical: 11),
             ),
             contentTextStyle: textStyle == null
                 ? null

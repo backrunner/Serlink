@@ -328,11 +328,15 @@ Future<void> _exportDiagnosticBundle(
     final bundle = await ref
         .read(diagnosticBundleServiceProvider)
         .buildRedactedBundle();
+    final now = DateTime.now();
+    final dateStamp =
+        '${_fourDigits(now.year)}-${_twoDigits(now.month)}-'
+        '${_twoDigits(now.day)}';
     final exported = await ref
         .read(documentGatewayProvider)
         .exportBytes(
           bytes: Uint8List.fromList(bundle.bytes),
-          suggestedName: 'serlink-diagnostics.zip',
+          suggestedName: 'serlink-diagnostics-$dateStamp.zip',
           acceptedTypeGroups: const [
             XTypeGroup(label: 'Serlink Diagnostics', extensions: ['zip']),
           ],

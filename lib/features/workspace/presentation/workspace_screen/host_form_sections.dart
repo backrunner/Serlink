@@ -160,12 +160,16 @@ class _HostCollapsibleSection extends StatelessWidget {
         children: [
           SerlinkPressable(
             onTap: onToggle,
-            borderRadius: SerlinkRadii.control,
+            borderRadius: expanded
+                ? const BorderRadius.vertical(top: SerlinkRadii.controlR)
+                : SerlinkRadii.control,
+            hoverColor: t.surfaceOverlay,
+            pressedColor: t.textPrimary.withValues(alpha: 0.12),
             child: Padding(
               padding: headerPadding,
               child: Row(
                 children: [
-                  Icon(icon, size: 18, color: t.textSecondary),
+                  _SettingsRowIcon(icon: icon, compact: compact),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -176,12 +180,15 @@ class _HostCollapsibleSection extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Icon(
-                    expanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    size: 20,
-                    color: t.textSecondary,
+                  AnimatedRotation(
+                    turns: expanded ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 160),
+                    curve: Curves.easeOut,
+                    child: Icon(
+                      Icons.arrow_forward_ios,
+                      size: 13,
+                      color: t.textMuted,
+                    ),
                   ),
                 ],
               ),

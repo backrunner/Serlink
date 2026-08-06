@@ -13,10 +13,12 @@ class _SingleTerminalViewport extends StatefulWidget {
     required this.terminal,
     required this.controller,
     required this.focusNode,
+    required this.terminalViewKey,
     required this.settings,
     required this.pane,
     required this.local,
     required this.detectSoftwareKeyboardDelete,
+    required this.deferKeyboardActivation,
     required this.onReconnect,
     required this.onDropTabPane,
     this.onKeyEvent,
@@ -27,10 +29,12 @@ class _SingleTerminalViewport extends StatefulWidget {
   final Terminal terminal;
   final TerminalController controller;
   final FocusNode focusNode;
+  final GlobalKey<TerminalViewState> terminalViewKey;
   final TerminalDisplaySettings settings;
   final TerminalPaneState pane;
   final bool local;
   final bool detectSoftwareKeyboardDelete;
+  final bool deferKeyboardActivation;
   final VoidCallback onReconnect;
   final void Function(WorkspaceTabId sourceTabId, _TerminalPaneDropPlacement)
   onDropTabPane;
@@ -87,6 +91,7 @@ class _SingleTerminalViewportState extends State<_SingleTerminalViewport> {
           children: [
             TerminalView(
               widget.terminal,
+              key: widget.terminalViewKey,
               controller: widget.controller,
               focusNode: widget.focusNode,
               autofocus: true,
@@ -94,6 +99,7 @@ class _SingleTerminalViewportState extends State<_SingleTerminalViewport> {
               theme: widget.settings.terminalTheme,
               textStyle: widget.settings.textStyle,
               deleteDetection: widget.detectSoftwareKeyboardDelete,
+              deferKeyboardActivation: widget.deferKeyboardActivation,
               onKeyEvent: widget.onKeyEvent,
               onInsertText: widget.onInsertText,
             ),
@@ -212,11 +218,13 @@ class _SplitTerminalViewport extends StatelessWidget {
     required this.terminals,
     required this.controllers,
     required this.focusNodes,
+    required this.terminalViewKeys,
     required this.globalSettings,
     required this.layout,
     required this.activePane,
     required this.local,
     required this.detectSoftwareKeyboardDelete,
+    required this.deferKeyboardActivation,
     required this.onActivatePane,
     required this.onClosePane,
     required this.onReconnectPane,
@@ -232,11 +240,13 @@ class _SplitTerminalViewport extends StatelessWidget {
   final List<Terminal> terminals;
   final List<TerminalController> controllers;
   final List<FocusNode> focusNodes;
+  final List<GlobalKey<TerminalViewState>> terminalViewKeys;
   final TerminalDisplaySettings globalSettings;
   final TerminalPaneLayout layout;
   final int activePane;
   final bool local;
   final bool detectSoftwareKeyboardDelete;
+  final bool deferKeyboardActivation;
   final ValueChanged<int> onActivatePane;
   final ValueChanged<int> onClosePane;
   final ValueChanged<int> onReconnectPane;
@@ -311,6 +321,7 @@ class _SplitTerminalViewport extends StatelessWidget {
       terminal: terminals[index],
       controller: controllers[index],
       focusNode: focusNodes[index],
+      terminalViewKey: terminalViewKeys[index],
       settings: pane.displaySettings ?? globalSettings,
       active: activePane == index || focusNodes[index].hasFocus,
       paneIndex: index,
@@ -320,6 +331,7 @@ class _SplitTerminalViewport extends StatelessWidget {
       pane: pane,
       canClose: panes.length > 1,
       detectSoftwareKeyboardDelete: detectSoftwareKeyboardDelete,
+      deferKeyboardActivation: deferKeyboardActivation,
       onKeyEvent: onKeyEvent,
       onInsertText: onInsertText,
       onTap: () => onActivatePane(index),
@@ -516,6 +528,7 @@ class _TerminalViewportPane extends StatefulWidget {
     required this.terminal,
     required this.controller,
     required this.focusNode,
+    required this.terminalViewKey,
     required this.settings,
     required this.active,
     required this.paneIndex,
@@ -525,6 +538,7 @@ class _TerminalViewportPane extends StatefulWidget {
     required this.pane,
     required this.canClose,
     required this.detectSoftwareKeyboardDelete,
+    required this.deferKeyboardActivation,
     this.onKeyEvent,
     this.onInsertText,
     required this.onTap,
@@ -537,6 +551,7 @@ class _TerminalViewportPane extends StatefulWidget {
   final Terminal terminal;
   final TerminalController controller;
   final FocusNode focusNode;
+  final GlobalKey<TerminalViewState> terminalViewKey;
   final TerminalDisplaySettings settings;
   final bool active;
   final int paneIndex;
@@ -546,6 +561,7 @@ class _TerminalViewportPane extends StatefulWidget {
   final TerminalPaneState pane;
   final bool canClose;
   final bool detectSoftwareKeyboardDelete;
+  final bool deferKeyboardActivation;
   final FocusOnKeyEventCallback? onKeyEvent;
   final TerminalInsertTextInterceptor? onInsertText;
   final VoidCallback onTap;
@@ -671,6 +687,7 @@ class _TerminalViewportPaneState extends State<_TerminalViewportPane> {
                     children: [
                       TerminalView(
                         widget.terminal,
+                        key: widget.terminalViewKey,
                         controller: widget.controller,
                         focusNode: widget.focusNode,
                         autofocus: widget.active,
@@ -678,6 +695,7 @@ class _TerminalViewportPaneState extends State<_TerminalViewportPane> {
                         theme: widget.settings.terminalTheme,
                         textStyle: widget.settings.textStyle,
                         deleteDetection: widget.detectSoftwareKeyboardDelete,
+                        deferKeyboardActivation: widget.deferKeyboardActivation,
                         onKeyEvent: widget.onKeyEvent,
                         onInsertText: widget.onInsertText,
                       ),

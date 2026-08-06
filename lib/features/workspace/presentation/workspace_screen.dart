@@ -75,6 +75,7 @@ part 'workspace_screen/vault_access.dart';
 part 'workspace_screen/vault_recovery_dialogs.dart';
 part 'workspace_screen/host_rows.dart';
 part 'workspace_screen/snippets.dart';
+part 'workspace_screen/bash_highlight.dart';
 part 'workspace_screen/sessions_tabs.dart';
 part 'workspace_screen/terminal_pane.dart';
 part 'workspace_screen/terminal_toolbar.dart';

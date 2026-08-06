@@ -1876,11 +1876,23 @@ abstract class AppLocalizations {
   /// **'Name'**
   String get snippetNameLabel;
 
+  /// No description provided for @snippetNamePlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Restart nginx'**
+  String get snippetNamePlaceholder;
+
   /// No description provided for @snippetCommandLabel.
   ///
   /// In en, this message translates to:
   /// **'Command'**
   String get snippetCommandLabel;
+
+  /// No description provided for @snippetCommandPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. sudo systemctl restart nginx'**
+  String get snippetCommandPlaceholder;
 
   /// No description provided for @snippetTagsLabel.
   ///
@@ -1893,6 +1905,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm before run'**
   String get snippetConfirmBeforeRun;
+
+  /// No description provided for @snippetExpandEditorTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand editor'**
+  String get snippetExpandEditorTooltip;
 
   /// No description provided for @snippetAddTagsHint.
   ///
@@ -1929,6 +1947,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Snippet could not be saved.'**
   String get snippetSaveFailed;
+
+  /// No description provided for @snippetErrorNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name for the snippet.'**
+  String get snippetErrorNameRequired;
+
+  /// No description provided for @snippetErrorCommandRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the command to save.'**
+  String get snippetErrorCommandRequired;
+
+  /// No description provided for @snippetErrorNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This snippet no longer exists.'**
+  String get snippetErrorNotFound;
 
   /// No description provided for @snippetSentSnack.
   ///

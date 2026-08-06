@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:forui/forui.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/app/serlink_app.dart';
@@ -1775,6 +1776,7 @@ void main() {
     tester.view.physicalSize = const Size(390, 844);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewInsets);
     final sshService = _FakeSshSessionService();
 
     await _pumpLockedVaultApp(
@@ -1811,6 +1813,35 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byType(TerminalView));
     await tester.pump(const Duration(milliseconds: 200));
+
+    final keyboardButton = find.byKey(const ValueKey('terminal-key-keyboard'));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: keyboardButton,
+        matching: find.byIcon(Icons.keyboard_hide_outlined),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(keyboardButton);
+    await tester.pump();
+    expect(tester.testTextInput.isVisible, isFalse);
+
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: keyboardButton,
+        matching: find.byIcon(Icons.keyboard_outlined),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(keyboardButton);
+    await tester.pump();
+    expect(tester.testTextInput.isVisible, isTrue);
     sshService.shell.writes.clear();
 
     for (var i = 0; i < 2; i += 1) {
@@ -1834,8 +1865,12 @@ void main() {
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(390, 844);
+      tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
+      tester.view.viewPadding = const FakeViewPadding(top: 59, bottom: 34);
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetPadding);
+      addTearDown(tester.view.resetViewPadding);
 
       await _pumpLockedVaultApp(
         tester,
@@ -1916,6 +1951,52 @@ void main() {
       expect(splitRight, findsOneWidget);
       expect(splitDown, findsOneWidget);
 
+      final splitRightTarget = find.descendant(
+        of: splitRight,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is DecoratedBox && widget.decoration is ShapeDecoration,
+        ),
+      );
+      final splitDownTarget = find.descendant(
+        of: splitDown,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is DecoratedBox && widget.decoration is ShapeDecoration,
+        ),
+      );
+      expect(splitRightTarget, findsOneWidget);
+      expect(splitDownTarget, findsOneWidget);
+      final menuItemGap =
+          tester.getRect(splitDownTarget).top -
+          tester.getRect(splitRightTarget).bottom;
+      expect(menuItemGap, greaterThanOrEqualTo(4));
+
+      await tester.tap(find.byKey(const ValueKey('terminal-settings-button')));
+      await tester.pumpAndSettle();
+
+      final settingsSheet = find.byKey(
+        const ValueKey('terminal-settings-sheet'),
+      );
+      final settingsScrollFrame = find.byKey(
+        const ValueKey('terminal-settings-scroll-frame'),
+      );
+      expect(find.byType(FDialog), findsNothing);
+      expect(settingsSheet, findsOneWidget);
+      expect(settingsScrollFrame, findsOneWidget);
+      final settingsSheetRect = tester.getRect(settingsSheet);
+      expect(settingsSheetRect.top, greaterThanOrEqualTo(59));
+      expect(settingsSheetRect.bottom, lessThanOrEqualTo(844));
+      expect(
+        tester.getSize(settingsScrollFrame).height,
+        lessThanOrEqualTo(500),
+      );
+
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      await tester.tap(overflowButton);
+      await tester.pumpAndSettle();
+
       await tester.tap(splitRight);
       await tester.pumpAndSettle();
       expect(_byTooltipLabel('Close pane'), findsNothing);
@@ -1967,6 +2048,16 @@ void main() {
       find.byKey(const ValueKey('terminal-accessory-bar')),
     );
     expect(bar.height, lessThanOrEqualTo(72));
+    final barDecoration =
+        tester
+                .widget<DecoratedBox>(
+                  find.byKey(const ValueKey('terminal-accessory-bar')),
+                )
+                .decoration
+            as BoxDecoration;
+    final barBorder = barDecoration.border! as Border;
+    expect(barBorder.top.width, barBorder.bottom.width);
+    expect(barBorder.top.color, barBorder.bottom.color);
 
     final ctrl = _rectForKey(tester, 'terminal-key-ctrl');
     final tab = _rectForKey(tester, 'terminal-key-tab');

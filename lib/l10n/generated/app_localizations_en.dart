@@ -1047,13 +1047,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get snippetNameLabel => 'Name';
 
   @override
+  String get snippetNamePlaceholder => 'e.g. Restart nginx';
+
+  @override
   String get snippetCommandLabel => 'Command';
+
+  @override
+  String get snippetCommandPlaceholder => 'e.g. sudo systemctl restart nginx';
 
   @override
   String get snippetTagsLabel => 'Tags';
 
   @override
   String get snippetConfirmBeforeRun => 'Confirm before run';
+
+  @override
+  String get snippetExpandEditorTooltip => 'Expand editor';
 
   @override
   String get snippetAddTagsHint => 'Add tags';
@@ -1072,6 +1081,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get snippetSaveFailed => 'Snippet could not be saved.';
+
+  @override
+  String get snippetErrorNameRequired => 'Enter a name for the snippet.';
+
+  @override
+  String get snippetErrorCommandRequired => 'Enter the command to save.';
+
+  @override
+  String get snippetErrorNotFound => 'This snippet no longer exists.';
 
   @override
   String get snippetSentSnack => 'Snippet sent to terminal.';

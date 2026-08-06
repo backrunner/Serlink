@@ -112,9 +112,24 @@ Future<void> _showTerminalSettingsDialog(
   required WorkspaceTabId tabId,
   required HostId? hostId,
   required int paneIndex,
+  required bool preferSheet,
 }) {
+  if (preferSheet) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _TerminalSettingsDialog(
+        tabId: tabId,
+        hostId: hostId,
+        paneIndex: paneIndex,
+        presentation: _TerminalSettingsPresentation.sheet,
+      ),
+    );
+  }
   return showSerlinkDialog<void>(
     context: context,
+    useSafeArea: true,
     builder: (context) => _TerminalSettingsDialog(
       tabId: tabId,
       hostId: hostId,
@@ -123,16 +138,20 @@ Future<void> _showTerminalSettingsDialog(
   );
 }
 
+enum _TerminalSettingsPresentation { dialog, sheet }
+
 class _TerminalSettingsDialog extends ConsumerStatefulWidget {
   const _TerminalSettingsDialog({
     required this.tabId,
     required this.hostId,
     required this.paneIndex,
+    this.presentation = _TerminalSettingsPresentation.dialog,
   });
 
   final WorkspaceTabId tabId;
   final HostId? hostId;
   final int paneIndex;
+  final _TerminalSettingsPresentation presentation;
 
   @override
   ConsumerState<_TerminalSettingsDialog> createState() =>
@@ -176,6 +195,9 @@ class _TerminalSettingsDialogState
     final workspaceController = ref.read(
       workspaceTabControllerProvider.notifier,
     );
+    final isIOS = ref.watch(
+      platformCapabilitiesProvider.select((capabilities) => capabilities.isIOS),
+    );
 
     void updateSettings(TerminalDisplaySettings next) {
       if (editingHostProfile) {
@@ -189,42 +211,45 @@ class _TerminalSettingsDialogState
       }
     }
 
-    final viewportHeight = math.min(
-      640.0,
-      MediaQuery.sizeOf(context).height * 0.72,
-    );
+    final sheet = widget.presentation == _TerminalSettingsPresentation.sheet;
+    final mediaQuery = MediaQuery.of(context);
+    final availableHeight =
+        mediaQuery.size.height - mediaQuery.viewPadding.vertical;
+    final viewportHeight = sheet
+        ? math.min(460.0, math.max(300.0, availableHeight * 0.62))
+        : isIOS
+        ? math.min(500.0, math.max(320.0, availableHeight * 0.58))
+        : math.min(640.0, mediaQuery.size.height * 0.72);
 
-    return SerlinkDialog(
-      maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
-      title: Text(l10n.terminalSettingsTitle),
-      content: SizedBox(
-        width: 560,
-        height: viewportHeight,
-        child: ClipRect(
-          child: Scrollbar(
-            controller: _scrollController,
-            child: ScrollConfiguration(
-              behavior: ScrollConfiguration.of(
-                context,
-              ).copyWith(scrollbars: false),
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                physics: const ClampingScrollPhysics(),
-                child: _TerminalSettingsContent(
-                  settings: settings,
-                  fontCatalog: fontCatalog,
-                  catalogLoading: fontCatalogAsync.isLoading,
-                  editingHostProfile: editingHostProfile,
-                  onChanged: updateSettings,
-                ),
+    final scrollFrame = SizedBox(
+      key: const ValueKey('terminal-settings-scroll-frame'),
+      width: sheet ? double.infinity : 560,
+      height: viewportHeight,
+      child: ClipRect(
+        child: Scrollbar(
+          controller: _scrollController,
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              physics: const ClampingScrollPhysics(),
+              child: _TerminalSettingsContent(
+                settings: settings,
+                fontCatalog: fontCatalog,
+                catalogLoading: fontCatalogAsync.isLoading,
+                editingHostProfile: editingHostProfile,
+                onChanged: updateSettings,
               ),
             ),
           ),
         ),
       ),
-      actions: [
-        if (widget.hostId != null && hostSettings == null)
-          SerlinkTextButton(
+    );
+
+    final hostAction = widget.hostId != null && hostSettings == null
+        ? SerlinkTextButton(
             onPressed: () =>
                 workspaceController.saveTerminalDisplaySettingsForHost(
                   widget.tabId,
@@ -232,16 +257,97 @@ class _TerminalSettingsDialogState
                   paneIndex: widget.paneIndex,
                 ),
             child: Text(l10n.terminalSaveForHostAction),
-          ),
-        if (widget.hostId != null && hostSettings != null)
-          SerlinkTextButton(
+          )
+        : widget.hostId != null && hostSettings != null
+        ? SerlinkTextButton(
             onPressed: () =>
                 workspaceController.resetTerminalDisplaySettingsForHost(
                   widget.tabId,
                   paneIndex: widget.paneIndex,
                 ),
             child: Text(l10n.terminalUseGlobalAction),
+          )
+        : null;
+
+    if (sheet) {
+      final t = context.tokens;
+      return Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Container(
+            key: const ValueKey('terminal-settings-sheet'),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: t.surfaceRaised,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              border: Border.all(color: t.borderSubtle),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: t.textMuted.withValues(alpha: 0.45),
+                        borderRadius: SerlinkRadii.pill,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.terminalSettingsTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: t.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                        ?hostAction,
+                        if (hostAction != null) const SizedBox(width: 6),
+                        SerlinkFilledButton(
+                          size: SerlinkButtonSize.sm,
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: Text(l10n.doneAction),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, color: t.borderSubtle),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
+                    child: scrollFrame,
+                  ),
+                ],
+              ),
+            ),
           ),
+        ),
+      );
+    }
+
+    return SerlinkDialog(
+      key: const ValueKey('terminal-settings-dialog'),
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
+      title: Text(l10n.terminalSettingsTitle),
+      content: scrollFrame,
+      actions: [
+        ?hostAction,
         SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l10n.doneAction),

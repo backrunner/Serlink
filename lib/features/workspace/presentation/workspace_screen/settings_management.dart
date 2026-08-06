@@ -85,18 +85,15 @@ class _SettingsActionRow extends StatelessWidget {
                 : Text(subtitle!, style: subtitleStyle));
         if (!compact) {
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: SerlinkListTile(
               minLeadingWidth: 28,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 4,
+                horizontal: 2,
                 vertical: 2,
               ),
               subtitleGap: 1,
-              leading: SizedBox.square(
-                dimension: 32,
-                child: Icon(icon, size: 19, color: t.textSecondary),
-              ),
+              leading: _SettingsRowIcon(icon: icon),
               title: Text(
                 title,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -153,10 +150,10 @@ class _SettingsActionRow extends StatelessWidget {
                 padding: EdgeInsets.only(
                   top: effectiveSubtitle == null || actionSlot != null ? 0 : 2,
                 ),
-                child: SizedBox.square(
+                child: _SettingsRowIcon(
                   key: leadingKey,
-                  dimension: 30,
-                  child: Icon(icon, size: 18, color: t.textSecondary),
+                  icon: icon,
+                  compact: true,
                 ),
               ),
               const SizedBox(width: 10),
@@ -189,6 +186,24 @@ class _SettingsActionRow extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Borderless leading glyph for settings-style rows: a plain icon centered in
+/// a fixed square slot so titles across rows stay aligned.
+class _SettingsRowIcon extends StatelessWidget {
+  const _SettingsRowIcon({super.key, required this.icon, this.compact = false});
+
+  final IconData icon;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return SizedBox.square(
+      dimension: compact ? 28 : 30,
+      child: Icon(icon, size: compact ? 17 : 18, color: t.textSecondary),
     );
   }
 }
@@ -249,7 +264,6 @@ class _SettingsTextButton extends StatelessWidget {
     super.key,
     required this.onPressed,
     required this.child,
-    this.compactSize = SerlinkButtonSize.xs,
   }) : icon = null,
        label = null;
 
@@ -258,103 +272,90 @@ class _SettingsTextButton extends StatelessWidget {
     required this.onPressed,
     required this.icon,
     required this.label,
-  }) : child = null,
-       compactSize = SerlinkButtonSize.xs;
+  }) : child = null;
 
   final VoidCallback? onPressed;
   final Widget? child;
   final Widget? icon;
   final Widget? label;
-  final SerlinkButtonSize compactSize;
 
   @override
   Widget build(BuildContext context) {
-    if (_settingsUseCompactControls(context) ||
-        _SettingsCompactControlsScope.of(context)) {
-      return _SettingsMobileButton(
-        onPressed: onPressed,
-        icon: icon,
-        child: child ?? label!,
-      );
-    }
-    final size = _settingsUseCompactControls(context)
-        ? compactSize
-        : SerlinkButtonSize.lg;
-    if (icon case final icon?) {
-      return SerlinkTextButton.icon(
-        onPressed: onPressed,
-        icon: icon,
-        label: label!,
-        size: size,
-      );
-    }
-    return SerlinkTextButton(onPressed: onPressed, size: size, child: child!);
+    final compact =
+        _settingsUseCompactControls(context) ||
+        _SettingsCompactControlsScope.of(context);
+    return _SettingsControlButton(
+      onPressed: onPressed,
+      icon: icon,
+      compact: compact,
+      child: child ?? label!,
+    );
   }
 }
 
-class _SettingsMobileButton extends StatelessWidget {
-  const _SettingsMobileButton({
+/// Borderless action button shared by every settings row, so hover feedback,
+/// icon sizing, and the 13px label stay identical on desktop and mobile.
+class _SettingsControlButton extends StatelessWidget {
+  const _SettingsControlButton({
     required this.onPressed,
     required this.child,
+    required this.compact,
     this.icon,
   });
 
   final VoidCallback? onPressed;
   final Widget child;
   final Widget? icon;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final enabled = onPressed != null;
-    return Opacity(
-      opacity: enabled ? 1 : 0.45,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: t.surfaceSunken,
-          borderRadius: SerlinkRadii.control,
-          border: Border.all(color: t.borderSubtle),
-        ),
-        child: SerlinkPressable(
-          onTap: onPressed,
-          borderRadius: SerlinkRadii.control,
-          hoverColor: t.accentPrimary.withValues(alpha: 0.08),
-          pressedColor: t.accentPrimary.withValues(alpha: 0.16),
-          child: SizedBox(
-            width: _settingsMobileActionWidth,
-            height: _settingsMobileActionHeight,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Center(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (icon != null) ...[
-                        IconTheme.merge(
-                          data: IconThemeData(size: 14, color: t.textPrimary),
-                          child: icon!,
-                        ),
-                        const SizedBox(width: 4),
-                      ],
-                      DefaultTextStyle.merge(
-                        style: TextStyle(
-                          color: t.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          height: 1,
-                        ),
-                        maxLines: 1,
-                        child: child,
-                      ),
-                    ],
-                  ),
+    final label = Padding(
+      padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10),
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                IconTheme.merge(
+                  data: IconThemeData(size: 14, color: t.textPrimary),
+                  child: icon!,
                 ),
+                const SizedBox(width: 5),
+              ],
+              DefaultTextStyle.merge(
+                style: TextStyle(
+                  color: t.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  height: 1,
+                ),
+                maxLines: 1,
+                child: child,
               ),
-            ),
+            ],
           ),
         ),
+      ),
+    );
+    return Opacity(
+      opacity: enabled ? 1 : 0.45,
+      child: SerlinkPressable(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(7),
+        hoverColor: t.surfaceOverlay,
+        pressedColor: t.textPrimary.withValues(alpha: 0.12),
+        child: compact
+            ? SizedBox(
+                width: _settingsMobileActionWidth,
+                height: _settingsMobileActionHeight,
+                child: label,
+              )
+            : SizedBox(height: 36, child: label),
       ),
     );
   }

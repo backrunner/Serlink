@@ -18,12 +18,14 @@ Future<T?> showSerlinkDialog<T>({
   required WidgetBuilder builder,
   bool barrierDismissible = true,
   bool useRootNavigator = false,
+  bool useSafeArea = false,
   RouteSettings? routeSettings,
 }) {
   return showFDialog<T>(
     context: context,
     barrierDismissible: barrierDismissible,
     useRootNavigator: useRootNavigator,
+    useSafeArea: useSafeArea,
     routeSettings: routeSettings,
     builder: (context, _, _) => builder(context),
   );
@@ -1033,6 +1035,10 @@ class _SerlinkInlineTextInputState extends State<_SerlinkInlineTextInput> {
         widget.hint != null &&
         widget.hint!.isNotEmpty &&
         _controller.text.isEmpty;
+    final multiline =
+        widget.expands ||
+        (widget.minLines ?? 1) > 1 ||
+        (widget.maxLines ?? 1) > 1;
     final inputFormatters = [
       ...?widget.inputFormatters,
       if (widget.maxLength case final maxLength?)
@@ -1074,7 +1080,9 @@ class _SerlinkInlineTextInputState extends State<_SerlinkInlineTextInput> {
       child: IgnorePointer(
         ignoring: !widget.enabled,
         child: Stack(
-          alignment: AlignmentDirectional.centerStart,
+          alignment: multiline
+              ? AlignmentDirectional.topStart
+              : AlignmentDirectional.centerStart,
           children: [
             field,
             if (showHint)

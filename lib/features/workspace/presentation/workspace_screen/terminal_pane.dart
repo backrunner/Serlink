@@ -30,11 +30,13 @@ class _TerminalPane extends ConsumerStatefulWidget {
   ConsumerState<_TerminalPane> createState() => _TerminalPaneState();
 }
 
-class _TerminalPaneState extends ConsumerState<_TerminalPane> {
+class _TerminalPaneState extends ConsumerState<_TerminalPane>
+    with WidgetsBindingObserver {
   late final WorkspaceRuntimeRegistry _runtimeRegistry;
   late final TextEditingController _searchTextController;
   late List<TerminalController> _terminalControllers;
   late List<FocusNode> _terminalFocusNodes;
+  late List<GlobalKey<TerminalViewState>> _terminalViewKeys;
   late List<TerminalBufferSearchController> _searchControllers;
   late List<Terminal> _cachedTerminals;
   BoxConstraints? _terminalViewportConstraints;
@@ -47,10 +49,12 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
   bool _ctrlLatched = false;
   bool _altLatched = false;
   bool _shiftLatched = false;
+  bool _softwareKeyboardVisible = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _runtimeRegistry = ref.read(workspaceRuntimeRegistryProvider);
     _searchTextController = TextEditingController();
     _buildPaneControllers();
@@ -58,6 +62,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final terminal in _terminals()) {
       terminal.removeListener(_refreshSearchAfterTerminalChange);
     }
@@ -69,6 +74,23 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     }
     _searchTextController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _softwareKeyboardVisible = View.of(context).viewInsets.bottom > 0;
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (!mounted) {
+      return;
+    }
+    final keyboardVisible = View.of(context).viewInsets.bottom > 0;
+    if (keyboardVisible != _softwareKeyboardVisible) {
+      setState(() => _softwareKeyboardVisible = keyboardVisible);
+    }
   }
 
   @override
@@ -133,12 +155,14 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
                         terminals: _terminals(),
                         controllers: _terminalControllers,
                         focusNodes: _terminalFocusNodes,
+                        terminalViewKeys: _terminalViewKeys,
                         globalSettings: globalSettings,
                         layout: widget.layout,
                         activePane: widget.activePane,
                         local: widget.local,
                         detectSoftwareKeyboardDelete: capabilities
                             .terminalSoftwareKeyboardDeleteDetection,
+                        deferKeyboardActivation: capabilities.prefersTouchUi,
                         onActivatePane: _setActivePane,
                         onClosePane: _closePane,
                         onReconnectPane: _reconnectPane,
@@ -153,12 +177,14 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
                         terminal: _terminals().first,
                         controller: _terminalControllers.first,
                         focusNode: _terminalFocusNodes.first,
+                        terminalViewKey: _terminalViewKeys.first,
                         settings: settings,
                         pane: activePaneState,
                         local:
                             activePaneState.endpoint?.isLocal ?? widget.local,
                         detectSoftwareKeyboardDelete: capabilities
                             .terminalSoftwareKeyboardDeleteDetection,
+                        deferKeyboardActivation: capabilities.prefersTouchUi,
                         onReconnect: () => _reconnectPane(0),
                         onDropTabPane: (sourceTabId, placement) =>
                             _dropTabPane(sourceTabId, 0, placement),
@@ -183,6 +209,8 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
             onPaste: _pasteClipboard,
             onToggleSearch: _toggleSearch,
             onOpenSnippets: () => _showTerminalSnippetPicker(context, ref),
+            keyboardVisible: _softwareKeyboardVisible,
+            onToggleKeyboard: _toggleSoftwareKeyboard,
           ),
       ],
     );
@@ -223,6 +251,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         tabId: widget.tabId,
         hostId: activeHostId,
         paneIndex: widget.activePane,
+        preferSheet: ref.read(platformCapabilitiesProvider).isIOS,
       ),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -399,6 +428,21 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
     ref
         .read(workspaceTabControllerProvider.notifier)
         .setActiveTerminalPane(widget.tabId, normalizedIndex);
+  }
+
+  void _toggleSoftwareKeyboard() {
+    if (_softwareKeyboardVisible) {
+      FocusManager.instance.primaryFocus?.unfocus(
+        disposition: UnfocusDisposition.scope,
+      );
+      return;
+    }
+
+    final activeIndex = widget.activePane.clamp(
+      0,
+      _terminalViewKeys.length - 1,
+    );
+    _terminalViewKeys[activeIndex].currentState?.requestKeyboard();
   }
 
   void _toggleSearch() {
@@ -815,6 +859,10 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane> {
         FocusNode(debugLabel: 'terminal-pane-$i')
           ..addListener(() => _handlePaneFocusChanged(i)),
     ];
+    _terminalViewKeys = [
+      for (var i = 0; i < widget.panes.length; i += 1)
+        GlobalKey<TerminalViewState>(debugLabel: 'terminal-view-$i'),
+    ];
     _searchControllers = [
       for (var i = 0; i < widget.panes.length; i += 1)
         TerminalBufferSearchController(
@@ -1011,6 +1059,8 @@ class _TerminalAccessoryBar extends StatefulWidget {
     required this.onPaste,
     required this.onToggleSearch,
     required this.onOpenSnippets,
+    required this.keyboardVisible,
+    required this.onToggleKeyboard,
   });
 
   final bool connected;
@@ -1024,6 +1074,8 @@ class _TerminalAccessoryBar extends StatefulWidget {
   final VoidCallback onPaste;
   final VoidCallback onToggleSearch;
   final VoidCallback onOpenSnippets;
+  final bool keyboardVisible;
+  final VoidCallback onToggleKeyboard;
 
   @override
   State<_TerminalAccessoryBar> createState() => _TerminalAccessoryBarState();
@@ -1036,12 +1088,12 @@ class _TerminalAccessoryBarState extends State<_TerminalAccessoryBar> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return DecoratedBox(
+      key: const ValueKey('terminal-accessory-bar'),
       decoration: BoxDecoration(
         color: t.surfaceRaised,
-        border: Border(top: BorderSide(color: t.borderSubtle)),
+        border: Border.symmetric(horizontal: BorderSide(color: t.borderSubtle)),
       ),
       child: SizedBox(
-        key: const ValueKey('terminal-accessory-bar'),
         height: 70,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -1148,10 +1200,11 @@ class _TerminalAccessoryBarState extends State<_TerminalAccessoryBar> {
                     const SizedBox(width: _terminalAccessoryGap),
                     _TerminalAccessoryIconKey(
                       keyValue: 'terminal-key-keyboard',
-                      icon: Icons.keyboard_hide_outlined,
+                      icon: widget.keyboardVisible
+                          ? Icons.keyboard_hide_outlined
+                          : Icons.keyboard_outlined,
                       enabled: true,
-                      onPressed: () => FocusManager.instance.primaryFocus
-                          ?.unfocus(disposition: UnfocusDisposition.scope),
+                      onPressed: widget.onToggleKeyboard,
                     ),
                   ],
                 ),

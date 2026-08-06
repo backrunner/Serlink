@@ -182,7 +182,7 @@ class _DialogList extends StatelessWidget {
   }
 }
 
-class _DialogScrollFrame extends StatelessWidget {
+class _DialogScrollFrame extends StatefulWidget {
   const _DialogScrollFrame({
     super.key,
     required this.width,
@@ -190,6 +190,7 @@ class _DialogScrollFrame extends StatelessWidget {
     required this.controller,
     required this.child,
     this.padding = EdgeInsets.zero,
+    this.fillHeight = true,
   });
 
   final double width;
@@ -198,23 +199,136 @@ class _DialogScrollFrame extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
 
+  /// When false the frame shrinks to the content height and only starts
+  /// scrolling once the content exceeds [height].
+  final bool fillHeight;
+
+  @override
+  State<_DialogScrollFrame> createState() => _DialogScrollFrameState();
+}
+
+class _DialogScrollFrameState extends State<_DialogScrollFrame> {
+  bool _showTopFade = false;
+  bool _showBottomFade = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_updateFades);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateFades());
+  }
+
+  @override
+  void didUpdateWidget(covariant _DialogScrollFrame oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_updateFades);
+      widget.controller.addListener(_updateFades);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateFades());
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_updateFades);
+    super.dispose();
+  }
+
+  void _updateFades() {
+    if (!mounted || !widget.controller.hasClients) {
+      return;
+    }
+    final position = widget.controller.position;
+    final showTop = position.pixels > 0.5;
+    final showBottom = position.pixels < position.maxScrollExtent - 0.5;
+    if (showTop != _showTopFade || showBottom != _showBottomFade) {
+      setState(() {
+        _showTopFade = showTop;
+        _showBottomFade = showBottom;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      height: height,
-      child: ClipRect(
-        child: Scrollbar(
-          controller: controller,
-          child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(
-              context,
-            ).copyWith(scrollbars: false),
-            child: SingleChildScrollView(
-              controller: controller,
-              physics: const ClampingScrollPhysics(),
-              padding: padding,
-              child: child,
+    final t = context.tokens;
+    final scrollView = ClipRect(
+      child: Scrollbar(
+        controller: widget.controller,
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+          child: SingleChildScrollView(
+            controller: widget.controller,
+            physics: const ClampingScrollPhysics(),
+            padding: widget.padding,
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+    final framed = widget.fillHeight
+        ? SizedBox(
+            width: widget.width,
+            height: widget.height,
+            child: scrollView,
+          )
+        : SizedBox(
+            width: widget.width,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: widget.height),
+              child: scrollView,
+            ),
+          );
+    return Stack(
+      children: [
+        framed,
+        _ScrollFadeEdge(
+          visible: _showTopFade,
+          color: t.surfaceRaised,
+          alignment: Alignment.topCenter,
+        ),
+        _ScrollFadeEdge(
+          visible: _showBottomFade,
+          color: t.surfaceRaised,
+          alignment: Alignment.bottomCenter,
+        ),
+      ],
+    );
+  }
+}
+
+/// Soft gradient that fades scrolled-off content into the dialog background.
+class _ScrollFadeEdge extends StatelessWidget {
+  const _ScrollFadeEdge({
+    required this.visible,
+    required this.color,
+    required this.alignment,
+  });
+
+  final bool visible;
+  final Color color;
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = alignment == Alignment.topCenter;
+    return Positioned(
+      top: top ? 0 : null,
+      bottom: top ? null : 0,
+      left: 0,
+      right: 8,
+      child: IgnorePointer(
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: const Duration(milliseconds: 150),
+          child: Container(
+            height: 20,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+                end: top ? Alignment.bottomCenter : Alignment.topCenter,
+                colors: [color, color.withValues(alpha: 0)],
+              ),
             ),
           ),
         ),

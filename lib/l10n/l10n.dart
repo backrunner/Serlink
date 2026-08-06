@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../core/failure/app_failure.dart';
+import '../features/snippets/application/snippet_write_service.dart';
 import '../features/vault/application/vault_service.dart';
 import 'generated/app_localizations.dart';
 import '../features/settings/application/app_language_settings.dart';
@@ -45,6 +46,21 @@ String localizedVaultExceptionMessage(AppLocalizations l10n, Object error) {
     'vault.local_unlock_failed' => l10n.vaultLocalUnlockFailedError,
     'vault.local_unlock_unavailable' => l10n.vaultLocalUnlockUnavailableError,
     'vault.empty_passphrase' => l10n.vaultEmptyPassphraseError,
+    _ => error.message,
+  };
+}
+
+String localizedSnippetWriteExceptionMessage(
+  AppLocalizations l10n,
+  Object error,
+) {
+  if (error is! SnippetWriteException) {
+    return error.toString();
+  }
+  return switch (error.code) {
+    'snippet.name_required' => l10n.snippetErrorNameRequired,
+    'snippet.command_required' => l10n.snippetErrorCommandRequired,
+    'snippet.not_found' => l10n.snippetErrorNotFound,
     _ => error.message,
   };
 }

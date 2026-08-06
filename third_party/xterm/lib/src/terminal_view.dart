@@ -37,6 +37,7 @@ class TerminalView extends StatefulWidget {
     this.backgroundOpacity = 1,
     this.focusNode,
     this.autofocus = false,
+    this.deferKeyboardActivation = false,
     this.onTapUp,
     this.onSecondaryTapDown,
     this.onSecondaryTapUp,
@@ -87,6 +88,13 @@ class TerminalView extends StatefulWidget {
   /// True if this widget will be selected as the initial focus when no other
   /// node in its scope is currently focused.
   final bool autofocus;
+
+  /// Waits for a primary tap to complete before activating keyboard input.
+  ///
+  /// This prevents a pointer down that later becomes a long press, selection,
+  /// or scroll gesture from opening the software keyboard. [false] by default
+  /// to preserve the immediate focus behavior used by desktop terminals.
+  final bool deferKeyboardActivation;
 
   /// Callback for when the user taps on the terminal.
   final void Function(TapUpDetails, CellOffset)? onTapUp;
@@ -306,7 +314,7 @@ class TerminalViewState extends State<TerminalView> {
     child = TerminalGestureHandler(
       terminalView: this,
       terminalController: _controller,
-      onTapUp: _onTapUp,
+      onSingleTapUp: _onSingleTapUp,
       onTapDown: _onTapDown,
       onSecondaryTapDown:
           widget.onSecondaryTapDown != null ? _onSecondaryTapDown : null,
@@ -352,7 +360,20 @@ class TerminalViewState extends State<TerminalView> {
     widget.onTapUp?.call(details, offset);
   }
 
-  void _onTapDown(_) {
+  void _onSingleTapUp(TapUpDetails details) {
+    if (widget.deferKeyboardActivation) {
+      _activateInput();
+    }
+    _onTapUp(details);
+  }
+
+  void _onTapDown(TapDownDetails details) {
+    if (!widget.deferKeyboardActivation) {
+      _activateInput();
+    }
+  }
+
+  void _activateInput() {
     if (_controller.selection != null) {
       _controller.clearSelection();
     } else {

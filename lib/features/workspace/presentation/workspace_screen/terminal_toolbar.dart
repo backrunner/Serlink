@@ -152,10 +152,14 @@ class _TerminalToolbarOverflowMenu extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6),
         child: FPopoverMenu(
+          divider: FItemDivider.none,
+          style: const FPopoverMenuStyleDelta.delta(
+            itemGroupStyle: FItemGroupStyleDelta.delta(spacing: 2),
+          ),
           menuBuilder: (context, controller, _) => [
-            FItemGroup(
-              children: [
-                for (final action in actions)
+            for (final action in actions)
+              FItemGroup(
+                children: [
                   FItem(
                     key: action.key,
                     title: Text(action.label),
@@ -169,8 +173,8 @@ class _TerminalToolbarOverflowMenu extends StatelessWidget {
                             action.onPressed!();
                           },
                   ),
-              ],
-            ),
+                ],
+              ),
           ],
           builder: (context, controller, _) => Center(
             child: SerlinkIconButton(

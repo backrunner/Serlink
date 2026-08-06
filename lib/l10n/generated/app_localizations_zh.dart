@@ -968,13 +968,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get snippetNameLabel => '名称';
 
   @override
+  String get snippetNamePlaceholder => '例如：重启 nginx';
+
+  @override
   String get snippetCommandLabel => '命令';
+
+  @override
+  String get snippetCommandPlaceholder => '例如：sudo systemctl restart nginx';
 
   @override
   String get snippetTagsLabel => '标签';
 
   @override
   String get snippetConfirmBeforeRun => '运行前确认';
+
+  @override
+  String get snippetExpandEditorTooltip => '放大编辑器';
 
   @override
   String get snippetAddTagsHint => '添加标签';
@@ -993,6 +1002,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get snippetSaveFailed => '无法保存片段。';
+
+  @override
+  String get snippetErrorNameRequired => '请输入片段名称。';
+
+  @override
+  String get snippetErrorCommandRequired => '请输入要保存的命令。';
+
+  @override
+  String get snippetErrorNotFound => '该片段已不存在。';
 
   @override
   String get snippetSentSnack => '片段已发送到终端。';
@@ -1604,13 +1622,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultCreateSubtitle => '用强密码短语加密主机和密钥。';
 
   @override
-  String get vaultUnlockSubtitle => '输入密码短语以解密工作区。';
+  String get vaultUnlockSubtitle => '输入密码以解密工作区。';
 
   @override
   String get vaultNewPassphraseLabel => '新密码短语';
 
   @override
-  String get vaultPassphraseLabel => '密码短语';
+  String get vaultPassphraseLabel => '密码';
 
   @override
   String get vaultCreateAction => '创建保险库';
@@ -1625,10 +1643,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultUseRecoveryCodeAction => '使用恢复码';
 
   @override
-  String get vaultPassphraseRequired => '请输入保险库密码短语以继续。';
+  String get vaultPassphraseRequired => '请输入保险库密码以继续。';
 
   @override
-  String get vaultInvalidPassphraseError => '密码短语无法解锁保险库。';
+  String get vaultInvalidPassphraseError => '密码无法解锁保险库。';
 
   @override
   String get vaultInvalidRecoveryKeyError => '恢复密钥无法解锁保险库。';
@@ -1640,7 +1658,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultLocalUnlockNotEnabledError => '此设备尚未启用 Face ID 解锁。';
 
   @override
-  String get vaultLocalUnlockFailedError => 'Face ID 解锁失败，请使用保险库密码短语。';
+  String get vaultLocalUnlockFailedError => 'Face ID 解锁失败，请使用保险库密码。';
 
   @override
   String get vaultLocalUnlockUnavailableError => '此设备不可用 Face ID。';

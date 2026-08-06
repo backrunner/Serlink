@@ -137,7 +137,14 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
   }
 
   void onSingleTapUp(TapUpDetails details) {
-    _tapUp(widget.onSingleTapUp, details, TerminalMouseButton.left);
+    // A completed primary tap must always reach the view so deferred keyboard
+    // activation is independent of terminal mouse reporting mode.
+    _tapUp(
+      widget.onSingleTapUp,
+      details,
+      TerminalMouseButton.left,
+      forceCallback: true,
+    );
   }
 
   void onSecondaryTapDown(TapDownDetails details) {

@@ -90,10 +90,8 @@ class _SettingsSurface extends ConsumerWidget {
                           items: _languageItems(l10n),
                           hintText: l10n.selectAction,
                           searchHint: l10n.searchAction,
-                          size: mobile
-                              ? FTextFieldSizeVariant.sm
-                              : FTextFieldSizeVariant.lg,
-                          compact: mobile,
+                          size: FTextFieldSizeVariant.sm,
+                          compact: true,
                           menuMinWidth: mobile ? 196 : null,
                           onChanged: (value) =>
                               unawaited(_setAppLanguage(context, ref, value)),
@@ -163,7 +161,7 @@ class _SettingsSurface extends ConsumerWidget {
                           key: const ValueKey('settings-vault-recovery-button'),
                           onPressed: () =>
                               _showVaultRecoveryCodeDialog(context),
-                          icon: const Icon(Icons.key_outlined, size: 18),
+                          icon: const Icon(Icons.key_outlined),
                           label: Text(l10n.settingsRecoverResetAction),
                         ),
                         VaultState.uninitialized || null => null,
@@ -198,7 +196,7 @@ class _SettingsSurface extends ConsumerWidget {
                                               .notifier,
                                         )
                                         .unlockWithLocalKey(),
-                              icon: const Icon(Icons.fingerprint, size: 18),
+                              icon: const Icon(Icons.fingerprint),
                               label: Text(l10n.settingsUnlockWithDeviceAction),
                             )
                           : null,
@@ -312,7 +310,7 @@ class _SettingsSurface extends ConsumerWidget {
                         key: const ValueKey('settings-about-github-button'),
                         onPressed: () =>
                             unawaited(_openSerlinkRepository(context)),
-                        icon: const Icon(Icons.open_in_new, size: 18),
+                        icon: const Icon(Icons.open_in_new),
                         label: Text(l10n.settingsOpenAction),
                       ),
                     ),
@@ -377,7 +375,7 @@ class _SettingsInlineValue extends StatelessWidget {
         textAlign: TextAlign.right,
         style: Theme.of(
           context,
-        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+        ).textTheme.bodySmall?.copyWith(fontSize: 13, color: t.textSecondary),
       ),
     );
   }

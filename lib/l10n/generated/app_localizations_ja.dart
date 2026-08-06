@@ -979,13 +979,22 @@ class AppLocalizationsJa extends AppLocalizations {
   String get snippetNameLabel => '名前';
 
   @override
+  String get snippetNamePlaceholder => '例：nginx の再起動';
+
+  @override
   String get snippetCommandLabel => 'コマンド';
+
+  @override
+  String get snippetCommandPlaceholder => '例：sudo systemctl restart nginx';
 
   @override
   String get snippetTagsLabel => 'タグ';
 
   @override
   String get snippetConfirmBeforeRun => '実行前に確認';
+
+  @override
+  String get snippetExpandEditorTooltip => 'エディターを拡大';
 
   @override
   String get snippetAddTagsHint => 'タグを追加';
@@ -1004,6 +1013,15 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get snippetSaveFailed => 'スニペットを保存できませんでした。';
+
+  @override
+  String get snippetErrorNameRequired => 'スニペット名を入力してください。';
+
+  @override
+  String get snippetErrorCommandRequired => '保存するコマンドを入力してください。';
+
+  @override
+  String get snippetErrorNotFound => 'このスニペットはもう存在しません。';
 
   @override
   String get snippetSentSnack => 'スニペットを端末に送信しました。';

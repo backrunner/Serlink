@@ -133,7 +133,6 @@ class _SyncSettingsSection extends ConsumerWidget {
                   devices,
                   allowReset: mobile,
                 ),
-                compactSize: SerlinkButtonSize.xs,
                 child: Text(
                   mobile
                       ? l10n.syncViewAction
@@ -160,7 +159,6 @@ class _SyncSettingsSection extends ConsumerWidget {
                               'settings-sync-devices-reset-button',
                             ),
                             onPressed: () => _rotateSyncDevice(context, ref),
-                            compactSize: SerlinkButtonSize.xs,
                             child: Text(l10n.syncResetAction),
                           ),
                         ],
@@ -361,7 +359,6 @@ class _SyncConflictRow extends ConsumerWidget {
     final reviewButton = _SettingsTextButton(
       key: const ValueKey('settings-sync-conflicts-view-button'),
       onPressed: () => _reviewSyncConflicts(context, ref, conflicts),
-      compactSize: SerlinkButtonSize.xs,
       child: Text(mobile ? l10n.syncViewAction : l10n.syncReviewAction),
     );
     return _SettingsActionRow(
@@ -384,7 +381,6 @@ class _SyncConflictRow extends ConsumerWidget {
                     SyncConflictResolution.useRemote,
                     conflicts,
                   ),
-                  compactSize: SerlinkButtonSize.xs,
                   child: Text(l10n.syncUseRemoteAction),
                 ),
                 _SettingsTextButton(
@@ -394,7 +390,6 @@ class _SyncConflictRow extends ConsumerWidget {
                     SyncConflictResolution.keepLocal,
                     conflicts,
                   ),
-                  compactSize: SerlinkButtonSize.xs,
                   child: Text(l10n.syncKeepLocalAction),
                 ),
               ],

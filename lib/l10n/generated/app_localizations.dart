@@ -1558,6 +1558,12 @@ abstract class AppLocalizations {
   /// **'Write to SSH config'**
   String get hostWriteBackToSshConfigTitle;
 
+  /// No description provided for @hostWriteBackToSshConfigNoPermissionTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot write to ~/.ssh — check the folder permissions'**
+  String get hostWriteBackToSshConfigNoPermissionTooltip;
+
   /// No description provided for @hostStartupCommandsLabel.
   ///
   /// In en, this message translates to:
@@ -2782,11 +2788,17 @@ abstract class AppLocalizations {
   /// **'Appearance'**
   String get terminalAppearanceSection;
 
-  /// No description provided for @terminalThemeLabel.
+  /// No description provided for @terminalDarkThemeLabel.
   ///
   /// In en, this message translates to:
-  /// **'Theme'**
-  String get terminalThemeLabel;
+  /// **'Theme in dark mode'**
+  String get terminalDarkThemeLabel;
+
+  /// No description provided for @terminalLightThemeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme in light mode'**
+  String get terminalLightThemeLabel;
 
   /// No description provided for @terminalLayoutSection.
   ///

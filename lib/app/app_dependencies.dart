@@ -446,7 +446,7 @@ final macOsSshConfigWritebackProvider =
       MacOsSshConfigWritebackState
     >(MacOsSshConfigWritebackController.new);
 
-enum MacOsSshConfigWritebackPhase { idle, reconciling, failed }
+enum MacOsSshConfigWritebackPhase { idle, reconciling, failed, blocked }
 
 class MacOsSshConfigWritebackState {
   const MacOsSshConfigWritebackState._({required this.phase, this.error});
@@ -459,6 +459,9 @@ class MacOsSshConfigWritebackState {
 
   const MacOsSshConfigWritebackState.failed(Object error)
     : this._(phase: MacOsSshConfigWritebackPhase.failed, error: error);
+
+  const MacOsSshConfigWritebackState.blocked()
+    : this._(phase: MacOsSshConfigWritebackPhase.blocked);
 
   final MacOsSshConfigWritebackPhase phase;
   final Object? error;
@@ -519,6 +522,17 @@ class MacOsSshConfigWritebackController
     if (session?.vaultState != VaultState.unlocked ||
         session?.recoveryKey != null) {
       state = const MacOsSshConfigWritebackState.idle();
+      return;
+    }
+
+    final service = ref.read(macOsSshConfigWritebackServiceProvider);
+    if (!await service.hasConfigAccess()) {
+      if (ref.mounted) {
+        state = const MacOsSshConfigWritebackState.blocked();
+      }
+      return;
+    }
+    if (!ref.mounted) {
       return;
     }
 

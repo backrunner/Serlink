@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/core/ids/entity_id.dart';
+import 'package:serlink/core/logging/offline_diagnostic_logger.dart';
 import 'package:serlink/features/hosts/application/host_repository.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/import_export/application/macos_ssh_config_writeback_service.dart';
@@ -386,6 +387,167 @@ Host prod
       });
     },
   );
+
+  test(
+    'controller blocks reconcile when the config directory is not writable',
+    () async {
+      final store = _AccessControlledFileStore()..accessible = false;
+      final logger = _RecordingDiagnosticLogger();
+      final service = MacOsSshConfigWritebackService(
+        hosts: _MutableHostRepository([
+          _host(
+            id: 'prod-id',
+            displayName: 'prod',
+            hostname: 'prod.example.test',
+            username: 'ops',
+            port: 22,
+            writeBack: true,
+          ),
+        ]),
+        registry: _MemoryRegistry(),
+        files: store,
+        configPath: '/virtual/config',
+        logger: logger,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          platformCapabilitiesProvider.overrideWithValue(
+            const PlatformCapabilities(
+              operatingSystem: 'macos',
+              targetPlatform: TargetPlatform.macOS,
+            ),
+          ),
+          vaultSessionControllerProvider.overrideWith(
+            _UnlockedVaultSessionController.new,
+          ),
+          vaultRecordChangesProvider.overrideWith(
+            (_) => const Stream<VaultRecordChange>.empty(),
+          ),
+          macOsSshConfigWritebackServiceProvider.overrideWithValue(service),
+        ],
+      );
+      addTearDown(container.dispose);
+      final subscription = container.listen(
+        macOsSshConfigWritebackProvider,
+        (_, _) {},
+        fireImmediately: true,
+      );
+      addTearDown(subscription.close);
+      await _waitFor(() async {
+        return container.read(vaultSessionControllerProvider).hasValue;
+      });
+
+      await _waitFor(() async {
+        return container.read(macOsSshConfigWritebackProvider).phase ==
+            MacOsSshConfigWritebackPhase.blocked;
+      });
+
+      expect(store.writeAttempts, 0);
+      expect(logger.events, contains('ssh_config.writeback_no_permission'));
+    },
+  );
+
+  test('controller recovers when config access is restored', () async {
+    final store = _AccessControlledFileStore()..accessible = false;
+    final service = MacOsSshConfigWritebackService(
+      hosts: _MutableHostRepository([
+        _host(
+          id: 'prod-id',
+          displayName: 'prod',
+          hostname: 'prod.example.test',
+          username: 'ops',
+          port: 22,
+          writeBack: true,
+        ),
+      ]),
+      registry: _MemoryRegistry(),
+      files: store,
+      configPath: '/virtual/config',
+    );
+    final container = ProviderContainer(
+      overrides: [
+        platformCapabilitiesProvider.overrideWithValue(
+          const PlatformCapabilities(
+            operatingSystem: 'macos',
+            targetPlatform: TargetPlatform.macOS,
+          ),
+        ),
+        vaultSessionControllerProvider.overrideWith(
+          _UnlockedVaultSessionController.new,
+        ),
+        vaultRecordChangesProvider.overrideWith(
+          (_) => const Stream<VaultRecordChange>.empty(),
+        ),
+        macOsSshConfigWritebackServiceProvider.overrideWithValue(service),
+      ],
+    );
+    addTearDown(container.dispose);
+    final subscription = container.listen(
+      macOsSshConfigWritebackProvider,
+      (_, _) {},
+      fireImmediately: true,
+    );
+    addTearDown(subscription.close);
+    await _waitFor(() async {
+      return container.read(vaultSessionControllerProvider).hasValue;
+    });
+    await _waitFor(() async {
+      return container.read(macOsSshConfigWritebackProvider).phase ==
+          MacOsSshConfigWritebackPhase.blocked;
+    });
+
+    store.accessible = true;
+    container
+        .read(macOsSshConfigWritebackProvider.notifier)
+        .requestReconcile();
+
+    await _waitFor(() async => store.writeAttempts > 0);
+    await _waitFor(() async {
+      return container.read(macOsSshConfigWritebackProvider).phase ==
+          MacOsSshConfigWritebackPhase.idle;
+    });
+    expect(store.contents, contains('HostName prod.example.test'));
+  });
+
+  test(
+    'LocalSshConfigFileStore.canAccess reports read-only directories',
+    () async {
+      if (Platform.isWindows) {
+        return;
+      }
+      final directory = await Directory.systemTemp.createTemp(
+        'serlink-writeback-access-',
+      );
+      var writable = true;
+      Future<void> restorePermissions() async {
+        if (!writable && await directory.exists()) {
+          await Process.run('chmod', ['700', directory.path]);
+          writable = true;
+        }
+      }
+
+      addTearDown(() async {
+        await restorePermissions();
+        if (await directory.exists()) {
+          await directory.delete(recursive: true);
+        }
+      });
+      const store = LocalSshConfigFileStore();
+      final configPath = '${directory.path}/config';
+
+      expect(await store.canAccess(configPath), isTrue);
+
+      await File(configPath).writeAsString('Host prod\n');
+      expect(await store.canAccess(configPath), isTrue);
+
+      await Process.run('chmod', ['500', directory.path]);
+      writable = false;
+      expect(await store.canAccess(configPath), isFalse);
+
+      await restorePermissions();
+      expect(await store.canAccess(configPath), isTrue);
+    },
+  );
 }
 
 class _Fixture {
@@ -486,12 +648,50 @@ class _FailingFileStore implements SshConfigFileStore {
   Future<String?> read(String path) async => contents;
 
   @override
+  Future<bool> canAccess(String path) async => true;
+
+  @override
   Future<void> writeAtomically(
     String path,
     String contents, {
     required String? expectedContents,
   }) async {
     throw FileSystemException('write failed', path);
+  }
+}
+
+class _AccessControlledFileStore implements SshConfigFileStore {
+  bool accessible = true;
+  String contents = '';
+  int writeAttempts = 0;
+
+  @override
+  Future<String?> read(String path) async => contents;
+
+  @override
+  Future<bool> canAccess(String path) async => accessible;
+
+  @override
+  Future<void> writeAtomically(
+    String path,
+    String contents, {
+    required String? expectedContents,
+  }) async {
+    writeAttempts += 1;
+    this.contents = contents;
+  }
+}
+
+class _RecordingDiagnosticLogger implements DiagnosticLogger {
+  final List<String> events = [];
+
+  @override
+  Future<void> record(
+    String event, {
+    DiagnosticLogLevel level = DiagnosticLogLevel.info,
+    Map<String, Object?> details = const {},
+  }) async {
+    events.add(event);
   }
 }
 

@@ -876,6 +876,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostWriteBackToSshConfigTitle => 'Write to SSH config';
 
   @override
+  String get hostWriteBackToSshConfigNoPermissionTooltip =>
+      'Cannot write to ~/.ssh — check the folder permissions';
+
+  @override
   String get hostStartupCommandsLabel => 'Startup commands';
 
   @override
@@ -1566,7 +1570,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get terminalAppearanceSection => 'Appearance';
 
   @override
-  String get terminalThemeLabel => 'Theme';
+  String get terminalDarkThemeLabel => 'Theme in dark mode';
+
+  @override
+  String get terminalLightThemeLabel => 'Theme in light mode';
 
   @override
   String get terminalLayoutSection => 'Layout';

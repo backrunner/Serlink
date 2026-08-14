@@ -814,6 +814,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostWriteBackToSshConfigTitle => 'SSH config に書き込む';
 
   @override
+  String get hostWriteBackToSshConfigNoPermissionTooltip =>
+      '~/.ssh に書き込めません。フォルダーの権限を確認してください';
+
+  @override
   String get hostStartupCommandsLabel => '起動コマンド';
 
   @override
@@ -1468,7 +1472,10 @@ class AppLocalizationsJa extends AppLocalizations {
   String get terminalAppearanceSection => '外観';
 
   @override
-  String get terminalThemeLabel => 'テーマ';
+  String get terminalDarkThemeLabel => 'ダークモードのテーマ';
+
+  @override
+  String get terminalLightThemeLabel => 'ライトモードのテーマ';
 
   @override
   String get terminalLayoutSection => 'レイアウト';

@@ -172,6 +172,7 @@ void main() {
   test('terminal display settings round trip through json', () {
     const settings = TerminalDisplaySettings(
       themeId: SerlinkTerminalThemeId.serlinkLight,
+      lightThemeId: SerlinkTerminalThemeId.serlinkDark,
       fontFamily: 'JetBrains Mono',
       fontSize: 16,
       lineHeight: 1.25,
@@ -181,14 +182,31 @@ void main() {
     final restored = TerminalDisplaySettings.fromJson(settings.toJson());
 
     expect(restored.themeId, settings.themeId);
+    expect(restored.lightThemeId, settings.lightThemeId);
     expect(restored.fontFamily, settings.fontFamily);
     expect(restored.fontSize, settings.fontSize);
     expect(restored.lineHeight, settings.lineHeight);
     expect(restored.scrollbackLines, settings.scrollbackLines);
   });
 
+  test('terminal theme resolves per app brightness', () {
+    const settings = TerminalDisplaySettings(
+      themeId: SerlinkTerminalThemeId.highContrast,
+      lightThemeId: SerlinkTerminalThemeId.serlinkLight,
+    );
+
+    expect(
+      settings.terminalThemeFor(Brightness.dark).background,
+      const Color(0xFF000000),
+    );
+    expect(
+      settings.terminalThemeFor(Brightness.light).background,
+      const Color(0xFFFFFFFF),
+    );
+  });
+
   test(
-    'terminal display settings read legacy json with default scrollback',
+    'terminal display settings read legacy json with default light theme',
     () {
       final restored = TerminalDisplaySettings.fromJson({
         'themeId': 'serlinkLight',
@@ -198,6 +216,7 @@ void main() {
       });
 
       expect(restored.themeId, SerlinkTerminalThemeId.serlinkLight);
+      expect(restored.lightThemeId, SerlinkTerminalThemeId.serlinkLight);
       expect(restored.scrollbackLines, 10000);
     },
   );

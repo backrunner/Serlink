@@ -13,13 +13,18 @@ enum SerlinkTerminalThemeId { serlinkDark, serlinkLight, highContrast }
 class TerminalDisplaySettings {
   const TerminalDisplaySettings({
     this.themeId = SerlinkTerminalThemeId.serlinkDark,
+    this.lightThemeId = SerlinkTerminalThemeId.serlinkLight,
     this.fontFamily = defaultTerminalFontFamily,
     this.fontSize = 13,
     this.lineHeight = 1.2,
     this.scrollbackLines = 10000,
   });
 
+  /// Theme used while the app is in dark mode.
   final SerlinkTerminalThemeId themeId;
+
+  /// Theme used while the app is in light mode.
+  final SerlinkTerminalThemeId lightThemeId;
   final String fontFamily;
   final double fontSize;
   final double lineHeight;
@@ -28,6 +33,7 @@ class TerminalDisplaySettings {
   Map<String, Object?> toJson() {
     return {
       'themeId': themeId.name,
+      'lightThemeId': lightThemeId.name,
       'fontFamily': fontFamily,
       'fontSize': fontSize,
       'lineHeight': lineHeight,
@@ -38,6 +44,7 @@ class TerminalDisplaySettings {
   factory TerminalDisplaySettings.fromJson(Map<String, Object?> json) {
     return TerminalDisplaySettings(
       themeId: _themeIdFromJson(json['themeId']),
+      lightThemeId: _lightThemeIdFromJson(json['lightThemeId']),
       fontFamily: switch (json['fontFamily']) {
         final String value when value.trim().isNotEmpty => value,
         _ => defaultTerminalFontFamily,
@@ -50,6 +57,7 @@ class TerminalDisplaySettings {
 
   TerminalDisplaySettings copyWith({
     SerlinkTerminalThemeId? themeId,
+    SerlinkTerminalThemeId? lightThemeId,
     String? fontFamily,
     double? fontSize,
     double? lineHeight,
@@ -57,6 +65,7 @@ class TerminalDisplaySettings {
   }) {
     return TerminalDisplaySettings(
       themeId: themeId ?? this.themeId,
+      lightThemeId: lightThemeId ?? this.lightThemeId,
       fontFamily: fontFamily ?? this.fontFamily,
       fontSize: fontSize ?? this.fontSize,
       lineHeight: lineHeight ?? this.lineHeight,
@@ -68,6 +77,7 @@ class TerminalDisplaySettings {
   bool operator ==(Object other) {
     return other is TerminalDisplaySettings &&
         other.themeId == themeId &&
+        other.lightThemeId == lightThemeId &&
         other.fontFamily == fontFamily &&
         other.fontSize == fontSize &&
         other.lineHeight == lineHeight &&
@@ -75,8 +85,14 @@ class TerminalDisplaySettings {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(themeId, fontFamily, fontSize, lineHeight, scrollbackLines);
+  int get hashCode => Object.hash(
+    themeId,
+    lightThemeId,
+    fontFamily,
+    fontSize,
+    lineHeight,
+    scrollbackLines,
+  );
 
   TerminalStyle get textStyle {
     return _SerlinkTerminalStyle(
@@ -88,8 +104,11 @@ class TerminalDisplaySettings {
     );
   }
 
-  TerminalTheme get terminalTheme {
-    return switch (themeId) {
+  TerminalTheme get terminalTheme => terminalThemeFor(Brightness.dark);
+
+  TerminalTheme terminalThemeFor(Brightness brightness) {
+    final effectiveId = brightness == Brightness.light ? lightThemeId : themeId;
+    return switch (effectiveId) {
       SerlinkTerminalThemeId.serlinkDark => _serlinkDarkTheme,
       SerlinkTerminalThemeId.serlinkLight => _serlinkLightTheme,
       SerlinkTerminalThemeId.highContrast => _highContrastTheme,
@@ -152,6 +171,18 @@ SerlinkTerminalThemeId _themeIdFromJson(Object? value) {
     }
   }
   return SerlinkTerminalThemeId.serlinkDark;
+}
+
+SerlinkTerminalThemeId _lightThemeIdFromJson(Object? value) {
+  if (value is! String) {
+    return SerlinkTerminalThemeId.serlinkLight;
+  }
+  for (final themeId in SerlinkTerminalThemeId.values) {
+    if (themeId.name == value) {
+      return themeId;
+    }
+  }
+  return SerlinkTerminalThemeId.serlinkLight;
 }
 
 double _doubleFromJson(Object? value, {required double fallback}) {

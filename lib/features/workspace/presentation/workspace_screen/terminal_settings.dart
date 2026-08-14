@@ -384,7 +384,7 @@ class _TerminalSettingsContent extends StatelessWidget {
             title: l10n.terminalAppearanceSection,
             children: [
               SerlinkLabeledField(
-                label: l10n.terminalThemeLabel,
+                label: l10n.terminalDarkThemeLabel,
                 child: SerlinkSelect<SerlinkTerminalThemeId>(
                   key: ValueKey(
                     'terminal-theme-${settings.themeId.name}-$editingHostProfile',
@@ -400,6 +400,27 @@ class _TerminalSettingsContent extends StatelessWidget {
                   ],
                   onChanged: (themeId) {
                     onChanged(settings.copyWith(themeId: themeId));
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              SerlinkLabeledField(
+                label: l10n.terminalLightThemeLabel,
+                child: SerlinkSelect<SerlinkTerminalThemeId>(
+                  key: ValueKey(
+                    'terminal-light-theme-${settings.lightThemeId.name}-$editingHostProfile',
+                  ),
+                  value: settings.lightThemeId,
+                  items: [
+                    for (final themeId in SerlinkTerminalThemeId.values)
+                      SerlinkSelectItem(
+                        value: themeId,
+                        label: themeId.label,
+                        icon: Icons.palette_outlined,
+                      ),
+                  ],
+                  onChanged: (themeId) {
+                    onChanged(settings.copyWith(lightThemeId: themeId));
                   },
                 ),
               ),
@@ -671,7 +692,7 @@ class _TerminalFontPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = settings.terminalTheme;
+    final theme = settings.terminalThemeFor(Theme.of(context).brightness);
     final t = context.tokens;
     return ClipRRect(
       borderRadius: SerlinkRadii.control,

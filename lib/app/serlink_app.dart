@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 
 import '../features/settings/application/app_language_settings.dart';
+import '../features/workspace/application/workspace_tab_controller.dart';
 import '../l10n/l10n.dart';
 import '../platform/app_window.dart';
 import 'app_dependencies.dart';
@@ -25,16 +28,20 @@ class SerlinkApp extends ConsumerWidget {
     ref.watch(autoSyncControllerProvider);
     ref.watch(macOsSshConfigWritebackProvider);
 
-    final foruiTheme = capabilities.prefersTouchUi
-        ? SerlinkTheme.foruiDarkTouch()
-        : SerlinkTheme.foruiDark();
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    final foruiTheme = switch ((capabilities.prefersTouchUi, brightness)) {
+      (true, Brightness.light) => SerlinkTheme.foruiLightTouch(),
+      (true, Brightness.dark) => SerlinkTheme.foruiDarkTouch(),
+      (false, Brightness.light) => SerlinkTheme.foruiLight(),
+      (false, Brightness.dark) => SerlinkTheme.foruiDark(),
+    };
 
     return MaterialApp.router(
       title: 'Serlink',
       debugShowCheckedModeBanner: false,
       theme: SerlinkTheme.light(),
       darkTheme: SerlinkTheme.dark(),
-      themeMode: ThemeMode.dark,
+      themeMode: ThemeMode.system,
       locale: language.locale,
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -90,6 +97,7 @@ class _LifecycleOverlay extends ConsumerStatefulWidget {
 class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
     with WidgetsBindingObserver {
   var _hidden = false;
+  var _wasBackgrounded = false;
 
   @override
   void initState() {
@@ -111,6 +119,10 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
       AppLifecycleState.hidden => true,
       AppLifecycleState.resumed || AppLifecycleState.detached => false,
     };
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _wasBackgrounded = true;
+    }
     if (!hidden) {
       ref.read(cloudKitVaultDiscoveryControllerProvider.notifier).refreshNow();
       ref
@@ -120,6 +132,17 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
           .read(autoSyncControllerProvider.notifier)
           .requestSync(delay: Duration.zero);
       ref.read(macOsSshConfigWritebackProvider.notifier).requestReconcile();
+      if (state == AppLifecycleState.resumed && _wasBackgrounded) {
+        _wasBackgrounded = false;
+        // SSH sockets may have died silently while the app was suspended
+        // (NAT expiry, network switch); dartssh2's keepalive never times
+        // out, so probe the sessions instead of waiting for shell.done.
+        unawaited(
+          ref
+              .read(workspaceTabControllerProvider.notifier)
+              .probeRemoteSessions(),
+        );
+      }
     }
     if (_hidden != hidden && mounted) {
       setState(() {
@@ -130,19 +153,31 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
 
   @override
   Widget build(BuildContext context) {
-    if (!_hidden || !widget.protectBackground) {
+    if (!widget.protectBackground) {
       return widget.child;
     }
     final colors = Theme.of(context).colorScheme;
-    return ColoredBox(
-      color: colors.surface,
-      child: Center(
-        child: Icon(
-          Icons.lock_outline,
-          size: 42,
-          color: colors.onSurfaceVariant,
-        ),
-      ),
+    // Keep the child mounted and cover it instead of replacing it, so a
+    // brief inactive blip (app switcher, Control Center) does not dispose
+    // terminal state, scroll positions, or in-progress text fields.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.child,
+        if (_hidden)
+          Positioned.fill(
+            child: ColoredBox(
+              color: colors.surface,
+              child: Center(
+                child: Icon(
+                  Icons.lock_outline,
+                  size: 42,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

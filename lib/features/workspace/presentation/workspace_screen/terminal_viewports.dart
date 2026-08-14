@@ -96,7 +96,9 @@ class _SingleTerminalViewportState extends State<_SingleTerminalViewport> {
               focusNode: widget.focusNode,
               autofocus: true,
               padding: _terminalViewportPadding,
-              theme: widget.settings.terminalTheme,
+              theme: widget.settings.terminalThemeFor(
+                Theme.of(context).brightness,
+              ),
               textStyle: widget.settings.textStyle,
               deleteDetection: widget.detectSoftwareKeyboardDelete,
               deferKeyboardActivation: widget.deferKeyboardActivation,
@@ -692,7 +694,9 @@ class _TerminalViewportPaneState extends State<_TerminalViewportPane> {
                         focusNode: widget.focusNode,
                         autofocus: widget.active,
                         padding: _terminalViewportPadding,
-                        theme: widget.settings.terminalTheme,
+                        theme: widget.settings.terminalThemeFor(
+                          Theme.of(context).brightness,
+                        ),
                         textStyle: widget.settings.textStyle,
                         deleteDetection: widget.detectSoftwareKeyboardDelete,
                         deferKeyboardActivation: widget.deferKeyboardActivation,

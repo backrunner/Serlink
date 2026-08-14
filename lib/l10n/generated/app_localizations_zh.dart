@@ -804,6 +804,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostWriteBackToSshConfigTitle => '写入 SSH config';
 
   @override
+  String get hostWriteBackToSshConfigNoPermissionTooltip =>
+      '无法写入 ~/.ssh，请检查文件夹权限';
+
+  @override
   String get hostStartupCommandsLabel => '启动命令';
 
   @override
@@ -1451,7 +1455,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get terminalAppearanceSection => '外观';
 
   @override
-  String get terminalThemeLabel => '主题';
+  String get terminalDarkThemeLabel => '深色模式主题';
+
+  @override
+  String get terminalLightThemeLabel => '浅色模式主题';
 
   @override
   String get terminalLayoutSection => '布局';

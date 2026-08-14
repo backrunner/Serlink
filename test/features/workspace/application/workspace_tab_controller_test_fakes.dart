@@ -35,6 +35,8 @@ class _FakeSshSessionService implements SshSessionService {
   final List<ConnectionProfileSnapshot> shellProfiles = [];
   final List<ConnectionProfileSnapshot> sftpProfiles = [];
   final List<Object> shellFailures = [];
+  final List<SessionId> probedSessionIds = [];
+  bool Function(SessionId sessionId) probeResult = (_) => true;
   var openShellCount = 0;
   var openSftpCount = 0;
 
@@ -101,6 +103,12 @@ class _FakeSshSessionService implements SshSessionService {
 
   @override
   Future<void> testConnection(ConnectionProfileSnapshot profile) async {}
+
+  @override
+  Future<bool> probeShell({required SessionId sessionId}) async {
+    probedSessionIds.add(sessionId);
+    return probeResult(sessionId);
+  }
 }
 
 class _FakeShellSession implements SshShellSession {

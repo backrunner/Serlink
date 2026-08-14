@@ -20,6 +20,8 @@ typedef SshSocketFactory =
     Future<SSHSocket> Function(String host, int port, {Duration? timeout});
 
 class DartSsh2SessionService implements SshSessionService {
+  static const _probeTimeout = Duration(seconds: 5);
+
   DartSsh2SessionService({
     SshSocketFactory socketFactory = SSHSocket.connect,
     Future<HostKeyDecision> Function(HostKeyPrompt prompt)? confirmHostKey,
@@ -107,6 +109,22 @@ class DartSsh2SessionService implements SshSessionService {
       await chain.target.ping();
     } finally {
       chain.close();
+    }
+  }
+
+  @override
+  Future<bool> probeShell({required SessionId sessionId}) async {
+    final client = _clientChains[sessionId]?.target;
+    if (client == null || client.isClosed) {
+      return false;
+    }
+    try {
+      // dartssh2's keepalive ping has no timeout of its own and hangs
+      // forever on a silently dead socket, so bound it here.
+      await client.ping().timeout(_probeTimeout);
+      return true;
+    } on Object {
+      return false;
     }
   }
 

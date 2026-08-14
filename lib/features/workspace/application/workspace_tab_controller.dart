@@ -74,6 +74,8 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
   final Map<SessionId, int> _paneConnectionTokens = {};
   final Map<WorkspaceTabId, Timer> _reconnectTimers = {};
   final Map<WorkspaceTabId, int> _reconnectAttempts = {};
+  final Map<WorkspaceTabId, SshReconnectPolicy> _reconnectPolicies = {};
+  var _remoteSessionProbeInFlight = false;
 
   @override
   WorkspaceState build() {
@@ -83,6 +85,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       }
       _reconnectTimers.clear();
       _reconnectAttempts.clear();
+      _reconnectPolicies.clear();
       _connectionTokens.clear();
       _paneConnectionTokens.clear();
     });
@@ -989,6 +992,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .firstOrNull;
     if (closingTab != null) {
       _clearReconnectState(tabId);
+      _reconnectPolicies.remove(tabId);
       _connectionTokens.remove(tabId);
       final panes = _terminalPanesOf(closingTab.content);
       if (panes != null) {
@@ -1044,6 +1048,60 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       _clearReconnectTimer(tabId);
       _runReconnect(tabId, automatic: true);
     });
+  }
+
+  /// Probes every connected remote terminal pane for liveness. Intended for
+  /// when the app returns from the background, where the OS may have
+  /// silently killed the SSH sockets while `shell.done` still has not
+  /// completed. Dead panes go through the same disconnect path as a
+  /// completed `shell.done`, so the recovery overlay and reconnect policy
+  /// behave exactly as if the session had dropped on its own.
+  Future<void> probeRemoteSessions() async {
+    if (_remoteSessionProbeInFlight || !ref.mounted) {
+      return;
+    }
+    _remoteSessionProbeInFlight = true;
+    try {
+      final targets = <({WorkspaceTabId tabId, SessionId sessionId})>[
+        for (final tab in state.tabs)
+          if (_terminalPanesOf(tab.content) case final panes?)
+            for (var index = 0; index < panes.length; index += 1)
+              if (panes[index].lifecycle == SessionLifecycleState.connected &&
+                  !_paneUsesLocalShell(
+                    tab.content,
+                    _paneWithEndpoint(tab, index),
+                  ))
+                (tabId: tab.id, sessionId: panes[index].sessionId),
+      ];
+      if (targets.isEmpty) {
+        return;
+      }
+      final service = ref.read(sshSessionServiceProvider);
+      await Future.wait([
+        for (final target in targets)
+          _probeRemotePane(service, target.tabId, target.sessionId),
+      ]);
+    } finally {
+      _remoteSessionProbeInFlight = false;
+    }
+  }
+
+  Future<void> _probeRemotePane(
+    SshSessionService service,
+    WorkspaceTabId tabId,
+    SessionId sessionId,
+  ) async {
+    final alive = await service.probeShell(sessionId: sessionId);
+    if (alive || !ref.mounted) {
+      return;
+    }
+    _markTerminalPaneDisconnectedByOpenSession(sessionId);
+    if (_currentTerminalPaneCount(tabId) == 1) {
+      _scheduleReconnect(
+        tabId: tabId,
+        policy: _reconnectPolicies[tabId] ?? const SshReconnectPolicy(),
+      );
+    }
   }
 
   Future<TerminalDisplaySettings?> _readTerminalDisplaySettingsForHost(
@@ -1325,6 +1383,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
               final profile = await ref
                   .read(connectionProfileResolverProvider)
                   .resolve(hostId: paneHostId, sessionId: pane.sessionId);
+              _reconnectPolicies[tab.id] = profile.reconnectPolicy;
               _ensureOpenPaneCurrent(pane.sessionId, paneToken);
               _setTerminalPaneLifecycleByOpenSession(
                 pane.sessionId,
@@ -1475,6 +1534,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       final profile = await ref
           .read(connectionProfileResolverProvider)
           .resolve(hostId: hostId, sessionId: pane.sessionId);
+      _reconnectPolicies[tab.id] = profile.reconnectPolicy;
       _ensureOpenPaneCurrent(pane.sessionId, token);
       _setTerminalPaneLifecycleByOpenSession(
         pane.sessionId,

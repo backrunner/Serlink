@@ -65,6 +65,92 @@ void main() {
     },
   );
 
+  group('probeRemoteSessions', () {
+    test(
+      'marks connected pane disconnected when probe reports a dead session',
+      () async {
+        final service = _FakeSshSessionService();
+        final container = _container(service: service);
+        addTearDown(container.dispose);
+
+        final controller = container.read(
+          workspaceTabControllerProvider.notifier,
+        );
+        controller.openTerminal(_host);
+        await _drainMicrotasks();
+
+        var state = container.read(workspaceTabControllerProvider);
+        expect(state.activeTab!.lifecycle, SessionLifecycleState.connected);
+
+        service.probeResult = (_) => false;
+        await controller.probeRemoteSessions();
+        await _drainMicrotasks();
+
+        state = container.read(workspaceTabControllerProvider);
+        final content = state.activeTab!.content as TerminalTabContent;
+        expect(state.activeTab!.lifecycle, SessionLifecycleState.disconnected);
+        expect(
+          content.primaryPane.lifecycle,
+          SessionLifecycleState.disconnected,
+        );
+        expect(service.probedSessionIds, [content.primaryPane.sessionId]);
+
+        // Recovery goes through the existing reconnect path.
+        controller.reconnect(state.activeTab!.id);
+        await _drainMicrotasks();
+
+        state = container.read(workspaceTabControllerProvider);
+        expect(state.activeTab!.lifecycle, SessionLifecycleState.connected);
+        expect(service.openShellCount, 2);
+      },
+    );
+
+    test('leaves alive sessions untouched', () async {
+      final service = _FakeSshSessionService();
+      final container = _container(service: service);
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openTerminal(_host);
+      await _drainMicrotasks();
+
+      await controller.probeRemoteSessions();
+      await _drainMicrotasks();
+
+      final state = container.read(workspaceTabControllerProvider);
+      final content = state.activeTab!.content as TerminalTabContent;
+      expect(state.activeTab!.lifecycle, SessionLifecycleState.connected);
+      expect(content.primaryPane.lifecycle, SessionLifecycleState.connected);
+      expect(service.probedSessionIds, [content.primaryPane.sessionId]);
+      expect(service.openShellCount, 1);
+    });
+
+    test('skips local terminal panes', () async {
+      final localTerminal = _FakeLocalTerminalService();
+      final service = _FakeSshSessionService();
+      final container = _container(
+        service: service,
+        localTerminal: localTerminal,
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      controller.openLocalTerminal();
+      await _drainMicrotasks();
+
+      await controller.probeRemoteSessions();
+      await _drainMicrotasks();
+
+      final state = container.read(workspaceTabControllerProvider);
+      expect(state.activeTab!.lifecycle, SessionLifecycleState.connected);
+      expect(service.probedSessionIds, isEmpty);
+    });
+  });
+
   test(
     'reuses failed terminal tab when host is opened again from hosts',
     () async {

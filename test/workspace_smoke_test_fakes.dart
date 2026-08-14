@@ -200,6 +200,9 @@ class _FakeSshSessionService implements SshSessionService {
 
   @override
   Future<void> testConnection(ConnectionProfileSnapshot profile) async {}
+
+  @override
+  Future<bool> probeShell({required SessionId sessionId}) async => true;
 }
 
 class _FakeLocalTerminalService implements LocalTerminalService {

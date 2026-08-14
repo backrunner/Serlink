@@ -72,6 +72,12 @@ abstract interface class SshSessionService {
   Future<SshShellSession> openShell(ConnectionProfileSnapshot profile);
   Future<SftpConnection> openSftp(ConnectionProfileSnapshot profile);
   Future<void> testConnection(ConnectionProfileSnapshot profile);
+
+  /// Probes whether the connection backing [sessionId] still answers.
+  /// Returns `false` when the session is unknown, already closed, or does
+  /// not respond within a bounded timeout (e.g. after the OS suspended the
+  /// app and the socket silently died).
+  Future<bool> probeShell({required SessionId sessionId});
   Future<void> startLocalForward({
     required SessionId sessionId,
     required int localPort,

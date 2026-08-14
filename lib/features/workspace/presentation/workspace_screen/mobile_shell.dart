@@ -503,7 +503,6 @@ class _MobileBottomNavigation extends StatelessWidget {
     return FBottomNavigationBar(
       key: const ValueKey('mobile-workspace-bottom-navigation'),
       index: index,
-      safeAreaBottom: false,
       onChange: onChange,
       children: [
         FBottomNavigationBarItem(

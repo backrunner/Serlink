@@ -7,7 +7,7 @@ import '../domain/sync_provider.dart';
 
 /// Encrypted-snapshot sync backed by the user's private CloudKit database.
 ///
-/// Bridges to native macOS via the `serlink/cloudkit` method channel. Each
+/// Bridges to native iOS/macOS via the `serlink/cloudkit` method channel. Each
 /// remote object (including the manifest) is stored as a CloudKit record keyed
 /// by its relative path; payloads are opaque encrypted bytes.
 class CloudKitSyncProvider implements SyncProvider {

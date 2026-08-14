@@ -7,6 +7,17 @@ class AppDelegate: FlutterAppDelegate {
     return true
   }
 
+  override func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    guard
+      let window = NSApp.windows.first(where: { $0 is MainFlutterWindow })
+        as? MainFlutterWindow
+    else {
+      return .terminateNow
+    }
+    window.requestApplicationTermination()
+    return .terminateLater
+  }
+
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
   }

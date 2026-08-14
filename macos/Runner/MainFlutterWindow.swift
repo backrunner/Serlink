@@ -7,17 +7,18 @@ class MainFlutterWindow: NSWindow {
   private var windowChannel: FlutterMethodChannel?
   private var platformChannel: FlutterMethodChannel?
   private let cloudKitChannel = CloudKitSyncChannel()
+  private var terminationReplyPending = false
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
-    // Match the dark theme's surface color so the window does not flash
-    // black while the engine renders its first frame.
-    flutterViewController.backgroundColor = NSColor(
-      red: 0x0E / 255.0,
-      green: 0x11 / 255.0,
-      blue: 0x16 / 255.0,
-      alpha: 1.0
-    )
+    // Match the theme's surface color so the window does not flash black
+    // while the engine renders its first frame. Follows system appearance.
+    flutterViewController.backgroundColor = NSColor(name: nil) { appearance in
+      let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+      return dark
+        ? NSColor(red: 0x0E / 255.0, green: 0x11 / 255.0, blue: 0x16 / 255.0, alpha: 1.0)
+        : NSColor(red: 0xEE / 255.0, green: 0xF1 / 255.0, blue: 0xF6 / 255.0, alpha: 1.0)
+    }
     let windowFrame = self.frame
     self.contentViewController = flutterViewController
     self.setFrame(windowFrame, display: true)
@@ -54,6 +55,33 @@ class MainFlutterWindow: NSWindow {
     standardWindowButton(.zoomButton)?.isHidden = true
   }
 
+  /// Asks the Dart side whether the app may terminate (Cmd+Q, Dock quit,
+  /// logout/shutdown). The Dart side answers through the `replyTerminate`
+  /// channel method; a timeout replies affirmatively so the app can always
+  /// quit even when the Dart side never responds (e.g. very early quit).
+  func requestApplicationTermination() {
+    if terminationReplyPending {
+      return
+    }
+    guard let windowChannel else {
+      NSApp.reply(toApplicationShouldTerminate: true)
+      return
+    }
+    terminationReplyPending = true
+    windowChannel.invokeMethod("requestTerminate", arguments: nil)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+      guard let self, self.terminationReplyPending else { return }
+      self.terminationReplyPending = false
+      NSApp.reply(toApplicationShouldTerminate: true)
+    }
+  }
+
+  private func completeApplicationTermination(confirmed: Bool) {
+    guard terminationReplyPending else { return }
+    terminationReplyPending = false
+    NSApp.reply(toApplicationShouldTerminate: confirmed)
+  }
+
   private func registerWindowChannel(flutterViewController: FlutterViewController) {
     let channel = FlutterMethodChannel(
       name: "serlink/window",
@@ -87,6 +115,11 @@ class MainFlutterWindow: NSWindow {
         result(self.isZoomed)
       case "close":
         self.close()
+        result(nil)
+      case "replyTerminate":
+        self.completeApplicationTermination(
+          confirmed: (call.arguments as? Bool) ?? false
+        )
         result(nil)
       case "startDrag":
         if let event = NSApp.currentEvent {

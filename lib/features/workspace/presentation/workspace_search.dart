@@ -52,6 +52,7 @@ String _hostSearchText(HostSummary host) {
     host.hostname,
     host.username,
     host.port.toString(),
+    ?host.groupId,
     ...host.tags,
   ].join(' ').toLowerCase();
 }

@@ -1042,6 +1042,74 @@ void main() {
     );
     expect(await records.list(), isEmpty);
   });
+
+  test('stores and updates host group metadata', () async {
+    final vault = InMemoryVaultService(
+      config: const VaultCryptoConfig.testing(),
+    );
+    final records = InMemoryVaultRecordRepository();
+    final hosts = EncryptedHostRepository(vault: vault, records: records);
+    final identities = EncryptedIdentityRepository(
+      vault: vault,
+      records: records,
+    );
+    await vault.initialize(passphrase: 'good passphrase');
+
+    final service = HostWriteService(
+      hosts: hosts,
+      identities: identities,
+      knownHosts: EncryptedKnownHostRepository(vault: vault, records: records),
+      tombstones: EncryptedSyncDeleteTombstoneRepository(
+        vault: vault,
+        records: records,
+      ),
+      records: records,
+      vault: vault,
+    );
+
+    final summary = await service.createPasswordHost(
+      const PasswordHostDraft(
+        displayName: 'Web Server',
+        hostname: 'web.internal',
+        port: 22,
+        username: 'ops',
+        password: 'server-password',
+        tags: {},
+        groupId: '  Production  ',
+      ),
+    );
+    expect(summary.groupId, 'Production');
+    expect((await hosts.read(summary.id))!.groupId, 'Production');
+    expect((await hosts.read(summary.id))!.toSummary().groupId, 'Production');
+
+    final existing = (await hosts.read(summary.id))!;
+    final updated = await service.updateHostMetadata(
+      HostMetadataDraft(
+        id: summary.id,
+        displayName: existing.displayName,
+        hostname: existing.hostname,
+        port: existing.port,
+        username: existing.username,
+        tags: existing.tags,
+        identityIds: existing.identityIds,
+        groupId: 'Staging',
+      ),
+    );
+    expect(updated.groupId, 'Staging');
+
+    final cleared = await service.updateHostMetadata(
+      HostMetadataDraft(
+        id: summary.id,
+        displayName: existing.displayName,
+        hostname: existing.hostname,
+        port: existing.port,
+        username: existing.username,
+        tags: existing.tags,
+        identityIds: existing.identityIds,
+      ),
+    );
+    expect(cleared.groupId, isNull);
+  });
 }
 
 Future<void> _saveIdentity({

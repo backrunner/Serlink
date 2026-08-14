@@ -25,6 +25,103 @@ const _hostListChangeDuration = Duration(milliseconds: 240);
 
 enum _HostSortOrder { addedAt, name, lastConnectedAt }
 
+final _collapsedHostGroupsProvider =
+    NotifierProvider<_CollapsedHostGroupsController, Set<String>>(
+      _CollapsedHostGroupsController.new,
+    );
+
+class _CollapsedHostGroupsController extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => const {};
+
+  void toggle(String groupKey) {
+    final next = {...state};
+    if (!next.add(groupKey)) {
+      next.remove(groupKey);
+    }
+    state = next;
+  }
+}
+
+sealed class _HostListEntry {
+  String get key;
+}
+
+class _HostEntry extends _HostListEntry {
+  _HostEntry(this.host);
+
+  final HostSummary host;
+
+  @override
+  String get key => 'host-${host.id.value}';
+}
+
+class _HostGroupEntry extends _HostListEntry {
+  _HostGroupEntry({
+    required this.groupId,
+    required this.label,
+    required this.count,
+    required this.collapsed,
+  });
+
+  final String? groupId;
+  final String label;
+  final int count;
+  final bool collapsed;
+
+  @override
+  String get key => 'group-${groupId ?? ''}';
+}
+
+List<_HostListEntry> _buildHostListEntries(
+  List<HostSummary> hosts,
+  Set<String> collapsedGroups, {
+  required String ungroupedLabel,
+}) {
+  final grouped = <String, List<HostSummary>>{};
+  final ungrouped = <HostSummary>[];
+  for (final host in hosts) {
+    final groupId = host.groupId;
+    if (groupId == null) {
+      ungrouped.add(host);
+    } else {
+      grouped.putIfAbsent(groupId, () => []).add(host);
+    }
+  }
+  if (grouped.isEmpty) {
+    return [for (final host in hosts) _HostEntry(host)];
+  }
+  final groupIds = grouped.keys.toList()
+    ..sort(
+      (left, right) =>
+          left.toLowerCase().compareTo(right.toLowerCase()),
+    );
+  final entries = <_HostListEntry>[];
+  void addGroup(String? groupId, String label, List<HostSummary> members) {
+    final key = groupId ?? '';
+    final collapsed = collapsedGroups.contains(key);
+    entries.add(
+      _HostGroupEntry(
+        groupId: groupId,
+        label: label,
+        count: members.length,
+        collapsed: collapsed,
+      ),
+    );
+    if (!collapsed) {
+      entries.addAll([for (final host in members) _HostEntry(host)]);
+    }
+  }
+
+  for (final groupId in groupIds) {
+    addGroup(groupId, groupId, grouped[groupId]!);
+  }
+  if (ungrouped.isNotEmpty) {
+    addGroup(null, ungroupedLabel, ungrouped);
+  }
+  return entries;
+}
+
 class _HostSortOrderController extends Notifier<_HostSortOrder> {
   @override
   _HostSortOrder build() => _HostSortOrder.addedAt;
@@ -136,7 +233,11 @@ class _HostsSurface extends ConsumerWidget {
                             key: PageStorageKey(
                               'hosts-list-${session.unlockGeneration}',
                             ),
-                            hosts: filteredHosts,
+                            entries: _buildHostListEntries(
+                              filteredHosts,
+                              ref.watch(_collapsedHostGroupsProvider),
+                              ungroupedLabel: l10n.hostsUngroupedGroup,
+                            ),
                             unlockGeneration: session.unlockGeneration,
                             mobile: mobile,
                           ),
@@ -159,12 +260,12 @@ class _HostsSurface extends ConsumerWidget {
 class _HostList extends ConsumerStatefulWidget {
   const _HostList({
     super.key,
-    required this.hosts,
+    required this.entries,
     required this.unlockGeneration,
     required this.mobile,
   });
 
-  final List<HostSummary> hosts;
+  final List<_HostListEntry> entries;
   final int unlockGeneration;
   final bool mobile;
 
@@ -175,14 +276,14 @@ class _HostList extends ConsumerStatefulWidget {
 class _HostListState extends ConsumerState<_HostList> {
   final _listKey = GlobalKey<AnimatedListState>();
   Timer? _settleTimer;
-  late List<HostSummary> _displayedHosts;
+  late List<_HostListEntry> _displayedEntries;
   Set<HostId> _entranceHostIds = const {};
   bool _playEntrance = false;
 
   @override
   void initState() {
     super.initState();
-    _displayedHosts = List.of(widget.hosts);
+    _displayedEntries = List.of(widget.entries);
     _claimEntrance(widget.unlockGeneration);
   }
 
@@ -190,11 +291,11 @@ class _HostListState extends ConsumerState<_HostList> {
   void didUpdateWidget(covariant _HostList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.unlockGeneration != widget.unlockGeneration) {
-      _displayedHosts = List.of(widget.hosts);
+      _displayedEntries = List.of(widget.entries);
       _claimEntrance(widget.unlockGeneration);
       return;
     }
-    _reconcileHosts(widget.hosts);
+    _reconcileEntries(widget.entries);
   }
 
   @override
@@ -209,7 +310,10 @@ class _HostListState extends ConsumerState<_HostList> {
         .read(_hostListEntranceTrackerProvider)
         .claim(unlockGeneration);
     _entranceHostIds = _playEntrance
-        ? {for (final host in _displayedHosts) host.id}
+        ? {
+            for (final entry in _displayedEntries)
+              if (entry is _HostEntry) entry.host.id,
+          }
         : const {};
     if (!_playEntrance) {
       return;
@@ -224,57 +328,65 @@ class _HostListState extends ConsumerState<_HostList> {
     });
   }
 
-  void _reconcileHosts(List<HostSummary> nextHosts) {
+  void _reconcileEntries(List<_HostListEntry> nextEntries) {
     final listState = _listKey.currentState;
     if (listState == null) {
-      _displayedHosts = List.of(nextHosts);
+      _displayedEntries = List.of(nextEntries);
       return;
     }
 
-    final nextIds = {for (final host in nextHosts) host.id};
-    final previousIds = {for (final host in _displayedHosts) host.id};
+    final nextKeys = {for (final entry in nextEntries) entry.key};
+    final previousKeys = {for (final entry in _displayedEntries) entry.key};
     final duration = MediaQuery.maybeOf(context)?.disableAnimations == true
         ? Duration.zero
         : _hostListChangeDuration;
 
-    for (var index = _displayedHosts.length - 1; index >= 0; index -= 1) {
-      final host = _displayedHosts[index];
-      if (nextIds.contains(host.id)) {
+    for (var index = _displayedEntries.length - 1; index >= 0; index -= 1) {
+      final entry = _displayedEntries[index];
+      if (nextKeys.contains(entry.key)) {
         continue;
       }
-      _displayedHosts.removeAt(index);
+      _displayedEntries.removeAt(index);
       listState.removeItem(
         index,
-        (context, animation) =>
-            _buildAnimatedHost(context, host, index, animation, removing: true),
+        (context, animation) => _buildAnimatedEntry(
+          context,
+          entry,
+          index,
+          animation,
+          removing: true,
+        ),
         duration: duration,
       );
     }
 
-    final nextById = {for (final host in nextHosts) host.id: host};
-    for (var index = 0; index < _displayedHosts.length; index += 1) {
-      _displayedHosts[index] = nextById[_displayedHosts[index].id]!;
+    final nextByKey = {for (final entry in nextEntries) entry.key: entry};
+    for (var index = 0; index < _displayedEntries.length; index += 1) {
+      _displayedEntries[index] = nextByKey[_displayedEntries[index].key]!;
     }
-    for (var index = 0; index < nextHosts.length; index += 1) {
-      final host = nextHosts[index];
-      if (previousIds.contains(host.id)) {
+    for (var index = 0; index < nextEntries.length; index += 1) {
+      final entry = nextEntries[index];
+      if (previousKeys.contains(entry.key)) {
         continue;
       }
-      _displayedHosts.insert(index, host);
+      _displayedEntries.insert(index, entry);
       listState.insertItem(index, duration: duration);
     }
 
-    if (!_sameHostOrder(_displayedHosts, nextHosts)) {
-      _displayedHosts = List.of(nextHosts);
+    if (!_sameEntryOrder(_displayedEntries, nextEntries)) {
+      _displayedEntries = List.of(nextEntries);
     }
   }
 
-  bool _sameHostOrder(List<HostSummary> left, List<HostSummary> right) {
+  bool _sameEntryOrder(
+    List<_HostListEntry> left,
+    List<_HostListEntry> right,
+  ) {
     if (left.length != right.length) {
       return false;
     }
     for (var index = 0; index < left.length; index += 1) {
-      if (left[index].id != right[index].id) {
+      if (left[index].key != right[index].key) {
         return false;
       }
     }
@@ -288,19 +400,47 @@ class _HostListState extends ConsumerState<_HostList> {
       padding: widget.mobile
           ? _mobileSurfaceListPadding
           : const EdgeInsets.all(16),
-      initialItemCount: _displayedHosts.length,
-      itemBuilder: (context, index, animation) =>
-          _buildAnimatedHost(context, _displayedHosts[index], index, animation),
+      initialItemCount: _displayedEntries.length,
+      itemBuilder: (context, index, animation) => _buildAnimatedEntry(
+        context,
+        _displayedEntries[index],
+        index,
+        animation,
+      ),
     );
   }
 
-  Widget _buildAnimatedHost(
+  Widget _buildAnimatedEntry(
     BuildContext context,
-    HostSummary host,
+    _HostListEntry entry,
     int index,
     Animation<double> animation, {
     bool removing = false,
   }) {
+    final Widget child = switch (entry) {
+      _HostGroupEntry() => _buildGroupHeader(context, entry),
+      _HostEntry() => _buildHostRow(context, entry.host, index),
+    };
+    return IgnorePointer(
+      ignoring: removing,
+      child: _HostListChangeTransition(
+        animation: animation,
+        child: Padding(padding: const EdgeInsets.only(bottom: 8), child: child),
+      ),
+    );
+  }
+
+  Widget _buildGroupHeader(BuildContext context, _HostGroupEntry entry) {
+    return _HostGroupHeader(
+      key: ValueKey('host-group-${entry.groupId ?? ''}'),
+      entry: entry,
+      onToggle: () => ref
+          .read(_collapsedHostGroupsProvider.notifier)
+          .toggle(entry.groupId ?? ''),
+    );
+  }
+
+  Widget _buildHostRow(BuildContext context, HostSummary host, int index) {
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     Widget row = KeyedSubtree(
       key: ValueKey('host-row-${host.id.value}'),
@@ -325,11 +465,58 @@ class _HostListState extends ConsumerState<_HostList> {
         child: row,
       );
     }
-    return IgnorePointer(
-      ignoring: removing,
-      child: _HostListChangeTransition(
-        animation: animation,
-        child: Padding(padding: const EdgeInsets.only(bottom: 8), child: row),
+    return row;
+  }
+}
+
+class _HostGroupHeader extends StatelessWidget {
+  const _HostGroupHeader({
+    super.key,
+    required this.entry,
+    required this.onToggle,
+  });
+
+  final _HostGroupEntry entry;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return SerlinkPressable(
+      onTap: onToggle,
+      borderRadius: SerlinkRadii.control,
+      hoverColor: t.surfaceOverlay,
+      pressedColor: t.textPrimary.withValues(alpha: 0.12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Row(
+          children: [
+            AnimatedRotation(
+              turns: entry.collapsed ? 0 : 0.25,
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              child: Icon(
+                Icons.arrow_forward_ios,
+                size: 12,
+                color: t.textMuted,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.folder_outlined, size: 16, color: t.textSecondary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                entry.label,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: t.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            _CountBadge(count: entry.count),
+          ],
+        ),
       ),
     );
   }

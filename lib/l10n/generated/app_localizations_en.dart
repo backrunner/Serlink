@@ -903,6 +903,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostTagsLabel => 'Tags';
 
   @override
+  String get hostGroupLabel => 'Group';
+
+  @override
+  String get hostGroupNone => 'No group';
+
+  @override
+  String get hostGroupNew => 'New group…';
+
+  @override
+  String get hostGroupNewHint => 'Group name';
+
+  @override
+  String get hostsUngroupedGroup => 'Ungrouped';
+
+  @override
   String get hostStartFolderLabel => 'Start folder';
 
   @override

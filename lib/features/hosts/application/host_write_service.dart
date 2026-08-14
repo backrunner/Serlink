@@ -38,6 +38,7 @@ class PasswordHostDraft {
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
     this.remoteSessionSettings = const HostRemoteSessionSettings(),
+    this.groupId,
     this.writeBackToSshConfig = false,
   });
 
@@ -53,6 +54,7 @@ class PasswordHostDraft {
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
   final HostRemoteSessionSettings remoteSessionSettings;
+  final String? groupId;
   final bool writeBackToSshConfig;
 }
 
@@ -71,6 +73,7 @@ class PrivateKeyHostDraft {
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
     this.remoteSessionSettings = const HostRemoteSessionSettings(),
+    this.groupId,
     this.writeBackToSshConfig = false,
   });
 
@@ -87,6 +90,7 @@ class PrivateKeyHostDraft {
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
   final HostRemoteSessionSettings remoteSessionSettings;
+  final String? groupId;
   final bool writeBackToSshConfig;
 }
 
@@ -104,6 +108,7 @@ class ExistingIdentitiesHostDraft {
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
     this.remoteSessionSettings = const HostRemoteSessionSettings(),
+    this.groupId,
     this.writeBackToSshConfig = false,
   });
 
@@ -119,6 +124,7 @@ class ExistingIdentitiesHostDraft {
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
   final HostRemoteSessionSettings remoteSessionSettings;
+  final String? groupId;
   final bool writeBackToSshConfig;
 }
 
@@ -135,6 +141,7 @@ class SshAgentHostDraft {
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
     this.remoteSessionSettings = const HostRemoteSessionSettings(),
+    this.groupId,
     this.writeBackToSshConfig = false,
   });
 
@@ -149,6 +156,7 @@ class SshAgentHostDraft {
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
   final HostRemoteSessionSettings remoteSessionSettings;
+  final String? groupId;
   final bool writeBackToSshConfig;
 }
 
@@ -167,6 +175,7 @@ class HostMetadataDraft {
     this.portForwarding,
     this.connectionSettings = const HostConnectionSettings(),
     this.remoteSessionSettings,
+    this.groupId,
     this.writeBackToSshConfig,
   });
 
@@ -183,6 +192,7 @@ class HostMetadataDraft {
   final HostPortForwardingSettings? portForwarding;
   final HostConnectionSettings connectionSettings;
   final HostRemoteSessionSettings? remoteSessionSettings;
+  final String? groupId;
   final bool? writeBackToSshConfig;
 }
 
@@ -201,6 +211,7 @@ class DuplicateHostDraft {
     this.portForwarding = const HostPortForwardingSettings(),
     this.connectionSettings = const HostConnectionSettings(),
     this.remoteSessionSettings = const HostRemoteSessionSettings(),
+    this.groupId,
     this.writeBackToSshConfig = false,
   });
 
@@ -217,6 +228,7 @@ class DuplicateHostDraft {
   final HostPortForwardingSettings portForwarding;
   final HostConnectionSettings connectionSettings;
   final HostRemoteSessionSettings remoteSessionSettings;
+  final String? groupId;
   final bool writeBackToSshConfig;
 }
 
@@ -313,6 +325,7 @@ class HostWriteService {
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       remoteSessionSettings: remoteSessionSettings,
+      groupId: _normalizeGroupId(draft.groupId),
       writeBackToSshConfig: draft.writeBackToSshConfig,
       createdAt: now,
       updatedAt: now,
@@ -390,6 +403,7 @@ class HostWriteService {
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       remoteSessionSettings: remoteSessionSettings,
+      groupId: _normalizeGroupId(draft.groupId),
       writeBackToSshConfig: draft.writeBackToSshConfig,
       createdAt: now,
       updatedAt: now,
@@ -438,6 +452,7 @@ class HostWriteService {
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       remoteSessionSettings: remoteSessionSettings,
+      groupId: _normalizeGroupId(draft.groupId),
       writeBackToSshConfig: draft.writeBackToSshConfig,
       createdAt: now,
       updatedAt: now,
@@ -494,6 +509,7 @@ class HostWriteService {
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       remoteSessionSettings: remoteSessionSettings,
+      groupId: _normalizeGroupId(draft.groupId),
       writeBackToSshConfig: draft.writeBackToSshConfig,
       createdAt: now,
       updatedAt: now,
@@ -543,7 +559,7 @@ class HostWriteService {
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       remoteSessionSettings: remoteSessionSettings,
-      groupId: source.groupId,
+      groupId: _normalizeGroupId(draft.groupId) ?? source.groupId,
       writeBackToSshConfig: draft.writeBackToSshConfig,
       createdAt: now,
       updatedAt: now,
@@ -596,7 +612,7 @@ class HostWriteService {
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       remoteSessionSettings: remoteSessionSettings,
-      groupId: existing.groupId,
+      groupId: _normalizeGroupId(draft.groupId),
       lastConnectedAt: existing.lastConnectedAt,
       writeBackToSshConfig:
           draft.writeBackToSshConfig ?? existing.writeBackToSshConfig,
@@ -725,8 +741,12 @@ class HostWriteService {
   }
 }
 
-List<String> _normalizeStartupCommands(List<String> commands) {
-  return List<String>.unmodifiable([
+String? _normalizeGroupId(String? groupId) {
+  final trimmed = groupId?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
+}
+
+List<String> _normalizeStartupCommands(List<String> commands) {  return List<String>.unmodifiable([
     for (final command in commands)
       if (command.trim().isNotEmpty) command.trimRight(),
   ]);

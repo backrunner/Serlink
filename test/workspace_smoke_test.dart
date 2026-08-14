@@ -592,6 +592,8 @@ void main() {
     await _submitVaultPassphrase(tester, 'correct horse battery staple');
     await _tapAddHost(tester);
 
+    await tester.ensureVisible(find.text('Saved'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Saved'));
     await tester.pumpAndSettle();
     expect(find.text(identity.displayName), findsOneWidget);

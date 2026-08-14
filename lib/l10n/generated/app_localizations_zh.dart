@@ -831,6 +831,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostTagsLabel => '标签';
 
   @override
+  String get hostGroupLabel => '分组';
+
+  @override
+  String get hostGroupNone => '不分组';
+
+  @override
+  String get hostGroupNew => '新建分组…';
+
+  @override
+  String get hostGroupNewHint => '分组名称';
+
+  @override
+  String get hostsUngroupedGroup => '未分组';
+
+  @override
   String get hostStartFolderLabel => '起始文件夹';
 
   @override

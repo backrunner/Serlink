@@ -151,6 +151,32 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     super.dispose();
   }
 
+  Widget _buildWriteBackSwitch(
+    AppLocalizations l10n, {
+    required bool blocked,
+  }) {
+    final tile = SerlinkSwitchListTile(
+      key: const ValueKey('host-ssh-config-writeback-switch'),
+      value: _writeBackToSshConfig,
+      onChanged: blocked
+          ? null
+          : (value) {
+              setState(() {
+                _writeBackToSshConfig = value;
+              });
+            },
+      title: Text(l10n.hostWriteBackToSshConfigTitle),
+      contentPadding: EdgeInsets.zero,
+    );
+    if (!blocked) {
+      return tile;
+    }
+    return SerlinkTooltip(
+      message: l10n.hostWriteBackToSshConfigNoPermissionTooltip,
+      child: tile,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<MacOsSshConfigStartupState>(macOsSshConfigStartupProvider, (
@@ -165,6 +191,10 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     final l10n = context.l10n;
     final capabilities = ref.watch(platformCapabilitiesProvider);
     final layout = _HostFormDialogLayout.resolve(context, capabilities);
+    final writebackBlocked =
+        capabilities.sshConfigImport &&
+        ref.watch(macOsSshConfigWritebackProvider).phase ==
+            MacOsSshConfigWritebackPhase.blocked;
 
     return SerlinkDialog(
       maxWidth: layout.dialogWidth,
@@ -256,17 +286,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                   ),
                   if (capabilities.sshConfigImport) ...[
                     SizedBox(height: layout.fieldGap),
-                    SerlinkSwitchListTile(
-                      key: const ValueKey('host-ssh-config-writeback-switch'),
-                      value: _writeBackToSshConfig,
-                      onChanged: (value) {
-                        setState(() {
-                          _writeBackToSshConfig = value;
-                        });
-                      },
-                      title: Text(l10n.hostWriteBackToSshConfigTitle),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                    _buildWriteBackSwitch(l10n, blocked: writebackBlocked),
                   ],
                 ],
               ),
@@ -721,6 +741,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
           hostConfigs
                   .map((host) => host.groupId)
                   .whereType<String>()
+                  .where((groupId) => groupId != _kNewGroupSentinel)
                   .toSet()
                   .toList()
                 ..sort(

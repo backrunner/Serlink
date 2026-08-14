@@ -710,6 +710,7 @@ void main() {
           identityIds: source.identityIds,
           startupCommands: const ['tmux attach || tmux'],
           sftpDefaultDirectory: '/home/deploy',
+          groupId: 'ops',
           connectionSettings: const HostConnectionSettings(
             connectTimeoutSeconds: 45,
             keepAliveIntervalSeconds: 25,

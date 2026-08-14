@@ -194,6 +194,11 @@ class _HostsSurface extends ConsumerWidget {
               filterHostSummaries(hosts, searchQuery),
               sortOrder,
             );
+            // While searching, expand all groups so matches stay visible.
+            final collapsedGroups =
+                normalizeWorkspaceSearchQuery(searchQuery) == null
+                ? ref.watch(_collapsedHostGroupsProvider)
+                : const <String>{};
             final contentChangeDuration =
                 MediaQuery.maybeOf(context)?.disableAnimations == true
                 ? Duration.zero
@@ -235,7 +240,7 @@ class _HostsSurface extends ConsumerWidget {
                             ),
                             entries: _buildHostListEntries(
                               filteredHosts,
-                              ref.watch(_collapsedHostGroupsProvider),
+                              collapsedGroups,
                               ungroupedLabel: l10n.hostsUngroupedGroup,
                             ),
                             unlockGeneration: session.unlockGeneration,

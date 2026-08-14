@@ -559,7 +559,7 @@ class HostWriteService {
       portForwarding: portForwarding,
       connectionSettings: connectionSettings,
       remoteSessionSettings: remoteSessionSettings,
-      groupId: _normalizeGroupId(draft.groupId) ?? source.groupId,
+      groupId: _normalizeGroupId(draft.groupId),
       writeBackToSshConfig: draft.writeBackToSshConfig,
       createdAt: now,
       updatedAt: now,

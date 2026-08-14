@@ -1,17 +1,23 @@
 part of '../workspace_screen.dart';
 
 var _windowCloseConfirmationInFlight = false;
+var _windowTerminationConfirmed = false;
 
-Future<void> _requestWindowClose(BuildContext context, WidgetRef ref) async {
+/// Shows the active-terminal confirmation dialog when terminal panes are
+/// still running. Returns true when the close/termination may proceed, and
+/// false when the user cancels or a confirmation is already in flight.
+Future<bool> _confirmCloseWithActiveTerminals(
+  BuildContext context,
+  WidgetRef ref,
+) async {
   if (_windowCloseConfirmationInFlight) {
-    return;
+    return false;
   }
   final activeTerminalPaneCount = ref
       .read(workspaceTabControllerProvider)
       .activeTerminalPaneCount;
   if (activeTerminalPaneCount == 0) {
-    await AppWindow.close();
-    return;
+    return true;
   }
 
   _windowCloseConfirmationInFlight = true;
@@ -24,12 +30,71 @@ Future<void> _requestWindowClose(BuildContext context, WidgetRef ref) async {
       confirmLabel: l10n.windowCloseWindowAction,
       destructive: true,
     );
-    if (!context.mounted || !confirmed) {
-      return;
-    }
-    await AppWindow.close();
+    return context.mounted && confirmed;
   } finally {
     _windowCloseConfirmationInFlight = false;
+  }
+}
+
+Future<void> _requestWindowClose(BuildContext context, WidgetRef ref) async {
+  if (!await _confirmCloseWithActiveTerminals(context, ref)) {
+    return;
+  }
+  _windowTerminationConfirmed = true;
+  await AppWindow.close();
+}
+
+/// Handles a native termination request (macOS Cmd+Q, Dock quit, logout).
+/// Returns true when the app may terminate.
+Future<bool> _requestApplicationTermination(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  // A termination triggered by a confirmed window close (macOS quits the
+  // app when the last window closes) must not ask again. The same applies
+  // once the shell is gone: never block quitting when no UI can answer.
+  if (_windowTerminationConfirmed || !context.mounted) {
+    return true;
+  }
+  final confirmed = await _confirmCloseWithActiveTerminals(context, ref);
+  if (confirmed) {
+    _windowTerminationConfirmed = true;
+  }
+  return confirmed;
+}
+
+/// Routes native application termination requests (macOS Cmd+Q, Dock quit)
+/// into the same active-terminal confirmation as the window close button.
+class _NativeTerminationGuard extends ConsumerStatefulWidget {
+  const _NativeTerminationGuard({required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<_NativeTerminationGuard> createState() =>
+      _NativeTerminationGuardState();
+}
+
+class _NativeTerminationGuardState
+    extends ConsumerState<_NativeTerminationGuard> {
+  @override
+  void initState() {
+    super.initState();
+    AppWindow.setTerminateRequestHandler(_confirmTermination);
+  }
+
+  // The handler is intentionally not cleared in dispose: the native side may
+  // still request termination while the window (and this widget) tears down
+  // after a confirmed close, and _requestApplicationTermination short-
+  // circuits to allowing termination once this state is unmounted.
+
+  Future<bool> _confirmTermination() {
+    return _requestApplicationTermination(context, ref);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }
 

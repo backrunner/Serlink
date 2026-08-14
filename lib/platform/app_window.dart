@@ -47,6 +47,48 @@ class AppWindow {
     await _invoke<void>('close');
   }
 
+  /// Replies to a native `requestTerminate` call (macOS). Safe to invoke on
+  /// other platforms: platforms without a native `replyTerminate` handler
+  /// raise [MissingPluginException], which is swallowed.
+  static Future<void> replyTerminate(bool confirmed) async {
+    await _invoke<void>('replyTerminate', confirmed);
+  }
+
+  static Future<bool> Function()? _terminateRequestHandler;
+
+  /// Registers a handler invoked when the native side asks whether the app
+  /// may terminate (macOS Cmd+Q, Dock quit, logout). The handler returns
+  /// true to allow termination. Only wired up on macOS; a no-op elsewhere.
+  static void setTerminateRequestHandler(Future<bool> Function()? handler) {
+    if (!Platform.isMacOS) {
+      return;
+    }
+    _terminateRequestHandler = handler;
+    if (handler == null) {
+      _channel.setMethodCallHandler(null);
+      return;
+    }
+    _channel.setMethodCallHandler(_handleNativeCall);
+  }
+
+  static Future<void> _handleNativeCall(MethodCall call) async {
+    if (call.method != 'requestTerminate') {
+      return;
+    }
+    final handler = _terminateRequestHandler;
+    if (handler == null) {
+      return;
+    }
+    var confirmed = true;
+    try {
+      confirmed = await handler();
+    } catch (_) {
+      // Never wedge quitting (or an OS logout) on a handler failure.
+      confirmed = true;
+    }
+    await replyTerminate(confirmed);
+  }
+
   static Future<void> startDrag() async {
     await _invoke<void>('startDrag');
   }

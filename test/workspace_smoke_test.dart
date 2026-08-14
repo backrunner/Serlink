@@ -1128,11 +1128,25 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump();
 
-    expect(find.text('Unlock Vault'), findsNothing);
-    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
+    // The overlay covers the UI while the app subtree stays mounted.
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Icon && widget.icon == Icons.lock_outline && widget.size == 42,
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Unlock Vault'), findsWidgets);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Icon && widget.icon == Icons.lock_outline && widget.size == 42,
+      ),
+      findsNothing,
+    );
+    expect(find.text('Unlock Vault'), findsWidgets);
   });
 
   testWidgets('iOS keeps an SSH session open across brief backgrounding', (

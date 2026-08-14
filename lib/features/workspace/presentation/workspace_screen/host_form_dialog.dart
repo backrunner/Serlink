@@ -34,6 +34,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   final TextEditingController _remoteSessionNameController =
       TextEditingController(text: 'serlink');
   final TextEditingController _tagsController = TextEditingController();
+  final TextEditingController _newGroupController = TextEditingController();
   final TextEditingController _sftpDefaultDirectoryController =
       TextEditingController(text: '/');
   final TextEditingController _connectTimeoutController = TextEditingController(
@@ -68,6 +69,9 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   _HostAuthInputMode _authMode = _HostAuthInputMode.password;
   List<IdentityConfig> _identityOptions = const [];
   List<HostSummary> _jumpHostOptions = const [];
+  List<String> _groupOptions = const [];
+  String? _selectedGroup;
+  bool _creatingNewGroup = false;
   Set<IdentityId> _selectedIdentityIds = const {};
   Set<HostId> _selectedJumpHostIds = const {};
   List<HostLocalPortForward> _localForwards = const [];
@@ -128,6 +132,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     _startupCommandsController.dispose();
     _remoteSessionNameController.dispose();
     _tagsController.dispose();
+    _newGroupController.dispose();
     _sftpDefaultDirectoryController.dispose();
     _connectTimeoutController.dispose();
     _keepAliveIntervalController.dispose();
@@ -227,6 +232,27 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                       labelText: l10n.hostUsernameLabel,
                     ),
                     textInputAction: TextInputAction.next,
+                  ),
+                  SizedBox(height: layout.fieldGap),
+                  _HostGroupField(
+                    groupOptions: _groupOptions,
+                    selectedGroup: _selectedGroup,
+                    creatingNewGroup: _creatingNewGroup,
+                    newGroupController: _newGroupController,
+                    fieldGap: layout.fieldGap,
+                    onChanged: (value) {
+                      setState(() {
+                        if (value.isEmpty) {
+                          _selectedGroup = null;
+                          _creatingNewGroup = false;
+                        } else if (value == _kNewGroupSentinel) {
+                          _creatingNewGroup = true;
+                        } else {
+                          _selectedGroup = value;
+                          _creatingNewGroup = false;
+                        }
+                      });
+                    },
                   ),
                   if (capabilities.sshConfigImport) ...[
                     SizedBox(height: layout.fieldGap),
@@ -451,6 +477,14 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     );
   }
 
+  String? _resolveGroupId() {
+    if (_creatingNewGroup) {
+      final name = _newGroupController.text.trim();
+      return name.isEmpty ? null : name;
+    }
+    return _selectedGroup;
+  }
+
   Future<void> _save() async {
     final port = int.tryParse(_portController.text.trim());
     if (port == null) {
@@ -503,6 +537,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            groupId: _resolveGroupId(),
             writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
@@ -522,6 +557,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            groupId: _resolveGroupId(),
             writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
@@ -540,6 +576,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            groupId: _resolveGroupId(),
             writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
@@ -559,6 +596,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            groupId: _resolveGroupId(),
             writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
@@ -577,6 +615,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            groupId: _resolveGroupId(),
             writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
@@ -595,6 +634,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             portForwarding: portForwarding,
             connectionSettings: connectionSettings,
             remoteSessionSettings: remoteSessionSettings,
+            groupId: _resolveGroupId(),
             writeBackToSshConfig: _writeBackToSshConfig,
           ),
         );
@@ -677,7 +717,19 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
           ),
         );
         _jumpHostOptions = List<HostSummary>.unmodifiable(jumpHosts);
+        _groupOptions = List<String>.unmodifiable(
+          hostConfigs
+                  .map((host) => host.groupId)
+                  .whereType<String>()
+                  .toSet()
+                  .toList()
+                ..sort(
+                  (left, right) =>
+                      left.toLowerCase().compareTo(right.toLowerCase()),
+                ),
+        );
         if (hostConfig != null) {
+          _selectedGroup = hostConfig.groupId;
           _selectedIdentityIds = {...hostConfig.identityIds};
           _selectedJumpHostIds = {...hostConfig.jumpHostIds};
           _startupCommandsController.text = hostConfig.startupCommands.join(

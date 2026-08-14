@@ -25,6 +25,7 @@ class HostSummary {
     required this.trustState,
     required this.createdAt,
     this.sftpDefaultDirectory = '/',
+    this.groupId,
     this.lastConnectedAt,
     this.writeBackToSshConfig = false,
   });
@@ -39,6 +40,7 @@ class HostSummary {
   final HostTrustState trustState;
   final DateTime createdAt;
   final String sftpDefaultDirectory;
+  final String? groupId;
   final DateTime? lastConnectedAt;
   final bool writeBackToSshConfig;
 }
@@ -100,6 +102,7 @@ class HostConfig {
       trustState: trustState,
       createdAt: createdAt,
       sftpDefaultDirectory: sftpDefaultDirectory,
+      groupId: groupId,
       lastConnectedAt: lastConnectedAt,
       writeBackToSshConfig: writeBackToSshConfig,
     );

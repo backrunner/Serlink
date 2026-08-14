@@ -1612,6 +1612,36 @@ abstract class AppLocalizations {
   /// **'Tags'**
   String get hostTagsLabel;
 
+  /// No description provided for @hostGroupLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get hostGroupLabel;
+
+  /// No description provided for @hostGroupNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No group'**
+  String get hostGroupNone;
+
+  /// No description provided for @hostGroupNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New group…'**
+  String get hostGroupNew;
+
+  /// No description provided for @hostGroupNewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Group name'**
+  String get hostGroupNewHint;
+
+  /// No description provided for @hostsUngroupedGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Ungrouped'**
+  String get hostsUngroupedGroup;
+
   /// No description provided for @hostStartFolderLabel.
   ///
   /// In en, this message translates to:

@@ -841,6 +841,21 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostTagsLabel => 'タグ';
 
   @override
+  String get hostGroupLabel => 'グループ';
+
+  @override
+  String get hostGroupNone => 'グループなし';
+
+  @override
+  String get hostGroupNew => '新しいグループ…';
+
+  @override
+  String get hostGroupNewHint => 'グループ名';
+
+  @override
+  String get hostsUngroupedGroup => '未分類';
+
+  @override
   String get hostStartFolderLabel => '開始フォルダ';
 
   @override

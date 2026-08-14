@@ -1,5 +1,71 @@
 part of '../workspace_screen.dart';
 
+const _kNewGroupSentinel = '__new_group__';
+
+class _HostGroupField extends StatelessWidget {
+  const _HostGroupField({
+    required this.groupOptions,
+    required this.selectedGroup,
+    required this.creatingNewGroup,
+    required this.newGroupController,
+    required this.fieldGap,
+    required this.onChanged,
+  });
+
+  final List<String> groupOptions;
+  final String? selectedGroup;
+  final bool creatingNewGroup;
+  final TextEditingController newGroupController;
+  final double fieldGap;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final selectValue = creatingNewGroup
+        ? _kNewGroupSentinel
+        : (selectedGroup ?? '');
+    return Column(
+      children: [
+        SerlinkSelect<String>(
+          key: const ValueKey('host-group-select'),
+          value: selectValue,
+          hintText: l10n.hostGroupLabel,
+          items: [
+            SerlinkSelectItem(
+              value: '',
+              label: l10n.hostGroupNone,
+              icon: Icons.block,
+            ),
+            for (final group in groupOptions)
+              SerlinkSelectItem(
+                value: group,
+                label: group,
+                icon: Icons.folder_outlined,
+              ),
+            SerlinkSelectItem(
+              value: _kNewGroupSentinel,
+              label: l10n.hostGroupNew,
+              icon: Icons.create_new_folder_outlined,
+            ),
+          ],
+          onChanged: onChanged,
+        ),
+        if (creatingNewGroup) ...[
+          SizedBox(height: fieldGap),
+          SerlinkTextField(
+            key: const ValueKey('host-new-group-field'),
+            controller: newGroupController,
+            decoration: InputDecoration(hintText: l10n.hostGroupNewHint),
+            textInputAction: TextInputAction.next,
+            autofocus: true,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _PrivateKeyFields extends StatelessWidget {
   const _PrivateKeyFields({
     required this.privateKeyController,

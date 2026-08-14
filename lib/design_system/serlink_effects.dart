@@ -36,11 +36,18 @@ List<BoxShadow> serlinkShadow(
 /// A diagonal accent gradient (deep teal -> cyan) used for primary affordances,
 /// badges, and focus glows. Starts from [SerlinkTokens.accentStrong] so white
 /// [SerlinkTokens.onAccent] foreground stays legible across the whole fill.
+///
+/// Light themes get deeper stops: the default light accents are tuned for text
+/// on pale surfaces, which looks washed out as a filled button and gives white
+/// foregrounds poor contrast on the bright sky-blue end.
 LinearGradient serlinkAccentGradient(SerlinkTokens t) {
+  final isLight = t.surfaceBase.computeLuminance() > 0.5;
   return LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [t.accentStrong, t.accentSecondary],
+    colors: isLight
+        ? const [Color(0xFF0F766E), Color(0xFF0369A1)]
+        : [t.accentStrong, t.accentSecondary],
   );
 }
 

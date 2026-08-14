@@ -104,6 +104,10 @@ abstract interface class SshConfigFileStore {
     String contents, {
     required String? expectedContents,
   });
+
+  /// Whether [path] is readable (when it exists) and its parent directory is
+  /// writable, so a reconcile could actually update it.
+  Future<bool> canAccess(String path);
 }
 
 class LocalSshConfigFileStore implements SshConfigFileStore {
@@ -113,6 +117,53 @@ class LocalSshConfigFileStore implements SshConfigFileStore {
   Future<String?> read(String path) async {
     final file = File(path);
     return await file.exists() ? file.readAsString() : null;
+  }
+
+  @override
+  Future<bool> canAccess(String path) async {
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        RandomAccessFile? handle;
+        try {
+          handle = await file.open();
+        } on Object {
+          return false;
+        }
+        await handle.close();
+      }
+      return await _probeDirectoryWritable(p.dirname(path));
+    } on Object {
+      return false;
+    }
+  }
+
+  static Future<bool> _probeDirectoryWritable(String directoryPath) async {
+    final directory = Directory(directoryPath);
+    if (!await directory.exists()) {
+      // The reconcile creates the directory on demand.
+      return true;
+    }
+    final probe = File(
+      p.join(
+        directoryPath,
+        '.serlink-access-probe-$pid-${DateTime.now().microsecondsSinceEpoch}',
+      ),
+    );
+    try {
+      await probe.writeAsString('', flush: true);
+      return true;
+    } on Object {
+      return false;
+    } finally {
+      try {
+        if (await probe.exists()) {
+          await probe.delete();
+        }
+      } on Object {
+        // Best-effort cleanup; a leftover probe file is harmless.
+      }
+    }
   }
 
   @override
@@ -165,6 +216,20 @@ class MacOsSshConfigWritebackService {
   final SshConfigFileStore _files;
   final String _configPath;
   final DiagnosticLogger _logger;
+
+  Future<bool> hasConfigAccess() async {
+    if (_configPath.trim().isEmpty) {
+      return true;
+    }
+    final accessible = await _files.canAccess(_configPath);
+    if (!accessible) {
+      await _logger.record(
+        'ssh_config.writeback_no_permission',
+        level: DiagnosticLogLevel.warning,
+      );
+    }
+    return accessible;
+  }
 
   Future<MacOsSshConfigWritebackResult> reconcile() async {
     if (_configPath.trim().isEmpty) {

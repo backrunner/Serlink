@@ -878,19 +878,29 @@ class _SavedCredentialFields extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _IdentitySelectionSection(
-          identities: identityOptions,
-          selectedIdentityIds: selectedIdentityIds,
-          enabled: !loadingOptions,
-          onToggle: onToggleIdentity,
-          onEdit: onEditIdentity,
-        ),
-        const SizedBox(height: 8),
-        const _CredentialOptionalNote(),
-      ],
+    if (identityOptions.isEmpty) {
+      return const _CredentialsEmptyState();
+    }
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 130),
+      opacity: loadingOptions ? 0.54 : 1,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var index = 0; index < identityOptions.length; index += 1) ...[
+            if (index > 0) const SizedBox(height: 8),
+            _CredentialSelectionRow(
+              identity: identityOptions[index],
+              selected: selectedIdentityIds.contains(identityOptions[index].id),
+              enabled: !loadingOptions,
+              onToggle: onToggleIdentity,
+              onEdit: onEditIdentity,
+            ),
+          ],
+          const SizedBox(height: 8),
+          const _CredentialOptionalNote(),
+        ],
+      ),
     );
   }
 }
@@ -906,72 +916,43 @@ class _HostFormError extends StatelessWidget {
   }
 }
 
-class _IdentitySelectionSection extends StatelessWidget {
-  const _IdentitySelectionSection({
-    required this.identities,
-    required this.selectedIdentityIds,
-    required this.enabled,
-    required this.onToggle,
-    required this.onEdit,
-  });
-
-  final List<IdentityConfig> identities;
-  final Set<IdentityId> selectedIdentityIds;
-  final bool enabled;
-  final ValueChanged<IdentityId> onToggle;
-  final ValueChanged<IdentityConfig> onEdit;
+class _CredentialsEmptyState extends StatelessWidget {
+  const _CredentialsEmptyState();
 
   @override
   Widget build(BuildContext context) {
-    if (identities.isEmpty) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Text(context.l10n.hostNoSavedCredentials),
-      );
-    }
+    final l10n = context.l10n;
     final t = context.tokens;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          context.l10n.hostCredentialsHeading,
-          style: Theme.of(context).textTheme.labelLarge,
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: SerlinkRadii.control,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: t.surfaceSunken,
-              borderRadius: SerlinkRadii.control,
-              border: Border.all(color: t.borderSubtle),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (var index = 0; index < identities.length; index += 1) ...[
-                  _CredentialSelectionRow(
-                    identity: identities[index],
-                    selected: selectedIdentityIds.contains(
-                      identities[index].id,
-                    ),
-                    enabled: enabled,
-                    onToggle: onToggle,
-                    onEdit: onEdit,
-                  ),
-                  if (index < identities.length - 1)
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      indent: 52,
-                      color: t.borderSubtle,
-                    ),
-                ],
-              ],
-            ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+      decoration: BoxDecoration(
+        color: t.surfaceSunken,
+        borderRadius: SerlinkRadii.control,
+        border: Border.all(color: t.borderSubtle),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.badge_outlined, size: 20, color: t.textMuted),
+          const SizedBox(height: 8),
+          Text(
+            l10n.hostNoSavedCredentials,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
           ),
-        ),
-      ],
+          const SizedBox(height: 2),
+          Text(
+            l10n.hostCredentialOptionalNote,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: t.textMuted),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1002,52 +983,72 @@ class _CredentialSelectionRow extends StatelessWidget {
       if (identity.certificatePrincipal case final principal?)
         l10n.identityPrincipalLabel(principal),
     ].join(' · ');
-    return Opacity(
-      opacity: enabled ? 1 : 0.54,
-      child: SerlinkPressable(
-        onTap: enabled ? () => onToggle(identity.id) : null,
-        borderRadius: BorderRadius.zero,
-        padding: const EdgeInsets.only(left: 8, right: 4, top: 8, bottom: 8),
-        child: Row(
-          children: [
-            SerlinkCheckbox(
-              value: selected,
-              onChanged: enabled ? (_) => onToggle(identity.id) : null,
+    return ListRow(
+      selected: selected,
+      onTap: enabled ? () => onToggle(identity.id) : null,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOut,
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: selected
+                  ? t.accentPrimary.withValues(alpha: 0.16)
+                  : t.surfaceSunken,
+              borderRadius: SerlinkRadii.control,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    identity.displayName,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: t.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
+            child: Icon(
+              _identityKindIcon(identity.kind),
+              size: 18,
+              color: selected ? t.accentPrimary : t.textSecondary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  identity.displayName,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: t.textPrimary,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                ),
+              ],
             ),
-            SerlinkTooltip(
-              message: l10n.hostEditCredentialTooltip,
-              child: SerlinkIconButton(
-                key: ValueKey('credential-edit-${identity.id.value}'),
-                onPressed: enabled ? () => onEdit(identity) : null,
-                icon: const Icon(Icons.edit_outlined, size: 18),
-              ),
+          ),
+          SerlinkTooltip(
+            message: l10n.hostEditCredentialTooltip,
+            child: SerlinkIconButton(
+              key: ValueKey('credential-edit-${identity.id.value}'),
+              onPressed: enabled ? () => onEdit(identity) : null,
+              icon: const Icon(Icons.edit_outlined, size: 18),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 4),
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 130),
+            opacity: selected ? 1 : 0,
+            child: Icon(
+              Icons.check_circle_rounded,
+              size: 18,
+              color: t.accentPrimary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1058,13 +1059,13 @@ class _CredentialOptionalNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerLeft,
+    return Padding(
+      padding: const EdgeInsets.only(left: 2),
       child: Text(
         context.l10n.hostCredentialOptionalNote,
         style: Theme.of(
           context,
-        ).textTheme.bodySmall?.copyWith(color: context.tokens.textSecondary),
+        ).textTheme.bodySmall?.copyWith(color: context.tokens.textMuted),
       ),
     );
   }

@@ -2,6 +2,15 @@ part of '../workspace_screen.dart';
 
 const String _serlinkRepositoryUrl = 'https://github.com/backrunner/serlink';
 
+const EdgeInsets _settingsDesktopSurfacePadding = EdgeInsets.fromLTRB(
+  SerlinkSpacing.xl,
+  22,
+  SerlinkSpacing.xl,
+  36,
+);
+const double _settingsHeaderGap = 28;
+const double _settingsSectionGap = 26;
+
 class _SettingsSurface extends ConsumerWidget {
   const _SettingsSurface();
 
@@ -29,8 +38,13 @@ class _SettingsSurface extends ConsumerWidget {
 
     return ListView(
       padding: showInPageTitle
-          ? const EdgeInsets.fromLTRB(24, 22, 24, 36)
-          : const EdgeInsets.fromLTRB(16, _mobileSurfaceTopGap, 16, 16),
+          ? _settingsDesktopSurfacePadding
+          : const EdgeInsets.fromLTRB(
+              SerlinkSpacing.lg,
+              _mobileSurfaceTopGap,
+              SerlinkSpacing.lg,
+              SerlinkSpacing.lg,
+            ),
       children: [
         Center(
           child: ConstrainedBox(
@@ -62,7 +76,7 @@ class _SettingsSurface extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      _SettingsStatusPill(
+                      StatusPill(
                         label: _vaultStatusPillLabel(l10n, vaultState),
                         color: vaultState == VaultState.unlocked
                             ? t.accentPrimary
@@ -70,9 +84,9 @@ class _SettingsSurface extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: _settingsHeaderGap),
                 ],
-                _SettingsSection(
+                SurfaceSection(
                   title: l10n.settingsGeneralSection,
                   children: [
                     _SettingsActionRow(
@@ -82,20 +96,17 @@ class _SettingsSurface extends ConsumerWidget {
                           : null,
                       title: l10n.settingsLanguageTitle,
                       subtitle: _settingsLanguageSubtitle(l10n, mobile),
-                      action: SizedBox(
-                        width: mobile ? _settingsMobileSelectActionWidth : 220,
-                        child: SerlinkSelect<AppLanguage>(
-                          key: const ValueKey('settings-language-select'),
-                          value: language,
-                          items: _languageItems(l10n),
-                          hintText: l10n.selectAction,
-                          searchHint: l10n.searchAction,
-                          size: FTextFieldSizeVariant.sm,
-                          compact: true,
-                          menuMinWidth: mobile ? 196 : null,
-                          onChanged: (value) =>
-                              unawaited(_setAppLanguage(context, ref, value)),
-                        ),
+                      action: SerlinkSelect<AppLanguage>(
+                        key: const ValueKey('settings-language-select'),
+                        value: language,
+                        items: _languageItems(l10n),
+                        hintText: l10n.selectAction,
+                        searchHint: l10n.searchAction,
+                        size: FTextFieldSizeVariant.sm,
+                        compact: true,
+                        menuMinWidth: mobile ? 196 : null,
+                        onChanged: (value) =>
+                            unawaited(_setAppLanguage(context, ref, value)),
                       ),
                       actionWidth: mobile
                           ? _settingsMobileSelectActionWidth
@@ -103,7 +114,6 @@ class _SettingsSurface extends ConsumerWidget {
                       actionHeight: mobile
                           ? _settingsMobileSelectActionHeight
                           : null,
-                      actionVerticalOffset: mobile ? 3 : 0,
                     ),
                     if (capabilities.sshConfigImport)
                       _SettingsActionRow(
@@ -134,8 +144,8 @@ class _SettingsSurface extends ConsumerWidget {
                       ),
                   ],
                 ),
-                const SizedBox(height: 26),
-                _SettingsSection(
+                const SizedBox(height: _settingsSectionGap),
+                SurfaceSection(
                   title: l10n.settingsSecuritySection,
                   children: [
                     _SettingsActionRow(
@@ -248,10 +258,10 @@ class _SettingsSurface extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 26),
+                const SizedBox(height: _settingsSectionGap),
                 _SyncSettingsSection(vaultState: vaultState),
-                const SizedBox(height: 26),
-                _SettingsSection(
+                const SizedBox(height: _settingsSectionGap),
+                SurfaceSection(
                   title: l10n.settingsDataSection,
                   children: [
                     _SettingsActionRow(
@@ -270,8 +280,8 @@ class _SettingsSurface extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 26),
-                _SettingsSection(
+                const SizedBox(height: _settingsSectionGap),
+                SurfaceSection(
                   title: l10n.settingsRuntimeSection,
                   children: [
                     _SettingsActionRow(
@@ -287,20 +297,17 @@ class _SettingsSurface extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 26),
-                _SettingsSection(
+                const SizedBox(height: _settingsSectionGap),
+                SurfaceSection(
                   title: l10n.settingsAboutSection,
                   children: [
                     _SettingsActionRow(
                       icon: Icons.info_outline,
                       title: l10n.appTitle,
                       actionWidth: mobile ? 146 : 220,
-                      action: SizedBox(
-                        width: mobile ? 146 : 220,
-                        child: _SettingsInlineValue(
-                          key: const ValueKey('settings-about-version-label'),
-                          text: _settingsAppVersionLabel(l10n, appPackageInfo),
-                        ),
+                      action: _SettingsInlineValue(
+                        key: const ValueKey('settings-about-version-label'),
+                        text: _settingsAppVersionLabel(l10n, appPackageInfo),
                       ),
                     ),
                     _SettingsActionRow(

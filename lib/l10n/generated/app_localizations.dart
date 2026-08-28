@@ -424,6 +424,12 @@ abstract class AppLocalizations {
   /// **'Choose the app display language.'**
   String get settingsLanguageSubtitle;
 
+  /// No description provided for @settingsLanguageSubtitleMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'App language'**
+  String get settingsLanguageSubtitleMobile;
+
   /// No description provided for @settingsLanguageSystem.
   ///
   /// In en, this message translates to:
@@ -520,11 +526,23 @@ abstract class AppLocalizations {
   /// **'Locked. Existing connections keep running.'**
   String get settingsVaultLocked;
 
+  /// No description provided for @settingsVaultLockedMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get settingsVaultLockedMobile;
+
   /// No description provided for @settingsVaultUnlocked.
   ///
   /// In en, this message translates to:
   /// **'Unlocked for new connection profile resolution.'**
   String get settingsVaultUnlocked;
+
+  /// No description provided for @settingsVaultUnlockedMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocked'**
+  String get settingsVaultUnlockedMobile;
 
   /// No description provided for @settingsLockAction.
   ///
@@ -556,11 +574,23 @@ abstract class AppLocalizations {
   /// **'Create the vault before enabling Face ID unlock.'**
   String get settingsLocalUnlockNeedsVault;
 
+  /// No description provided for @settingsLocalUnlockNeedsVaultMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Create vault first'**
+  String get settingsLocalUnlockNeedsVaultMobile;
+
   /// No description provided for @settingsLocalUnlockEnabled.
   ///
   /// In en, this message translates to:
   /// **'Enabled. Lock the vault to unlock with Face ID.'**
   String get settingsLocalUnlockEnabled;
+
+  /// No description provided for @settingsLocalUnlockEnabledMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Face ID ready'**
+  String get settingsLocalUnlockEnabledMobile;
 
   /// No description provided for @settingsLocalUnlockUnavailable.
   ///
@@ -568,11 +598,23 @@ abstract class AppLocalizations {
   /// **'Face ID is not available on this device.'**
   String get settingsLocalUnlockUnavailable;
 
+  /// No description provided for @settingsLocalUnlockUnavailableMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available'**
+  String get settingsLocalUnlockUnavailableMobile;
+
   /// No description provided for @settingsLocalUnlockDisabled.
   ///
   /// In en, this message translates to:
   /// **'Disabled. Passphrase or recovery key is required after lock.'**
   String get settingsLocalUnlockDisabled;
+
+  /// No description provided for @settingsLocalUnlockDisabledMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase required'**
+  String get settingsLocalUnlockDisabledMobile;
 
   /// No description provided for @settingsUnlockWithDeviceAction.
   ///
@@ -682,6 +724,12 @@ abstract class AppLocalizations {
   /// **'Unlock the vault to review encrypted credentials.'**
   String get settingsCredentialsLocked;
 
+  /// No description provided for @settingsCredentialsLockedMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock vault first'**
+  String get settingsCredentialsLockedMobile;
+
   /// No description provided for @settingsKnownHostsTitle.
   ///
   /// In en, this message translates to:
@@ -693,6 +741,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unlock the vault to review trusted host fingerprints.'**
   String get settingsKnownHostsLocked;
+
+  /// No description provided for @settingsKnownHostsLockedMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock vault first'**
+  String get settingsKnownHostsLockedMobile;
 
   /// No description provided for @settingsManageAction.
   ///
@@ -717,6 +771,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Backups, OpenSSH files, certificates, known_hosts, and metadata.'**
   String get settingsImportExportSubtitle;
+
+  /// No description provided for @settingsImportExportSubtitleMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups and SSH data'**
+  String get settingsImportExportSubtitleMobile;
 
   /// No description provided for @settingsOpenAction.
   ///
@@ -2194,6 +2254,18 @@ abstract class AppLocalizations {
   /// **'Allow HTTP endpoint'**
   String get webDavAllowHttpTitle;
 
+  /// No description provided for @webDavEnableMobileLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable sync'**
+  String get webDavEnableMobileLabel;
+
+  /// No description provided for @webDavAllowHttpMobileLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow HTTP'**
+  String get webDavAllowHttpMobileLabel;
+
   /// No description provided for @webDavUseHttpTitle.
   ///
   /// In en, this message translates to:
@@ -3591,6 +3663,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This record type currently requires whole-record resolution. Use the existing local or remote action for this conflict.'**
   String get syncConflictUnsupportedBody;
+
+  /// No description provided for @syncConflictFieldCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 field differs} other{{count} fields differ}}'**
+  String syncConflictFieldCount(num count);
 
   /// No description provided for @sftpParentFolderTooltip.
   ///

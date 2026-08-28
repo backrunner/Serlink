@@ -1,51 +1,5 @@
 part of '../workspace_screen.dart';
 
-class _SettingsSection extends StatelessWidget {
-  const _SettingsSection({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return SurfaceSection(title: title, children: children);
-  }
-}
-
-class _SettingsInfoRow extends StatelessWidget {
-  const _SettingsInfoRow({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return _SettingsActionRow(
-      icon: icon,
-      title: title,
-      subtitle: subtitle,
-      action: null,
-    );
-  }
-}
-
-class _SettingsStatusPill extends StatelessWidget {
-  const _SettingsStatusPill({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return StatusPill(label: label, color: color);
-  }
-}
-
 class _SettingsActionRow extends StatelessWidget {
   const _SettingsActionRow({
     required this.icon,
@@ -55,7 +9,6 @@ class _SettingsActionRow extends StatelessWidget {
     this.subtitleWidget,
     this.actionWidth,
     this.actionHeight,
-    this.actionVerticalOffset = 0,
     this.leadingKey,
   });
 
@@ -66,7 +19,6 @@ class _SettingsActionRow extends StatelessWidget {
   final Widget? action;
   final double? actionWidth;
   final double? actionHeight;
-  final double actionVerticalOffset;
   final Key? leadingKey;
 
   @override
@@ -77,7 +29,7 @@ class _SettingsActionRow extends StatelessWidget {
     ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 560;
+        final compact = constraints.maxWidth < _settingsCompactBreakpoint;
         final desktopSubtitle =
             subtitleWidget ??
             (subtitle == null || subtitle!.trim().isEmpty
@@ -106,7 +58,9 @@ class _SettingsActionRow extends StatelessWidget {
                   ? null
                   : Padding(
                       padding: const EdgeInsets.only(left: 16),
-                      child: action,
+                      child: actionWidth == null
+                          ? action
+                          : SizedBox(width: actionWidth, child: action),
                     ),
             ),
           );
@@ -133,9 +87,12 @@ class _SettingsActionRow extends StatelessWidget {
                 height:
                     actionHeight ??
                     (actionWidth == null ? _settingsMobileActionHeight : 40),
-                verticalOffset: actionVerticalOffset,
                 alignment: Alignment.centerRight,
-                child: _SettingsCompactControlsScope(child: action!),
+                child: _SettingsCompactControlsScope(
+                  child: actionWidth == null
+                      ? action!
+                      : SizedBox(width: slotWidth, child: action!),
+                ),
               );
 
         return Padding(
@@ -212,29 +169,21 @@ class _SettingsActionSlot extends StatelessWidget {
   const _SettingsActionSlot({
     required this.width,
     required this.height,
-    required this.verticalOffset,
     required this.alignment,
     required this.child,
   });
 
   final double width;
   final double height;
-  final double verticalOffset;
   final AlignmentGeometry alignment;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final aligned = Align(alignment: alignment, child: child);
     return SizedBox(
       width: width,
       height: height,
-      child: verticalOffset == 0
-          ? aligned
-          : Transform.translate(
-              offset: Offset(0, verticalOffset),
-              child: aligned,
-            ),
+      child: Align(alignment: alignment, child: child),
     );
   }
 }
@@ -254,10 +203,12 @@ class _SettingsCompactControlsScope extends InheritedWidget {
   bool updateShouldNotify(_SettingsCompactControlsScope oldWidget) => false;
 }
 
+const double _settingsCompactBreakpoint = 700;
 const double _settingsMobileActionWidth = 92;
 const double _settingsMobileActionHeight = 32;
 const double _settingsMobileSelectActionWidth = 112;
 const double _settingsMobileSelectActionHeight = 40;
+const double _settingsDesktopActionHeight = 36;
 
 class _SettingsTextButton extends StatelessWidget {
   const _SettingsTextButton({
@@ -343,10 +294,10 @@ class _SettingsControlButton extends StatelessWidget {
       ),
     );
     return Opacity(
-      opacity: enabled ? 1 : 0.45,
+      opacity: enabled ? 1 : 0.54,
       child: SerlinkPressable(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: SerlinkRadii.control,
         hoverColor: t.surfaceOverlay,
         pressedColor: t.textPrimary.withValues(alpha: 0.12),
         child: compact
@@ -355,7 +306,7 @@ class _SettingsControlButton extends StatelessWidget {
                 height: _settingsMobileActionHeight,
                 child: label,
               )
-            : SizedBox(height: 36, child: label),
+            : SizedBox(height: _settingsDesktopActionHeight, child: label),
       ),
     );
   }
@@ -385,7 +336,7 @@ class _SettingsSwitch extends StatelessWidget {
 }
 
 bool _settingsUseCompactControls(BuildContext context) {
-  return MediaQuery.sizeOf(context).width < 700;
+  return MediaQuery.sizeOf(context).width < _settingsCompactBreakpoint;
 }
 
 List<SerlinkSelectItem<AppLanguage>> _languageItems(AppLocalizations l10n) {
@@ -494,13 +445,8 @@ String _vaultStateLabel(
     VaultState.locked
         when busyReason == VaultSessionBusyReason.waitingForICloud =>
       l10n.settingsVaultWaitingICloud,
-    VaultState.locked => _mobileText(l10n, zh: '已锁定', en: 'Locked', ja: 'ロック中'),
-    VaultState.unlocked => _mobileText(
-      l10n,
-      zh: '已解锁',
-      en: 'Unlocked',
-      ja: '解除済み',
-    ),
+    VaultState.locked => l10n.settingsVaultLockedMobile,
+    VaultState.unlocked => l10n.settingsVaultUnlockedMobile,
     null => _vaultPreparingLabel(l10n, busyReason),
   };
 }
@@ -539,30 +485,15 @@ String _localUnlockLabel(
 ) {
   if (mobile) {
     if (session?.vaultState == VaultState.uninitialized) {
-      return _mobileText(
-        l10n,
-        zh: '需先创建保险库',
-        en: 'Create vault first',
-        ja: '先に作成',
-      );
+      return l10n.settingsLocalUnlockNeedsVaultMobile;
     }
     if (session?.localUnlockAvailable == true) {
-      return _mobileText(
-        l10n,
-        zh: 'Face ID 可用',
-        en: 'Face ID ready',
-        ja: 'Face ID 可',
-      );
+      return l10n.settingsLocalUnlockEnabledMobile;
     }
     if (session?.biometricUnlockSupported != true) {
-      return _mobileText(l10n, zh: '此设备不可用', en: 'Not available', ja: '利用不可');
+      return l10n.settingsLocalUnlockUnavailableMobile;
     }
-    return _mobileText(
-      l10n,
-      zh: '需密码或恢复密钥',
-      en: 'Passphrase required',
-      ja: 'パスフレーズ必須',
-    );
+    return l10n.settingsLocalUnlockDisabledMobile;
   }
   if (session?.vaultState == VaultState.uninitialized) {
     return l10n.settingsLocalUnlockNeedsVault;
@@ -580,46 +511,28 @@ String _settingsLanguageSubtitle(AppLocalizations l10n, bool mobile) {
   if (!mobile) {
     return l10n.settingsLanguageSubtitle;
   }
-  return _mobileText(l10n, zh: '应用语言', en: 'App language', ja: '表示言語');
+  return l10n.settingsLanguageSubtitleMobile;
 }
 
 String _settingsCredentialsLocked(AppLocalizations l10n, bool mobile) {
   if (!mobile) {
     return l10n.settingsCredentialsLocked;
   }
-  return _mobileText(l10n, zh: '需解锁保险库', en: 'Unlock vault first', ja: '解除が必要');
+  return l10n.settingsCredentialsLockedMobile;
 }
 
 String _settingsKnownHostsLocked(AppLocalizations l10n, bool mobile) {
   if (!mobile) {
     return l10n.settingsKnownHostsLocked;
   }
-  return _mobileText(l10n, zh: '需解锁保险库', en: 'Unlock vault first', ja: '解除が必要');
+  return l10n.settingsKnownHostsLockedMobile;
 }
 
 String _settingsImportExportSubtitle(AppLocalizations l10n, bool mobile) {
   if (!mobile) {
     return l10n.settingsImportExportSubtitle;
   }
-  return _mobileText(
-    l10n,
-    zh: '备份与 SSH 数据',
-    en: 'Backups and SSH data',
-    ja: 'バックアップと SSH',
-  );
-}
-
-String _mobileText(
-  AppLocalizations l10n, {
-  required String zh,
-  required String en,
-  required String ja,
-}) {
-  return switch (l10n.localeName.split('_').first) {
-    'zh' => zh,
-    'ja' => ja,
-    _ => en,
-  };
+  return l10n.settingsImportExportSubtitleMobile;
 }
 
 Future<void> _setLocalVaultUnlock(

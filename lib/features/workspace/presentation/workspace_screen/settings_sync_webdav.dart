@@ -119,7 +119,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
                   key: const ValueKey('webdav-enabled-row'),
                   value: _enabled,
                   label: l10n.webDavEnableTitle,
-                  kind: _WebDavOptionKind.switchControl,
+                  mobileLabel: l10n.webDavEnableMobileLabel,
                   onChanged: (value) {
                     setState(() {
                       _enabled = value;
@@ -131,7 +131,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
                   key: const ValueKey('webdav-allow-http-row'),
                   value: _allowInsecureHttp,
                   label: l10n.webDavAllowHttpTitle,
-                  kind: _WebDavOptionKind.checkbox,
+                  mobileLabel: l10n.webDavAllowHttpMobileLabel,
                   onChanged: (value) {
                     setState(() {
                       _allowInsecureHttp = value;
@@ -262,86 +262,57 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
   }
 }
 
-enum _WebDavOptionKind { switchControl, checkbox }
-
 class _WebDavOptionRow extends StatelessWidget {
   const _WebDavOptionRow({
     super.key,
     required this.value,
     required this.label,
+    required this.mobileLabel,
     required this.onChanged,
-    required this.kind,
   });
 
   final bool value;
   final String label;
+  final String mobileLabel;
   final ValueChanged<bool> onChanged;
-  final _WebDavOptionKind kind;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final mobile = MediaQuery.sizeOf(context).width < 560;
-    final control = switch (kind) {
-      _WebDavOptionKind.switchControl => SerlinkSwitch(
-        value: value,
-        onChanged: onChanged,
-        scale: mobile ? 0.62 : 0.72,
-      ),
-      _WebDavOptionKind.checkbox => SerlinkCheckbox(
-        value: value,
-        onChanged: (next) => onChanged(next ?? false),
-      ),
-    };
 
     return SerlinkPressable(
       onTap: () => onChanged(!value),
       borderRadius: SerlinkRadii.control,
       hoverColor: t.accentPrimary.withValues(alpha: 0.06),
       pressedColor: t.accentPrimary.withValues(alpha: 0.12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: t.surfaceSunken,
-          borderRadius: SerlinkRadii.control,
-          border: Border.all(color: t.borderSubtle),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: SerlinkSpacing.md,
+          vertical: SerlinkSpacing.sm,
         ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: mobile ? 10 : 12,
-            vertical: mobile ? 8 : 9,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  mobile
-                      ? _webDavOptionMobileLabel(context.l10n, label)
-                      : label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: t.textPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: mobile ? 13 : 13.5,
-                  ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                mobile ? mobileLabel : label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: t.textPrimary,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(width: 12),
-              control,
-            ],
-          ),
+            ),
+            const SizedBox(width: SerlinkSpacing.md),
+            SerlinkSwitch(
+              value: value,
+              onChanged: onChanged,
+              scale: mobile ? 0.6 : 0.72,
+            ),
+          ],
         ),
       ),
     );
   }
-}
-
-String _webDavOptionMobileLabel(AppLocalizations l10n, String label) {
-  if (label == l10n.webDavEnableTitle) {
-    return _mobileText(l10n, zh: '启用同步', en: 'Enable sync', ja: '同期を有効化');
-  }
-  if (label == l10n.webDavAllowHttpTitle) {
-    return _mobileText(l10n, zh: '允许 HTTP', en: 'Allow HTTP', ja: 'HTTP を許可');
-  }
-  return label;
 }

@@ -147,32 +147,29 @@ class _SyncDevicesDialog extends StatelessWidget {
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
       title: Text(l10n.syncDevicesDialogTitle),
-      content: SizedBox(
-        width: 520,
-        child: _DialogList(
-          empty: _DialogState(
-            icon: Icons.devices_other_outlined,
-            title: l10n.syncDevicesEmptyTitle,
-            body: l10n.syncDevicesEmptyBody,
-          ),
-          items: [
-            for (final device in devices)
-              _DialogListItem(
-                icon: Icons.devices_outlined,
-                title: device.id == localDeviceId
-                    ? l10n.syncDeviceThisDevice(device.displayName)
-                    : device.displayName,
-                subtitle: _syncDeviceSubtitle(l10n, device),
-                trailing: device.id == localDeviceId
-                    ? null
-                    : SerlinkIconButton(
-                        tooltip: l10n.syncDeviceRemoveTooltip,
-                        onPressed: () => onDelete(device),
-                        icon: const Icon(Icons.delete_outline, size: 18),
-                      ),
-              ),
-          ],
+      content: _DialogList(
+        empty: _DialogState(
+          icon: Icons.devices_other_outlined,
+          title: l10n.syncDevicesEmptyTitle,
+          body: l10n.syncDevicesEmptyBody,
         ),
+        items: [
+          for (final device in devices)
+            _DialogListItem(
+              icon: Icons.devices_outlined,
+              title: device.id == localDeviceId
+                  ? l10n.syncDeviceThisDevice(device.displayName)
+                  : device.displayName,
+              subtitle: _syncDeviceSubtitle(l10n, device),
+              trailing: device.id == localDeviceId
+                  ? null
+                  : SerlinkIconButton(
+                      tooltip: l10n.syncDeviceRemoveTooltip,
+                      onPressed: () => onDelete(device),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                    ),
+            ),
+        ],
       ),
       actions: [
         if (onReset != null)

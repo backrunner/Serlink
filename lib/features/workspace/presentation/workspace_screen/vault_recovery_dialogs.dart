@@ -103,7 +103,6 @@ class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
     final t = context.tokens;
     final compactActions = MediaQuery.sizeOf(context).width < 420;
@@ -149,53 +148,16 @@ class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
               l10n.vaultRecoveryKeySaveInstruction,
               style: Theme.of(
                 context,
-              ).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+              ).textTheme.bodyMedium?.copyWith(color: t.textSecondary),
             ),
             const SizedBox(height: 14),
             SerlinkAlert.warning(
-              key: ValueKey('recovery-key-warning'),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.vaultRecoveryKeyWarningTitle,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: t.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.vaultRecoveryKeyWarningBody,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: t.textSecondary,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
+              key: const ValueKey('recovery-key-warning'),
+              title: l10n.vaultRecoveryKeyWarningTitle,
+              message: l10n.vaultRecoveryKeyWarningBody,
             ),
             const SizedBox(height: 14),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest.withValues(alpha: 0.64),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: scheme.outlineVariant),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: SelectableText(
-                  widget.recoveryKey,
-                  key: const ValueKey('recovery-key-value'),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    height: 1.35,
-                  ),
-                ),
-              ),
-            ),
+            _RecoveryKeyValueBox(recoveryKey: widget.recoveryKey),
           ],
         ),
       ),
@@ -233,6 +195,37 @@ class _RecoveryKeyDialogState extends State<_RecoveryKeyDialog> {
   }
 }
 
+/// Sunken, monospace presentation of the vault recovery key, shared between
+/// the post-creation dialog and the unlock surface.
+class _RecoveryKeyValueBox extends StatelessWidget {
+  const _RecoveryKeyValueBox({required this.recoveryKey});
+
+  final String recoveryKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.surfaceSunken,
+        borderRadius: SerlinkRadii.control,
+        border: Border.all(color: t.borderSubtle),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: SelectableText(
+          recoveryKey,
+          key: const ValueKey('recovery-key-value'),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontFamily: 'monospace',
+            height: 1.35,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RecoveryCodeDialog extends ConsumerStatefulWidget {
   const _RecoveryCodeDialog();
 
@@ -267,8 +260,8 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
+    final t = context.tokens;
     final canReset =
         _resetConfirmationController.text.trim() ==
         _vaultResetConfirmationPhrase;
@@ -299,7 +292,7 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
                       ? l10n.vaultResetSubtitle
                       : l10n.vaultRecoveryCodeSubtitle,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
+                    color: t.textSecondary,
                     height: 1.4,
                   ),
                 ),
@@ -368,7 +361,7 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
             key: const ValueKey('vault-reset-confirm-button'),
             onPressed: !_busy && canReset ? _resetVault : null,
             child: _busy
-                ? _DialogButtonSpinner(color: scheme.onError)
+                ? _DialogButtonSpinner(color: t.onAccent)
                 : Text(l10n.vaultResetPermanentlyAction),
           )
         else
@@ -376,7 +369,7 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
             key: const ValueKey('vault-recovery-unlock-button'),
             onPressed: _busy ? null : _unlockWithRecoveryCode,
             child: _busy
-                ? _DialogButtonSpinner(color: scheme.onPrimary)
+                ? _DialogButtonSpinner(color: t.onAccent)
                 : Text(l10n.vaultUnlockAction),
           ),
       ],

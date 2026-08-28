@@ -230,6 +230,7 @@ class _HostsSurface extends ConsumerWidget {
                         ? KeyedSubtree(
                             key: const ValueKey('hosts-no-matches'),
                             child: _PlaceholderSurface(
+                              icon: Icons.search_off_outlined,
                               title: l10n.hostsNoMatchesTitle,
                               body: l10n.hostsNoMatchesBody,
                             ),

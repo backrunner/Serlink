@@ -64,18 +64,27 @@ class SurfaceSection extends StatelessWidget {
     required this.title,
     required this.children,
     this.dividerIndent = SerlinkSizes.dividerIndent,
+    this.showDividers = true,
+    this.contentPadding,
   });
 
   final String title;
   final List<Widget> children;
   final double dividerIndent;
 
+  /// Whether to insert hairline dividers between [children]. Turn off for
+  /// sections whose children are self-spaced blocks (e.g. form fields).
+  final bool showDividers;
+
+  /// Optional padding inside the panel, for self-spaced block content.
+  final EdgeInsetsGeometry? contentPadding;
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final rows = <Widget>[];
     for (var i = 0; i < children.length; i++) {
-      if (i > 0) {
+      if (showDividers && i > 0) {
         rows.add(
           Divider(
             height: 1,
@@ -104,6 +113,7 @@ class SurfaceSection extends StatelessWidget {
           ),
         ),
         SurfacePanel(
+          padding: contentPadding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: rows,

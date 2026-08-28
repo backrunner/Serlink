@@ -1,5 +1,17 @@
 part of '../workspace_screen.dart';
 
+/// Viewport sizing for the terminal settings dialog/sheet: the content height
+/// follows a fraction of the available window height, clamped so the dialog
+/// stays usable on small windows and does not stretch on large ones.
+const double _settingsSheetHeightFactor = 0.62;
+const double _settingsSheetMinHeight = 300;
+const double _settingsSheetMaxHeight = 460;
+const double _settingsDialogHeightFactorIOS = 0.58;
+const double _settingsDialogMinHeightIOS = 320;
+const double _settingsDialogMaxHeightIOS = 500;
+const double _settingsDialogHeightFactor = 0.72;
+const double _settingsDialogMaxHeight = 640;
+
 class _TerminalSearchBar extends StatelessWidget {
   const _TerminalSearchBar({
     required this.controller,
@@ -216,14 +228,29 @@ class _TerminalSettingsDialogState
     final availableHeight =
         mediaQuery.size.height - mediaQuery.viewPadding.vertical;
     final viewportHeight = sheet
-        ? math.min(460.0, math.max(300.0, availableHeight * 0.62))
+        ? math.min(
+            _settingsSheetMaxHeight,
+            math.max(
+              _settingsSheetMinHeight,
+              availableHeight * _settingsSheetHeightFactor,
+            ),
+          )
         : isIOS
-        ? math.min(500.0, math.max(320.0, availableHeight * 0.58))
-        : math.min(640.0, mediaQuery.size.height * 0.72);
+        ? math.min(
+            _settingsDialogMaxHeightIOS,
+            math.max(
+              _settingsDialogMinHeightIOS,
+              availableHeight * _settingsDialogHeightFactorIOS,
+            ),
+          )
+        : math.min(
+            _settingsDialogMaxHeight,
+            mediaQuery.size.height * _settingsDialogHeightFactor,
+          );
 
     final scrollFrame = SizedBox(
       key: const ValueKey('terminal-settings-scroll-frame'),
-      width: sheet ? double.infinity : 560,
+      width: sheet ? double.infinity : _dialogWidthSmall,
       height: viewportHeight,
       child: ClipRect(
         child: Scrollbar(
@@ -281,7 +308,7 @@ class _TerminalSettingsDialogState
             decoration: BoxDecoration(
               color: t.surfaceRaised,
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
+                top: SerlinkRadii.dialogR,
               ),
               border: Border.all(color: t.borderSubtle),
             ),
@@ -380,8 +407,10 @@ class _TerminalSettingsContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _TerminalSettingsGroup(
+          SurfaceSection(
             title: l10n.terminalAppearanceSection,
+            showDividers: false,
+            contentPadding: const EdgeInsets.all(16),
             children: [
               SerlinkLabeledField(
                 label: l10n.terminalDarkThemeLabel,
@@ -437,8 +466,10 @@ class _TerminalSettingsContent extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 22),
-          _TerminalSettingsGroup(
+          SurfaceSection(
             title: l10n.terminalLayoutSection,
+            showDividers: false,
+            contentPadding: const EdgeInsets.all(16),
             children: [
               _SettingsSlider(
                 label: l10n.terminalFontSizeLabel,
@@ -479,42 +510,6 @@ class _TerminalSettingsContent extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _TerminalSettingsGroup extends StatelessWidget {
-  const _TerminalSettingsGroup({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 10),
-          child: Text(
-            title,
-            style: TextStyle(
-              color: t.textMuted,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.4,
-            ),
-          ),
-        ),
-        SurfacePanel(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: children,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -773,30 +768,7 @@ class _SettingsSlider extends StatelessWidget {
                 ),
               ),
             ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: t.accentPrimary.withValues(alpha: 0.14),
-                borderRadius: SerlinkRadii.pill,
-                border: Border.all(
-                  color: t.accentPrimary.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                child: Text(
-                  displayValue,
-                  style: TextStyle(
-                    color: t.accentPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-            ),
+            StatusPill(label: displayValue, color: t.accentPrimary),
           ],
         ),
         const SizedBox(height: 10),

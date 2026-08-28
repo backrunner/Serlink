@@ -62,6 +62,7 @@ class _SnippetsSurface extends ConsumerWidget {
                         )
                       : filteredItems.isEmpty
                       ? _PlaceholderSurface(
+                          icon: Icons.search_off_outlined,
                           title: l10n.hostsNoMatchesTitle,
                           body: l10n.snippetsNoMatchesBody,
                         )

@@ -486,6 +486,11 @@ const double _snackBarMargin = 16;
 const double _snackBarCloseButtonSize = 22;
 const double _mobileBottomNavigationBaseHeight = 56;
 
+/// Fraction of the bottom safe-area inset reserved behind the mobile bottom
+/// navigation bar. The bar already covers part of the gesture area visually,
+/// so only two thirds of the inset is added on top of the bar height.
+const double _mobileBottomNavigationSafeAreaFraction = 2 / 3;
+
 void _showSnackBar(BuildContext context, String message) {
   final t = context.tokens;
   final l10n = context.l10n;
@@ -544,7 +549,9 @@ double _snackBarBottomReservedHeight(BuildContext context) {
   if (!hasMobileBottomNavigation) {
     return 0;
   }
-  final bottomSafePadding = MediaQuery.viewPaddingOf(context).bottom * 2 / 3;
+  final bottomSafePadding =
+      MediaQuery.viewPaddingOf(context).bottom *
+      _mobileBottomNavigationSafeAreaFraction;
   return _mobileBottomNavigationBaseHeight + bottomSafePadding;
 }
 
@@ -577,21 +584,27 @@ class _PlaceholderSurface extends StatelessWidget {
   const _PlaceholderSurface({
     required this.title,
     required this.body,
+    this.icon,
     this.loading = false,
     this.action,
   });
 
   final String title;
   final String body;
+
+  /// Optional semantic icon; when present it renders in the same accent
+  /// square used by `_DialogStateView` so both empty states share a layout.
+  final IconData? icon;
   final bool loading;
   final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final icon = this.icon;
     final bodyStyle = Theme.of(
       context,
-    ).textTheme.bodyMedium?.copyWith(color: t.textSecondary);
+    ).textTheme.bodySmall?.copyWith(color: t.textSecondary, height: 1.4);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -604,11 +617,27 @@ class _PlaceholderSurface extends StatelessWidget {
               ),
               const SizedBox(height: 16),
             ],
+            if (icon != null) ...[
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: t.accentPrimary.withValues(alpha: 0.12),
+                  borderRadius: SerlinkRadii.control,
+                  border: Border.all(
+                    color: t.accentPrimary.withValues(alpha: 0.28),
+                  ),
+                ),
+                child: Icon(icon, size: 26, color: t.accentPrimary),
+              ),
+              const SizedBox(height: 14),
+            ],
             Text(
               title,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 color: t.textPrimary,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 8),

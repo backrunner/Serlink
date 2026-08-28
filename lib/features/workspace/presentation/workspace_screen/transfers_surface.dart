@@ -53,6 +53,7 @@ class _TransfersSurface extends ConsumerWidget {
               );
               if (filteredTasks.isEmpty) {
                 return _PlaceholderSurface(
+                  icon: Icons.search_off_outlined,
                   title: l10n.hostsNoMatchesTitle,
                   body: l10n.transfersNoMatchesBody,
                 );

@@ -1104,6 +1104,17 @@ String _identityKindLabel(AppLocalizations l10n, IdentityKind kind) {
   };
 }
 
+IconData _identityKindIcon(IdentityKind kind) {
+  return switch (kind) {
+    IdentityKind.password => Icons.password_rounded,
+    IdentityKind.privateKey => Icons.key_outlined,
+    IdentityKind.keyboardInteractive => Icons.keyboard_outlined,
+    IdentityKind.openSshCertificate => Icons.verified_user_outlined,
+    IdentityKind.sshAgent => Icons.vpn_key_outlined,
+    IdentityKind.hardwareKey => Icons.usb_rounded,
+  };
+}
+
 bool _identitySupportedByCapabilities(
   IdentityConfig identity,
   PlatformCapabilities capabilities,

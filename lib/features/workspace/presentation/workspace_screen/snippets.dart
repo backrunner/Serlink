@@ -166,11 +166,18 @@ class _WorkspaceListHeader extends StatelessWidget {
           const SizedBox(width: 8),
           _CountBadge(count: count),
           if (status != null) ...[const SizedBox(width: 8), status!],
-          const Spacer(),
-          if (beforeAction != null) ...[
-            Flexible(child: beforeAction!),
-            const SizedBox(width: 8),
-          ],
+          if (beforeAction != null)
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: beforeAction!,
+                ),
+              ),
+            )
+          else
+            const Spacer(),
           ?action,
         ],
       ),

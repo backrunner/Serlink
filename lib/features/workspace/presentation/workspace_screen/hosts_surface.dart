@@ -653,10 +653,12 @@ class _HostsHeader extends ConsumerWidget {
           ),
           const SizedBox(width: 8),
           _CountBadge(count: count),
-          const Spacer(),
-          Flexible(
-            child: _WorkspaceHeaderSearch(
-              placeholder: l10n.searchHostsPlaceholder,
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: _WorkspaceHeaderSearch(
+                placeholder: l10n.searchHostsPlaceholder,
+              ),
             ),
           ),
           const SizedBox(width: 8),

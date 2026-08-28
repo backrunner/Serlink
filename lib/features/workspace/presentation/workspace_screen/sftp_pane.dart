@@ -339,6 +339,9 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
         final entries = _filterEntries(visibleEntries, _filterText);
         if (entries.isEmpty) {
           return _PlaceholderSurface(
+            icon: _filterText.trim().isEmpty
+                ? Icons.folder_open_outlined
+                : Icons.search_off_outlined,
             title: _filterText.trim().isEmpty
                 ? l10n.sftpEmptyFolderTitle
                 : l10n.hostsNoMatchesTitle,

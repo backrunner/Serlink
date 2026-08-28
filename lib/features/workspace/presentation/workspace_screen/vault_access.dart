@@ -205,7 +205,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                     _VaultErrorText(message: errorMessage),
                     if (recoveryKey != null) ...[
                       const SizedBox(height: 20),
-                      SelectableText(recoveryKey.value),
+                      _RecoveryKeyValueBox(recoveryKey: recoveryKey.value),
                       const SizedBox(height: 8),
                       SerlinkOutlinedButton(
                         onPressed: () => ref
@@ -540,7 +540,7 @@ class _VaultLockBadgeState extends State<_VaultLockBadge>
           height: 56,
           decoration: BoxDecoration(
             gradient: serlinkAccentGradient(t),
-            borderRadius: const BorderRadius.all(Radius.circular(16)),
+            borderRadius: SerlinkRadii.dialog,
             boxShadow: [
               BoxShadow(
                 color: t.accentStrong.withValues(alpha: 0.4),
@@ -598,7 +598,7 @@ class _VaultPrimaryButton extends StatelessWidget {
         child: SerlinkPressable(
           onTap: onPressed,
           borderRadius: SerlinkRadii.control,
-          hoverColor: Colors.white.withValues(alpha: 0.06),
+          hoverColor: t.onAccent.withValues(alpha: 0.06),
           pressedColor: Colors.black.withValues(alpha: 0.08),
           child: SizedBox(
             height: 46,

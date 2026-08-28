@@ -30,10 +30,16 @@ class _RemoteFileDialogState extends State<_RemoteFileDialog> {
     final preview = widget.preview;
     final l10n = context.l10n;
     return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthWide),
       title: Text(widget.entry.name, overflow: TextOverflow.ellipsis),
       content: SizedBox(
         width: 720,
-        height: 460,
+        // Keep the fixed height on roomy windows, but clamp it so the
+        // dialog (title + actions included) never overflows short windows.
+        height: math.max(
+          240.0,
+          math.min(460.0, MediaQuery.sizeOf(context).height - 180),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -117,6 +123,7 @@ class _SftpDefaultDirectoryDialogState
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return SerlinkDialog(
+      maxWidth: _adaptiveDialogWidth(context, _dialogWidthPrompt),
       title: Text(l10n.sftpDefaultDirectoryDialogTitle),
       content: SizedBox(
         width: 480,
@@ -232,46 +239,43 @@ class _SftpEntryRow extends StatelessWidget {
             metadataLabel.isEmpty ? typeLabel : '$typeLabel · $metadataLabel',
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: SizedBox(
-            width: 408,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: Text(sizeLabel, overflow: TextOverflow.ellipsis),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(sizeLabel, overflow: TextOverflow.ellipsis),
+              const SizedBox(width: 16),
+              // Permission strings look like `drwxr-xr-x`; keep a fixed
+              // column so rows stay aligned.
+              SizedBox(width: 88, child: Text(permissionsLabel)),
+              _SftpEntryActionButton(
+                tooltip: l10n.downloadAction,
+                onPressed: onDownload,
+                icon: const Icon(Icons.download_outlined, size: 16),
+              ),
+              _SftpEntryActionButton(
+                tooltip: l10n.renameAction,
+                onPressed: onRename,
+                icon: const Icon(Icons.drive_file_rename_outline, size: 16),
+              ),
+              _SftpEntryActionButton(
+                tooltip: l10n.moveAction,
+                onPressed: onMove,
+                icon: const Icon(Icons.drive_file_move_outline, size: 16),
+              ),
+              _SftpEntryActionButton(
+                tooltip: l10n.sftpChangePermissionsTitle,
+                onPressed: onChmod,
+                icon: const Icon(
+                  Icons.admin_panel_settings_outlined,
+                  size: 16,
                 ),
-                const SizedBox(width: 16),
-                SizedBox(width: 88, child: Text(permissionsLabel)),
-                _SftpEntryActionButton(
-                  tooltip: l10n.downloadAction,
-                  onPressed: onDownload,
-                  icon: const Icon(Icons.download_outlined, size: 16),
-                ),
-                _SftpEntryActionButton(
-                  tooltip: l10n.renameAction,
-                  onPressed: onRename,
-                  icon: const Icon(Icons.drive_file_rename_outline, size: 16),
-                ),
-                _SftpEntryActionButton(
-                  tooltip: l10n.moveAction,
-                  onPressed: onMove,
-                  icon: const Icon(Icons.drive_file_move_outline, size: 16),
-                ),
-                _SftpEntryActionButton(
-                  tooltip: l10n.sftpChangePermissionsTitle,
-                  onPressed: onChmod,
-                  icon: const Icon(
-                    Icons.admin_panel_settings_outlined,
-                    size: 16,
-                  ),
-                ),
-                _SftpEntryActionButton(
-                  tooltip: l10n.deleteAction,
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline, size: 16),
-                ),
-              ],
-            ),
+              ),
+              _SftpEntryActionButton(
+                tooltip: l10n.deleteAction,
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline, size: 16),
+              ),
+            ],
           ),
           onTap: onTap,
         );

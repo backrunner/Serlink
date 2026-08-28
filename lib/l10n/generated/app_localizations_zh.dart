@@ -175,6 +175,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLanguageSubtitle => '选择应用显示语言。';
 
   @override
+  String get settingsLanguageSubtitleMobile => '应用语言';
+
+  @override
   String get settingsLanguageSystem => '跟随系统';
 
   @override
@@ -223,7 +226,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsVaultLocked => '已锁定。现有连接会继续运行。';
 
   @override
+  String get settingsVaultLockedMobile => '已锁定';
+
+  @override
   String get settingsVaultUnlocked => '已解锁，可解析新的连接配置。';
+
+  @override
+  String get settingsVaultUnlockedMobile => '已解锁';
 
   @override
   String get settingsLockAction => '锁定';
@@ -241,13 +250,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLocalUnlockNeedsVault => '请先创建保险库，再启用 Face ID 解锁。';
 
   @override
+  String get settingsLocalUnlockNeedsVaultMobile => '需先创建保险库';
+
+  @override
   String get settingsLocalUnlockEnabled => '已启用。锁定保险库后可使用 Face ID 解锁。';
+
+  @override
+  String get settingsLocalUnlockEnabledMobile => 'Face ID 可用';
 
   @override
   String get settingsLocalUnlockUnavailable => '此设备不可用 Face ID。';
 
   @override
+  String get settingsLocalUnlockUnavailableMobile => '此设备不可用';
+
+  @override
   String get settingsLocalUnlockDisabled => '已停用。锁定后需要密码短语或恢复密钥。';
+
+  @override
+  String get settingsLocalUnlockDisabledMobile => '需密码或恢复密钥';
 
   @override
   String get settingsUnlockWithDeviceAction => '使用 Face ID';
@@ -313,10 +334,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCredentialsLocked => '解锁保险库以查看加密凭据。';
 
   @override
+  String get settingsCredentialsLockedMobile => '需解锁保险库';
+
+  @override
   String get settingsKnownHostsTitle => '已知主机';
 
   @override
   String get settingsKnownHostsLocked => '解锁保险库以查看受信任的主机指纹。';
+
+  @override
+  String get settingsKnownHostsLockedMobile => '需解锁保险库';
 
   @override
   String get settingsManageAction => '管理';
@@ -330,6 +357,9 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsImportExportSubtitle =>
       '备份、OpenSSH 文件、证书、known_hosts 与元数据。';
+
+  @override
+  String get settingsImportExportSubtitleMobile => '备份与 SSH 数据';
 
   @override
   String get settingsOpenAction => '打开';
@@ -1141,6 +1171,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get webDavAllowHttpTitle => '允许 HTTP 端点';
 
   @override
+  String get webDavEnableMobileLabel => '启用同步';
+
+  @override
+  String get webDavAllowHttpMobileLabel => '允许 HTTP';
+
+  @override
   String get webDavUseHttpTitle => '使用 HTTP WebDAV？';
 
   @override
@@ -1863,6 +1899,11 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get syncConflictUnsupportedBody =>
       '此记录类型当前需要整条记录解决。请对该冲突使用已有的本地或远程操作。';
+
+  @override
+  String syncConflictFieldCount(num count) {
+    return '$count 个字段存在差异';
+  }
 
   @override
   String get sftpParentFolderTooltip => '前往上级文件夹';

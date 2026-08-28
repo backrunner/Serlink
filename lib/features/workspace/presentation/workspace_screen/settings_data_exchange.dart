@@ -74,38 +74,26 @@ class _DataExchangeDialog extends StatelessWidget {
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthDataExchange),
       contentPadding: EdgeInsets.zero,
+      title: Row(
+        children: [
+          Expanded(child: Text(l10n.dataExchangeTitle)),
+          SerlinkIconButton(
+            key: const ValueKey('data-exchange-close-button'),
+            visualDensity: VisualDensity.compact,
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close),
+          ),
+        ],
+      ),
       content: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: _adaptiveDialogWidth(context, _dialogWidthDataExchange),
-          maxHeight: 720,
-        ),
+        constraints: const BoxConstraints(maxHeight: 720),
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 18),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l10n.dataExchangeTitle,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: t.textPrimary,
-                        ),
-                      ),
-                    ),
-                    SerlinkIconButton(
-                      key: const ValueKey('data-exchange-close-button'),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
                 Text(
                   l10n.dataExchangeSubtitle,
                   style: Theme.of(
@@ -115,7 +103,6 @@ class _DataExchangeDialog extends StatelessWidget {
                 const SizedBox(height: 20),
                 SurfaceSection(
                   title: l10n.dataExchangeExportSection,
-                  dividerIndent: 52,
                   children: [
                     _DataExchangeActionTile(
                       icon: Icons.lock_outline,
@@ -168,7 +155,6 @@ class _DataExchangeDialog extends StatelessWidget {
                 const SizedBox(height: 20),
                 SurfaceSection(
                   title: l10n.dataExchangeImportSection,
-                  dividerIndent: 52,
                   children: [
                     _DataExchangeActionTile(
                       icon: Icons.restore_outlined,
@@ -220,7 +206,7 @@ class _DataExchangeDialog extends StatelessWidget {
   }
 }
 
-class _DataExchangeActionTile extends StatefulWidget {
+class _DataExchangeActionTile extends StatelessWidget {
   const _DataExchangeActionTile({
     required this.icon,
     required this.title,
@@ -238,76 +224,49 @@ class _DataExchangeActionTile extends StatefulWidget {
   final String? disabledSubtitle;
 
   @override
-  State<_DataExchangeActionTile> createState() =>
-      _DataExchangeActionTileState();
-}
-
-class _DataExchangeActionTileState extends State<_DataExchangeActionTile> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final effectiveSubtitle = widget.enabled
-        ? widget.subtitle
-        : widget.disabledSubtitle ?? widget.subtitle;
-    final interactive = widget.enabled;
-    final foregroundOpacity = interactive ? 1.0 : 0.48;
+    final effectiveSubtitle = enabled ? subtitle : disabledSubtitle ?? subtitle;
 
-    return MouseRegion(
-      cursor: interactive ? SystemMouseCursors.click : MouseCursor.defer,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: interactive ? widget.onPressed : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          decoration: BoxDecoration(
-            color: interactive && _hovered
-                ? t.accentPrimary.withValues(alpha: 0.06)
-                : Colors.transparent,
-            borderRadius: SerlinkRadii.control,
-          ),
-          child: Opacity(
-            opacity: foregroundOpacity,
-            child: Row(
-              children: [
-                SizedBox.square(
-                  dimension: 40,
-                  child: Center(
-                    child: Icon(widget.icon, size: 20, color: t.textSecondary),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: t.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        effectiveSubtitle,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Icon(Icons.chevron_right, size: 20, color: t.textMuted),
-              ],
+    return Opacity(
+      opacity: enabled ? 1 : 0.54,
+      child: SerlinkPressable(
+        onTap: enabled ? onPressed : null,
+        borderRadius: SerlinkRadii.control,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 40,
+              child: Center(
+                child: Icon(icon, size: 20, color: t.textSecondary),
+              ),
             ),
-          ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: t.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    effectiveSubtitle,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Icon(Icons.chevron_right, size: 20, color: t.textMuted),
+          ],
         ),
       ),
     );

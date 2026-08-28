@@ -197,6 +197,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageSubtitle => 'Choose the app display language.';
 
   @override
+  String get settingsLanguageSubtitleMobile => 'App language';
+
+  @override
   String get settingsLanguageSystem => 'System';
 
   @override
@@ -247,8 +250,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Locked. Existing connections keep running.';
 
   @override
+  String get settingsVaultLockedMobile => 'Locked';
+
+  @override
   String get settingsVaultUnlocked =>
       'Unlocked for new connection profile resolution.';
+
+  @override
+  String get settingsVaultUnlockedMobile => 'Unlocked';
 
   @override
   String get settingsLockAction => 'Lock';
@@ -267,16 +276,28 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create the vault before enabling Face ID unlock.';
 
   @override
+  String get settingsLocalUnlockNeedsVaultMobile => 'Create vault first';
+
+  @override
   String get settingsLocalUnlockEnabled =>
       'Enabled. Lock the vault to unlock with Face ID.';
+
+  @override
+  String get settingsLocalUnlockEnabledMobile => 'Face ID ready';
 
   @override
   String get settingsLocalUnlockUnavailable =>
       'Face ID is not available on this device.';
 
   @override
+  String get settingsLocalUnlockUnavailableMobile => 'Not available';
+
+  @override
   String get settingsLocalUnlockDisabled =>
       'Disabled. Passphrase or recovery key is required after lock.';
+
+  @override
+  String get settingsLocalUnlockDisabledMobile => 'Passphrase required';
 
   @override
   String get settingsUnlockWithDeviceAction => 'Use Face ID';
@@ -352,11 +373,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Unlock the vault to review encrypted credentials.';
 
   @override
+  String get settingsCredentialsLockedMobile => 'Unlock vault first';
+
+  @override
   String get settingsKnownHostsTitle => 'Known hosts';
 
   @override
   String get settingsKnownHostsLocked =>
       'Unlock the vault to review trusted host fingerprints.';
+
+  @override
+  String get settingsKnownHostsLockedMobile => 'Unlock vault first';
 
   @override
   String get settingsManageAction => 'Manage';
@@ -370,6 +397,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsImportExportSubtitle =>
       'Backups, OpenSSH files, certificates, known_hosts, and metadata.';
+
+  @override
+  String get settingsImportExportSubtitleMobile => 'Backups and SSH data';
 
   @override
   String get settingsOpenAction => 'Open';
@@ -1230,6 +1260,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get webDavAllowHttpTitle => 'Allow HTTP endpoint';
 
   @override
+  String get webDavEnableMobileLabel => 'Enable sync';
+
+  @override
+  String get webDavAllowHttpMobileLabel => 'Allow HTTP';
+
+  @override
   String get webDavUseHttpTitle => 'Use HTTP WebDAV?';
 
   @override
@@ -2017,6 +2053,17 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get syncConflictUnsupportedBody =>
       'This record type currently requires whole-record resolution. Use the existing local or remote action for this conflict.';
+
+  @override
+  String syncConflictFieldCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fields differ',
+      one: '1 field differs',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get sftpParentFolderTooltip => 'Go to parent folder';

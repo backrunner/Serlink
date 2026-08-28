@@ -1,5 +1,15 @@
 part of '../workspace_screen.dart';
 
+/// Width below which conflict field rows stack vertically and the
+/// Local/Remote column labels are hidden.
+const double _conflictNarrowBreakpoint = 620;
+
+/// Width of the field label column in wide conflict rows. The column label
+/// header indents by this plus the row gap so both align by construction.
+const double _conflictFieldLabelWidth = 104;
+const double _conflictFieldLabelTopPadding = 12;
+const double _conflictChoiceMinHeight = 66;
+
 class _SyncConflictReviewDialog extends ConsumerStatefulWidget {
   const _SyncConflictReviewDialog({required this.conflicts});
 
@@ -161,7 +171,7 @@ class _SyncConflictFieldCard extends StatelessWidget {
     final t = context.tokens;
     final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
       color: t.textPrimary,
-      fontWeight: FontWeight.w800,
+      fontWeight: FontWeight.w700,
     );
     return SurfacePanel(
       borderRadius: SerlinkRadii.dialog,
@@ -213,16 +223,21 @@ class _SyncConflictFieldCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: t.textMuted,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.syncConflictFieldCount(fieldSet.fields.length),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: t.textMuted,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: SerlinkSpacing.md),
-                StatusPill(
-                  label: fieldSet.fields.length.toString(),
-                  color: t.statusWarning,
                 ),
               ],
             ),
@@ -270,16 +285,18 @@ class _ConflictColumnLabels extends StatelessWidget {
     final t = context.tokens;
     final style = Theme.of(context).textTheme.labelSmall?.copyWith(
       color: t.textMuted,
-      fontWeight: FontWeight.w800,
+      fontWeight: FontWeight.w600,
     );
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 620) {
+        if (constraints.maxWidth < _conflictNarrowBreakpoint) {
           return const SizedBox.shrink();
         }
         return Row(
           children: [
-            const SizedBox(width: 116),
+            const SizedBox(
+              width: _conflictFieldLabelWidth + SerlinkSpacing.md,
+            ),
             Expanded(child: Text(localLabel, style: style)),
             const SizedBox(width: SerlinkSpacing.sm),
             Expanded(child: Text(remoteLabel, style: style)),
@@ -316,7 +333,7 @@ class _ConflictFieldRow extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: Theme.of(context).textTheme.labelMedium?.copyWith(
         color: t.textSecondary,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w600,
       ),
     );
     return DecoratedBox(
@@ -344,7 +361,7 @@ class _ConflictFieldRow extends StatelessWidget {
               selected: useRemote,
               onSelected: () => onChanged(field.key, true),
             );
-            if (constraints.maxWidth < 620) {
+            if (constraints.maxWidth < _conflictNarrowBreakpoint) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -360,9 +377,11 @@ class _ConflictFieldRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  width: 104,
+                  width: _conflictFieldLabelWidth,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.only(
+                      top: _conflictFieldLabelTopPadding,
+                    ),
                     child: label,
                   ),
                 ),
@@ -396,10 +415,13 @@ class _ConflictChoiceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final borderColor = selected
-        ? t.accentPrimary.withValues(alpha: 0.72)
+        ? t.accentPrimary.withValues(alpha: 0.6)
         : t.borderSubtle;
     final background = selected
-        ? t.accentPrimary.withValues(alpha: 0.09)
+        ? Color.alphaBlend(
+            t.accentPrimary.withValues(alpha: 0.12),
+            t.surfaceRaised,
+          )
         : t.surfaceSunken.withValues(alpha: 0.72);
     return SerlinkPressable(
       onTap: onSelected,
@@ -409,7 +431,7 @@ class _ConflictChoiceTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 140),
         curve: Curves.easeOut,
-        constraints: const BoxConstraints(minHeight: 66),
+        constraints: const BoxConstraints(minHeight: _conflictChoiceMinHeight),
         padding: const EdgeInsets.symmetric(
           horizontal: SerlinkSpacing.md,
           vertical: SerlinkSpacing.sm,
@@ -439,7 +461,7 @@ class _ConflictChoiceTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: selected ? t.accentPrimary : t.textMuted,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -470,48 +492,14 @@ class _SyncConflictUnsupportedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return SurfacePanel(
-      padding: const EdgeInsets.all(SerlinkSpacing.lg),
-      borderRadius: SerlinkRadii.dialog,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.warning_amber_rounded, color: t.statusWarning, size: 22),
-          const SizedBox(width: SerlinkSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  conflict.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: t.textPrimary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: SerlinkSpacing.xs),
-                Text(
-                  conflict.subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: t.textMuted,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: SerlinkSpacing.xs),
-                Text(
-                  context.l10n.syncConflictUnsupportedBody,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
-                ),
-              ],
-            ),
-          ),
-        ],
+    return SerlinkAlert.warning(
+      title: conflict.title,
+      message: conflict.subtitle,
+      child: Text(
+        context.l10n.syncConflictUnsupportedBody,
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
       ),
     );
   }

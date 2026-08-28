@@ -1,5 +1,13 @@
 part of '../workspace_screen.dart';
 
+/// Maximum number of import warnings shown inline in the import/export
+/// dialogs; longer lists are truncated to keep the dialogs compact.
+const int _maxImportWarningsShown = 3;
+
+/// Caps the host picker list in [_showHostSelectionDialog] so large host
+/// lists scroll inside the dialog instead of growing it past the viewport.
+const double _hostSelectionListMaxHeight = 320;
+
 Future<void> _exportVaultBackup(BuildContext context, WidgetRef ref) async {
   final l10n = context.l10n;
   final confirmed = await _confirmDialog(
@@ -239,46 +247,47 @@ Future<List<HostId>?> _showHostSelectionDialog(
           return SerlinkDialog(
             maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
             title: Text(title),
-            content: SizedBox(
-              width: 560,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    description,
-                    style: Theme.of(context).textTheme.bodySmall,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  description,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: context.tokens.textSecondary,
                   ),
-                  const SizedBox(height: 12),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 320),
-                    child: ListView(
-                      shrinkWrap: true,
-                      children: [
-                        for (final host in hosts)
-                          SerlinkCheckboxListTile(
-                            dense: true,
-                            value: selected.contains(host.id),
-                            title: Text(host.displayName),
-                            subtitle: Text(
-                              '${host.username}@${host.hostname}:${host.port}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                if (value ?? false) {
-                                  selected.add(host.id);
-                                } else {
-                                  selected.remove(host.id);
-                                }
-                              });
-                            },
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxHeight: _hostSelectionListMaxHeight,
+                  ),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final host in hosts)
+                        SerlinkCheckboxListTile(
+                          dense: true,
+                          value: selected.contains(host.id),
+                          title: Text(host.displayName),
+                          subtitle: Text(
+                            '${host.username}@${host.hostname}:${host.port}',
+                            overflow: TextOverflow.ellipsis,
                           ),
-                      ],
-                    ),
+                          onChanged: (value) {
+                            setState(() {
+                              if (value ?? false) {
+                                selected.add(host.id);
+                              } else {
+                                selected.remove(host.id);
+                              }
+                            });
+                          },
+                        ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
             actions: [
               SerlinkTextButton(
@@ -545,7 +554,9 @@ Future<bool> _showOpenSshConfigImportDialog(
   BuildContext context,
   OpenSshConfigImportResult preview,
 ) async {
-  final warnings = preview.warnings.take(4).toList(growable: false);
+  final warnings = preview.warnings
+      .take(_maxImportWarningsShown)
+      .toList(growable: false);
   final result = await showSerlinkDialog<bool>(
     context: context,
     barrierDismissible: false,

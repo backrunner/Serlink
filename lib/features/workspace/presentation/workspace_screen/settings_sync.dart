@@ -24,10 +24,11 @@ class _SyncSettingsSection extends ConsumerWidget {
         ? null
         : ref.watch(syncRepairServiceProvider).planFor(lastFailure);
     final webDavRow = webDav.when(
-      loading: () => _SettingsInfoRow(
+      loading: () => _SettingsActionRow(
         icon: Icons.cloud_queue,
         title: 'WebDAV',
         subtitle: l10n.syncLoadingSettings,
+        action: null,
       ),
       error: (error, stackTrace) => _SettingsActionRow(
         icon: Icons.cloud_queue,
@@ -52,15 +53,17 @@ class _SyncSettingsSection extends ConsumerWidget {
     );
 
     final iCloudRow = iCloudAvailable.when<Widget?>(
-      loading: () => _SettingsInfoRow(
+      loading: () => _SettingsActionRow(
         icon: Icons.cloud_outlined,
         title: 'iCloud',
         subtitle: l10n.syncICloudChecking,
+        action: null,
       ),
-      error: (error, stackTrace) => _SettingsInfoRow(
+      error: (error, stackTrace) => _SettingsActionRow(
         icon: Icons.cloud_outlined,
         title: 'iCloud',
         subtitle: _syncSettingsErrorMessage(l10n, error),
+        action: null,
       ),
       data: (available) {
         if (!available) {
@@ -68,15 +71,17 @@ class _SyncSettingsSection extends ConsumerWidget {
         }
         final cloudKit = ref.watch(cloudKitSyncSettingsProvider);
         return cloudKit.when(
-              loading: () => _SettingsInfoRow(
+              loading: () => _SettingsActionRow(
                 icon: Icons.cloud_outlined,
                 title: 'iCloud',
                 subtitle: l10n.syncICloudChecking,
+                action: null,
               ),
-              error: (error, stackTrace) => _SettingsInfoRow(
+              error: (error, stackTrace) => _SettingsActionRow(
                 icon: Icons.cloud_outlined,
                 title: 'iCloud',
                 subtitle: _syncSettingsErrorMessage(l10n, error),
+                action: null,
               ),
               data: (settings) {
                 final enabled = settings?.enabled ?? false;
@@ -96,15 +101,16 @@ class _SyncSettingsSection extends ConsumerWidget {
                 );
               },
             ) ??
-            _SettingsInfoRow(
+            _SettingsActionRow(
               icon: Icons.cloud_outlined,
               title: 'iCloud',
               subtitle: l10n.syncICloudChecking,
+              action: null,
             );
       },
     );
 
-    return _SettingsSection(
+    return SurfaceSection(
       title: l10n.syncSectionTitle,
       children: [
         webDavRow,
@@ -114,15 +120,17 @@ class _SyncSettingsSection extends ConsumerWidget {
           _SyncConflictRow(conflicts: conflicts, mobile: mobile),
         if (knownDevices != null)
           knownDevices.when(
-            loading: () => _SettingsInfoRow(
+            loading: () => _SettingsActionRow(
               icon: Icons.devices_outlined,
               title: l10n.syncDevicesTitle,
               subtitle: l10n.syncDevicesLoading,
+              action: null,
             ),
-            error: (error, stackTrace) => _SettingsInfoRow(
+            error: (error, stackTrace) => _SettingsActionRow(
               icon: Icons.devices_outlined,
               title: l10n.syncDevicesTitle,
               subtitle: _syncSettingsErrorMessage(l10n, error),
+              action: null,
             ),
             data: (devices) {
               final viewButton = _SettingsTextButton(
@@ -145,7 +153,6 @@ class _SyncSettingsSection extends ConsumerWidget {
                 icon: Icons.devices_outlined,
                 title: l10n.syncDevicesTitle,
                 subtitle: _syncDevicesSubtitle(l10n, devices, mobile: mobile),
-                actionWidth: mobile ? null : 188,
                 action: mobile
                     ? viewButton
                     : Wrap(
@@ -251,15 +258,19 @@ Future<void> _repairWebDavSync(
   }
 }
 
+WebDavTlsCertificateDetails? _lastFailureWebDavCertificate(WidgetRef ref) {
+  final lastFailure = ref.read(autoSyncControllerProvider).lastFailure;
+  return lastFailure is SyncProviderException
+      ? WebDavTlsCertificateDetails.tryParse(lastFailure.diagnostic)
+      : null;
+}
+
 Future<void> _trustWebDavCertificate(
   BuildContext context,
   WidgetRef ref,
   SyncRepairPlan plan,
 ) async {
-  final lastFailure = ref.read(autoSyncControllerProvider).lastFailure;
-  final certificate = lastFailure is SyncProviderException
-      ? WebDavTlsCertificateDetails.tryParse(lastFailure.diagnostic)
-      : null;
+  final certificate = _lastFailureWebDavCertificate(ref);
   if (certificate == null) {
     _showSnackBar(context, _syncRepairCopy(context.l10n, plan).message);
     return;
@@ -294,56 +305,64 @@ Future<void> _reviewLocalClock(
   WidgetRef ref,
   SyncRepairPlan plan,
 ) async {
-  final lastFailure = ref.read(autoSyncControllerProvider).lastFailure;
-  final certificate = lastFailure is SyncProviderException
-      ? WebDavTlsCertificateDetails.tryParse(lastFailure.diagnostic)
-      : null;
+  final certificate = _lastFailureWebDavCertificate(ref);
   final copy = _syncRepairCopy(context.l10n, plan);
   await showSerlinkDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (context) => SerlinkDialog(
-      maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
-      title: Text(copy.title),
-      content: SizedBox(
-        width: 520,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(copy.message),
-            const SizedBox(height: 12),
-            Text(
-              context.l10n.syncLocalTimeLabel(
-                _shortLocalDateTime(DateTime.now()),
-              ),
-            ),
-            if (certificate != null) ...[
-              const SizedBox(height: 8),
-              Text(context.l10n.syncEndpointLabel('${certificate.endpoint}')),
-              const SizedBox(height: 8),
+    builder: (context) {
+      final t = context.tokens;
+      final l10n = context.l10n;
+      final detailStyle = Theme.of(
+        context,
+      ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
+      return SerlinkDialog(
+        maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
+        title: Text(copy.title),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SerlinkAlert.info(message: copy.message),
+              const SizedBox(height: SerlinkSpacing.md),
               Text(
-                context.l10n.syncValidFromLabel(
-                  _shortLocalDateTime(certificate.validFrom),
-                ),
+                l10n.syncLocalTimeLabel(_shortLocalDateTime(DateTime.now())),
+                style: detailStyle,
               ),
-              const SizedBox(height: 8),
-              Text(
-                context.l10n.syncValidUntilLabel(
-                  _shortLocalDateTime(certificate.validUntil),
+              if (certificate != null) ...[
+                const SizedBox(height: SerlinkSpacing.sm),
+                Text(
+                  l10n.syncEndpointLabel('${certificate.endpoint}'),
+                  style: detailStyle,
                 ),
-              ),
+                const SizedBox(height: SerlinkSpacing.sm),
+                Text(
+                  l10n.syncValidFromLabel(
+                    _shortLocalDateTime(certificate.validFrom),
+                  ),
+                  style: detailStyle,
+                ),
+                const SizedBox(height: SerlinkSpacing.sm),
+                Text(
+                  l10n.syncValidUntilLabel(
+                    _shortLocalDateTime(certificate.validUntil),
+                  ),
+                  style: detailStyle,
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
-      actions: [
-        SerlinkFilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(context.l10n.doneAction),
-        ),
-      ],
-    ),
+        actions: [
+          SerlinkFilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.doneAction),
+          ),
+        ],
+      );
+    },
   );
 }
 
@@ -365,7 +384,6 @@ class _SyncConflictRow extends ConsumerWidget {
       icon: Icons.report_problem_outlined,
       title: l10n.syncConflictsTitle,
       subtitle: l10n.syncConflictsSubtitle(conflicts.length),
-      actionWidth: mobile ? null : 286,
       action: mobile
           ? reviewButton
           : Wrap(

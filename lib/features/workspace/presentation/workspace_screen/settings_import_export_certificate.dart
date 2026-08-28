@@ -63,7 +63,9 @@ class _OpenSshCertificateImportDialogState
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final warnings = widget.preview.warnings.take(3).toList(growable: false);
+    final warnings = widget.preview.warnings
+        .take(_maxImportWarningsShown)
+        .toList(growable: false);
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
       title: Text(l10n.importOpenSshCertificateTitle),
@@ -109,7 +111,6 @@ class _OpenSshCertificateImportDialogState
               controller: _displayNameController,
               decoration: InputDecoration(
                 labelText: l10n.hostDisplayNameLabel,
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 10),
@@ -118,7 +119,6 @@ class _OpenSshCertificateImportDialogState
               controller: _usernameController,
               decoration: InputDecoration(
                 labelText: l10n.credentialUsernameHintLabel,
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 10),
@@ -128,7 +128,6 @@ class _OpenSshCertificateImportDialogState
               obscureText: true,
               decoration: InputDecoration(
                 labelText: l10n.hostKeyPassphraseLabel,
-                border: OutlineInputBorder(),
               ),
             ),
             if (_errorMessage != null) ...[
@@ -184,10 +183,14 @@ class _ImportPreviewLine extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 84,
-            child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: context.tokens.textMuted,
+              fontWeight: FontWeight.w600,
+            ),
           ),
+          const SizedBox(width: 12),
           Expanded(
             child: SelectableText(
               value,

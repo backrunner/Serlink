@@ -175,6 +175,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsLanguageSubtitle => 'アプリの表示言語を選択します。';
 
   @override
+  String get settingsLanguageSubtitleMobile => '表示言語';
+
+  @override
   String get settingsLanguageSystem => 'システムに合わせる';
 
   @override
@@ -223,7 +226,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsVaultLocked => 'ロック中です。既存の接続は動作を続けます。';
 
   @override
+  String get settingsVaultLockedMobile => 'ロック中';
+
+  @override
   String get settingsVaultUnlocked => '新しい接続プロファイルを解決できます。';
+
+  @override
+  String get settingsVaultUnlockedMobile => '解除済み';
 
   @override
   String get settingsLockAction => 'ロック';
@@ -242,13 +251,25 @@ class AppLocalizationsJa extends AppLocalizations {
       'Face ID 解除を有効にする前にボールトを作成してください。';
 
   @override
+  String get settingsLocalUnlockNeedsVaultMobile => '先に作成';
+
+  @override
   String get settingsLocalUnlockEnabled => '有効です。ボールトをロックすると Face ID で解除できます。';
+
+  @override
+  String get settingsLocalUnlockEnabledMobile => 'Face ID 可';
 
   @override
   String get settingsLocalUnlockUnavailable => 'このデバイスでは Face ID を利用できません。';
 
   @override
+  String get settingsLocalUnlockUnavailableMobile => '利用不可';
+
+  @override
   String get settingsLocalUnlockDisabled => '無効です。ロック後はパスフレーズまたは復旧キーが必要です。';
+
+  @override
+  String get settingsLocalUnlockDisabledMobile => 'パスフレーズ必須';
 
   @override
   String get settingsUnlockWithDeviceAction => 'Face ID を使用';
@@ -318,10 +339,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsCredentialsLocked => '暗号化された認証情報を確認するにはボールトを解除してください。';
 
   @override
+  String get settingsCredentialsLockedMobile => '解除が必要';
+
+  @override
   String get settingsKnownHostsTitle => '既知のホスト';
 
   @override
   String get settingsKnownHostsLocked => '信頼済みホスト指紋を確認するにはボールトを解除してください。';
+
+  @override
+  String get settingsKnownHostsLockedMobile => '解除が必要';
 
   @override
   String get settingsManageAction => '管理';
@@ -335,6 +362,9 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get settingsImportExportSubtitle =>
       'バックアップ、OpenSSH ファイル、証明書、known_hosts、メタデータ。';
+
+  @override
+  String get settingsImportExportSubtitleMobile => 'バックアップと SSH';
 
   @override
   String get settingsOpenAction => '開く';
@@ -1152,6 +1182,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get webDavAllowHttpTitle => 'HTTP エンドポイントを許可';
 
   @override
+  String get webDavEnableMobileLabel => '同期を有効化';
+
+  @override
+  String get webDavAllowHttpMobileLabel => 'HTTP を許可';
+
+  @override
   String get webDavUseHttpTitle => 'HTTP WebDAV を使用しますか？';
 
   @override
@@ -1888,6 +1924,11 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get syncConflictUnsupportedBody =>
       'このレコードタイプは現在、レコード全体での解決が必要です。この競合には既存のローカルまたはリモート操作を使用してください。';
+
+  @override
+  String syncConflictFieldCount(num count) {
+    return '$count 件のフィールドに差異があります';
+  }
 
   @override
   String get sftpParentFolderTooltip => '親フォルダへ移動';

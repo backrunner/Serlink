@@ -218,6 +218,17 @@ SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
 This produces the direct channel app build. Package the resulting app into a
 DMG and notarize it before distributing outside the Mac App Store.
 
+The script forwards extra arguments to `xcodebuild`, so local/development DMGs
+can override the user-visible app name to avoid confusion with an installed
+App Store copy (CFBundleDisplayName/CFBundleName come from
+`SERLINK_APP_DISPLAY_NAME` in `macos/Runner/Configs/AppInfo.xcconfig`,
+default `Serlink`):
+
+```sh
+SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
+  ./tool/build_macos_direct.sh SERLINK_APP_DISPLAY_NAME="Serlink (Dev)"
+```
+
 ## App icon checks
 
 Apple rejects App Store/TestFlight uploads when the large app icon contains an

@@ -14,6 +14,12 @@ import '../features/diagnostics/application/diagnostic_bundle_service.dart';
 import '../features/hosts/application/host_repository.dart';
 import '../features/hosts/application/host_store.dart';
 import '../features/identities/application/identity_repository.dart';
+import '../features/mcp/application/agent_session_bridge.dart';
+import '../features/mcp/application/mcp_authorization_service.dart';
+import '../features/mcp/application/mcp_server_controller.dart';
+import '../features/mcp/data/command_risk_policy.dart';
+import '../features/mcp/domain/agent_grant.dart';
+import '../features/mcp/domain/agent_session.dart';
 import '../features/import_export/application/identity_metadata_export_service.dart';
 import '../features/import_export/application/host_metadata_export_service.dart';
 import '../features/import_export/application/open_ssh_config_export_service.dart';
@@ -62,6 +68,7 @@ import '../features/vault/application/vault_record_repository.dart';
 import '../features/vault/application/vault_record_health_service.dart';
 import '../features/vault/application/vault_service.dart';
 import '../features/vault/data/drift_vault_repository.dart';
+import '../features/workspace/application/workspace_tab_controller.dart';
 import '../l10n/l10n.dart';
 import '../platform/document_gateway.dart';
 import '../platform/flutter_secure_storage_secret_store.dart';
@@ -3852,3 +3859,52 @@ final encryptedConnectionProfileResolverProvider =
         hardwareKeyAuthAvailable: capabilities.hardwareKeyAuth,
       );
     });
+
+final commandRiskPolicyProvider = Provider<CommandRiskPolicy>((ref) {
+  return CommandRiskPolicy();
+});
+
+final mcpAuthorizationServiceProvider = Provider<McpAuthorizationService>((
+  ref,
+) {
+  final service = McpAuthorizationService(
+    securityModalService: ref.watch(securityModalServiceProvider),
+  );
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final agentSessionBridgeProvider = Provider<AgentSessionBridge>((ref) {
+  final bridge = AgentSessionBridge(
+    ref: ref,
+    authorization: ref.watch(mcpAuthorizationServiceProvider),
+    riskPolicy: ref.watch(commandRiskPolicyProvider),
+    securityModalService: ref.watch(securityModalServiceProvider),
+  );
+  // Drop session handles whose workspace tab or pane the user closed
+  // manually, so bridge state never goes stale.
+  ref.listen(workspaceTabControllerProvider, (_, next) {
+    bridge.reconcileWithWorkspace(next);
+  });
+  ref.onDispose(bridge.dispose);
+  return bridge;
+});
+
+final mcpGrantsProvider = StreamProvider<List<AgentGrant>>((ref) async* {
+  final service = ref.watch(mcpAuthorizationServiceProvider);
+  yield service.grants;
+  yield* service.watchGrants;
+});
+
+final agentSessionsProvider = StreamProvider<List<AgentSessionHandle>>((
+  ref,
+) async* {
+  final bridge = ref.watch(agentSessionBridgeProvider);
+  yield bridge.sessions;
+  yield* bridge.watchSessions;
+});
+
+final mcpServerControllerProvider =
+    NotifierProvider<McpServerController, McpServerState>(
+      McpServerController.new,
+    );

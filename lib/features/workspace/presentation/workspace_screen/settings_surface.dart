@@ -259,6 +259,10 @@ class _SettingsSurface extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: _settingsSectionGap),
+                if (capabilities.mcpServer) ...[
+                  const _McpSettingsSection(),
+                  const SizedBox(height: _settingsSectionGap),
+                ],
                 _SyncSettingsSection(vaultState: vaultState),
                 const SizedBox(height: _settingsSectionGap),
                 SurfaceSection(

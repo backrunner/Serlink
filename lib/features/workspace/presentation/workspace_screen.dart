@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -33,6 +34,9 @@ import '../../import_export/application/open_ssh_certificate_import_service.dart
 import '../../import_export/application/open_ssh_config_import_service.dart';
 import '../../import_export/application/macos_ssh_config_startup_service.dart';
 import '../../import_export/application/vault_backup_service.dart';
+import '../../mcp/application/mcp_server_controller.dart';
+import '../../mcp/domain/agent_grant.dart';
+import '../../mcp/domain/agent_session.dart';
 import '../../security/application/security_modal_service.dart';
 import '../../sftp/application/sftp_connection.dart';
 import '../../sftp/application/sftp_failure.dart';
@@ -94,6 +98,7 @@ part 'workspace_screen/settings_sync_conflicts.dart';
 part 'workspace_screen/settings_sync_devices.dart';
 part 'workspace_screen/settings_sync_webdav.dart';
 part 'workspace_screen/settings_management.dart';
+part 'workspace_screen/settings_mcp.dart';
 part 'workspace_screen/settings_import_export.dart';
 part 'workspace_screen/settings_import_export_certificate.dart';
 part 'workspace_screen/ssh_config_import_prompt.dart';

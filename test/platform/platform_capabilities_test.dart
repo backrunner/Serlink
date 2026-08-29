@@ -20,6 +20,8 @@ void main() {
     expect(capabilities.openLocalFile, isFalse);
     expect(capabilities.sshAgentAuth, isFalse);
     expect(capabilities.hardwareKeyAuth, isFalse);
+    expect(capabilities.mcpServer, isFalse);
+    expect(capabilities.mcpStdioHelper, isFalse);
     expect(capabilities.terminalSoftwareKeyboardDeleteDetection, isTrue);
     expect(capabilities.terminalTargetPlatform, TerminalTargetPlatform.ios);
   });
@@ -41,6 +43,8 @@ void main() {
     expect(capabilities.sshAgentAuth, isTrue);
     expect(capabilities.sshConfigImport, isTrue);
     expect(capabilities.hardwareKeyAuth, isFalse);
+    expect(capabilities.mcpServer, isTrue);
+    expect(capabilities.mcpStdioHelper, isTrue);
     expect(capabilities.terminalSoftwareKeyboardDeleteDetection, isFalse);
     expect(capabilities.terminalTargetPlatform, TerminalTargetPlatform.macos);
   });
@@ -56,6 +60,8 @@ void main() {
     expect(capabilities.sshAgentAuth, isFalse);
     expect(capabilities.sshConfigImport, isFalse);
     expect(capabilities.openLocalFile, isFalse);
+    expect(capabilities.mcpServer, isTrue);
+    expect(capabilities.mcpStdioHelper, isFalse);
     expect(capabilities.cloudKitSync, isTrue);
     expect(capabilities.terminalSplit, isTrue);
     expect(capabilities.terminalZmodemTransfers, isTrue);

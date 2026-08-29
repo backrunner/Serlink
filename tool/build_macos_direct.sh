@@ -36,12 +36,15 @@ fi
 dart compile exe "$ROOT_DIR/cli/serlink_mcp.dart" -o "$HELPER_PATH"
 
 # Sign the helper like the main app: Developer ID, hardened runtime, and a
-# secure timestamp so the notarized DMG passes Gatekeeper.
+# secure timestamp so the notarized DMG passes Gatekeeper. The Dart AOT binary
+# needs allow-unsigned-executable-memory or it is killed at launch under
+# Hardened Runtime.
 codesign \
   --force \
   --sign "$CODE_SIGN_IDENTITY" \
   --options runtime \
   --timestamp \
+  --entitlements "$ROOT_DIR/macos/Runner/SerlinkMcp.entitlements" \
   --identifier com.alkinum.serlink.mcp \
   "$HELPER_PATH"
 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The serlink-mcp helper is a Dart AOT binary. Under Hardened Runtime
+	     the Dart VM loads the AOT snapshot into unsigned executable memory,
+	     so without this entitlement the helper is killed (SIGKILL) at launch.
+	     Required for notarized direct-distribution builds. -->
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+</dict>
+</plist>

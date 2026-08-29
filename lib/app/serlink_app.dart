@@ -27,6 +27,7 @@ class SerlinkApp extends ConsumerWidget {
     ref.watch(cloudKitEncryptedSnapshotPrefetchControllerProvider);
     ref.watch(autoSyncControllerProvider);
     ref.watch(macOsSshConfigWritebackProvider);
+    ref.watch(mcpServerControllerProvider);
 
     final brightness = MediaQuery.platformBrightnessOf(context);
     final foruiTheme = switch ((capabilities.prefersTouchUi, brightness)) {

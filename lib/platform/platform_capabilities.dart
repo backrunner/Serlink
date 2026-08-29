@@ -73,6 +73,10 @@ class PlatformCapabilities {
 
   bool get sshConfigImport => isMacOS && !isAppStoreDistribution;
 
+  bool get mcpServer => isMacOS;
+
+  bool get mcpStdioHelper => isMacOS && !isAppStoreDistribution;
+
   bool get hardwareKeyAuth => false;
 
   bool get stableLocalFilePaths => !isIOS;

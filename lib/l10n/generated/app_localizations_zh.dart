@@ -349,6 +349,93 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsManageAction => '管理';
 
   @override
+  String get settingsMcpSection => 'MCP / 代理访问';
+
+  @override
+  String get settingsMcpServerTitle => '代理服务器';
+
+  @override
+  String get settingsMcpServerSemantics => '启用代理服务器';
+
+  @override
+  String settingsMcpServerRunning(String url) {
+    return '正在 $url 运行';
+  }
+
+  @override
+  String get settingsMcpServerStopped => '已停止。';
+
+  @override
+  String settingsMcpServerError(String error) {
+    return '错误：$error';
+  }
+
+  @override
+  String get settingsMcpTokenTitle => '访问令牌';
+
+  @override
+  String get settingsMcpTokenNotAvailable => '启动服务器以生成令牌。';
+
+  @override
+  String get settingsMcpTokenRevealTooltip => '显示令牌';
+
+  @override
+  String get settingsMcpTokenHideTooltip => '隐藏令牌';
+
+  @override
+  String get settingsMcpTokenCopyTooltip => '复制令牌';
+
+  @override
+  String get settingsMcpTokenCopied => '令牌已复制到剪贴板。';
+
+  @override
+  String get settingsMcpCopyHttpConfigAction => '复制 HTTP MCP 配置 (JSON)';
+
+  @override
+  String get settingsMcpCopyStdioConfigAction => '复制 stdio 助手配置 (JSON)';
+
+  @override
+  String get settingsMcpConfigCopied => 'MCP 客户端配置已复制到剪贴板。';
+
+  @override
+  String get settingsMcpStdioPathHint => '只要应用保持在此位置，该路径即有效。';
+
+  @override
+  String get settingsMcpStdioNotInstalled =>
+      'stdio 助手仅随 Serlink 发布版本提供，当前安装中不可用。';
+
+  @override
+  String get settingsMcpGrantsTitle => '活动授权';
+
+  @override
+  String get settingsMcpGrantsEmpty => '当前没有代理拥有访问权限。';
+
+  @override
+  String get settingsMcpGrantExpiry => '直到应用退出';
+
+  @override
+  String get settingsMcpRevokeAction => '撤销';
+
+  @override
+  String get settingsMcpSessionsTitle => '活动代理会话';
+
+  @override
+  String get settingsMcpSessionsEmpty => '没有活动的代理会话。';
+
+  @override
+  String settingsMcpSessionOpenedAt(String time) {
+    return '于 $time 打开';
+  }
+
+  @override
+  String agentPaneBadgeTooltip(String client) {
+    return '正由 $client 控制。';
+  }
+
+  @override
+  String get agentPaneBadgeCloseTooltip => '关闭代理会话';
+
+  @override
   String get settingsDataSection => '数据';
 
   @override
@@ -691,6 +778,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get confirmAction => '确认';
 
   @override
+  String get denyAction => '拒绝';
+
+  @override
+  String get allowAction => '允许';
+
+  @override
   String get applyAction => '应用';
 
   @override
@@ -786,6 +879,41 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get securityAgentAccessTitle => '代理访问请求';
+
+  @override
+  String securityAgentAccessBody(String client, String host) {
+    return '$client 请求在 $host 上打开会话。';
+  }
+
+  @override
+  String securityAgentAccessHostIdLabel(String id) {
+    return '主机 ID：$id';
+  }
+
+  @override
+  String get securityAgentAccessWarning => '在应用退出或访问被撤销之前，代理可以在该主机上运行命令。';
+
+  @override
+  String get securityAgentCommandTitle => '代理命令确认';
+
+  @override
+  String securityAgentCommandBody(String client, String host) {
+    return '$client 请求在 $host 上运行命令。';
+  }
+
+  @override
+  String securityAgentCommandRuleLabel(String rule) {
+    return '标记原因：$rule';
+  }
+
+  @override
+  String get securityAgentAllowOnceAction => '仅允许一次';
+
+  @override
+  String get securityAgentAllowSessionAction => '会话期间允许';
+
+  @override
   String get hostEditTitle => '编辑主机';
 
   @override
@@ -822,7 +950,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostDisplayNameHostnameHelper => '留空则使用主机名。';
 
   @override
-  String get hostHostnameLabel => '主机名';
+  String get hostHostnameLabel => '主机域名/IP';
 
   @override
   String get hostPortLabel => '端口';
@@ -1231,6 +1359,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get credentialDeleteFailedSnack => '无法删除凭据。';
+
+  @override
+  String get credentialAddedSnack => '凭据已添加。';
+
+  @override
+  String get credentialGenerateKeyAction => '生成密钥对';
+
+  @override
+  String get credentialGeneratedPublicKeyLabel => '公钥';
+
+  @override
+  String get credentialGeneratedPublicKeyNote =>
+      '将此公钥添加到服务器的 authorized_keys。私钥已加密保存在保险库中。';
+
+  @override
+  String get credentialCopyPublicKeyTooltip => '复制公钥';
+
+  @override
+  String get credentialPublicKeyCopiedSnack => '已复制公钥。';
+
+  @override
+  String get credentialKeyGenerationFailed => '密钥生成失败。';
 
   @override
   String get knownHostsDialogTitle => '已知主机';
@@ -1841,6 +1991,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get credentialEditTitle => '编辑凭据';
+
+  @override
+  String get credentialAddTitle => '添加凭据';
+
+  @override
+  String get hostAddCredentialAction => '添加凭据';
 
   @override
   String get credentialLoadingSecretSemantics => '正在加载凭据机密';

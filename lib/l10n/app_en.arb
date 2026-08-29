@@ -126,6 +126,63 @@
   "settingsKnownHostsLocked": "Unlock the vault to review trusted host fingerprints.",
   "settingsKnownHostsLockedMobile": "Unlock vault first",
   "settingsManageAction": "Manage",
+  "settingsMcpSection": "MCP / Agent access",
+  "settingsMcpServerTitle": "Agent server",
+  "settingsMcpServerSemantics": "Enable the agent server",
+  "settingsMcpServerRunning": "Running at {url}",
+  "@settingsMcpServerRunning": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMcpServerStopped": "Stopped.",
+  "settingsMcpServerError": "Error: {error}",
+  "@settingsMcpServerError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMcpTokenTitle": "Access token",
+  "settingsMcpTokenNotAvailable": "Start the server to generate a token.",
+  "settingsMcpTokenRevealTooltip": "Show token",
+  "settingsMcpTokenHideTooltip": "Hide token",
+  "settingsMcpTokenCopyTooltip": "Copy token",
+  "settingsMcpTokenCopied": "Token copied to clipboard.",
+  "settingsMcpCopyHttpConfigAction": "Copy HTTP MCP config (JSON)",
+  "settingsMcpCopyStdioConfigAction": "Copy stdio helper config (JSON)",
+  "settingsMcpConfigCopied": "MCP client config copied to clipboard.",
+  "settingsMcpStdioPathHint": "This path works while the app stays in place.",
+  "settingsMcpStdioNotInstalled": "The stdio helper ships with Serlink release builds and is not available in this installation.",
+  "@settingsMcpStdioNotInstalled": {
+    "description": "Hint on the stdio config row when the serlink-mcp helper binary is missing (e.g. debug runs)."
+  },
+  "settingsMcpGrantsTitle": "Active grants",
+  "settingsMcpGrantsEmpty": "No agents currently have access.",
+  "settingsMcpGrantExpiry": "until app quits",
+  "settingsMcpRevokeAction": "Revoke",
+  "settingsMcpSessionsTitle": "Active agent sessions",
+  "settingsMcpSessionsEmpty": "No active agent sessions.",
+  "settingsMcpSessionOpenedAt": "opened {time}",
+  "@settingsMcpSessionOpenedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "agentPaneBadgeTooltip": "Controlled by {client}.",
+  "@agentPaneBadgeTooltip": {
+    "placeholders": {
+      "client": {
+        "type": "String"
+      }
+    }
+  },
+  "agentPaneBadgeCloseTooltip": "Close agent session",
   "settingsDataSection": "Data",
   "settingsImportExportTitle": "Import / Export",
   "settingsImportExportSubtitle": "Backups, OpenSSH files, certificates, known_hosts, and metadata.",
@@ -307,6 +364,8 @@
   "skipAction": "Skip",
   "pasteAction": "Paste",
   "confirmAction": "Confirm",
+  "denyAction": "Deny",
+  "allowAction": "Allow",
   "applyAction": "Apply",
   "createAction": "Create",
   "runAction": "Run",
@@ -386,6 +445,49 @@
       }
     }
   },
+  "securityAgentAccessTitle": "Agent access request",
+  "securityAgentAccessBody": "{client} wants to open a session on {host}.",
+  "@securityAgentAccessBody": {
+    "placeholders": {
+      "client": {
+        "type": "String"
+      },
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "securityAgentAccessHostIdLabel": "Host ID: {id}",
+  "@securityAgentAccessHostIdLabel": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "securityAgentAccessWarning": "The agent can run commands on this host until the app quits or access is revoked.",
+  "securityAgentCommandTitle": "Agent command confirmation",
+  "securityAgentCommandBody": "{client} wants to run a command on {host}.",
+  "@securityAgentCommandBody": {
+    "placeholders": {
+      "client": {
+        "type": "String"
+      },
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "securityAgentCommandRuleLabel": "Flagged: {rule}",
+  "@securityAgentCommandRuleLabel": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      }
+    }
+  },
+  "securityAgentAllowOnceAction": "Allow Once",
+  "securityAgentAllowSessionAction": "Allow for Session",
   "hostEditTitle": "Edit Host",
   "hostAddTitle": "Add Host",
   "hostSectionConnection": "Connection",
@@ -597,6 +699,13 @@
   },
   "credentialDeletedSnack": "Credential deleted.",
   "credentialDeleteFailedSnack": "Credential could not be deleted.",
+  "credentialAddedSnack": "Credential added.",
+  "credentialGenerateKeyAction": "Generate key pair",
+  "credentialGeneratedPublicKeyLabel": "Public key",
+  "credentialGeneratedPublicKeyNote": "Add this public key to the server''s authorized_keys. The private key stays encrypted in the vault.",
+  "credentialCopyPublicKeyTooltip": "Copy public key",
+  "credentialPublicKeyCopiedSnack": "Public key copied.",
+  "credentialKeyGenerationFailed": "Key generation failed.",
   "knownHostsDialogTitle": "Known Hosts",
   "knownHostsEmptyTitle": "No trusted fingerprints",
   "knownHostsEmptyBody": "Host fingerprints accepted during connection review will be listed here.",
@@ -842,6 +951,8 @@
   "vaultResetWarningSecrets": "Reset does not recover your passphrase or reveal existing secrets.",
   "vaultResetWarningBackup": "You will need a backup or a new vault before continuing.",
   "credentialEditTitle": "Edit Credential",
+  "credentialAddTitle": "Add Credential",
+  "hostAddCredentialAction": "Add credential",
   "credentialLoadingSecretSemantics": "Loading credential secret",
   "credentialNameLabel": "Credential name",
   "credentialUsernameHintLabel": "Username hint",

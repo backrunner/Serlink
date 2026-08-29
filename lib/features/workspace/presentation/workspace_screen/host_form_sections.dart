@@ -735,6 +735,8 @@ class _HostAuthenticationFields extends StatelessWidget {
     required this.onTogglePasswordVisible,
     required this.onToggleIdentity,
     required this.onEditIdentity,
+    required this.onDeleteIdentity,
+    required this.onAddIdentity,
     required this.onSubmit,
     required this.compact,
   });
@@ -754,6 +756,8 @@ class _HostAuthenticationFields extends StatelessWidget {
   final VoidCallback onTogglePasswordVisible;
   final ValueChanged<IdentityId> onToggleIdentity;
   final ValueChanged<IdentityConfig> onEditIdentity;
+  final ValueChanged<IdentityConfig> onDeleteIdentity;
+  final VoidCallback onAddIdentity;
   final VoidCallback onSubmit;
   final bool compact;
 
@@ -767,6 +771,8 @@ class _HostAuthenticationFields extends StatelessWidget {
         loadingOptions: loadingOptions,
         onToggleIdentity: onToggleIdentity,
         onEditIdentity: onEditIdentity,
+        onDeleteIdentity: onDeleteIdentity,
+        onAddIdentity: onAddIdentity,
       );
     }
     return Column(
@@ -842,6 +848,8 @@ class _HostAuthenticationFields extends StatelessWidget {
             loadingOptions: loadingOptions,
             onToggleIdentity: onToggleIdentity,
             onEditIdentity: onEditIdentity,
+            onDeleteIdentity: onDeleteIdentity,
+            onAddIdentity: onAddIdentity,
           ),
         },
       ],
@@ -868,6 +876,8 @@ class _SavedCredentialFields extends StatelessWidget {
     required this.loadingOptions,
     required this.onToggleIdentity,
     required this.onEditIdentity,
+    required this.onDeleteIdentity,
+    required this.onAddIdentity,
   });
 
   final List<IdentityConfig> identityOptions;
@@ -875,32 +885,56 @@ class _SavedCredentialFields extends StatelessWidget {
   final bool loadingOptions;
   final ValueChanged<IdentityId> onToggleIdentity;
   final ValueChanged<IdentityConfig> onEditIdentity;
+  final ValueChanged<IdentityConfig> onDeleteIdentity;
+  final VoidCallback onAddIdentity;
 
   @override
   Widget build(BuildContext context) {
-    if (identityOptions.isEmpty) {
-      return const _CredentialsEmptyState();
-    }
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 130),
-      opacity: loadingOptions ? 0.54 : 1,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var index = 0; index < identityOptions.length; index += 1) ...[
-            if (index > 0) const SizedBox(height: 8),
-            _CredentialSelectionRow(
-              identity: identityOptions[index],
-              selected: selectedIdentityIds.contains(identityOptions[index].id),
-              enabled: !loadingOptions,
-              onToggle: onToggleIdentity,
-              onEdit: onEditIdentity,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (identityOptions.isEmpty)
+          const _CredentialsEmptyState()
+        else
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 130),
+            opacity: loadingOptions ? 0.54 : 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (
+                  var index = 0;
+                  index < identityOptions.length;
+                  index += 1
+                ) ...[
+                  if (index > 0) const SizedBox(height: 8),
+                  _CredentialSelectionRow(
+                    identity: identityOptions[index],
+                    selected: selectedIdentityIds.contains(
+                      identityOptions[index].id,
+                    ),
+                    enabled: !loadingOptions,
+                    onToggle: onToggleIdentity,
+                    onEdit: onEditIdentity,
+                    onDelete: onDeleteIdentity,
+                  ),
+                ],
+                const SizedBox(height: 8),
+                const _CredentialOptionalNote(),
+              ],
             ),
-          ],
-          const SizedBox(height: 8),
-          const _CredentialOptionalNote(),
-        ],
-      ),
+          ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SerlinkOutlinedButton.icon(
+            key: const ValueKey('credential-add-button'),
+            onPressed: loadingOptions ? null : onAddIdentity,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: Text(context.l10n.hostAddCredentialAction),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -964,6 +998,7 @@ class _CredentialSelectionRow extends StatelessWidget {
     required this.enabled,
     required this.onToggle,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final IdentityConfig identity;
@@ -971,6 +1006,7 @@ class _CredentialSelectionRow extends StatelessWidget {
   final bool enabled;
   final ValueChanged<IdentityId> onToggle;
   final ValueChanged<IdentityConfig> onEdit;
+  final ValueChanged<IdentityConfig> onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -983,72 +1019,87 @@ class _CredentialSelectionRow extends StatelessWidget {
       if (identity.certificatePrincipal case final principal?)
         l10n.identityPrincipalLabel(principal),
     ].join(' · ');
-    return ListRow(
-      selected: selected,
-      onTap: enabled ? () => onToggle(identity.id) : null,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOut,
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: selected
-                  ? t.accentPrimary.withValues(alpha: 0.16)
-                  : t.surfaceSunken,
-              borderRadius: SerlinkRadii.control,
+    return SerlinkContextMenu(
+      enabled: enabled,
+      actions: [
+        SerlinkMenuAction(
+          label: l10n.hostEditCredentialTooltip,
+          icon: Icons.edit_outlined,
+          onPressed: () => onEdit(identity),
+        ),
+        SerlinkMenuAction(
+          label: l10n.credentialsDeleteTooltip,
+          icon: Icons.delete_outline,
+          onPressed: () => onDelete(identity),
+        ),
+      ],
+      child: ListRow(
+        selected: selected,
+        onTap: enabled ? () => onToggle(identity.id) : null,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: selected
+                    ? t.accentPrimary.withValues(alpha: 0.16)
+                    : t.surfaceSunken,
+                borderRadius: SerlinkRadii.control,
+              ),
+              child: Icon(
+                _identityKindIcon(identity.kind),
+                size: 18,
+                color: selected ? t.accentPrimary : t.textSecondary,
+              ),
             ),
-            child: Icon(
-              _identityKindIcon(identity.kind),
-              size: 18,
-              color: selected ? t.accentPrimary : t.textSecondary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  identity.displayName,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: t.textPrimary,
-                    fontWeight: FontWeight.w700,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    identity.displayName,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: t.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                  ),
+                ],
+              ),
             ),
-          ),
-          SerlinkTooltip(
-            message: l10n.hostEditCredentialTooltip,
-            child: SerlinkIconButton(
-              key: ValueKey('credential-edit-${identity.id.value}'),
-              onPressed: enabled ? () => onEdit(identity) : null,
-              icon: const Icon(Icons.edit_outlined, size: 18),
+            SerlinkTooltip(
+              message: l10n.hostEditCredentialTooltip,
+              child: SerlinkIconButton(
+                key: ValueKey('credential-edit-${identity.id.value}'),
+                onPressed: enabled ? () => onEdit(identity) : null,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+              ),
             ),
-          ),
-          const SizedBox(width: 4),
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 130),
-            opacity: selected ? 1 : 0,
-            child: Icon(
-              Icons.check_circle_rounded,
-              size: 18,
-              color: t.accentPrimary,
+            const SizedBox(width: 4),
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 130),
+              opacity: selected ? 1 : 0,
+              child: Icon(
+                Icons.check_circle_rounded,
+                size: 18,
+                color: t.accentPrimary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

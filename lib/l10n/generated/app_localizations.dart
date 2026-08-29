@@ -754,6 +754,162 @@ abstract class AppLocalizations {
   /// **'Manage'**
   String get settingsManageAction;
 
+  /// No description provided for @settingsMcpSection.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP / Agent access'**
+  String get settingsMcpSection;
+
+  /// No description provided for @settingsMcpServerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent server'**
+  String get settingsMcpServerTitle;
+
+  /// No description provided for @settingsMcpServerSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable the agent server'**
+  String get settingsMcpServerSemantics;
+
+  /// No description provided for @settingsMcpServerRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running at {url}'**
+  String settingsMcpServerRunning(String url);
+
+  /// No description provided for @settingsMcpServerStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped.'**
+  String get settingsMcpServerStopped;
+
+  /// No description provided for @settingsMcpServerError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String settingsMcpServerError(String error);
+
+  /// No description provided for @settingsMcpTokenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Access token'**
+  String get settingsMcpTokenTitle;
+
+  /// No description provided for @settingsMcpTokenNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Start the server to generate a token.'**
+  String get settingsMcpTokenNotAvailable;
+
+  /// No description provided for @settingsMcpTokenRevealTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show token'**
+  String get settingsMcpTokenRevealTooltip;
+
+  /// No description provided for @settingsMcpTokenHideTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide token'**
+  String get settingsMcpTokenHideTooltip;
+
+  /// No description provided for @settingsMcpTokenCopyTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy token'**
+  String get settingsMcpTokenCopyTooltip;
+
+  /// No description provided for @settingsMcpTokenCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Token copied to clipboard.'**
+  String get settingsMcpTokenCopied;
+
+  /// No description provided for @settingsMcpCopyHttpConfigAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy HTTP MCP config (JSON)'**
+  String get settingsMcpCopyHttpConfigAction;
+
+  /// No description provided for @settingsMcpCopyStdioConfigAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy stdio helper config (JSON)'**
+  String get settingsMcpCopyStdioConfigAction;
+
+  /// No description provided for @settingsMcpConfigCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP client config copied to clipboard.'**
+  String get settingsMcpConfigCopied;
+
+  /// No description provided for @settingsMcpStdioPathHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This path works while the app stays in place.'**
+  String get settingsMcpStdioPathHint;
+
+  /// Hint on the stdio config row when the serlink-mcp helper binary is missing (e.g. debug runs).
+  ///
+  /// In en, this message translates to:
+  /// **'The stdio helper ships with Serlink release builds and is not available in this installation.'**
+  String get settingsMcpStdioNotInstalled;
+
+  /// No description provided for @settingsMcpGrantsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Active grants'**
+  String get settingsMcpGrantsTitle;
+
+  /// No description provided for @settingsMcpGrantsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No agents currently have access.'**
+  String get settingsMcpGrantsEmpty;
+
+  /// No description provided for @settingsMcpGrantExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'until app quits'**
+  String get settingsMcpGrantExpiry;
+
+  /// No description provided for @settingsMcpRevokeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get settingsMcpRevokeAction;
+
+  /// No description provided for @settingsMcpSessionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Active agent sessions'**
+  String get settingsMcpSessionsTitle;
+
+  /// No description provided for @settingsMcpSessionsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No active agent sessions.'**
+  String get settingsMcpSessionsEmpty;
+
+  /// No description provided for @settingsMcpSessionOpenedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'opened {time}'**
+  String settingsMcpSessionOpenedAt(String time);
+
+  /// No description provided for @agentPaneBadgeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Controlled by {client}.'**
+  String agentPaneBadgeTooltip(String client);
+
+  /// No description provided for @agentPaneBadgeCloseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close agent session'**
+  String get agentPaneBadgeCloseTooltip;
+
   /// No description provided for @settingsDataSection.
   ///
   /// In en, this message translates to:
@@ -1360,6 +1516,18 @@ abstract class AppLocalizations {
   /// **'Confirm'**
   String get confirmAction;
 
+  /// No description provided for @denyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get denyAction;
+
+  /// No description provided for @allowAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get allowAction;
+
   /// No description provided for @applyAction.
   ///
   /// In en, this message translates to:
@@ -1521,6 +1689,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 line will be sent to the active terminal.} other{{count} lines will be sent to the active terminal.}}'**
   String securityPasteMultipleLinesBody(num count);
+
+  /// No description provided for @securityAgentAccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent access request'**
+  String get securityAgentAccessTitle;
+
+  /// No description provided for @securityAgentAccessBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{client} wants to open a session on {host}.'**
+  String securityAgentAccessBody(String client, String host);
+
+  /// No description provided for @securityAgentAccessHostIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Host ID: {id}'**
+  String securityAgentAccessHostIdLabel(String id);
+
+  /// No description provided for @securityAgentAccessWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent can run commands on this host until the app quits or access is revoked.'**
+  String get securityAgentAccessWarning;
+
+  /// No description provided for @securityAgentCommandTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent command confirmation'**
+  String get securityAgentCommandTitle;
+
+  /// No description provided for @securityAgentCommandBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{client} wants to run a command on {host}.'**
+  String securityAgentCommandBody(String client, String host);
+
+  /// No description provided for @securityAgentCommandRuleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Flagged: {rule}'**
+  String securityAgentCommandRuleLabel(String rule);
+
+  /// No description provided for @securityAgentAllowOnceAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Once'**
+  String get securityAgentAllowOnceAction;
+
+  /// No description provided for @securityAgentAllowSessionAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow for Session'**
+  String get securityAgentAllowSessionAction;
 
   /// No description provided for @hostEditTitle.
   ///
@@ -2373,6 +2595,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Credential could not be deleted.'**
   String get credentialDeleteFailedSnack;
+
+  /// No description provided for @credentialAddedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Credential added.'**
+  String get credentialAddedSnack;
+
+  /// No description provided for @credentialGenerateKeyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate key pair'**
+  String get credentialGenerateKeyAction;
+
+  /// No description provided for @credentialGeneratedPublicKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Public key'**
+  String get credentialGeneratedPublicKeyLabel;
+
+  /// No description provided for @credentialGeneratedPublicKeyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Add this public key to the server\'\'s authorized_keys. The private key stays encrypted in the vault.'**
+  String get credentialGeneratedPublicKeyNote;
+
+  /// No description provided for @credentialCopyPublicKeyTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy public key'**
+  String get credentialCopyPublicKeyTooltip;
+
+  /// No description provided for @credentialPublicKeyCopiedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Public key copied.'**
+  String get credentialPublicKeyCopiedSnack;
+
+  /// No description provided for @credentialKeyGenerationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Key generation failed.'**
+  String get credentialKeyGenerationFailed;
 
   /// No description provided for @knownHostsDialogTitle.
   ///
@@ -3549,6 +3813,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edit Credential'**
   String get credentialEditTitle;
+
+  /// No description provided for @credentialAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Credential'**
+  String get credentialAddTitle;
+
+  /// No description provided for @hostAddCredentialAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add credential'**
+  String get hostAddCredentialAction;
 
   /// No description provided for @credentialLoadingSecretSemantics.
   ///

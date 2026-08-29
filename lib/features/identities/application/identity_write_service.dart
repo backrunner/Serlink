@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../app/app_dependencies.dart';
 import '../../../core/ids/entity_id.dart';
@@ -28,6 +29,7 @@ class IdentityUpdateDraft {
     this.privateKeyPassphrase,
     this.openSshCertificate,
     this.keyboardInteractiveResponses,
+    this.publicKeyFingerprint,
   });
 
   final IdentityId id;
@@ -38,6 +40,31 @@ class IdentityUpdateDraft {
   final String? privateKeyPassphrase;
   final String? openSshCertificate;
   final List<String>? keyboardInteractiveResponses;
+  final String? publicKeyFingerprint;
+}
+
+class IdentityCreateDraft {
+  const IdentityCreateDraft({
+    required this.kind,
+    required this.displayName,
+    this.usernameHint,
+    this.password,
+    this.privateKeyPem,
+    this.privateKeyPassphrase,
+    this.openSshCertificate,
+    this.keyboardInteractiveResponses,
+    this.publicKeyFingerprint,
+  });
+
+  final IdentityKind kind;
+  final String displayName;
+  final String? usernameHint;
+  final String? password;
+  final String? privateKeyPem;
+  final String? privateKeyPassphrase;
+  final String? openSshCertificate;
+  final List<String>? keyboardInteractiveResponses;
+  final String? publicKeyFingerprint;
 }
 
 class IdentityWriteService {
@@ -52,6 +79,56 @@ class IdentityWriteService {
   final IdentityRepository _identities;
   final VaultRecordRepository _records;
   final VaultService _vault;
+
+  static const _uuid = Uuid();
+
+  Future<IdentityConfig> create(IdentityCreateDraft draft) async {
+    final displayName = draft.displayName.trim();
+    if (displayName.isEmpty) {
+      throw const IdentityWriteException(
+        'identity.display_name_required',
+        'Credential name is required.',
+      );
+    }
+
+    final now = DateTime.now().toUtc();
+    final id = IdentityId(_uuid.v4());
+    final secret = _secretFor(
+      draft.kind,
+      password: draft.password,
+      privateKeyPem: draft.privateKeyPem,
+      privateKeyPassphrase: draft.privateKeyPassphrase,
+      openSshCertificate: draft.openSshCertificate,
+      keyboardInteractiveResponses: draft.keyboardInteractiveResponses,
+    );
+    final secretRecordId = secret == null
+        ? null
+        : VaultRecordId('secret:${id.value}');
+    if (secret != null) {
+      final envelope = await _vault.encryptRecord(
+        id: secretRecordId!,
+        type: 'identity_secret',
+        plaintext: secret.toBytes(),
+      );
+      await _records.upsert(envelope);
+    }
+
+    final identity = IdentityConfig(
+      id: id,
+      displayName: displayName,
+      kind: draft.kind,
+      usernameHint: _blankToNull(draft.usernameHint),
+      secretRecordId: secretRecordId,
+      publicKeyFingerprint: draft.publicKeyFingerprint,
+      certificatePrincipal: draft.kind == IdentityKind.openSshCertificate
+          ? _certificateComment(draft.openSshCertificate)
+          : null,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await _identities.save(identity);
+    return identity;
+  }
 
   Future<IdentitySecretMaterial?> readSecretMaterial(
     IdentityConfig identity,
@@ -86,7 +163,14 @@ class IdentityWriteService {
       );
     }
 
-    final secret = _secretFor(existing.kind, draft);
+    final secret = _secretFor(
+      existing.kind,
+      password: draft.password,
+      privateKeyPem: draft.privateKeyPem,
+      privateKeyPassphrase: draft.privateKeyPassphrase,
+      openSshCertificate: draft.openSshCertificate,
+      keyboardInteractiveResponses: draft.keyboardInteractiveResponses,
+    );
     final secretRecordId = secret == null
         ? existing.secretRecordId
         : existing.secretRecordId ??
@@ -106,7 +190,8 @@ class IdentityWriteService {
       kind: existing.kind,
       usernameHint: _blankToNull(draft.usernameHint),
       secretRecordId: secretRecordId,
-      publicKeyFingerprint: existing.publicKeyFingerprint,
+      publicKeyFingerprint:
+          draft.publicKeyFingerprint ?? existing.publicKeyFingerprint,
       certificatePrincipal: existing.kind == IdentityKind.openSshCertificate
           ? _certificateComment(draft.openSshCertificate)
           : existing.certificatePrincipal,
@@ -118,29 +203,33 @@ class IdentityWriteService {
   }
 
   IdentitySecretMaterial? _secretFor(
-    IdentityKind kind,
-    IdentityUpdateDraft draft,
-  ) {
+    IdentityKind kind, {
+    String? password,
+    String? privateKeyPem,
+    String? privateKeyPassphrase,
+    String? openSshCertificate,
+    List<String>? keyboardInteractiveResponses,
+  }) {
     return switch (kind) {
       IdentityKind.password => IdentitySecretMaterial(
         password: _requiredNonEmpty(
-          draft.password,
+          password,
           code: 'identity.password_required',
           message: 'Password is required.',
         ),
       ),
       IdentityKind.privateKey => IdentitySecretMaterial(
-        privateKeyPem: _requiredPrivateKey(draft.privateKeyPem),
-        privateKeyPassphrase: _blankToNull(draft.privateKeyPassphrase),
+        privateKeyPem: _requiredPrivateKey(privateKeyPem),
+        privateKeyPassphrase: _blankToNull(privateKeyPassphrase),
       ),
       IdentityKind.openSshCertificate => IdentitySecretMaterial(
-        privateKeyPem: _requiredPrivateKey(draft.privateKeyPem),
-        privateKeyPassphrase: _blankToNull(draft.privateKeyPassphrase),
-        openSshCertificate: _requiredCertificate(draft.openSshCertificate),
+        privateKeyPem: _requiredPrivateKey(privateKeyPem),
+        privateKeyPassphrase: _blankToNull(privateKeyPassphrase),
+        openSshCertificate: _requiredCertificate(openSshCertificate),
       ),
       IdentityKind.keyboardInteractive => IdentitySecretMaterial(
         keyboardInteractiveResponses: _normalizeKeyboardResponses(
-          draft.keyboardInteractiveResponses,
+          keyboardInteractiveResponses,
         ),
       ),
       IdentityKind.sshAgent || IdentityKind.hardwareKey => null,

@@ -262,11 +262,11 @@ void main() {
     expect(find.text('Display name (optional)'), findsOneWidget);
     expect(find.text('Leave blank to use the hostname.'), findsOneWidget);
     expect(
-      tester.getTopLeft(find.byKey(const ValueKey('host-hostname-field'))).dy,
+      tester
+          .getTopLeft(find.byKey(const ValueKey('host-display-name-field')))
+          .dy,
       lessThan(
-        tester
-            .getTopLeft(find.byKey(const ValueKey('host-display-name-field')))
-            .dy,
+        tester.getTopLeft(find.byKey(const ValueKey('host-hostname-field'))).dy,
       ),
     );
 
@@ -615,6 +615,214 @@ void main() {
 
     expect(hosts.hosts.single.identityIds, [identity.id]);
     expect(hosts.hosts.single.authKinds, {HostAuthKind.openSshCertificate});
+  });
+
+  testWidgets('host form deletes unlinked credentials from the context menu', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 8, 29);
+    final hosts = _MemoryHostRepository();
+    hosts.hosts.add(
+      HostConfig(
+        id: HostId('linked-host'),
+        displayName: 'Linked Host',
+        hostname: 'linked.internal',
+        username: 'ops',
+        port: 22,
+        authKinds: const {HostAuthKind.password},
+        tags: const {},
+        trustState: HostTrustState.unknown,
+        identityIds: [IdentityId('linked-credential')],
+        startupCommands: const [],
+        jumpHostIds: const [],
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    final linkedIdentity = IdentityConfig(
+      id: IdentityId('linked-credential'),
+      displayName: 'Linked credential',
+      kind: IdentityKind.password,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final freeIdentity = IdentityConfig(
+      id: IdentityId('free-credential'),
+      displayName: 'Free credential',
+      kind: IdentityKind.password,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final identities = _MemoryIdentityRepository([
+      freeIdentity,
+      linkedIdentity,
+    ]);
+
+    await _pumpLockedVaultApp(
+      tester,
+      hostRepository: hosts,
+      identityRepository: identities,
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _tapAddHost(tester);
+
+    await tester.ensureVisible(find.text('Saved'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Saved'));
+    await tester.pumpAndSettle();
+
+    // A credential still linked to a host cannot be deleted.
+    await tester.tap(
+      find.text(linkedIdentity.displayName),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete credential'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('still linked to'), findsOneWidget);
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Close'));
+    await tester.pumpAndSettle();
+    expect(await identities.read(linkedIdentity.id), isNotNull);
+    expect(find.text(linkedIdentity.displayName), findsOneWidget);
+
+    // An unlinked credential is deleted after confirmation.
+    await tester.tap(
+      find.text(freeIdentity.displayName),
+      buttons: kSecondaryMouseButton,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete credential'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete credential?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(await identities.read(freeIdentity.id), isNull);
+    expect(find.text(freeIdentity.displayName), findsNothing);
+  });
+
+  testWidgets('host form adds a new credential from the saved picker', (
+    tester,
+  ) async {
+    final hosts = _MemoryHostRepository();
+    final identities = _MemoryIdentityRepository(const []);
+
+    await _pumpLockedVaultApp(
+      tester,
+      hostRepository: hosts,
+      identityRepository: identities,
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _tapAddHost(tester);
+
+    await tester.ensureVisible(find.text('Saved'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Saved'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('credential-add-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Add Credential'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('credential-display-name-field')),
+      'Deploy password',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('credential-password-field')),
+      's3cret',
+    );
+    await tester.tap(find.byKey(const ValueKey('credential-save-button')));
+    await tester.pumpAndSettle();
+
+    final created = (await identities.list()).single;
+    expect(created.displayName, 'Deploy password');
+    expect(created.kind, IdentityKind.password);
+    expect(find.text('Deploy password'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('host-hostname-field')),
+      'deploy.example.test',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('host-username-field')),
+      'deploy',
+    );
+    await tester.tap(find.byKey(const ValueKey('host-save-button')));
+    await tester.pumpAndSettle();
+
+    expect(hosts.hosts.single.identityIds, [created.id]);
+  });
+
+  testWidgets('settings can add a credential with a generated key pair', (
+    tester,
+  ) async {
+    final hosts = _MemoryHostRepository();
+    final identities = _MemoryIdentityRepository(const []);
+
+    await _pumpLockedVaultApp(
+      tester,
+      hostRepository: hosts,
+      identityRepository: identities,
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Credentials'));
+    await tester.pumpAndSettle();
+
+    // Open the credential manager from the Credentials settings row.
+    final credentialsDy = tester.getCenter(find.text('Credentials')).dy;
+    final manageButtons = find.text('Manage');
+    var target = manageButtons.first;
+    var bestDistance = double.infinity;
+    for (var index = 0; index < manageButtons.evaluate().length; index += 1) {
+      final candidate = manageButtons.at(index);
+      final distance = (tester.getCenter(candidate).dy - credentialsDy).abs();
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        target = candidate;
+      }
+    }
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('credentials-add-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Add Credential'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('credential-display-name-field')),
+      'Generated key',
+    );
+    await tester.tap(find.text('Private Key'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('credential-generate-key-button')),
+    );
+    await tester.pumpAndSettle();
+
+    // The public key is shown for deployment and the private key field is
+    // filled with the generated key.
+    expect(find.textContaining('ssh-ed25519 '), findsOneWidget);
+    expect(find.textContaining('SHA256:'), findsOneWidget);
+    final privateKeyField = tester.widget<SerlinkTextField>(
+      find.byKey(const ValueKey('host-private-key-field')),
+    );
+    expect(
+      privateKeyField.controller!.text,
+      contains('BEGIN OPENSSH PRIVATE KEY'),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('credential-save-button')));
+    await tester.pumpAndSettle();
+
+    final created = (await identities.list()).single;
+    expect(created.displayName, 'Generated key');
+    expect(created.kind, IdentityKind.privateKey);
+    expect(created.secretRecordId, isNotNull);
+    expect(created.publicKeyFingerprint, startsWith('SHA256:'));
+    expect(find.text('Generated key'), findsOneWidget);
   });
 
   testWidgets('iOS offers Face ID unlock after vault creation', (tester) async {
@@ -1131,7 +1339,10 @@ void main() {
     // The overlay covers the UI while the app subtree stays mounted.
     expect(
       find.byWidgetPredicate(
-        (widget) => widget is Icon && widget.icon == Icons.lock_outline && widget.size == 42,
+        (widget) =>
+            widget is Icon &&
+            widget.icon == Icons.lock_outline &&
+            widget.size == 42,
       ),
       findsOneWidget,
     );
@@ -1142,7 +1353,10 @@ void main() {
 
     expect(
       find.byWidgetPredicate(
-        (widget) => widget is Icon && widget.icon == Icons.lock_outline && widget.size == 42,
+        (widget) =>
+            widget is Icon &&
+            widget.icon == Icons.lock_outline &&
+            widget.size == 42,
       ),
       findsNothing,
     );

@@ -354,6 +354,93 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsManageAction => '管理';
 
   @override
+  String get settingsMcpSection => 'MCP / エージェントアクセス';
+
+  @override
+  String get settingsMcpServerTitle => 'エージェントサーバー';
+
+  @override
+  String get settingsMcpServerSemantics => 'エージェントサーバーを有効にする';
+
+  @override
+  String settingsMcpServerRunning(String url) {
+    return '$url で実行中';
+  }
+
+  @override
+  String get settingsMcpServerStopped => '停止しています。';
+
+  @override
+  String settingsMcpServerError(String error) {
+    return 'エラー: $error';
+  }
+
+  @override
+  String get settingsMcpTokenTitle => 'アクセストークン';
+
+  @override
+  String get settingsMcpTokenNotAvailable => 'サーバーを起動するとトークンが生成されます。';
+
+  @override
+  String get settingsMcpTokenRevealTooltip => 'トークンを表示';
+
+  @override
+  String get settingsMcpTokenHideTooltip => 'トークンを隠す';
+
+  @override
+  String get settingsMcpTokenCopyTooltip => 'トークンをコピー';
+
+  @override
+  String get settingsMcpTokenCopied => 'トークンをクリップボードにコピーしました。';
+
+  @override
+  String get settingsMcpCopyHttpConfigAction => 'HTTP MCP 設定をコピー (JSON)';
+
+  @override
+  String get settingsMcpCopyStdioConfigAction => 'stdio ヘルパー設定をコピー (JSON)';
+
+  @override
+  String get settingsMcpConfigCopied => 'MCP クライアント設定をクリップボードにコピーしました。';
+
+  @override
+  String get settingsMcpStdioPathHint => 'このパスはアプリが同じ場所にある間有効です。';
+
+  @override
+  String get settingsMcpStdioNotInstalled =>
+      'stdio ヘルパーは Serlink のリリースビルドに同梱されており、このインストールでは利用できません。';
+
+  @override
+  String get settingsMcpGrantsTitle => '有効な許可';
+
+  @override
+  String get settingsMcpGrantsEmpty => '現在アクセス権を持つエージェントはありません。';
+
+  @override
+  String get settingsMcpGrantExpiry => 'アプリ終了まで';
+
+  @override
+  String get settingsMcpRevokeAction => '取り消す';
+
+  @override
+  String get settingsMcpSessionsTitle => 'アクティブなエージェントセッション';
+
+  @override
+  String get settingsMcpSessionsEmpty => 'アクティブなエージェントセッションはありません。';
+
+  @override
+  String settingsMcpSessionOpenedAt(String time) {
+    return '$time に開始';
+  }
+
+  @override
+  String agentPaneBadgeTooltip(String client) {
+    return '$client が操作しています。';
+  }
+
+  @override
+  String get agentPaneBadgeCloseTooltip => 'エージェントセッションを閉じる';
+
+  @override
   String get settingsDataSection => 'データ';
 
   @override
@@ -700,6 +787,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get confirmAction => '確認';
 
   @override
+  String get denyAction => '拒否';
+
+  @override
+  String get allowAction => '許可';
+
+  @override
   String get applyAction => '適用';
 
   @override
@@ -794,6 +887,42 @@ class AppLocalizationsJa extends AppLocalizations {
   String securityPasteMultipleLinesBody(num count) {
     return '$count 行がアクティブな端末に送信されます。';
   }
+
+  @override
+  String get securityAgentAccessTitle => 'エージェントのアクセス要求';
+
+  @override
+  String securityAgentAccessBody(String client, String host) {
+    return '$client が $host でセッションを開こうとしています。';
+  }
+
+  @override
+  String securityAgentAccessHostIdLabel(String id) {
+    return 'ホスト ID: $id';
+  }
+
+  @override
+  String get securityAgentAccessWarning =>
+      'アプリを終了するかアクセスを取り消すまで、エージェントはこのホストでコマンドを実行できます。';
+
+  @override
+  String get securityAgentCommandTitle => 'エージェントのコマンド確認';
+
+  @override
+  String securityAgentCommandBody(String client, String host) {
+    return '$client が $host でコマンドを実行しようとしています。';
+  }
+
+  @override
+  String securityAgentCommandRuleLabel(String rule) {
+    return 'フラグ: $rule';
+  }
+
+  @override
+  String get securityAgentAllowOnceAction => '今回のみ許可';
+
+  @override
+  String get securityAgentAllowSessionAction => 'セッション中許可';
 
   @override
   String get hostEditTitle => 'ホストを編集';
@@ -1243,6 +1372,28 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get credentialDeleteFailedSnack => '認証情報を削除できませんでした。';
+
+  @override
+  String get credentialAddedSnack => '認証情報を追加しました。';
+
+  @override
+  String get credentialGenerateKeyAction => '鍵ペアを生成';
+
+  @override
+  String get credentialGeneratedPublicKeyLabel => '公開鍵';
+
+  @override
+  String get credentialGeneratedPublicKeyNote =>
+      'この公開鍵をサーバーの authorized_keys に追加してください。秘密鍵はボールトに暗号化して保存されます。';
+
+  @override
+  String get credentialCopyPublicKeyTooltip => '公開鍵をコピー';
+
+  @override
+  String get credentialPublicKeyCopiedSnack => '公開鍵をコピーしました。';
+
+  @override
+  String get credentialKeyGenerationFailed => '鍵の生成に失敗しました。';
 
   @override
   String get knownHostsDialogTitle => '既知のホスト';
@@ -1866,6 +2017,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get credentialEditTitle => '認証情報を編集';
+
+  @override
+  String get credentialAddTitle => '認証情報を追加';
+
+  @override
+  String get hostAddCredentialAction => '認証情報を追加';
 
   @override
   String get credentialLoadingSecretSemantics => '認証情報のシークレットを読み込み中';

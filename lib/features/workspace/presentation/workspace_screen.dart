@@ -27,6 +27,7 @@ import '../../hosts/application/host_store.dart';
 import '../../hosts/application/host_write_service.dart';
 import '../../hosts/domain/host.dart';
 import '../../identities/application/identity_write_service.dart';
+import '../../identities/application/ssh_key_pair_generator.dart';
 import '../../identities/domain/identity.dart';
 import '../../import_export/application/open_ssh_certificate_import_service.dart';
 import '../../import_export/application/open_ssh_config_import_service.dart';

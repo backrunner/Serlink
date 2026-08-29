@@ -686,6 +686,12 @@ class _IdentityManagerDialog extends ConsumerWidget {
             ),
           ),
           actions: [
+            SerlinkOutlinedButton.icon(
+              key: const ValueKey('credentials-add-button'),
+              onPressed: () => _addManagedIdentity(context, ref),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: Text(l10n.hostAddCredentialAction),
+            ),
             SerlinkFilledButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(l10n.doneAction),
@@ -694,6 +700,19 @@ class _IdentityManagerDialog extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+Future<void> _addManagedIdentity(BuildContext context, WidgetRef ref) async {
+  final created = await showSerlinkDialog<Object?>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => const _IdentityEditDialog(),
+  );
+  if (created is IdentityConfig && context.mounted) {
+    Navigator.of(context).pop();
+    _showSnackBar(context, context.l10n.credentialAddedSnack);
+    await _showIdentityManagerDialog(context, ref);
   }
 }
 

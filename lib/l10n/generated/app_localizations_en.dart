@@ -389,6 +389,97 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsManageAction => 'Manage';
 
   @override
+  String get settingsMcpSection => 'MCP / Agent access';
+
+  @override
+  String get settingsMcpServerTitle => 'Agent server';
+
+  @override
+  String get settingsMcpServerSemantics => 'Enable the agent server';
+
+  @override
+  String settingsMcpServerRunning(String url) {
+    return 'Running at $url';
+  }
+
+  @override
+  String get settingsMcpServerStopped => 'Stopped.';
+
+  @override
+  String settingsMcpServerError(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get settingsMcpTokenTitle => 'Access token';
+
+  @override
+  String get settingsMcpTokenNotAvailable =>
+      'Start the server to generate a token.';
+
+  @override
+  String get settingsMcpTokenRevealTooltip => 'Show token';
+
+  @override
+  String get settingsMcpTokenHideTooltip => 'Hide token';
+
+  @override
+  String get settingsMcpTokenCopyTooltip => 'Copy token';
+
+  @override
+  String get settingsMcpTokenCopied => 'Token copied to clipboard.';
+
+  @override
+  String get settingsMcpCopyHttpConfigAction => 'Copy HTTP MCP config (JSON)';
+
+  @override
+  String get settingsMcpCopyStdioConfigAction =>
+      'Copy stdio helper config (JSON)';
+
+  @override
+  String get settingsMcpConfigCopied =>
+      'MCP client config copied to clipboard.';
+
+  @override
+  String get settingsMcpStdioPathHint =>
+      'This path works while the app stays in place.';
+
+  @override
+  String get settingsMcpStdioNotInstalled =>
+      'The stdio helper ships with Serlink release builds and is not available in this installation.';
+
+  @override
+  String get settingsMcpGrantsTitle => 'Active grants';
+
+  @override
+  String get settingsMcpGrantsEmpty => 'No agents currently have access.';
+
+  @override
+  String get settingsMcpGrantExpiry => 'until app quits';
+
+  @override
+  String get settingsMcpRevokeAction => 'Revoke';
+
+  @override
+  String get settingsMcpSessionsTitle => 'Active agent sessions';
+
+  @override
+  String get settingsMcpSessionsEmpty => 'No active agent sessions.';
+
+  @override
+  String settingsMcpSessionOpenedAt(String time) {
+    return 'opened $time';
+  }
+
+  @override
+  String agentPaneBadgeTooltip(String client) {
+    return 'Controlled by $client.';
+  }
+
+  @override
+  String get agentPaneBadgeCloseTooltip => 'Close agent session';
+
+  @override
   String get settingsDataSection => 'Data';
 
   @override
@@ -754,6 +845,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirmAction => 'Confirm';
 
   @override
+  String get denyAction => 'Deny';
+
+  @override
+  String get allowAction => 'Allow';
+
+  @override
   String get applyAction => 'Apply';
 
   @override
@@ -855,6 +952,42 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get securityAgentAccessTitle => 'Agent access request';
+
+  @override
+  String securityAgentAccessBody(String client, String host) {
+    return '$client wants to open a session on $host.';
+  }
+
+  @override
+  String securityAgentAccessHostIdLabel(String id) {
+    return 'Host ID: $id';
+  }
+
+  @override
+  String get securityAgentAccessWarning =>
+      'The agent can run commands on this host until the app quits or access is revoked.';
+
+  @override
+  String get securityAgentCommandTitle => 'Agent command confirmation';
+
+  @override
+  String securityAgentCommandBody(String client, String host) {
+    return '$client wants to run a command on $host.';
+  }
+
+  @override
+  String securityAgentCommandRuleLabel(String rule) {
+    return 'Flagged: $rule';
+  }
+
+  @override
+  String get securityAgentAllowOnceAction => 'Allow Once';
+
+  @override
+  String get securityAgentAllowSessionAction => 'Allow for Session';
 
   @override
   String get hostEditTitle => 'Edit Host';
@@ -1324,6 +1457,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get credentialDeleteFailedSnack => 'Credential could not be deleted.';
+
+  @override
+  String get credentialAddedSnack => 'Credential added.';
+
+  @override
+  String get credentialGenerateKeyAction => 'Generate key pair';
+
+  @override
+  String get credentialGeneratedPublicKeyLabel => 'Public key';
+
+  @override
+  String get credentialGeneratedPublicKeyNote =>
+      'Add this public key to the server\'s authorized_keys. The private key stays encrypted in the vault.';
+
+  @override
+  String get credentialCopyPublicKeyTooltip => 'Copy public key';
+
+  @override
+  String get credentialPublicKeyCopiedSnack => 'Public key copied.';
+
+  @override
+  String get credentialKeyGenerationFailed => 'Key generation failed.';
 
   @override
   String get knownHostsDialogTitle => 'Known Hosts';
@@ -1993,6 +2148,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get credentialEditTitle => 'Edit Credential';
+
+  @override
+  String get credentialAddTitle => 'Add Credential';
+
+  @override
+  String get hostAddCredentialAction => 'Add credential';
 
   @override
   String get credentialLoadingSecretSemantics => 'Loading credential secret';

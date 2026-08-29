@@ -7,6 +7,11 @@
 // The application's name. By default this is also the title of the Flutter window.
 PRODUCT_NAME = serlink
 
+// The user-visible application name (Finder, Dock, app menu). Local/dev builds
+// override this (e.g. `SERLINK_APP_DISPLAY_NAME=Serlink (Dev)`) so a
+// development DMG is distinguishable from the App Store install.
+SERLINK_APP_DISPLAY_NAME = Serlink
+
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.alkinum.serlink
 

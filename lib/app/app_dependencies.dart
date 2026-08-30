@@ -42,6 +42,7 @@ import '../features/sync/application/auto_sync_controller.dart';
 import '../features/sync/application/cloudkit_encrypted_snapshot_prefetch_controller.dart';
 import '../features/sync/application/encrypted_snapshot_staging.dart';
 import '../features/sync/application/remote_vault_discovery_service.dart';
+import '../features/sync/application/sync_compatibility.dart';
 import '../features/sync/application/sync_delete_tombstone_repository.dart';
 import '../features/sync/application/sync_device_service.dart';
 import '../features/sync/application/sync_field_merge_service.dart';
@@ -1025,7 +1026,11 @@ typedef _CloudKitUnlockSyncPlan = ({
 
 enum VaultSessionBusyReason { waitingForICloud }
 
-enum VaultSessionNotice { cloudKitRemoteVaultAdopted }
+enum VaultSessionNotice {
+  cloudKitRemoteVaultAdopted,
+  cloudKitRemoteVaultAdoptedAfterInitialize,
+  webDavRemoteVaultAdopted,
+}
 
 class _CloudKitBootstrapResult {
   const _CloudKitBootstrapResult({
@@ -1998,6 +2003,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   InMemoryVaultService? _service;
   Future<void>? _localUnlockFuture;
   bool _cloudKitHeaderDiscovered = false;
+  bool _webDavHeaderAdopted = false;
   var _postUnlockSyncToken = 0;
 
   VaultService get service {
@@ -2014,6 +2020,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
 
   Future<VaultSessionState> _loadInitialState() async {
     _cloudKitHeaderDiscovered = false;
+    _webDavHeaderAdopted = false;
     VaultHeader? header;
     bool loadedFromLocalStore;
     try {
@@ -2103,6 +2110,77 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     }
   }
 
+  /// Probes iCloud for an existing remote vault before a new local vault is
+  /// created. Returns `null` when probing does not apply (non-Apple platform,
+  /// iCloud disabled locally or unavailable) or when discovery fails — a
+  /// network failure must never block vault creation.
+  Future<RemoteVaultDiscovery?> probeRemoteVaultBeforeInitialize() async {
+    if (!ref.read(platformCapabilitiesProvider).cloudKitSync) {
+      return null;
+    }
+    if (await _cloudKitSyncDisabledLocally()) {
+      return null;
+    }
+    try {
+      final available = await ref.read(cloudKitAvailabilityCheckProvider)();
+      if (!available) {
+        return null;
+      }
+      return await RemoteVaultDiscoveryService(
+        ref.read(cloudKitSyncProviderFactoryProvider)(),
+      ).discover();
+    } on Object catch (error) {
+      _recordVaultEvent(
+        'vault.initialize.probe_remote.failure',
+        level: DiagnosticLogLevel.warning,
+        details: _vaultSessionErrorDetails(error),
+      );
+      return null;
+    }
+  }
+
+  /// Shared commit path for adopting a remote vault header: writes the remote
+  /// header locally with an empty record set, records the sync-enabled shadow
+  /// setting where applicable, locks the session into the remote vault
+  /// identity, and arms the initial pull that runs after the next unlock.
+  Future<void> adoptRemoteVaultHeader(
+    VaultHeader header, {
+    required SyncProviderKind kind,
+    VaultSessionNotice? notice,
+  }) async {
+    final sanitized = await _sanitizeLoadedHeader(header, persist: false);
+    final adopted = sanitized ?? header;
+    await _commitRemoteBootstrapSnapshot(header: adopted, records: const []);
+    await _lockServiceIfUnlocked();
+    _service = _createService(header: adopted);
+    switch (kind) {
+      case SyncProviderKind.cloudKit:
+        _cloudKitHeaderDiscovered = true;
+        await _saveLocalCloudKitSyncSetting(true);
+        await ref
+            .read(cloudKitSyncShadowSettingsStoreProvider)
+            .save(vaultId: syncVaultId(adopted), enabled: true);
+      case SyncProviderKind.webDav:
+        _webDavHeaderAdopted = true;
+      case SyncProviderKind.local || SyncProviderKind.iCloudDrive:
+        throw ArgumentError.value(
+          kind,
+          'kind',
+          'Remote vault adoption is only supported for cloudKit and webDav.',
+        );
+    }
+    final localUnlockStatus = await _localUnlockStatus();
+    state = AsyncData(
+      VaultSessionState(
+        vaultState: VaultState.locked,
+        localUnlockAvailable: localUnlockStatus.available,
+        biometricUnlockSupported: localUnlockStatus.supported,
+        notice: notice,
+      ),
+    );
+    _invalidateSyncStateProviders();
+  }
+
   InMemoryVaultService _createService({VaultHeader? header}) {
     return InMemoryVaultService(
       config: ref.read(vaultCryptoConfigProvider),
@@ -2186,24 +2264,11 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       await ref.read(vaultHeaderStoreProvider).save(result.header);
       final bootstrap = await _bootstrapCloudKitSnapshotAfterInitialize();
       if (bootstrap.adoptedRemoteHeader != null) {
-        final header = bootstrap.adoptedRemoteHeader!;
-        await _commitCloudKitBootstrapSnapshot(
-          header: header,
-          records: const [],
+        await adoptRemoteVaultHeader(
+          bootstrap.adoptedRemoteHeader!,
+          kind: SyncProviderKind.cloudKit,
+          notice: bootstrap.notice,
         );
-        await service.lock();
-        _service = _createService(header: header);
-        _cloudKitHeaderDiscovered = true;
-        final localUnlockStatus = await _localUnlockStatus();
-        state = AsyncData(
-          VaultSessionState(
-            vaultState: VaultState.locked,
-            localUnlockAvailable: localUnlockStatus.available,
-            biometricUnlockSupported: localUnlockStatus.supported,
-            notice: bootstrap.notice,
-          ),
-        );
-        _invalidateSyncStateProviders();
         _recordVaultEvent(
           'vault.initialize.success',
           details: {'adoptedRemoteHeader': true},
@@ -2587,6 +2652,12 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   Future<_CloudKitUnlockSyncPlan> _prepareCloudKitSyncForUnlock() async {
+    if (_webDavHeaderAdopted) {
+      return (
+        runsInBackground: false,
+        outcome: await _pullWebDavSnapshotAfterAdoption(),
+      );
+    }
     if (_shouldSyncCloudKitAfterUnlockInBackground) {
       return (
         runsInBackground: true,
@@ -2597,6 +2668,48 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       runsInBackground: false,
       outcome: await _pullCloudKitSnapshotAfterUnlockIfNeeded(),
     );
+  }
+
+  /// Initial pull that runs after unlocking a vault adopted from a WebDAV
+  /// remote: replaces the (empty) local record set with the remote snapshot.
+  /// Failures propagate so the unlock surfaces the error instead of silently
+  /// opening an empty vault, matching the CloudKit initial-pull behavior.
+  Future<_CloudKitUnlockSyncOutcome> _pullWebDavSnapshotAfterAdoption() async {
+    final header = service.header;
+    if (header == null) {
+      _webDavHeaderAdopted = false;
+      return _CloudKitUnlockSyncOutcome.skipped;
+    }
+    final provider = await ref.read(webDavSyncProviderFactoryProvider)(
+      ref.read(syncSettingsServiceProvider),
+    );
+    final manifest = await provider.readManifest();
+    if (manifest == null) {
+      throw const SyncRunException(
+        'sync.remote_manifest_missing',
+        'Remote sync manifest is missing.',
+      );
+    }
+    if (manifest.vaultId != syncVaultId(header)) {
+      throw const SyncRunException(
+        'sync.remote_manifest_wrong_vault',
+        'Remote sync data belongs to another vault.',
+      );
+    }
+    validateRemoteManifestProtocol(manifest);
+    final restoredRecords = InMemoryVaultRecordRepository();
+    await SyncRunService(
+      vault: service,
+      records: restoredRecords,
+      diagnosticLogger: ref.read(offlineDiagnosticLoggerProvider),
+    ).pullEncryptedSnapshot(provider);
+    await _commitRemoteBootstrapSnapshot(
+      header: header,
+      records: await restoredRecords.list(),
+    );
+    _webDavHeaderAdopted = false;
+    _invalidateSyncStateProviders();
+    return _CloudKitUnlockSyncOutcome.synced;
   }
 
   void _completePublishedUnlock(
@@ -2771,7 +2884,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       if (!isActive()) {
         return _CloudKitUnlockSyncOutcome.skipped;
       }
-      await _commitCloudKitBootstrapSnapshot(
+      await _commitRemoteBootstrapSnapshot(
         header: header,
         records: await restoredRecords.list(),
       );
@@ -2789,9 +2902,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       return _CloudKitUnlockSyncOutcome.skipped;
     }
     _cloudKitHeaderDiscovered = false;
-    ref.invalidate(webDavSyncSettingsProvider);
-    ref.invalidate(cloudKitSyncSettingsProvider);
-    ref.invalidate(syncKnownDevicesProvider);
+    _invalidateSyncStateProviders();
     return _CloudKitUnlockSyncOutcome.synced;
   }
 
@@ -2990,14 +3101,12 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
         records: restoredRecords,
         diagnosticLogger: ref.read(offlineDiagnosticLoggerProvider),
       ).pullEncryptedSnapshot(provider);
-      await _commitCloudKitBootstrapSnapshot(
+      await _commitRemoteBootstrapSnapshot(
         header: header,
         records: await restoredRecords.list(),
       );
       _cloudKitHeaderDiscovered = false;
-      ref.invalidate(webDavSyncSettingsProvider);
-      ref.invalidate(cloudKitSyncSettingsProvider);
-      ref.invalidate(syncKnownDevicesProvider);
+      _invalidateSyncStateProviders();
       return _CloudKitUnlockSyncOutcome.synced;
     } on SyncRunException catch (error) {
       if (error.code == 'sync.remote_vault_reset') {
@@ -3074,9 +3183,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       if (!isActive()) {
         return _CloudKitUnlockSyncOutcome.skipped;
       }
-      ref.invalidate(webDavSyncSettingsProvider);
-      ref.invalidate(cloudKitSyncSettingsProvider);
-      ref.invalidate(syncKnownDevicesProvider);
+      _invalidateSyncStateProviders();
       return _CloudKitUnlockSyncOutcome.synced;
     } on SyncRunException catch (error) {
       if (error.code == 'sync.remote_vault_reset') {
@@ -3132,8 +3239,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     }
     final available = await ref.read(cloudKitAvailabilityCheckProvider)();
     if (!available) {
-      return const _CloudKitBootstrapResult(
-        failureMessage: 'iCloud sync is not available.',
+      return _CloudKitBootstrapResult(
+        failureMessage: _currentLocalizations(ref).syncICloudUnavailableError,
       );
     }
     _markWaitingForICloud();
@@ -3142,15 +3249,9 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
       final provider = ref.read(cloudKitSyncProviderFactoryProvider)();
       final remote = await RemoteVaultDiscoveryService(provider).discover();
       if (remote != null) {
-        await _saveLocalCloudKitSyncSetting(true);
-        await ref
-            .read(cloudKitSyncShadowSettingsStoreProvider)
-            .save(vaultId: syncVaultId(remote.header), enabled: true);
-        ref.invalidate(cloudKitSyncSettingsProvider);
-        ref.invalidate(syncKnownDevicesProvider);
         return _CloudKitBootstrapResult(
           adoptedRemoteHeader: remote.header,
-          notice: VaultSessionNotice.cloudKitRemoteVaultAdopted,
+          notice: VaultSessionNotice.cloudKitRemoteVaultAdoptedAfterInitialize,
         );
       }
       await _saveLocalCloudKitSyncSetting(true);
@@ -3179,14 +3280,14 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
             .read(cloudKitSyncShadowSettingsStoreProvider)
             .save(vaultId: syncVaultId(header), enabled: true);
       }
-      ref.invalidate(cloudKitSyncSettingsProvider);
-      ref.invalidate(syncKnownDevicesProvider);
+      ref.container.invalidate(cloudKitSyncSettingsProvider);
+      ref.container.invalidate(syncKnownDevicesProvider);
       return const _CloudKitBootstrapResult();
     } on Object catch (error) {
       await _clearCloudKitSyncSettingAfterBootstrapFailure();
-      ref.invalidate(cloudKitSyncSettingsProvider);
+      ref.container.invalidate(cloudKitSyncSettingsProvider);
       return _CloudKitBootstrapResult(
-        failureMessage: _syncBootstrapFailureMessage(error),
+        failureMessage: _syncBootstrapFailureMessage(ref, error),
       );
     }
   }
@@ -3201,7 +3302,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     }
   }
 
-  Future<void> _commitCloudKitBootstrapSnapshot({
+  Future<void> _commitRemoteBootstrapSnapshot({
     required VaultHeader header,
     required List<VaultRecordEnvelope> records,
   }) {
@@ -3643,9 +3744,13 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
   }
 
   void _invalidateSyncStateProviders() {
-    ref.invalidate(webDavSyncSettingsProvider);
-    ref.invalidate(cloudKitSyncSettingsProvider);
-    ref.invalidate(syncKnownDevicesProvider);
+    // Go through the container: these providers transitively depend on
+    // vaultSessionControllerProvider (via vaultServiceProvider), so
+    // ref.invalidate would trip the circular-dependency assert once a
+    // dependent (e.g. the sync settings page) has been built.
+    ref.container.invalidate(webDavSyncSettingsProvider);
+    ref.container.invalidate(cloudKitSyncSettingsProvider);
+    ref.container.invalidate(syncKnownDevicesProvider);
   }
 
   void _recordVaultEvent(
@@ -3744,6 +3849,7 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     await ref.read(vaultHeaderStoreProvider).clear();
     await service.lock();
     _cloudKitHeaderDiscovered = false;
+    _webDavHeaderAdopted = false;
     _service = _createService();
     ref.read(syncConflictControllerProvider.notifier).clear();
     state = const AsyncData(
@@ -3796,19 +3902,20 @@ bool _hasSupportedLocalUnlockProtector(VaultHeader? header) {
 }
 
 String _vaultFailureMessage(Ref ref, Object error) {
+  final l10n = _currentLocalizations(ref);
   if (error is VaultException) {
-    return localizedVaultExceptionMessage(_currentLocalizations(ref), error);
+    return localizedVaultExceptionMessage(l10n, error);
   }
   if (error is SyncRunException) {
-    return error.message;
+    return localizedSyncRunExceptionMessage(l10n, error);
   }
   if (error is SyncProviderException) {
     return error.message;
   }
   if (error is AppProfileLockException) {
-    return 'This Serlink profile is already open in another window.';
+    return l10n.appProfileLockedError;
   }
-  return 'Vault operation failed: ${Redactor.redact(error.toString())}';
+  return l10n.vaultOperationFailedError(Redactor.redact(error.toString()));
 }
 
 String _vaultStructuralFailureMessage(Object error) {
@@ -3819,18 +3926,22 @@ String _vaultStructuralFailureMessage(Object error) {
 }
 
 String _recoveryFailureMessage(Ref ref, Object error) {
+  final l10n = _currentLocalizations(ref);
   if (error is DatabaseIntegrityException) {
-    return error.message;
+    return l10n.vaultDatabaseUnreadableError;
   }
   if (error is VaultException) {
-    return localizedVaultExceptionMessage(_currentLocalizations(ref), error);
+    return localizedVaultExceptionMessage(l10n, error);
   }
-  return 'Vault recovery failed: ${Redactor.redact(error.toString())}';
+  if (error is SyncRunException) {
+    return localizedSyncRunExceptionMessage(l10n, error);
+  }
+  return l10n.vaultRecoveryFailedError(Redactor.redact(error.toString()));
 }
 
-String _syncBootstrapFailureMessage(Object error) {
+String _syncBootstrapFailureMessage(Ref ref, Object error) {
   if (error is SyncRunException) {
-    return error.message;
+    return localizedSyncRunExceptionMessage(_currentLocalizations(ref), error);
   }
   if (error is SyncProviderException) {
     return error.message;
@@ -3838,7 +3949,7 @@ String _syncBootstrapFailureMessage(Object error) {
   if (error is SyncSettingsException) {
     return error.message;
   }
-  return 'Initial iCloud sync failed.';
+  return _currentLocalizations(ref).syncICloudSetupFailedError;
 }
 
 AppLocalizations _currentLocalizations(Ref ref) {

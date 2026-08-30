@@ -1348,7 +1348,9 @@ class _SerlinkButtonCore extends StatelessWidget {
       size: _foruiButtonSize(size),
       mainAxisSize: MainAxisSize.min,
       prefix: prefix,
-      child: child,
+      // Flexible lets long labels shrink on narrow layouts instead of
+      // overflowing the button's content row.
+      child: Flexible(child: child),
     );
   }
 }

@@ -1246,6 +1246,114 @@ abstract class AppLocalizations {
   /// **'WebDAV certificate trust saved.'**
   String get syncWebDavCertificateTrustSaved;
 
+  /// Shown when a sync operation cannot find the local vault data.
+  ///
+  /// In en, this message translates to:
+  /// **'The vault data needed for sync is missing on this device.'**
+  String get syncErrorVaultDataMissing;
+
+  /// Shown when the remote sync manifest cannot be read.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote sync data could not be read.'**
+  String get syncErrorRemoteDataUnreadable;
+
+  /// Shown when the remote sync manifest is missing.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote sync data is missing.'**
+  String get syncErrorRemoteDataMissing;
+
+  /// Shown when the remote sync data belongs to a different vault.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote sync data belongs to another vault.'**
+  String get syncErrorRemoteWrongVault;
+
+  /// Shown when remote sync data fails validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote sync data is invalid or corrupted.'**
+  String get syncErrorRemoteDataInvalid;
+
+  /// Shown when the remote sync manifest does not match its record objects.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote sync data does not match its contents.'**
+  String get syncErrorRemoteDataMismatch;
+
+  /// Shown when remote sync data requires a newer app version.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote sync data was written by a newer Serlink version. Update Serlink before syncing, or turn sync off on this device.'**
+  String get syncErrorRemoteVersionUnsupported;
+
+  /// Shown when the remote vault metadata is missing.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote vault data is missing.'**
+  String get syncErrorRemoteVaultDataMissing;
+
+  /// Shown when the remote vault metadata fails validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote vault data is invalid or corrupted.'**
+  String get syncErrorRemoteVaultDataInvalid;
+
+  /// Shown when the remote vault reset marker cannot be parsed.
+  ///
+  /// In en, this message translates to:
+  /// **'The remote vault reset marker is invalid.'**
+  String get syncErrorRemoteResetMarkerInvalid;
+
+  /// Shown when a sync run loses a compare-and-swap race.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote sync data changed while syncing.'**
+  String get syncErrorRemoteChanged;
+
+  /// Shown when the remote vault was reset on another device.
+  ///
+  /// In en, this message translates to:
+  /// **'The remote vault was reset.'**
+  String get syncErrorRemoteVaultReset;
+
+  /// Shown when a conflict merge is submitted without a selection.
+  ///
+  /// In en, this message translates to:
+  /// **'No sync conflicts were selected for merge.'**
+  String get syncErrorNoConflictsSelected;
+
+  /// Shown when a conflicting record was removed before merging.
+  ///
+  /// In en, this message translates to:
+  /// **'The conflicting record no longer exists on this device.'**
+  String get syncErrorConflictRecordMissing;
+
+  /// Shown when a sync operation requires an unlocked vault.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock the vault before syncing.'**
+  String get syncErrorVaultLocked;
+
+  /// Shown when damaged local vault data blocks a sync operation.
+  ///
+  /// In en, this message translates to:
+  /// **'Local vault data needs recovery before it can sync.'**
+  String get syncErrorLocalUnhealthy;
+
+  /// Shown when a sync operation runs without an enabled provider.
+  ///
+  /// In en, this message translates to:
+  /// **'No sync provider is enabled.'**
+  String get syncErrorProviderMissing;
+
+  /// Shown when a staged sync snapshot references an invalid provider.
+  ///
+  /// In en, this message translates to:
+  /// **'The staged sync provider is invalid.'**
+  String get syncErrorStagedProviderInvalid;
+
   /// No description provided for @syncICloudEnabledSnack.
   ///
   /// In en, this message translates to:
@@ -1263,6 +1371,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'iCloud already has a Serlink vault. Use that vault passphrase to finish syncing.'**
   String get syncICloudRemoteVaultAdoptedSnack;
+
+  /// Snack shown after creating a local vault when setup adopted the existing iCloud vault instead.
+  ///
+  /// In en, this message translates to:
+  /// **'Serlink switched to the existing iCloud vault, so the passphrase you just entered was not applied. Unlock with the iCloud vault passphrase.'**
+  String get syncICloudRemoteVaultAdoptedAfterInitializeSnack;
+
+  /// Snack shown after WebDAV setup adopted the existing remote vault and locked this device into it.
+  ///
+  /// In en, this message translates to:
+  /// **'Serlink switched to the remote vault. Unlock with the remote vault passphrase.'**
+  String get syncWebDavRemoteVaultAdoptedSnack;
+
+  /// Shown when iCloud is unavailable while setting up sync.
+  ///
+  /// In en, this message translates to:
+  /// **'iCloud sync is not available.'**
+  String get syncICloudUnavailableError;
+
+  /// Shown when the initial iCloud sync setup fails for an unknown reason.
+  ///
+  /// In en, this message translates to:
+  /// **'iCloud sync could not be set up.'**
+  String get syncICloudSetupFailedError;
 
   /// No description provided for @syncConflictsResolvedSnack.
   ///
@@ -2530,6 +2662,54 @@ abstract class AppLocalizations {
   /// **'WebDAV sync settings removed.'**
   String get webDavRemovedSnack;
 
+  /// Title of the dialog shown when enabling WebDAV sync against a location that already holds a different Serlink vault.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote already has another Serlink vault'**
+  String get webDavRemoteVaultMismatchTitle;
+
+  /// Body of the dialog shown when enabling WebDAV sync against a location that already holds a different Serlink vault.
+  ///
+  /// In en, this message translates to:
+  /// **'This WebDAV location already contains sync data for a different Serlink vault. You can replace the remote data with this device\'\'s vault, or restore this device from the remote vault.'**
+  String get webDavRemoteVaultMismatchBody;
+
+  /// Button that keeps this device's vault and overwrites the remote WebDAV sync data.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Local Data and Replace Remote'**
+  String get webDavReplaceRemoteAction;
+
+  /// Button that adopts the remote WebDAV vault and replaces this device's local vault data.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore This Device from Remote'**
+  String get webDavRestoreFromRemoteAction;
+
+  /// Title of the confirmation shown before overwriting remote WebDAV sync data with the local vault.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace the remote vault?'**
+  String get webDavReplaceRemoteConfirmTitle;
+
+  /// Body of the confirmation shown before overwriting remote WebDAV sync data with the local vault.
+  ///
+  /// In en, this message translates to:
+  /// **'The remote Serlink sync data will be overwritten with this device\'\'s vault. This cannot be undone.'**
+  String get webDavReplaceRemoteConfirmBody;
+
+  /// Title of the confirmation shown before replacing local vault data with the remote WebDAV vault.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore this device from the remote vault?'**
+  String get webDavRestoreFromRemoteConfirmTitle;
+
+  /// Body of the confirmation shown before replacing local vault data with the remote WebDAV vault.
+  ///
+  /// In en, this message translates to:
+  /// **'The current vault data on this device will be replaced by the remote vault, and this device will lock. Unlock with the remote vault passphrase. A local backup is created first.'**
+  String get webDavRestoreFromRemoteConfirmBody;
+
   /// No description provided for @credentialsDialogTitle.
   ///
   /// In en, this message translates to:
@@ -3526,6 +3706,42 @@ abstract class AppLocalizations {
   /// **'Create Vault'**
   String get vaultCreateAction;
 
+  /// Title of the dialog shown when iCloud already contains a Serlink vault while creating a new local vault.
+  ///
+  /// In en, this message translates to:
+  /// **'An iCloud vault already exists'**
+  String get vaultCreateICloudVaultExistsTitle;
+
+  /// Body of the dialog shown when iCloud already contains a Serlink vault while creating a new local vault.
+  ///
+  /// In en, this message translates to:
+  /// **'You can restore the existing vault by unlocking it with its own passphrase, or create a brand-new vault. Creating a new vault replaces the sync data stored in iCloud.'**
+  String get vaultCreateICloudVaultExistsBody;
+
+  /// Button that adopts the existing iCloud vault instead of creating a new local vault.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore iCloud Vault'**
+  String get vaultCreateRestoreICloudVaultAction;
+
+  /// Button that continues creating a new local vault even though iCloud already contains one.
+  ///
+  /// In en, this message translates to:
+  /// **'Create New Vault Anyway'**
+  String get vaultCreateNewAnywayAction;
+
+  /// Title of the confirmation shown before creating a new vault that replaces existing iCloud sync data.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace iCloud sync data?'**
+  String get vaultCreateReplaceICloudConfirmTitle;
+
+  /// Body of the confirmation shown before creating a new vault that replaces existing iCloud sync data.
+  ///
+  /// In en, this message translates to:
+  /// **'The new vault replaces the Serlink sync data already stored in iCloud. This cannot be undone.'**
+  String get vaultCreateReplaceICloudConfirmBody;
+
   /// No description provided for @vaultUnlockAction.
   ///
   /// In en, this message translates to:
@@ -3555,6 +3771,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Passphrase did not unlock the vault.'**
   String get vaultInvalidPassphraseError;
+
+  /// Shown when a vault backup export is attempted without a vault.
+  ///
+  /// In en, this message translates to:
+  /// **'Create or unlock a vault before exporting a backup.'**
+  String get vaultBackupMissingVaultError;
+
+  /// Fallback for a failed vault operation with redacted technical detail.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault operation failed: {detail}'**
+  String vaultOperationFailedError(String detail);
+
+  /// Fallback for a failed vault recovery action with redacted technical detail.
+  ///
+  /// In en, this message translates to:
+  /// **'Vault recovery failed: {detail}'**
+  String vaultRecoveryFailedError(String detail);
+
+  /// Shown when a vault recovery action fails on a damaged local database.
+  ///
+  /// In en, this message translates to:
+  /// **'The local Serlink database could not be read or restored.'**
+  String get vaultDatabaseUnreadableError;
+
+  /// Shown when the active Serlink profile is locked by another window.
+  ///
+  /// In en, this message translates to:
+  /// **'This Serlink profile is already open in another window.'**
+  String get appProfileLockedError;
 
   /// No description provided for @vaultInvalidRecoveryKeyError.
   ///
@@ -3640,58 +3886,64 @@ abstract class AppLocalizations {
   /// **'Vault recovery tools are available.'**
   String get vaultRecoveryBody;
 
-  /// No description provided for @vaultRecoveryDatabaseTitle.
+  /// Recovery surface title when local vault data cannot be read.
   ///
   /// In en, this message translates to:
-  /// **'Database recovery'**
-  String get vaultRecoveryDatabaseTitle;
+  /// **'Local vault data is damaged'**
+  String get vaultRecoveryLocalDataTitle;
 
-  /// No description provided for @vaultRecoveryDatabaseBody.
+  /// Recovery surface body when local vault data cannot be read.
   ///
   /// In en, this message translates to:
-  /// **'Serlink could not open this local database safely.'**
-  String get vaultRecoveryDatabaseBody;
+  /// **'Serlink cannot read the vault data stored on this device. You can usually recover it from the automatic backup or a backup file.'**
+  String get vaultRecoveryLocalDataBody;
 
-  /// No description provided for @vaultRecoveryHeaderTitle.
+  /// Recovery surface title when only the cloud sync data is damaged.
   ///
   /// In en, this message translates to:
-  /// **'Vault header recovery'**
-  String get vaultRecoveryHeaderTitle;
+  /// **'Cloud sync data needs repair'**
+  String get vaultRecoveryCloudSyncTitle;
 
-  /// No description provided for @vaultRecoveryHeaderBody.
+  /// Recovery surface body when only the cloud sync data is damaged.
   ///
   /// In en, this message translates to:
-  /// **'The local vault header is invalid or incomplete.'**
-  String get vaultRecoveryHeaderBody;
+  /// **'The vault data on this device is not affected. Open Settings → Sync to repair the cloud sync data.'**
+  String get vaultRecoveryCloudSyncBody;
 
-  /// No description provided for @vaultRecoveryRecordsTitle.
+  /// Recovery surface title when some vault records fail authentication.
   ///
   /// In en, this message translates to:
-  /// **'Record recovery'**
-  String get vaultRecoveryRecordsTitle;
+  /// **'Some vault records are damaged'**
+  String get vaultRecoveryRecordsDamagedTitle;
 
-  /// No description provided for @vaultRecoveryRecordsBody.
+  /// Recovery surface body with the number of damaged vault records.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, one {# encrypted record failed authentication.} other {# encrypted records failed authentication.}}'**
-  String vaultRecoveryRecordsBody(num count);
+  /// **'{count, plural, one {# encrypted record could not be read. Quarantine it to keep using the rest of the vault.} other {# encrypted records could not be read. Quarantine them to keep using the rest of the vault.}}'**
+  String vaultRecoveryRecordsDamagedBody(num count);
 
-  /// No description provided for @vaultRecoveryRemoteTitle.
+  /// Recovery surface action that restores from a backup file.
   ///
   /// In en, this message translates to:
-  /// **'Remote sync recovery'**
-  String get vaultRecoveryRemoteTitle;
+  /// **'Import backup file'**
+  String get vaultRecoveryImportBackupAction;
 
-  /// No description provided for @vaultRecoveryRemoteBody.
+  /// Expands the technical failure detail on the recovery surface.
   ///
   /// In en, this message translates to:
-  /// **'The remote sync set needs repair before it can be used.'**
-  String get vaultRecoveryRemoteBody;
+  /// **'View details'**
+  String get vaultRecoveryViewDetailsAction;
+
+  /// Collapses the technical failure detail on the recovery surface.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide details'**
+  String get vaultRecoveryHideDetailsAction;
 
   /// No description provided for @vaultRestoreLatestBackupAction.
   ///
   /// In en, this message translates to:
-  /// **'Restore latest backup'**
+  /// **'Restore from automatic backup'**
   String get vaultRestoreLatestBackupAction;
 
   /// No description provided for @vaultQuarantineRecordsAction.
@@ -4609,7 +4861,7 @@ abstract class AppLocalizations {
   /// No description provided for @exportVaultBackupBody.
   ///
   /// In en, this message translates to:
-  /// **'The backup contains encrypted vault records and the vault header. Keep it private.'**
+  /// **'The backup contains your encrypted vault data. Keep it private.'**
   String get exportVaultBackupBody;
 
   /// No description provided for @backupExportedSnack.
@@ -4735,7 +4987,7 @@ abstract class AppLocalizations {
   /// No description provided for @importEncryptedBackupBody.
   ///
   /// In en, this message translates to:
-  /// **'This replaces the local vault header and merges encrypted records from the selected backup.'**
+  /// **'This replaces the vault data on this device and merges encrypted records from the selected backup.'**
   String get importEncryptedBackupBody;
 
   /// No description provided for @backupImportedSnack.

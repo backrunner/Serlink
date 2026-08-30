@@ -222,12 +222,21 @@ The script forwards extra arguments to `xcodebuild`, so local/development DMGs
 can override the user-visible app name to avoid confusion with an installed
 App Store copy (CFBundleDisplayName/CFBundleName come from
 `SERLINK_APP_DISPLAY_NAME` in `macos/Runner/Configs/AppInfo.xcconfig`,
-default `Serlink`):
+default `Serlink`).
+
+For local development DMGs, use the dedicated script instead:
 
 ```sh
-SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
-  ./tool/build_macos_direct.sh SERLINK_APP_DISPLAY_NAME="Serlink (Dev)"
+./tool/build_macos_dev_dmg.sh
 ```
+
+It builds the direct channel with `SERLINK_APP_DISPLAY_NAME="Serlink (Dev)"`,
+keeps the Xcode development provisioning profile (required for the app to
+launch), embeds and signs the `serlink-mcp` helper, creates
+`build/Serlink-<version>-<arch>-dev.dmg`, installs the branded app into
+`/Applications`, and deletes intermediate `.app` copies so LaunchServices does
+not index duplicate Serlink apps. It signs with `Apple Development` by default
+and is not notarized — use `build_macos_direct.sh` for formal releases.
 
 ## App icon checks
 

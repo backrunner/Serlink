@@ -396,7 +396,7 @@ class SyncSettingsService {
     return settings;
   }
 
-  Future<WebDavSyncProvider> buildWebDavProviderFromDraft(
+  Future<SyncProvider> buildWebDavProviderFromDraft(
     WebDavSyncSettingsDraft draft,
   ) async {
     final existing = await _settings.readWebDav();

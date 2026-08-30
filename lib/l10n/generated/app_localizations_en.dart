@@ -669,6 +669,73 @@ class AppLocalizationsEn extends AppLocalizations {
       'WebDAV certificate trust saved.';
 
   @override
+  String get syncErrorVaultDataMissing =>
+      'The vault data needed for sync is missing on this device.';
+
+  @override
+  String get syncErrorRemoteDataUnreadable =>
+      'Remote sync data could not be read.';
+
+  @override
+  String get syncErrorRemoteDataMissing => 'Remote sync data is missing.';
+
+  @override
+  String get syncErrorRemoteWrongVault =>
+      'Remote sync data belongs to another vault.';
+
+  @override
+  String get syncErrorRemoteDataInvalid =>
+      'Remote sync data is invalid or corrupted.';
+
+  @override
+  String get syncErrorRemoteDataMismatch =>
+      'Remote sync data does not match its contents.';
+
+  @override
+  String get syncErrorRemoteVersionUnsupported =>
+      'Remote sync data was written by a newer Serlink version. Update Serlink before syncing, or turn sync off on this device.';
+
+  @override
+  String get syncErrorRemoteVaultDataMissing => 'Remote vault data is missing.';
+
+  @override
+  String get syncErrorRemoteVaultDataInvalid =>
+      'Remote vault data is invalid or corrupted.';
+
+  @override
+  String get syncErrorRemoteResetMarkerInvalid =>
+      'The remote vault reset marker is invalid.';
+
+  @override
+  String get syncErrorRemoteChanged =>
+      'Remote sync data changed while syncing.';
+
+  @override
+  String get syncErrorRemoteVaultReset => 'The remote vault was reset.';
+
+  @override
+  String get syncErrorNoConflictsSelected =>
+      'No sync conflicts were selected for merge.';
+
+  @override
+  String get syncErrorConflictRecordMissing =>
+      'The conflicting record no longer exists on this device.';
+
+  @override
+  String get syncErrorVaultLocked => 'Unlock the vault before syncing.';
+
+  @override
+  String get syncErrorLocalUnhealthy =>
+      'Local vault data needs recovery before it can sync.';
+
+  @override
+  String get syncErrorProviderMissing => 'No sync provider is enabled.';
+
+  @override
+  String get syncErrorStagedProviderInvalid =>
+      'The staged sync provider is invalid.';
+
+  @override
   String get syncICloudEnabledSnack => 'iCloud sync enabled.';
 
   @override
@@ -677,6 +744,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get syncICloudRemoteVaultAdoptedSnack =>
       'iCloud already has a Serlink vault. Use that vault passphrase to finish syncing.';
+
+  @override
+  String get syncICloudRemoteVaultAdoptedAfterInitializeSnack =>
+      'Serlink switched to the existing iCloud vault, so the passphrase you just entered was not applied. Unlock with the iCloud vault passphrase.';
+
+  @override
+  String get syncWebDavRemoteVaultAdoptedSnack =>
+      'Serlink switched to the remote vault. Unlock with the remote vault passphrase.';
+
+  @override
+  String get syncICloudUnavailableError => 'iCloud sync is not available.';
+
+  @override
+  String get syncICloudSetupFailedError => 'iCloud sync could not be set up.';
 
   @override
   String syncConflictsResolvedSnack(num count) {
@@ -1422,6 +1503,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get webDavRemovedSnack => 'WebDAV sync settings removed.';
 
   @override
+  String get webDavRemoteVaultMismatchTitle =>
+      'Remote already has another Serlink vault';
+
+  @override
+  String get webDavRemoteVaultMismatchBody =>
+      'This WebDAV location already contains sync data for a different Serlink vault. You can replace the remote data with this device\'s vault, or restore this device from the remote vault.';
+
+  @override
+  String get webDavReplaceRemoteAction => 'Keep Local Data and Replace Remote';
+
+  @override
+  String get webDavRestoreFromRemoteAction => 'Restore This Device from Remote';
+
+  @override
+  String get webDavReplaceRemoteConfirmTitle => 'Replace the remote vault?';
+
+  @override
+  String get webDavReplaceRemoteConfirmBody =>
+      'The remote Serlink sync data will be overwritten with this device\'s vault. This cannot be undone.';
+
+  @override
+  String get webDavRestoreFromRemoteConfirmTitle =>
+      'Restore this device from the remote vault?';
+
+  @override
+  String get webDavRestoreFromRemoteConfirmBody =>
+      'The current vault data on this device will be replaced by the remote vault, and this device will lock. Unlock with the remote vault passphrase. A local backup is created first.';
+
+  @override
   String get credentialsDialogTitle => 'Credentials';
 
   @override
@@ -1975,6 +2085,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultCreateAction => 'Create Vault';
 
   @override
+  String get vaultCreateICloudVaultExistsTitle =>
+      'An iCloud vault already exists';
+
+  @override
+  String get vaultCreateICloudVaultExistsBody =>
+      'You can restore the existing vault by unlocking it with its own passphrase, or create a brand-new vault. Creating a new vault replaces the sync data stored in iCloud.';
+
+  @override
+  String get vaultCreateRestoreICloudVaultAction => 'Restore iCloud Vault';
+
+  @override
+  String get vaultCreateNewAnywayAction => 'Create New Vault Anyway';
+
+  @override
+  String get vaultCreateReplaceICloudConfirmTitle =>
+      'Replace iCloud sync data?';
+
+  @override
+  String get vaultCreateReplaceICloudConfirmBody =>
+      'The new vault replaces the Serlink sync data already stored in iCloud. This cannot be undone.';
+
+  @override
   String get vaultUnlockAction => 'Unlock';
 
   @override
@@ -1989,6 +2121,28 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get vaultInvalidPassphraseError =>
       'Passphrase did not unlock the vault.';
+
+  @override
+  String get vaultBackupMissingVaultError =>
+      'Create or unlock a vault before exporting a backup.';
+
+  @override
+  String vaultOperationFailedError(String detail) {
+    return 'Vault operation failed: $detail';
+  }
+
+  @override
+  String vaultRecoveryFailedError(String detail) {
+    return 'Vault recovery failed: $detail';
+  }
+
+  @override
+  String get vaultDatabaseUnreadableError =>
+      'The local Serlink database could not be read or restored.';
+
+  @override
+  String get appProfileLockedError =>
+      'This Serlink profile is already open in another window.';
 
   @override
   String get vaultInvalidRecoveryKeyError =>
@@ -2040,42 +2194,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultRecoveryBody => 'Vault recovery tools are available.';
 
   @override
-  String get vaultRecoveryDatabaseTitle => 'Database recovery';
+  String get vaultRecoveryLocalDataTitle => 'Local vault data is damaged';
 
   @override
-  String get vaultRecoveryDatabaseBody =>
-      'Serlink could not open this local database safely.';
+  String get vaultRecoveryLocalDataBody =>
+      'Serlink cannot read the vault data stored on this device. You can usually recover it from the automatic backup or a backup file.';
 
   @override
-  String get vaultRecoveryHeaderTitle => 'Vault header recovery';
+  String get vaultRecoveryCloudSyncTitle => 'Cloud sync data needs repair';
 
   @override
-  String get vaultRecoveryHeaderBody =>
-      'The local vault header is invalid or incomplete.';
+  String get vaultRecoveryCloudSyncBody =>
+      'The vault data on this device is not affected. Open Settings → Sync to repair the cloud sync data.';
 
   @override
-  String get vaultRecoveryRecordsTitle => 'Record recovery';
+  String get vaultRecoveryRecordsDamagedTitle =>
+      'Some vault records are damaged';
 
   @override
-  String vaultRecoveryRecordsBody(num count) {
+  String vaultRecoveryRecordsDamagedBody(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# encrypted records failed authentication.',
-      one: '# encrypted record failed authentication.',
+      other:
+          '# encrypted records could not be read. Quarantine them to keep using the rest of the vault.',
+      one:
+          '# encrypted record could not be read. Quarantine it to keep using the rest of the vault.',
     );
     return '$_temp0';
   }
 
   @override
-  String get vaultRecoveryRemoteTitle => 'Remote sync recovery';
+  String get vaultRecoveryImportBackupAction => 'Import backup file';
 
   @override
-  String get vaultRecoveryRemoteBody =>
-      'The remote sync set needs repair before it can be used.';
+  String get vaultRecoveryViewDetailsAction => 'View details';
 
   @override
-  String get vaultRestoreLatestBackupAction => 'Restore latest backup';
+  String get vaultRecoveryHideDetailsAction => 'Hide details';
+
+  @override
+  String get vaultRestoreLatestBackupAction => 'Restore from automatic backup';
 
   @override
   String get vaultQuarantineRecordsAction => 'Quarantine corrupt records';
@@ -2615,7 +2774,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportVaultBackupBody =>
-      'The backup contains encrypted vault records and the vault header. Keep it private.';
+      'The backup contains your encrypted vault data. Keep it private.';
 
   @override
   String get backupExportedSnack => 'Encrypted backup exported.';
@@ -2685,7 +2844,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importEncryptedBackupBody =>
-      'This replaces the local vault header and merges encrypted records from the selected backup.';
+      'This replaces the vault data on this device and merges encrypted records from the selected backup.';
 
   @override
   String get backupImportedSnack => 'Encrypted backup imported.';

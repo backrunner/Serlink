@@ -23,18 +23,25 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
   String? _localErrorMessage;
   VaultSessionNotice? _lastShownNotice;
   bool _didRequestInitialPassphraseFocus = false;
+  bool _probingRemoteVault = false;
 
-  late final AnimationController _shakeController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 480),
-  );
+  // Created lazily so the recovery-surface early return (which never reaches
+  // the AnimatedBuilder below) does not allocate a controller, and so dispose
+  // never has to create one on a deactivated widget.
+  AnimationController? _shakeController;
+
+  AnimationController get _shake =>
+      _shakeController ??= AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 480),
+      );
   String? _lastShownError;
 
   @override
   void dispose() {
     _passphraseController.dispose();
     _passphraseFocusNode.dispose();
-    _shakeController.dispose();
+    _shakeController?.dispose();
     super.dispose();
   }
 
@@ -44,7 +51,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
       return;
     }
     _lastShownError = errorMessage;
-    _shakeController.forward(from: 0);
+    _shake.forward(from: 0);
   }
 
   void _showOneShotNotice(VaultSessionNotice? notice) {
@@ -59,6 +66,10 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     final message = switch (notice) {
       VaultSessionNotice.cloudKitRemoteVaultAdopted =>
         context.l10n.syncICloudRemoteVaultAdoptedSnack,
+      VaultSessionNotice.cloudKitRemoteVaultAdoptedAfterInitialize =>
+        context.l10n.syncICloudRemoteVaultAdoptedAfterInitializeSnack,
+      VaultSessionNotice.webDavRemoteVaultAdopted =>
+        context.l10n.syncWebDavRemoteVaultAdoptedSnack,
     };
     _showSnackBar(context, message);
     ref.read(vaultSessionControllerProvider.notifier).dismissNotice(notice);
@@ -79,7 +90,8 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     final t = context.tokens;
     final asyncState = ref.watch(vaultSessionControllerProvider);
     final session = asyncState.value ?? widget.session;
-    final busy = session?.isBusy ?? asyncState.isLoading;
+    final busy = (session?.isBusy ?? asyncState.isLoading) ||
+        _probingRemoteVault;
     final isInitializing = session?.vaultState == VaultState.uninitialized;
     final recoveryKey = session?.recoveryKey;
     final showRecoveryCodeAccess =
@@ -93,10 +105,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
         widget.error?.toString();
 
     if (session != null && !session.localDataHealthy) {
-      return _VaultRecoverySurface(
-        session: session,
-        errorMessage: errorMessage,
-      );
+      return _VaultRecoverySurface(session: session);
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -117,11 +126,11 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: AnimatedBuilder(
-              animation: _shakeController,
+              animation: _shake,
               builder: (context, child) {
                 // Damped oscillation: amplitude decays as the controller runs.
-                final decay = 1 - _shakeController.value;
-                final dx = decay * 10 * _sineShake(_shakeController.value);
+                final decay = 1 - _shake.value;
+                final dx = decay * 10 * _sineShake(_shake.value);
                 return Transform.translate(offset: Offset(dx, 0), child: child);
               },
               child: GlassPanel(
@@ -240,25 +249,107 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
       _localErrorMessage = null;
     });
     if (isInitializing) {
-      ref
-          .read(vaultSessionControllerProvider.notifier)
-          .initialize(passphrase: passphrase);
+      unawaited(_createVaultWithRemoteProbe(passphrase));
     } else {
       ref
           .read(vaultSessionControllerProvider.notifier)
           .unlock(passphrase: passphrase);
     }
   }
+
+  /// Before creating a vault, check whether iCloud already holds one so the
+  /// user can restore it instead of silently discarding the vault they just
+  /// created. Probe failures fall through to normal creation.
+  Future<void> _createVaultWithRemoteProbe(String passphrase) async {
+    final controller = ref.read(vaultSessionControllerProvider.notifier);
+    setState(() {
+      _probingRemoteVault = true;
+    });
+    final RemoteVaultDiscovery? discovery;
+    try {
+      discovery = await controller.probeRemoteVaultBeforeInitialize();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _probingRemoteVault = false;
+        });
+      }
+    }
+    if (!mounted) {
+      return;
+    }
+    if (discovery == null) {
+      await controller.initialize(passphrase: passphrase);
+      return;
+    }
+    final action = await _showICloudVaultExistsDialog();
+    if (!mounted || action == null) {
+      return;
+    }
+    switch (action) {
+      case _ICloudVaultExistsAction.restore:
+        await controller.adoptRemoteVaultHeader(
+          discovery.header,
+          kind: SyncProviderKind.cloudKit,
+          notice: VaultSessionNotice.cloudKitRemoteVaultAdoptedAfterInitialize,
+        );
+      case _ICloudVaultExistsAction.createNew:
+        final confirmed = await _confirmDialog(
+          context,
+          title: context.l10n.vaultCreateReplaceICloudConfirmTitle,
+          body: context.l10n.vaultCreateReplaceICloudConfirmBody,
+          confirmLabel: context.l10n.replaceAction,
+          destructive: true,
+        );
+        if (!mounted || !confirmed) {
+          return;
+        }
+        await controller.initialize(passphrase: passphrase);
+    }
+  }
+
+  Future<_ICloudVaultExistsAction?> _showICloudVaultExistsDialog() {
+    return showSerlinkDialog<_ICloudVaultExistsAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        final l10n = context.l10n;
+        return SerlinkDialog(
+          maxWidth: _adaptiveDialogWidth(context, _dialogWidthPrompt),
+          title: Text(l10n.vaultCreateICloudVaultExistsTitle),
+          content: SerlinkAlert.warning(
+            message: l10n.vaultCreateICloudVaultExistsBody,
+          ),
+          actions: [
+            SerlinkTextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(l10n.cancelAction),
+            ),
+            SerlinkTextButton(
+              key: const ValueKey('icloud-vault-exists-create-button'),
+              onPressed: () =>
+                  Navigator.of(context).pop(_ICloudVaultExistsAction.createNew),
+              child: Text(l10n.vaultCreateNewAnywayAction),
+            ),
+            SerlinkFilledButton(
+              key: const ValueKey('icloud-vault-exists-restore-button'),
+              onPressed: () =>
+                  Navigator.of(context).pop(_ICloudVaultExistsAction.restore),
+              child: Text(l10n.vaultCreateRestoreICloudVaultAction),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
+enum _ICloudVaultExistsAction { restore, createNew }
+
 class _VaultRecoverySurface extends ConsumerStatefulWidget {
-  const _VaultRecoverySurface({
-    required this.session,
-    required this.errorMessage,
-  });
+  const _VaultRecoverySurface({required this.session});
 
   final VaultSessionState session;
-  final String? errorMessage;
 
   @override
   ConsumerState<_VaultRecoverySurface> createState() =>
@@ -267,6 +358,7 @@ class _VaultRecoverySurface extends ConsumerStatefulWidget {
 
 class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
   String? _localErrorMessage;
+  bool _detailsExpanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -275,26 +367,37 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
     final session =
         ref.watch(vaultSessionControllerProvider).value ?? widget.session;
     final busy = session.isBusy;
-    final message =
-        _localErrorMessage ?? session.failureMessage ?? widget.errorMessage;
-    final recordReport = session.recordHealthReport;
-    final corruptCount = recordReport?.corruptRecords.length ?? 0;
-    final title = switch (session.recoveryStatus) {
-      VaultRecoveryStatus.databaseCorrupt => l10n.vaultRecoveryDatabaseTitle,
-      VaultRecoveryStatus.vaultHeaderInvalid => l10n.vaultRecoveryHeaderTitle,
-      VaultRecoveryStatus.recordsCorrupt => l10n.vaultRecoveryRecordsTitle,
-      VaultRecoveryStatus.remoteCorrupt => l10n.vaultRecoveryRemoteTitle,
-      VaultRecoveryStatus.healthy => l10n.vaultRecoveryTitle,
-    };
-    final body = switch (session.recoveryStatus) {
-      VaultRecoveryStatus.databaseCorrupt => l10n.vaultRecoveryDatabaseBody,
-      VaultRecoveryStatus.vaultHeaderInvalid => l10n.vaultRecoveryHeaderBody,
-      VaultRecoveryStatus.recordsCorrupt => l10n.vaultRecoveryRecordsBody(
-        corruptCount,
+    final status = session.recoveryStatus;
+    final corruptCount = session.recordHealthReport?.corruptRecords.length ?? 0;
+    final isLocalDataDamage =
+        status == VaultRecoveryStatus.databaseCorrupt ||
+        status == VaultRecoveryStatus.vaultHeaderInvalid;
+    final showQuarantine =
+        status == VaultRecoveryStatus.recordsCorrupt && corruptCount > 0;
+    final showBackupRestore =
+        isLocalDataDamage ||
+        status == VaultRecoveryStatus.recordsCorrupt ||
+        status == VaultRecoveryStatus.healthy;
+    final (title, body) = switch (status) {
+      VaultRecoveryStatus.databaseCorrupt ||
+      VaultRecoveryStatus.vaultHeaderInvalid => (
+        l10n.vaultRecoveryLocalDataTitle,
+        l10n.vaultRecoveryLocalDataBody,
       ),
-      VaultRecoveryStatus.remoteCorrupt => l10n.vaultRecoveryRemoteBody,
-      VaultRecoveryStatus.healthy => l10n.vaultRecoveryBody,
+      VaultRecoveryStatus.recordsCorrupt => (
+        l10n.vaultRecoveryRecordsDamagedTitle,
+        l10n.vaultRecoveryRecordsDamagedBody(corruptCount),
+      ),
+      VaultRecoveryStatus.remoteCorrupt => (
+        l10n.vaultRecoveryCloudSyncTitle,
+        l10n.vaultRecoveryCloudSyncBody,
+      ),
+      VaultRecoveryStatus.healthy => (
+        l10n.vaultRecoveryTitle,
+        l10n.vaultRecoveryBody,
+      ),
     };
+    final detail = session.failureMessage;
 
     return Center(
       child: SingleChildScrollView(
@@ -332,35 +435,47 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
                   ),
                 ),
                 const SizedBox(height: 22),
-                SerlinkFilledButton.icon(
-                  key: const ValueKey('vault-restore-latest-backup-button'),
-                  onPressed: busy ? null : _restoreLatestBackup,
-                  icon: const Icon(Icons.restore_outlined, size: 19),
-                  label: Text(
-                    busy
-                        ? context.l10n.savingAction
-                        : context.l10n.vaultRestoreLatestBackupAction,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SerlinkOutlinedButton.icon(
-                  key: const ValueKey('vault-import-recovery-backup-button'),
-                  onPressed: busy ? null : _importEncryptedBackup,
-                  icon: const Icon(Icons.upload_file_outlined, size: 19),
-                  label: Text(context.l10n.dataExchangeImportBackupTitle),
-                ),
-                if (session.recoveryStatus ==
-                        VaultRecoveryStatus.recordsCorrupt &&
-                    corruptCount > 0) ...[
-                  const SizedBox(height: 10),
-                  SerlinkOutlinedButton.icon(
+                if (showQuarantine) ...[
+                  SerlinkFilledButton.icon(
                     key: const ValueKey('vault-quarantine-records-button'),
                     onPressed: busy ? null : _quarantineCorruptRecords,
                     icon: const Icon(Icons.inventory_2_outlined, size: 19),
-                    label: Text(context.l10n.vaultQuarantineRecordsAction),
+                    label: Text(
+                      busy
+                          ? context.l10n.savingAction
+                          : context.l10n.vaultQuarantineRecordsAction,
+                    ),
                   ),
+                  const SizedBox(height: 10),
                 ],
-                const SizedBox(height: 10),
+                if (showBackupRestore) ...[
+                  if (status == VaultRecoveryStatus.recordsCorrupt)
+                    SerlinkOutlinedButton.icon(
+                      key: const ValueKey('vault-restore-latest-backup-button'),
+                      onPressed: busy ? null : _restoreLatestBackup,
+                      icon: const Icon(Icons.restore_outlined, size: 19),
+                      label: Text(context.l10n.vaultRestoreLatestBackupAction),
+                    )
+                  else
+                    SerlinkFilledButton.icon(
+                      key: const ValueKey('vault-restore-latest-backup-button'),
+                      onPressed: busy ? null : _restoreLatestBackup,
+                      icon: const Icon(Icons.restore_outlined, size: 19),
+                      label: Text(
+                        busy
+                            ? context.l10n.savingAction
+                            : context.l10n.vaultRestoreLatestBackupAction,
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  SerlinkOutlinedButton.icon(
+                    key: const ValueKey('vault-import-recovery-backup-button'),
+                    onPressed: busy ? null : _importEncryptedBackup,
+                    icon: const Icon(Icons.upload_file_outlined, size: 19),
+                    label: Text(context.l10n.vaultRecoveryImportBackupAction),
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 SerlinkTextButton.icon(
                   onPressed: busy
                       ? null
@@ -376,7 +491,36 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
                   onPressed: busy ? null : _showRecoveryCodeDialog,
                   child: Text(context.l10n.vaultResetVaultAction),
                 ),
-                _VaultErrorText(message: message),
+                if (detail != null) ...[
+                  const SizedBox(height: 4),
+                  SerlinkTextButton.icon(
+                    key: const ValueKey('vault-recovery-details-toggle'),
+                    onPressed: () => setState(() {
+                      _detailsExpanded = !_detailsExpanded;
+                    }),
+                    icon: Icon(
+                      _detailsExpanded ? Icons.expand_less : Icons.expand_more,
+                      size: 19,
+                    ),
+                    label: Text(
+                      _detailsExpanded
+                          ? context.l10n.vaultRecoveryHideDetailsAction
+                          : context.l10n.vaultRecoveryViewDetailsAction,
+                    ),
+                  ),
+                  if (_detailsExpanded)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: SelectableText(
+                        detail,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: t.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                ],
+                _VaultErrorText(message: _localErrorMessage),
               ],
             ),
           ),

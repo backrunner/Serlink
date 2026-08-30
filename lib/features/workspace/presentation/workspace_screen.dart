@@ -47,6 +47,7 @@ import '../../sync/application/auto_sync_controller.dart';
 import '../../sync/application/sync_delete_tombstone_repository.dart';
 import '../../sync/application/sync_device_service.dart';
 import '../../sync/application/sync_field_merge_service.dart';
+import '../../sync/application/remote_vault_discovery_service.dart';
 import '../../sync/application/sync_compatibility.dart';
 import '../../sync/application/sync_repair_service.dart';
 import '../../sync/application/sync_run_service.dart';

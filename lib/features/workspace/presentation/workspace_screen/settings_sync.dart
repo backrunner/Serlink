@@ -806,7 +806,7 @@ String _syncSettingsErrorMessage(AppLocalizations l10n, Object error) {
     return error.message;
   }
   if (error is SyncRunException) {
-    return error.message;
+    return localizedSyncRunExceptionMessage(l10n, error);
   }
   if (error is SyncProviderException) {
     return error.message;

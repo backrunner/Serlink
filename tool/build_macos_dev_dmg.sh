@@ -17,8 +17,9 @@
 #   - Signs with SERLINK_MACOS_CODE_SIGN_IDENTITY (default "Apple Development")
 #     because local dev builds cannot be Developer ID signed here; such DMGs
 #     are for the machine they are built on and are not notarized.
-#   - CloudKit in this build talks to the Development environment, not the
-#     Production data used by App Store / Developer ID builds.
+#   - CloudKit in this build talks to the Production environment (set via
+#     com.apple.developer.icloud-container-environment in Direct.entitlements)
+#     so it shares the same vault data as App Store / Developer ID builds.
 #   - Defaults to ARCHS=arm64: the macOS 26 beta Command Line Tools ship a
 #     lipo whose -verify_arch accepts only one architecture, which breaks
 #     universal (arm64+x86_64) Flutter framework thinning. Override with

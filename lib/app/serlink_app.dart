@@ -27,7 +27,11 @@ class SerlinkApp extends ConsumerWidget {
     ref.watch(cloudKitEncryptedSnapshotPrefetchControllerProvider);
     ref.watch(autoSyncControllerProvider);
     ref.watch(macOsSshConfigWritebackProvider);
-    ref.watch(mcpServerControllerProvider);
+    // Only macOS ships the MCP server; keep mobile from instantiating the
+    // controller at all.
+    if (capabilities.mcpServer) {
+      ref.watch(mcpServerControllerProvider);
+    }
 
     final brightness = MediaQuery.platformBrightnessOf(context);
     final foruiTheme = switch ((capabilities.prefersTouchUi, brightness)) {

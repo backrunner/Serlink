@@ -379,6 +379,38 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsMcpTokenTitle => 'アクセストークン';
 
   @override
+  String get settingsMcpConfigTitle => 'クライアント設定';
+
+  @override
+  String get settingsMcpHttpConfigNeedsServer =>
+      'エージェントサーバーを起動すると HTTP 設定を利用できます。';
+
+  @override
+  String get settingsMcpInstallTitle => 'エージェントへインストール';
+
+  @override
+  String get settingsMcpInstallAction => 'インストール';
+
+  @override
+  String get settingsMcpUpdateAction => '更新';
+
+  @override
+  String get settingsMcpInstalledLabel => 'インストール済み';
+
+  @override
+  String get settingsMcpInstallNoneDetected => '対応するエージェントがこの Mac で見つかりません。';
+
+  @override
+  String settingsMcpInstallSuccess(String agent) {
+    return '$agent に Serlink MCP 設定を書き込みました。';
+  }
+
+  @override
+  String settingsMcpInstallFailed(String error) {
+    return '設定の書き込みに失敗しました: $error';
+  }
+
+  @override
   String get settingsMcpTokenNotAvailable => 'サーバーを起動するとトークンが生成されます。';
 
   @override

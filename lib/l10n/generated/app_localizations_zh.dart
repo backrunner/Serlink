@@ -374,6 +374,37 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsMcpTokenTitle => '访问令牌';
 
   @override
+  String get settingsMcpConfigTitle => '客户端配置';
+
+  @override
+  String get settingsMcpHttpConfigNeedsServer => '启动代理服务器后可使用 HTTP 配置。';
+
+  @override
+  String get settingsMcpInstallTitle => '安装到 Agent';
+
+  @override
+  String get settingsMcpInstallAction => '安装';
+
+  @override
+  String get settingsMcpUpdateAction => '更新';
+
+  @override
+  String get settingsMcpInstalledLabel => '已安装';
+
+  @override
+  String get settingsMcpInstallNoneDetected => '未在这台 Mac 上检测到支持的 Agent。';
+
+  @override
+  String settingsMcpInstallSuccess(String agent) {
+    return '已将 Serlink MCP 配置写入 $agent。';
+  }
+
+  @override
+  String settingsMcpInstallFailed(String error) {
+    return '写入配置失败：$error';
+  }
+
+  @override
   String get settingsMcpTokenNotAvailable => '启动服务器以生成令牌。';
 
   @override

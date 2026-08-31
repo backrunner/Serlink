@@ -796,6 +796,60 @@ abstract class AppLocalizations {
   /// **'Access token'**
   String get settingsMcpTokenTitle;
 
+  /// No description provided for @settingsMcpConfigTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Client config'**
+  String get settingsMcpConfigTitle;
+
+  /// No description provided for @settingsMcpHttpConfigNeedsServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Start the agent server to use the HTTP config.'**
+  String get settingsMcpHttpConfigNeedsServer;
+
+  /// No description provided for @settingsMcpInstallTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Install into agents'**
+  String get settingsMcpInstallTitle;
+
+  /// No description provided for @settingsMcpInstallAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Install'**
+  String get settingsMcpInstallAction;
+
+  /// No description provided for @settingsMcpUpdateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get settingsMcpUpdateAction;
+
+  /// No description provided for @settingsMcpInstalledLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed'**
+  String get settingsMcpInstalledLabel;
+
+  /// No description provided for @settingsMcpInstallNoneDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'No supported agents detected on this Mac.'**
+  String get settingsMcpInstallNoneDetected;
+
+  /// No description provided for @settingsMcpInstallSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Serlink MCP config written to {agent}.'**
+  String settingsMcpInstallSuccess(String agent);
+
+  /// No description provided for @settingsMcpInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to write the config: {error}'**
+  String settingsMcpInstallFailed(String error);
+
   /// No description provided for @settingsMcpTokenNotAvailable.
   ///
   /// In en, this message translates to:

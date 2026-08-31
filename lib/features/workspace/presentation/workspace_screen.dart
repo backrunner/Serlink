@@ -34,6 +34,7 @@ import '../../import_export/application/open_ssh_certificate_import_service.dart
 import '../../import_export/application/open_ssh_config_import_service.dart';
 import '../../import_export/application/macos_ssh_config_startup_service.dart';
 import '../../import_export/application/vault_backup_service.dart';
+import '../../mcp/application/agent_config_installer.dart';
 import '../../mcp/application/mcp_server_controller.dart';
 import '../../mcp/domain/agent_grant.dart';
 import '../../mcp/domain/agent_session.dart';

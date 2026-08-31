@@ -414,6 +414,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsMcpTokenTitle => 'Access token';
 
   @override
+  String get settingsMcpConfigTitle => 'Client config';
+
+  @override
+  String get settingsMcpHttpConfigNeedsServer =>
+      'Start the agent server to use the HTTP config.';
+
+  @override
+  String get settingsMcpInstallTitle => 'Install into agents';
+
+  @override
+  String get settingsMcpInstallAction => 'Install';
+
+  @override
+  String get settingsMcpUpdateAction => 'Update';
+
+  @override
+  String get settingsMcpInstalledLabel => 'Installed';
+
+  @override
+  String get settingsMcpInstallNoneDetected =>
+      'No supported agents detected on this Mac.';
+
+  @override
+  String settingsMcpInstallSuccess(String agent) {
+    return 'Serlink MCP config written to $agent.';
+  }
+
+  @override
+  String settingsMcpInstallFailed(String error) {
+    return 'Failed to write the config: $error';
+  }
+
+  @override
   String get settingsMcpTokenNotAvailable =>
       'Start the server to generate a token.';
 

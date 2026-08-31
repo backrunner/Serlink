@@ -8,6 +8,7 @@ class _SettingsActionRow extends StatelessWidget {
     this.subtitle,
     this.subtitleWidget,
     this.actionWidth,
+    this.compactActionWidth,
     this.actionHeight,
     this.leadingKey,
   });
@@ -18,6 +19,7 @@ class _SettingsActionRow extends StatelessWidget {
   final Widget? subtitleWidget;
   final Widget? action;
   final double? actionWidth;
+  final double? compactActionWidth;
   final double? actionHeight;
   final Key? leadingKey;
 
@@ -29,7 +31,7 @@ class _SettingsActionRow extends StatelessWidget {
     ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < _settingsCompactBreakpoint;
+        final compact = constraints.maxWidth < _settingsRowCompactBreakpoint;
         final desktopSubtitle =
             subtitleWidget ??
             (subtitle == null || subtitle!.trim().isEmpty
@@ -76,9 +78,10 @@ class _SettingsActionRow extends StatelessWidget {
                     overflow: compact ? TextOverflow.ellipsis : null,
                     style: subtitleStyle,
                   ));
+        final configuredActionWidth = compactActionWidth ?? actionWidth;
         final slotWidth = math.min(
-          actionWidth ?? _settingsMobileActionWidth,
-          actionWidth == null ? constraints.maxWidth * 0.42 : actionWidth!,
+          configuredActionWidth ?? _settingsMobileActionWidth,
+          configuredActionWidth ?? constraints.maxWidth * 0.42,
         );
         final actionSlot = action == null
             ? null
@@ -86,10 +89,12 @@ class _SettingsActionRow extends StatelessWidget {
                 width: slotWidth,
                 height:
                     actionHeight ??
-                    (actionWidth == null ? _settingsMobileActionHeight : 40),
+                    (configuredActionWidth == null
+                        ? _settingsMobileActionHeight
+                        : 40),
                 alignment: Alignment.centerRight,
                 child: _SettingsCompactControlsScope(
-                  child: actionWidth == null
+                  child: configuredActionWidth == null
                       ? action!
                       : SizedBox(width: slotWidth, child: action!),
                 ),
@@ -204,6 +209,7 @@ class _SettingsCompactControlsScope extends InheritedWidget {
 }
 
 const double _settingsCompactBreakpoint = 700;
+const double _settingsRowCompactBreakpoint = 560;
 const double _settingsMobileActionWidth = 92;
 const double _settingsMobileActionHeight = 32;
 const double _settingsMobileSelectActionWidth = 112;
@@ -263,33 +269,35 @@ class _SettingsControlButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final enabled = onPressed != null;
+    // Buttons hug their label in both layouts: no fixed width, just symmetric
+    // horizontal padding, so the label sits centered inside the button (and
+    // its hover background). The compact slot right-aligns the whole button,
+    // which keeps every button on the same right edge.
     final label = Padding(
       padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 10),
-      child: Center(
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                IconTheme.merge(
-                  data: IconThemeData(size: 14, color: t.textPrimary),
-                  child: icon!,
-                ),
-                const SizedBox(width: 5),
-              ],
-              DefaultTextStyle.merge(
-                style: TextStyle(
-                  color: t.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  height: 1,
-                ),
-                maxLines: 1,
-                child: child,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              IconTheme.merge(
+                data: IconThemeData(size: 14, color: t.textPrimary),
+                child: icon!,
               ),
+              const SizedBox(width: 5),
             ],
-          ),
+            DefaultTextStyle.merge(
+              style: TextStyle(
+                color: t.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                height: 1,
+              ),
+              maxLines: 1,
+              child: child,
+            ),
+          ],
         ),
       ),
     );
@@ -300,13 +308,12 @@ class _SettingsControlButton extends StatelessWidget {
         borderRadius: SerlinkRadii.control,
         hoverColor: t.surfaceOverlay,
         pressedColor: t.textPrimary.withValues(alpha: 0.12),
-        child: compact
-            ? SizedBox(
-                width: _settingsMobileActionWidth,
-                height: _settingsMobileActionHeight,
-                child: label,
-              )
-            : SizedBox(height: _settingsDesktopActionHeight, child: label),
+        child: SizedBox(
+          height: compact
+              ? _settingsMobileActionHeight
+              : _settingsDesktopActionHeight,
+          child: label,
+        ),
       ),
     );
   }
@@ -341,25 +348,18 @@ bool _settingsUseCompactControls(BuildContext context) {
 
 List<SerlinkSelectItem<AppLanguage>> _languageItems(AppLocalizations l10n) {
   return [
-    SerlinkSelectItem(
-      value: AppLanguage.system,
-      label: l10n.settingsLanguageSystem,
-      icon: Icons.computer_outlined,
-    ),
+    SerlinkSelectItem(value: AppLanguage.system, label: l10n.settingsLanguageSystem),
     SerlinkSelectItem(
       value: AppLanguage.english,
       label: l10n.settingsLanguageEnglish,
-      icon: Icons.language_outlined,
     ),
     SerlinkSelectItem(
       value: AppLanguage.simplifiedChinese,
       label: l10n.settingsLanguageChinese,
-      icon: Icons.language_outlined,
     ),
     SerlinkSelectItem(
       value: AppLanguage.japanese,
       label: l10n.settingsLanguageJapanese,
-      icon: Icons.language_outlined,
     ),
   ];
 }

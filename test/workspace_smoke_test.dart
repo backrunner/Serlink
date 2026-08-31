@@ -1312,6 +1312,70 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('settings desktop layout matches golden', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 960);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'macos',
+        targetPlatform: TargetPlatform.macOS,
+      ),
+      syncDevices: [
+        SyncDeviceMetadata(
+          id: 'desktop-device',
+          displayName: 'Studio Mac',
+          platform: 'macos',
+          createdAt: DateTime.utc(2026, 6, 2),
+          lastSeenAt: DateTime.utc(2026, 6, 29),
+        ),
+        SyncDeviceMetadata(
+          id: 'mobile-device',
+          displayName: 'Pixel Fold',
+          platform: 'android',
+          createdAt: DateTime.utc(2026, 6, 1),
+          lastSeenAt: DateTime.utc(2026, 6, 28),
+        ),
+      ],
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(SerlinkApp),
+      matchesGoldenFile('goldens/settings_desktop.png'),
+    );
+
+    final syncDevicesViewButton = find.byKey(
+      const ValueKey('settings-sync-devices-view-button'),
+    );
+    await tester.ensureVisible(syncDevicesViewButton);
+    await tester.pumpAndSettle();
+    await tester.tap(syncDevicesViewButton);
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(SerlinkApp),
+      matchesGoldenFile('goldens/settings_sync_devices_dialog.png'),
+    );
+
+    // Narrow desktop window: rows switch to the compact layout, controls must
+    // stay right-aligned and the language select must not balloon in width.
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    tester.view.physicalSize = const Size(800, 600);
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(SerlinkApp),
+      matchesGoldenFile('goldens/settings_compact.png'),
+    );
+  });
+
   testWidgets('background privacy screen is off by default', (tester) async {
     await _pumpLockedVaultApp(tester);
 

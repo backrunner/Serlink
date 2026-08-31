@@ -117,7 +117,14 @@ class _SyncSettingsSection extends ConsumerWidget {
         ?iCloudRow,
         if (repairPlan != null) _SyncRepairRow(plan: repairPlan),
         if (conflicts.isNotEmpty)
-          _SyncConflictRow(conflicts: conflicts, mobile: mobile),
+          LayoutBuilder(
+            builder: (context, constraints) => _SyncConflictRow(
+              conflicts: conflicts,
+              mobile:
+                  mobile ||
+                  constraints.maxWidth < _settingsRowCompactBreakpoint,
+            ),
+          ),
         if (knownDevices != null)
           knownDevices.when(
             loading: () => _SettingsActionRow(
@@ -132,46 +139,58 @@ class _SyncSettingsSection extends ConsumerWidget {
               subtitle: _syncSettingsErrorMessage(l10n, error),
               action: null,
             ),
-            data: (devices) {
-              final viewButton = _SettingsTextButton(
-                key: const ValueKey('settings-sync-devices-view-button'),
-                onPressed: () => _showSyncDevicesDialog(
-                  context,
-                  ref,
-                  devices,
-                  allowReset: mobile,
-                ),
-                child: Text(
-                  mobile
-                      ? l10n.syncViewAction
-                      : devices.isEmpty
-                      ? l10n.syncViewAction
-                      : l10n.settingsManageAction,
-                ),
-              );
-              return _SettingsActionRow(
-                icon: Icons.devices_outlined,
-                title: l10n.syncDevicesTitle,
-                subtitle: _syncDevicesSubtitle(l10n, devices, mobile: mobile),
-                action: mobile
-                    ? viewButton
-                    : Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        alignment: WrapAlignment.end,
-                        children: [
-                          viewButton,
-                          _SettingsTextButton(
-                            key: const ValueKey(
-                              'settings-sync-devices-reset-button',
+            data: (devices) => LayoutBuilder(
+              builder: (context, constraints) {
+                // Below the row compact breakpoint the trailing slot cannot
+                // hold multiple buttons; keep the single view button and move
+                // the reset action into the devices dialog.
+                final compactActions =
+                    mobile ||
+                    constraints.maxWidth < _settingsRowCompactBreakpoint;
+                final viewButton = _SettingsTextButton(
+                  key: const ValueKey('settings-sync-devices-view-button'),
+                  onPressed: () => _showSyncDevicesDialog(
+                    context,
+                    ref,
+                    devices,
+                    allowReset: compactActions,
+                  ),
+                  child: Text(
+                    compactActions
+                        ? l10n.syncViewAction
+                        : devices.isEmpty
+                        ? l10n.syncViewAction
+                        : l10n.settingsManageAction,
+                  ),
+                );
+                return _SettingsActionRow(
+                  icon: Icons.devices_outlined,
+                  title: l10n.syncDevicesTitle,
+                  subtitle: _syncDevicesSubtitle(
+                    l10n,
+                    devices,
+                    mobile: mobile,
+                  ),
+                  action: compactActions
+                      ? viewButton
+                      : Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          alignment: WrapAlignment.end,
+                          children: [
+                            viewButton,
+                            _SettingsTextButton(
+                              key: const ValueKey(
+                                'settings-sync-devices-reset-button',
+                              ),
+                              onPressed: () => _rotateSyncDevice(context, ref),
+                              child: Text(l10n.syncResetAction),
                             ),
-                            onPressed: () => _rotateSyncDevice(context, ref),
-                            child: Text(l10n.syncResetAction),
-                          ),
-                        ],
-                      ),
-              );
-            },
+                          ],
+                        ),
+                );
+              },
+            ),
           ),
       ],
     );

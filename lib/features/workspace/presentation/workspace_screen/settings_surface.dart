@@ -108,9 +108,8 @@ class _SettingsSurface extends ConsumerWidget {
                         onChanged: (value) =>
                             unawaited(_setAppLanguage(context, ref, value)),
                       ),
-                      actionWidth: mobile
-                          ? _settingsMobileSelectActionWidth
-                          : 220,
+                      actionWidth: mobile ? null : 220,
+                      compactActionWidth: _settingsMobileSelectActionWidth,
                       actionHeight: mobile
                           ? _settingsMobileSelectActionHeight
                           : null,

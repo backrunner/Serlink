@@ -10,6 +10,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/core/logging/offline_diagnostic_logger.dart';
+import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/mcp/application/agent_session_bridge.dart';
 import 'package:serlink/features/mcp/application/mcp_authorization_service.dart';
 import 'package:serlink/features/mcp/application/mcp_server_controller.dart';
@@ -52,8 +53,46 @@ void main() {
       expect(harness.bridge!.lastOpenClientName, 'test-client');
     });
 
-    test('serlink_exec clamps timeoutMs to 500..120000', () async {
-      final harness = _Harness();
+    test('server sends agent behavior instructions at initialization', () async {
+      final container = _container(harness: _Harness());
+      addTearDown(container.dispose);
+      final controller = container.read(mcpServerControllerProvider.notifier);
+      await controller.start();
+      final state = container.read(mcpServerControllerProvider);
+      final client = await _connectClient(state.port!, state.token!);
+      addTearDown(client.close);
+
+      final instructions = client.getInstructions();
+      expect(instructions, isNotNull);
+      expect(instructions, contains('serlink_list_hosts'));
+      expect(instructions, contains('serlink_open_session'));
+      expect(instructions, contains('serlink_close_session'));
+      expect(instructions, contains('NEVER connect to any host yourself'));
+      expect(instructions, contains('vault_locked'));
+      expect(instructions, contains('authorization_denied'));
+    });
+
+    test('serlink_list_hosts surfaces vault_locked through the tool', () async {
+      final container = _container(harness: _Harness());
+      addTearDown(container.dispose);
+      final controller = container.read(mcpServerControllerProvider.notifier);
+      await controller.start();
+      final state = container.read(mcpServerControllerProvider);
+      final client = await _connectClient(state.port!, state.token!);
+      addTearDown(client.close);
+
+      final result = await client.callTool(
+        const CallToolRequest(name: 'serlink_list_hosts'),
+      );
+
+      // The container has no vault, so the bridge must refuse rather than
+      // leak the host list past the unlock gate.
+      expect(result.isError, isTrue);
+      final text = (result.content.single as TextContent).text;
+      expect(text, contains('vault_locked'));
+    });
+
+    test('serlink_exec clamps timeoutMs to 500..120000', () async {      final harness = _Harness();
       final container = _container(harness: harness);
       addTearDown(container.dispose);
       final controller = container.read(mcpServerControllerProvider.notifier);
@@ -279,6 +318,13 @@ class _CapturingBridge extends AgentSessionBridge {
   String? lastOpenClientName;
   String? lastExecClientName;
   Duration? lastExecTimeout;
+
+  @override
+  Future<List<HostSummary>> listHosts() {
+    // Mirrors the real bridge's behavior when the vault is locked; the
+    // unlock gating itself is covered in agent_session_bridge_test.dart.
+    throw const McpBridgeException('vault_locked');
+  }
 
   @override
   Future<AgentSessionHandle> openSession({

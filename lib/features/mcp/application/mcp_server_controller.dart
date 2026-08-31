@@ -241,10 +241,42 @@ class McpServerController extends Notifier<McpServerState> {
     }
   }
 
+  /// Server-level instructions sent to the MCP client during initialization.
+  /// They are the behavioral contract every agent must follow: Serlink tools
+  /// are the only sanctioned way to reach the user's hosts, and credentials
+  /// never leave the app.
+  static const _mcpAgentInstructions =
+      "Serlink MCP server. All SSH access to the user's hosts goes through "
+      'these tools — there is no other sanctioned path.\n'
+      'Workflow: discover hosts with serlink_list_hosts, open a terminal '
+      'inside the Serlink app with serlink_open_session, drive it with '
+      'serlink_exec, serlink_send_input, and serlink_read_screen, then '
+      'always finish with serlink_close_session.\n'
+      'Rules you must follow:\n'
+      '- NEVER connect to any host yourself: no ssh/scp/sftp, no shell '
+      'commands, no sockets, no port scanning. You have no credentials and '
+      'must not obtain any.\n'
+      '- NEVER ask for, read, or handle passwords, private keys, '
+      'passphrases, SSH agent material, keychains, or the Serlink vault. '
+      'Authentication happens inside the Serlink app only.\n'
+      '- vault_locked means the user must unlock the vault in the Serlink '
+      'app — ask them and wait; do not retry or look for another way in.\n'
+      '- authorization_denied / authorization_required means the user has '
+      'not granted you access to that host in Serlink — ask them to grant '
+      'it; do not retry or work around it.\n'
+      '- command_blocked / command_denied means the risk policy rejected '
+      'the command — do not rephrase, split, encode, or otherwise disguise '
+      'it to get it through.\n'
+      '- The user watches every session in a visible Serlink tab and can '
+      'take back control at any time; act accordingly.';
+
   McpServer _buildServer(AgentSessionBridge bridge, String version) {
     final server = McpServer(
       Implementation(name: 'serlink', version: version),
-      options: const McpServerOptions(protocol: McpProtocol.stable),
+      options: const McpServerOptions(
+        protocol: McpProtocol.stable,
+        instructions: _mcpAgentInstructions,
+      ),
     );
 
     Future<CallToolResult> guard(
@@ -286,7 +318,11 @@ class McpServerController extends Notifier<McpServerState> {
           'first, then serlink_open_session with a host id, then '
           'serlink_exec/serlink_read_screen to drive the session, and '
           'serlink_close_session when done. Fails with vault_locked while '
-          'the Serlink vault is locked; ask the user to unlock it in the app.',
+          'the Serlink vault is locked; ask the user to unlock it in the '
+          'app. These hosts are reachable ONLY through Serlink tools: do '
+          'not try to connect to them yourself with ssh, shell commands, or '
+          'sockets, and never request or read credentials — no credentials '
+          'are exposed through this server, ever.',
       inputSchema: JsonSchema.object(),
       callback: (args, extra) => guard((clientName) async {
         final hosts = await bridge.listHosts();
@@ -309,7 +345,9 @@ class McpServerController extends Notifier<McpServerState> {
           'in the Serlink app. The user must approve access in a Serlink '
           'dialog (and unlock the vault first if it is locked), so this call '
           'may block until the user responds. Credentials never leave the '
-          'app; you drive the resulting terminal with serlink_exec, '
+          'app — never ask for passwords or private keys, and never try to '
+          'read them from the user\'s files, keychain, or SSH agent. You '
+          'drive the resulting terminal with serlink_exec, '
           'serlink_read_screen, and serlink_send_input. The user can take '
           'back control at any time by typing in the tab.',
       inputSchema: JsonSchema.object(

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +12,7 @@ import 'package:serlink/app/serlink_app.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/database/serlink_database.dart';
 import 'package:serlink/design_system/design_system.dart';
+import 'package:serlink/features/mcp/application/agent_config_installer.dart';
 import 'package:serlink/features/mcp/application/agent_session_bridge.dart';
 import 'package:serlink/features/mcp/application/mcp_server_controller.dart';
 import 'package:serlink/features/mcp/data/command_risk_policy.dart';
@@ -25,33 +28,35 @@ import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
 void main() {
-  testWidgets('MCP settings section renders status, toggle, and config rows', (
+  testWidgets('MCP manager dialog renders status, toggle, and config', (
     tester,
   ) async {
     _useLargeSurface(tester);
     _stubMcpStdioHelperFileExists(installed: true);
     final server = _FakeMcpServerController();
     await _pumpSerlinkApp(tester, serverController: server);
-    await _openSettings(tester);
+    await _openMcpManager(tester);
 
-    expect(find.text('MCP / Agent access'), findsOneWidget);
-    expect(find.text('Agent server'), findsOneWidget);
-    expect(find.text('Stopped.'), findsOneWidget);
+    expect(find.text('Agent server'), findsWidgets);
+    expect(find.text('Stopped.'), findsWidgets);
     expect(
       find.byKey(const ValueKey('settings-mcp-server-switch')),
       findsOneWidget,
     );
-    expect(find.text('Copy HTTP MCP config (JSON)'), findsOneWidget);
-    expect(find.text('Copy stdio helper config (JSON)'), findsOneWidget);
+    expect(find.text('Client config'), findsOneWidget);
+    expect(find.text('HTTP'), findsOneWidget);
+    expect(find.text('stdio'), findsOneWidget);
     expect(
-      find.text('This path works while the app stays in place.'),
+      find.text('Start the agent server to use the HTTP config.'),
       findsOneWidget,
     );
-    expect(_stdioCopyButton(tester).onTap, isNotNull);
-    expect(
-      find.text('Start the server to generate a token.'),
-      findsOneWidget,
-    );
+    expect(find.text('Start the server to generate a token.'), findsOneWidget);
+
+    // The stdio tab shows the helper config with an enabled copy action.
+    await tester.tap(find.text('stdio'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('"command"'), findsOneWidget);
+    expect(_stdioCopyButton(tester).onPressed, isNotNull);
 
     await tester.tap(
       find.byKey(const ValueKey('settings-mcp-server-switch')),
@@ -59,18 +64,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(server.startCallCount, 1);
+    expect(find.text('Running at http://127.0.0.1:7432/mcp'), findsWidgets);
+    // The token is shown in plain text with an explicit access-token label.
+    expect(find.text('Access token'), findsOneWidget);
+    expect(find.text('test-token'), findsOneWidget);
     expect(
-      find.text('Running at http://127.0.0.1:7432/mcp'),
+      find.byKey(const ValueKey('settings-mcp-token-copy-button')),
       findsOneWidget,
     );
-    expect(find.text('••••••••••••'), findsOneWidget);
-    expect(find.text('test-token'), findsNothing);
-
-    await tester.tap(
-      find.byKey(const ValueKey('settings-mcp-token-reveal-button')),
-    );
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('test-token'), findsOneWidget);
   });
 
   testWidgets('grant list renders and revoke calls through', (tester) async {
@@ -88,7 +89,7 @@ void main() {
     );
     await tester.pump();
 
-    await _openSettings(tester);
+    await _openMcpManager(tester);
 
     await _pumpUntilFound(tester, find.text('claude'));
     expect(find.text('Active grants'), findsOneWidget);
@@ -128,7 +129,7 @@ void main() {
     final bridge =
         container.read(agentSessionBridgeProvider)
             as _RecordingAgentSessionBridge;
-    await _openSettings(tester);
+    await _openMcpManager(tester);
 
     await _pumpUntilFound(tester, find.text('codex'));
     expect(find.text('Active agent sessions'), findsOneWidget);
@@ -143,7 +144,7 @@ void main() {
   });
 
   testWidgets(
-    'stdio config row renders disabled when the helper binary is missing',
+    'stdio config tab renders disabled when the helper binary is missing',
     (tester) async {
       _useLargeSurface(tester);
       _stubMcpStdioHelperFileExists(installed: false);
@@ -151,9 +152,11 @@ void main() {
         tester,
         serverController: _FakeMcpServerController(),
       );
-      await _openSettings(tester);
+      await _openMcpManager(tester);
 
-      expect(find.text('Copy stdio helper config (JSON)'), findsOneWidget);
+      await tester.tap(find.text('stdio'));
+      await tester.pump(const Duration(milliseconds: 300));
+
       expect(
         find.text(
           'The stdio helper ships with Serlink release builds and is not '
@@ -161,13 +164,70 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(find.textContaining('"command"'), findsNothing);
       expect(
-        find.text('This path works while the app stays in place.'),
+        find.byKey(const ValueKey('settings-mcp-copy-stdio-config-button')),
         findsNothing,
       );
-      expect(_stdioCopyButton(tester).onTap, isNull);
     },
   );
+
+  testWidgets('install into agents writes the config from the dialog', (
+    tester,
+  ) async {
+    _useLargeSurface(tester);
+    _stubMcpStdioHelperFileExists(installed: true);
+    final configHome = Directory.systemTemp.createTempSync(
+      'serlink-mcp-install-test',
+    );
+    Directory('${configHome.path}/.claude').createSync();
+
+    await _pumpSerlinkApp(
+      tester,
+      serverController: _FakeMcpServerController(),
+      agentConfigHome: configHome,
+    );
+    await _openMcpManager(tester);
+
+    expect(find.text('Install into agents'), findsOneWidget);
+    // The agent list starts collapsed; expand it via the section header.
+    expect(find.text('Claude Code'), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('settings-mcp-install-toggle')));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Claude Code'), findsOneWidget);
+    expect(find.textContaining('/.claude.json'), findsOneWidget);
+
+    final installButton = find.byKey(
+      const ValueKey('settings-mcp-install-claude-code'),
+    );
+    await tester.ensureVisible(installButton);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(installButton);
+
+    // The install future interleaves fake-zone continuations (flushed by
+    // pump) with real file IO (drained by runAsync); alternate both.
+    Map<String, Object?>? written;
+    final writtenFile = File('${configHome.path}/.claude.json');
+    for (var attempt = 0; attempt < 30 && written == null; attempt += 1) {
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      if (writtenFile.existsSync()) {
+        final content = writtenFile.readAsStringSync();
+        if (content.trim().isNotEmpty) {
+          written = jsonDecode(content) as Map<String, Object?>;
+        }
+      }
+    }
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(written, isNotNull);
+    final servers = written!['mcpServers']! as Map<String, Object?>;
+    expect((servers['serlink']! as Map)['type'], 'stdio');
+    expect(find.text('Installed'), findsOneWidget);
+  });
 
   testWidgets('MCP settings section is hidden without the capability', (
     tester,
@@ -204,13 +264,20 @@ void _stubMcpStdioHelperFileExists({required bool installed}) {
   addTearDown(() => mcpStdioHelperFileExists = original);
 }
 
-SerlinkPressable _stdioCopyButton(WidgetTester tester) {
-  return tester.widget<SerlinkPressable>(
-    find.descendant(
-      of: find.byKey(const ValueKey('settings-mcp-copy-stdio-config-button')),
-      matching: find.byType(SerlinkPressable),
-    ),
+SerlinkIconButton _stdioCopyButton(WidgetTester tester) {
+  return tester.widget<SerlinkIconButton>(
+    find.byKey(const ValueKey('settings-mcp-copy-stdio-config-button')),
   );
+}
+
+Future<void> _openMcpManager(WidgetTester tester) async {
+  await _openSettings(tester);
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('settings-mcp-manage-button')),
+  );
+  await tester.tap(find.byKey(const ValueKey('settings-mcp-manage-button')));
+  await _pumpUntilFound(tester, find.text('Client config'));
 }
 
 Future<ProviderContainer> _pumpSerlinkApp(
@@ -222,16 +289,25 @@ Future<ProviderContainer> _pumpSerlinkApp(
   _FakeMcpServerController? serverController,
   AgentSessionBridge Function(Ref ref)? bridgeFactory,
   Stream<List<AgentSessionHandle>>? agentSessionsStream,
+  Directory? agentConfigHome,
 }) async {
   final database = SerlinkDatabase(NativeDatabase.memory());
   final transferQueue = TransferQueueController();
+  // Deterministic, empty home so agent detection never scans the real one.
+  final configHome =
+      agentConfigHome ??
+      Directory.systemTemp.createTempSync('serlink-mcp-test-home');
   addTearDown(database.close);
   addTearDown(transferQueue.dispose);
+  addTearDown(() => configHome.deleteSync(recursive: true));
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         serlinkDatabaseProvider.overrideWithValue(database),
         platformCapabilitiesProvider.overrideWithValue(capabilities),
+        agentConfigInstallerProvider.overrideWithValue(
+          AgentConfigInstaller(homeDirectory: configHome.path),
+        ),
         vaultCryptoConfigProvider.overrideWithValue(
           const VaultCryptoConfig.testing(),
         ),

@@ -14,6 +14,7 @@ import '../features/diagnostics/application/diagnostic_bundle_service.dart';
 import '../features/hosts/application/host_repository.dart';
 import '../features/hosts/application/host_store.dart';
 import '../features/identities/application/identity_repository.dart';
+import '../features/mcp/application/agent_config_installer.dart';
 import '../features/mcp/application/agent_session_bridge.dart';
 import '../features/mcp/application/mcp_authorization_service.dart';
 import '../features/mcp/application/mcp_server_controller.dart';
@@ -3983,6 +3984,10 @@ final mcpAuthorizationServiceProvider = Provider<McpAuthorizationService>((
   );
   ref.onDispose(service.dispose);
   return service;
+});
+
+final agentConfigInstallerProvider = Provider<AgentConfigInstaller>((ref) {
+  return AgentConfigInstaller();
 });
 
 final agentSessionBridgeProvider = Provider<AgentSessionBridge>((ref) {

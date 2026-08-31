@@ -147,6 +147,29 @@
     }
   },
   "settingsMcpTokenTitle": "Access token",
+  "settingsMcpConfigTitle": "Client config",
+  "settingsMcpHttpConfigNeedsServer": "Start the agent server to use the HTTP config.",
+  "settingsMcpInstallTitle": "Install into agents",
+  "settingsMcpInstallAction": "Install",
+  "settingsMcpUpdateAction": "Update",
+  "settingsMcpInstalledLabel": "Installed",
+  "settingsMcpInstallNoneDetected": "No supported agents detected on this Mac.",
+  "settingsMcpInstallSuccess": "Serlink MCP config written to {agent}.",
+  "@settingsMcpInstallSuccess": {
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMcpInstallFailed": "Failed to write the config: {error}",
+  "@settingsMcpInstallFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "settingsMcpTokenNotAvailable": "Start the server to generate a token.",
   "settingsMcpTokenRevealTooltip": "Show token",
   "settingsMcpTokenHideTooltip": "Hide token",

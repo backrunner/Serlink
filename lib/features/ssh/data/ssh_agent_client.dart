@@ -161,6 +161,12 @@ class SshAgentKeyPair implements SSHKeyPair {
   String get name => identity.keyType;
 
   @override
+  String? get comment => identity.comment;
+
+  @override
+  bool get shouldProbe => false;
+
+  @override
   String get type => switch (identity.keyType) {
     'ssh-rsa' => SSHRsaSignatureType.sha256,
     _ => identity.keyType,

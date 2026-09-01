@@ -304,11 +304,12 @@ class _TestApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      home: FTheme(
+      builder: (context, child) => FTheme(
         data: SerlinkTheme.foruiDark(),
         platform: FPlatformVariant.macOS,
-        child: const Scaffold(body: SizedBox.shrink()),
+        child: child ?? const SizedBox.shrink(),
       ),
+      home: const Scaffold(body: SizedBox.shrink()),
     );
   }
 }

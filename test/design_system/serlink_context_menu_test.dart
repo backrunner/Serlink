@@ -58,12 +58,13 @@ class _ContextMenuTestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: SerlinkTheme.dark(),
-      home: FTheme(
+      builder: (context, child) => FTheme(
         data: SerlinkTheme.foruiDark(),
         platform: FPlatformVariant.macOS,
-        child: Scaffold(
-          body: Align(alignment: Alignment.topLeft, child: child),
-        ),
+        child: child ?? const SizedBox.shrink(),
+      ),
+      home: Scaffold(
+        body: Align(alignment: Alignment.topLeft, child: child),
       ),
     );
   }

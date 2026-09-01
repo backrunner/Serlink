@@ -28,7 +28,7 @@ class SurfacePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final card = FCard.raw(
+    final card = FCard(
       clipBehavior: Clip.antiAlias,
       style: FCardStyleDelta.delta(
         decoration: DecorationDelta.value(

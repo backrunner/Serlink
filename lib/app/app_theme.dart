@@ -16,28 +16,28 @@ class SerlinkTheme {
 
   static FThemeData foruiDark() => _buildForui(
     tokens: SerlinkTokens.dark,
-    baseColors: FThemes.neutral.dark.desktop.colors,
+    baseColors: FTheme.neutral.dark.desktop.colors,
     debugLabel: 'Serlink Dark Desktop',
     touch: false,
   );
 
   static FThemeData foruiLight() => _buildForui(
     tokens: SerlinkTokens.light,
-    baseColors: FThemes.neutral.light.desktop.colors,
+    baseColors: FTheme.neutral.light.desktop.colors,
     debugLabel: 'Serlink Light Desktop',
     touch: false,
   );
 
   static FThemeData foruiDarkTouch() => _buildForui(
     tokens: SerlinkTokens.dark,
-    baseColors: FThemes.neutral.dark.touch.colors,
+    baseColors: FTheme.neutral.dark.touch.colors,
     debugLabel: 'Serlink Dark Touch',
     touch: true,
   );
 
   static FThemeData foruiLightTouch() => _buildForui(
     tokens: SerlinkTokens.light,
-    baseColors: FThemes.neutral.light.touch.colors,
+    baseColors: FTheme.neutral.light.touch.colors,
     debugLabel: 'Serlink Light Touch',
     touch: true,
   );

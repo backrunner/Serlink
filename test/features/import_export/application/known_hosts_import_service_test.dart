@@ -64,7 +64,7 @@ unmatched.example.test ssh-ed25519 aGVsbG8=
       expect(bastion!.algorithm, 'ssh-ed25519');
       expect(
         bastion.fingerprint,
-        'MD5:5d:41:40:2a:bc:4b:2a:76:b9:71:9d:91:10:17:c5:92',
+        'SHA256:LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ',
       );
       expect(bastion.updatedAt, DateTime.utc(2026, 5, 27, 12));
 

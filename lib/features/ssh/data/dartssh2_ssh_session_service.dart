@@ -475,7 +475,9 @@ class DartSsh2SessionService implements SshSessionService {
         hostname: endpoint.hostname,
         port: endpoint.port,
         algorithm: algorithm,
-        fingerprint: _formatMd5Fingerprint(fingerprint),
+        // dartssh2 passes the OpenSSH-style `SHA256:<base64>` fingerprint as
+        // UTF-8 bytes; decode it back to the display/compare string.
+        fingerprint: utf8.decode(fingerprint),
       ),
     );
     return decision != HostKeyDecision.cancel;
@@ -856,11 +858,4 @@ Future<void> _pipeRemoteForward(
   } finally {
     await socket?.close();
   }
-}
-
-String _formatMd5Fingerprint(Uint8List fingerprint) {
-  final parts = [
-    for (final byte in fingerprint) byte.toRadixString(16).padLeft(2, '0'),
-  ];
-  return 'MD5:${parts.join(':')}';
 }

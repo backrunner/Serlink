@@ -139,7 +139,7 @@ _KnownHostsParseResult _parseKnownHosts(String contents) {
       _KnownHostsEntry(
         targets: targets,
         algorithm: fields[algorithmIndex],
-        fingerprint: _formatMd5Fingerprint(keyBlob),
+        fingerprint: _formatSha256Fingerprint(keyBlob),
       ),
     );
   }
@@ -283,12 +283,9 @@ int _unmatchedTargetCount(
   return unmatched;
 }
 
-String _formatMd5Fingerprint(Uint8List keyBlob) {
-  final digest = MD5Digest().process(keyBlob);
-  final bytes = [
-    for (final byte in digest) byte.toRadixString(16).padLeft(2, '0'),
-  ];
-  return 'MD5:${bytes.join(':')}';
+String _formatSha256Fingerprint(Uint8List keyBlob) {
+  final digest = SHA256Digest().process(keyBlob);
+  return 'SHA256:${base64.encode(digest).replaceAll('=', '')}';
 }
 
 class _KnownHostsParseResult {

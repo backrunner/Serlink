@@ -6,7 +6,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
-import 'package:dartssh2/src/ssh_hostkey.dart';
 
 import '../../../core/ids/entity_id.dart';
 import '../../../core/logging/offline_diagnostic_logger.dart';
@@ -60,7 +59,7 @@ class DartSsh2SessionService implements SshSessionService {
         ),
       );
     } on Object {
-      chain.close();
+      await chain.close();
       rethrow;
     }
     _clientChains[profile.sessionId] = chain;
@@ -84,14 +83,14 @@ class DartSsh2SessionService implements SshSessionService {
     try {
       sftp = await chain.target.sftp();
     } on Object {
-      chain.close();
+      await chain.close();
       rethrow;
     }
     _clientChains[profile.sessionId] = chain;
     try {
       await _startProfileForwarding(profile, chain.target);
     } on Object {
-      sftp.close();
+      await sftp.close();
       await _closeSessionResources(profile.sessionId);
       rethrow;
     }
@@ -108,7 +107,7 @@ class DartSsh2SessionService implements SshSessionService {
     try {
       await chain.target.ping();
     } finally {
-      chain.close();
+      await chain.close();
     }
   }
 
@@ -220,7 +219,7 @@ class DartSsh2SessionService implements SshSessionService {
     await _stopProfileDynamicForwards(sessionId);
     await stopRemoteForward(sessionId: sessionId);
     await _stopProfileRemoteForwards(sessionId);
-    _clientChains.remove(sessionId)?.close();
+    await _clientChains.remove(sessionId)?.close();
   }
 
   SSHClient _activeClient(SessionId sessionId) {
@@ -391,7 +390,7 @@ class DartSsh2SessionService implements SshSessionService {
         level: DiagnosticLogLevel.error,
         details: {...details, ..._sshErrorDetails(error)},
       );
-      _SshClientChain(clients).close();
+      await _SshClientChain(clients).close();
       rethrow;
     }
   }
@@ -454,6 +453,7 @@ class DartSsh2SessionService implements SshSessionService {
           ? null
           : (_) => material.keyboardInteractiveResponses,
       keepAliveInterval: endpoint.keepAliveInterval,
+      algorithms: _sshAlgorithms,
       onVerifyHostKey: (algorithm, fingerprint) {
         return _verifyHostKey(endpoint, algorithm, fingerprint);
       },
@@ -700,12 +700,61 @@ class _SshClientChain {
 
   SSHClient get target => clients.last;
 
-  void close() {
+  Future<void> close() async {
     for (final client in clients.reversed) {
-      client.close();
+      await client.close();
     }
   }
 }
+
+/// dartssh2 4.0 narrowed its default algorithm proposal to modern OpenSSH
+/// defaults, which would break connections to older routers, NAS boxes, and
+/// embedded servers that only offer SHA-1 kex, `ssh-rsa` host keys, or CBC
+/// ciphers. Keep the modern algorithms preferred first, then append the
+/// legacy set that dartssh2 2.x proposed by default so existing servers keep
+/// working.
+const _sshAlgorithms = SSHAlgorithms(
+  kex: [
+    SSHKexType.x25519Rfc,
+    SSHKexType.x25519,
+    SSHKexType.nistp521,
+    SSHKexType.nistp384,
+    SSHKexType.nistp256,
+    SSHKexType.dhGexSha256,
+    SSHKexType.dh14Sha256,
+    SSHKexType.dh14Sha1,
+    SSHKexType.dhGexSha1,
+    SSHKexType.dh1Sha1,
+  ],
+  hostkey: [
+    SSHHostkeyType.ed25519,
+    SSHHostkeyType.rsaSha512,
+    SSHHostkeyType.rsaSha256,
+    SSHHostkeyType.ecdsa521,
+    SSHHostkeyType.ecdsa384,
+    SSHHostkeyType.ecdsa256,
+    SSHHostkeyType.rsaSha1,
+  ],
+  cipher: [
+    SSHCipherType.aes256gcm,
+    SSHCipherType.aes128gcm,
+    SSHCipherType.chacha20poly1305,
+    SSHCipherType.aes256ctr,
+    SSHCipherType.aes128ctr,
+    SSHCipherType.aes256cbc,
+    SSHCipherType.aes128cbc,
+  ],
+  mac: [
+    SSHMacType.hmacSha256Etm,
+    SSHMacType.hmacSha512Etm,
+    SSHMacType.hmacSha256,
+    SSHMacType.hmacSha512,
+    SSHMacType.hmacSha1,
+    SSHMacType.hmacSha256_96,
+    SSHMacType.hmacSha512_96,
+    SSHMacType.hmacMd5,
+  ],
+);
 
 class _OpenSshUserCertificate {
   const _OpenSshUserCertificate({required this.algorithm, required this.blob});
@@ -746,6 +795,12 @@ class _OpenSshCertificateKeyPair implements SSHKeyPair {
 
   @override
   String get name => keyPair.name;
+
+  @override
+  String? get comment => keyPair.comment;
+
+  @override
+  bool get shouldProbe => keyPair.shouldProbe;
 
   @override
   String get type => certificate.algorithm;

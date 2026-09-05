@@ -64,12 +64,34 @@ class ZModemMux {
   ZModemRequestHandler? onFileRequest;
 
   ZModemMux({required this.stdin, required this.stdout}) {
-    _stdoutSubscription = stdout.listen(_handleStdout);
+    _stdoutSubscription = stdout.listen(_handleStdout, onDone: () {
+      _closeTerminalSink();
+      unawaited(close());
+    });
+  }
+
+  bool _closed = false;
+
+  /// Stops consuming the underlying channel and releases buffered state.
+  Future<void> close() async {
+    if (_closed) {
+      return;
+    }
+    _closed = true;
+    await _stdoutSubscription.cancel();
+    // A paused or not-yet-listened receive stream must not block teardown.
+    unawaited(_receiveSink?.close());
+    _receiveSink = null;
+    await _terminalSink.close();
+    _pendingPrefix = Uint8List(0);
+    _session = null;
+    _fileOffers = null;
   }
 
   /// Subscriptions to [stdout]. Used to pause/resume the stream when no more
   /// space is available in local buffers.
   late final StreamSubscription<Uint8List> _stdoutSubscription;
+  Uint8List _pendingPrefix = Uint8List(0);
 
   late final _terminalSink = StreamController<List<int>>(
       // onPause: _stdoutSubscription.pause,
@@ -92,7 +114,7 @@ class ZModemMux {
   /// Writes terminal output to the underlying connection. [input] may be
   /// buffered if a ZModem session is active.
   void terminalWrite(String input) {
-    if (_session == null) {
+    if (!_closed && _session == null) {
       stdin.add(utf8.encode(input));
     }
   }
@@ -100,16 +122,61 @@ class ZModemMux {
   /// This is the entry point of multiplexing, dispatching data to ZModem or
   /// terminal depending on the current state.
   void _handleStdout(Uint8List chunk) {
+    if (_closed) {
+      return;
+    }
     if (_session != null) {
       _handleZModem(chunk);
       return;
     }
 
+    if (_pendingPrefix.isNotEmpty) {
+      chunk = Uint8List.fromList([..._pendingPrefix, ...chunk]);
+      _pendingPrefix = Uint8List(0);
+    }
     if (_detectZModem(chunk)) {
       return;
     }
 
-    _terminalSink.add(chunk);
+    // SSH chunks may end partway through the handshake. Retain only that
+    // possible prefix, allowing ordinary terminal output to flow immediately.
+    final suffixLength = _handshakeSuffixLength(chunk);
+    final plainEnd = chunk.length - suffixLength;
+    if (plainEnd > 0) {
+      _terminalSink.add(Uint8List.sublistView(chunk, 0, plainEnd));
+    }
+    if (suffixLength > 0) {
+      _pendingPrefix = Uint8List.fromList(chunk.sublist(plainEnd));
+    }
+  }
+
+  int _handshakeSuffixLength(Uint8List chunk) {
+    for (var length = _zmodemSenderInit.length - 1; length > 0; length--) {
+      if (length > chunk.length) {
+        continue;
+      }
+      for (final header in [_zmodemSenderInit, _zmodemReceiverInit]) {
+        var matches = true;
+        for (var i = 0; i < length; i++) {
+          if (chunk[chunk.length - length + i] != header[i]) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches) {
+          return length;
+        }
+      }
+    }
+    return 0;
+  }
+
+  void _closeTerminalSink() {
+    if (_pendingPrefix.isNotEmpty) {
+      _terminalSink.add(_pendingPrefix);
+      _pendingPrefix = Uint8List(0);
+    }
+    unawaited(_terminalSink.close());
   }
 
   /// Detects a ZModem session in [chunk] and starts it if found. Returns true
@@ -135,7 +202,12 @@ class ZModemMux {
   }
 
   void _handleZModem(Uint8List chunk) async {
-    for (final event in _session!.receive(chunk)) {
+    final session = _session!;
+    for (final event in session.receive(chunk)) {
+      if (_closed) {
+        return;
+      }
+
       /// remote is sz
       if (event is ZFileOfferedEvent) {
         _handleZFileOfferedEvent(event);
@@ -156,6 +228,9 @@ class ZModemMux {
         _handleFileSkippedEvent(event);
       }
 
+      if (_closed) {
+        return;
+      }
       _flush();
     }
 
@@ -187,7 +262,11 @@ class ZModemMux {
   }
 
   Future<void> _handleFileRequestEvent(ZReadyToSendEvent event) async {
-    _fileOffers ??= (await onFileRequest?.call())?.iterator;
+    final offers = _fileOffers ?? (await onFileRequest?.call())?.iterator;
+    if (_closed) {
+      return;
+    }
+    _fileOffers = offers;
 
     _moveToNextOffer();
   }
@@ -200,6 +279,9 @@ class ZModemMux {
       data.transform(
         StreamTransformer<Uint8List, Uint8List>.fromHandlers(
           handleData: (chunk, sink) {
+            if (_closed) {
+              return;
+            }
             bytesSent += chunk.length;
             _session!.sendFileData(chunk);
             sink.add(_session!.dataToSend());
@@ -208,7 +290,9 @@ class ZModemMux {
       ),
     );
 
-    _session!.finishSending(event.offset + bytesSent);
+    if (!_closed) {
+      _session!.finishSending(event.offset + bytesSent);
+    }
   }
 
   void _handleFileSkippedEvent(ZFileSkippedEvent event) {
@@ -218,6 +302,9 @@ class ZModemMux {
 
   /// Sends next file offer if available, or closes the session if not.
   void _moveToNextOffer() {
+    if (_closed || _session == null) {
+      return;
+    }
     if (_fileOffers?.moveNext() != true) {
       _closeSession();
       return;
@@ -232,6 +319,9 @@ class ZModemMux {
     return ZModemCallbackOffer(
       fileInfo,
       onAccept: (offset) {
+        if (_closed) {
+          return const Stream<Uint8List>.empty();
+        }
         _session!.acceptFile(offset);
         _flush();
 
@@ -239,6 +329,9 @@ class ZModemMux {
         return _receiveSink!.stream;
       },
       onSkip: () {
+        if (_closed) {
+          return;
+        }
         _session!.skipFile();
         _flush();
       },
@@ -264,6 +357,9 @@ class ZModemMux {
 
   /// Requests remote to close the session.
   void _closeSession() {
+    if (_closed || _session == null) {
+      return;
+    }
     _session!.finishSession();
   }
 
@@ -277,6 +373,9 @@ class ZModemMux {
   /// Sends all pending data packets to the remote. No data is automatically
   /// sent to the remote without calling this method.
   void _flush() {
+    if (_closed) {
+      return;
+    }
     final dataToSend = _session?.dataToSend();
     if (dataToSend != null && dataToSend.isNotEmpty) {
       stdin.add(dataToSend);
@@ -293,7 +392,7 @@ extension ListExtension on List<int> {
     if (other.length + start > length) {
       return null;
     }
-    for (var i = start; i < length - other.length; i++) {
+    for (var i = start; i <= length - other.length; i++) {
       if (this[i] == other[0]) {
         var found = true;
         for (var j = 1; j < other.length; j++) {

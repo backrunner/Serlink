@@ -164,15 +164,6 @@ class _MobileHeaderTitle extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 4),
-          Container(
-            width: 28,
-            height: 2,
-            decoration: BoxDecoration(
-              gradient: serlinkAccentGradient(t),
-              borderRadius: SerlinkRadii.pill,
-            ),
-          ),
         ],
       ),
     );
@@ -349,7 +340,7 @@ class _MobileMainSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: context.tokens.surfaceRaised,
+        color: context.tokens.surfaceBase,
         border: Border(top: BorderSide(color: context.tokens.borderSubtle)),
       ),
       child: Column(

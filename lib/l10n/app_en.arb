@@ -178,7 +178,7 @@
   "settingsMcpCopyHttpConfigAction": "Copy HTTP MCP config (JSON)",
   "settingsMcpCopyStdioConfigAction": "Copy stdio helper config (JSON)",
   "settingsMcpConfigCopied": "MCP client config copied to clipboard.",
-  "settingsMcpStdioPathHint": "This path works while the app stays in place.",
+  "settingsMcpStdioPathHint": "Serlink opens on demand when a tool is called. Keep the app at this path.",
   "settingsMcpStdioNotInstalled": "The stdio helper ships with Serlink release builds and is not available in this installation.",
   "@settingsMcpStdioNotInstalled": {
     "description": "Hint on the stdio config row when the serlink-mcp helper binary is missing (e.g. debug runs)."

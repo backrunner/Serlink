@@ -14,5 +14,7 @@ Current patches:
 - Reply to CPR cursor position queries with 1-indexed VT coordinates and support
   CHT/CBT cursor tab CSI sequences used by ncurses applications.
 - Ignore keyboard visibility metric callbacks after `TerminalView` disposal.
+- Detect ZMODEM handshakes across SSH chunks and ignore pending file selection
+  and transfer callbacks after the terminal closes.
 - Allow touch-first clients to defer keyboard activation until a tap completes,
   so long presses, text selection, and scroll gestures do not summon the IME.

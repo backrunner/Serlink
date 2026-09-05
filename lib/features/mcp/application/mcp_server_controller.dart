@@ -11,6 +11,7 @@ import '../../../app/app_dependencies.dart';
 import '../../../core/ids/entity_id.dart';
 import '../../../core/security/local_file_security.dart';
 import '../data/mcp_server_transport.dart';
+import '../domain/mcp_contract.dart';
 import 'agent_session_bridge.dart';
 
 class McpServerState {
@@ -127,8 +128,7 @@ class McpServerController extends Notifier<McpServerState> {
       return;
     }
     final token = _uuid.v4();
-    final version =
-        ref.read(appPackageInfoProvider).value?.version ?? '1.0.0';
+    final version = ref.read(appPackageInfoProvider).value?.version ?? '1.0.0';
     final bridge = ref.read(agentSessionBridgeProvider);
     final transport = _transportFactory(
       bearerToken: token,
@@ -212,10 +212,13 @@ class McpServerController extends Notifier<McpServerState> {
   }) async {
     try {
       final file = await _discoveryFile();
-      // Restrict permissions BEFORE writing the token: restrictFile only
-      // chmods, so creating the file empty first closes the window where a
-      // token-bearing file would be world-readable under default Linux/macOS
-      // umasks.
+      final type = FileSystemEntity.typeSync(file.path, followLinks: false);
+      if (type == FileSystemEntityType.link) {
+        throw StateError('discovery file is a symbolic link');
+      }
+      // Create an empty private destination first. Besides preserving the
+      // permission invariant, this keeps the write path compatible with
+      // custom File implementations used by platform tests.
       await LocalFileSecurity.restrictFile(file);
       await file.writeAsString(
         jsonEncode({
@@ -241,41 +244,12 @@ class McpServerController extends Notifier<McpServerState> {
     }
   }
 
-  /// Server-level instructions sent to the MCP client during initialization.
-  /// They are the behavioral contract every agent must follow: Serlink tools
-  /// are the only sanctioned way to reach the user's hosts, and credentials
-  /// never leave the app.
-  static const _mcpAgentInstructions =
-      "Serlink MCP server. All SSH access to the user's hosts goes through "
-      'these tools — there is no other sanctioned path.\n'
-      'Workflow: discover hosts with serlink_list_hosts, open a terminal '
-      'inside the Serlink app with serlink_open_session, drive it with '
-      'serlink_exec, serlink_send_input, and serlink_read_screen, then '
-      'always finish with serlink_close_session.\n'
-      'Rules you must follow:\n'
-      '- NEVER connect to any host yourself: no ssh/scp/sftp, no shell '
-      'commands, no sockets, no port scanning. You have no credentials and '
-      'must not obtain any.\n'
-      '- NEVER ask for, read, or handle passwords, private keys, '
-      'passphrases, SSH agent material, keychains, or the Serlink vault. '
-      'Authentication happens inside the Serlink app only.\n'
-      '- vault_locked means the user must unlock the vault in the Serlink '
-      'app — ask them and wait; do not retry or look for another way in.\n'
-      '- authorization_denied / authorization_required means the user has '
-      'not granted you access to that host in Serlink — ask them to grant '
-      'it; do not retry or work around it.\n'
-      '- command_blocked / command_denied means the risk policy rejected '
-      'the command — do not rephrase, split, encode, or otherwise disguise '
-      'it to get it through.\n'
-      '- The user watches every session in a visible Serlink tab and can '
-      'take back control at any time; act accordingly.';
-
   McpServer _buildServer(AgentSessionBridge bridge, String version) {
     final server = McpServer(
       Implementation(name: 'serlink', version: version),
       options: const McpServerOptions(
         protocol: McpProtocol.stable,
-        instructions: _mcpAgentInstructions,
+        instructions: serlinkMcpInstructions,
       ),
     );
 
@@ -287,8 +261,7 @@ class McpServerController extends Notifier<McpServerState> {
       // mcp_dart, so resolve the identity negotiated by this session's own
       // McpServer instance first.
       final clientName =
-          _serversBySessionId[extra.sessionId]
-              ?.server
+          _serversBySessionId[extra.sessionId]?.server
               .getClientVersion()
               ?.name ??
           extra.clientInfo?.name ??
@@ -311,19 +284,8 @@ class McpServerController extends Notifier<McpServerState> {
       }
     }
 
-    server.registerTool(
-      'serlink_list_hosts',
-      description:
-          'List the SSH hosts configured in Serlink. Workflow: call this '
-          'first, then serlink_open_session with a host id, then '
-          'serlink_exec/serlink_read_screen to drive the session, and '
-          'serlink_close_session when done. Fails with vault_locked while '
-          'the Serlink vault is locked; ask the user to unlock it in the '
-          'app. These hosts are reachable ONLY through Serlink tools: do '
-          'not try to connect to them yourself with ssh, shell commands, or '
-          'sockets, and never request or read credentials — no credentials '
-          'are exposed through this server, ever.',
-      inputSchema: JsonSchema.object(),
+    serlinkMcpTools['serlink_list_hosts']!.register(
+      server,
       callback: (args, extra) => guard((clientName) async {
         final hosts = await bridge.listHosts();
         return [
@@ -338,26 +300,8 @@ class McpServerController extends Notifier<McpServerState> {
       }, extra),
     );
 
-    server.registerTool(
-      'serlink_open_session',
-      description:
-          'Open an SSH session to a Serlink host as a visible terminal tab '
-          'in the Serlink app. The user must approve access in a Serlink '
-          'dialog (and unlock the vault first if it is locked), so this call '
-          'may block until the user responds. Credentials never leave the '
-          'app — never ask for passwords or private keys, and never try to '
-          'read them from the user\'s files, keychain, or SSH agent. You '
-          'drive the resulting terminal with serlink_exec, '
-          'serlink_read_screen, and serlink_send_input. The user can take '
-          'back control at any time by typing in the tab.',
-      inputSchema: JsonSchema.object(
-        properties: {
-          'hostId': JsonSchema.string(
-            description: 'Host id from serlink_list_hosts.',
-          ),
-        },
-        required: ['hostId'],
-      ),
+    serlinkMcpTools['serlink_open_session']!.register(
+      server,
       callback: (args, extra) => guard((clientName) async {
         final handle = await bridge.openSession(
           clientName: clientName,
@@ -381,28 +325,8 @@ class McpServerController extends Notifier<McpServerState> {
       }, extra),
     );
 
-    server.registerTool(
-      'serlink_exec',
-      description:
-          'Run a shell command in an open Serlink session and return the '
-          'terminal screen after the output settles. Risky commands require '
-          'user confirmation in the Serlink app; destructive commands are '
-          'blocked outright. The result is the last screen lines (including '
-          'the echoed command), not a byte-exact output capture.',
-      inputSchema: JsonSchema.object(
-        properties: {
-          'sessionId': JsonSchema.string(
-            description: 'Session id from serlink_open_session.',
-          ),
-          'command': JsonSchema.string(description: 'Shell command to run.'),
-          'timeoutMs': JsonSchema.integer(
-            description:
-                'Maximum time in milliseconds to wait for the output to '
-                'settle (default 10000).',
-          ),
-        },
-        required: ['sessionId', 'command'],
-      ),
+    serlinkMcpTools['serlink_exec']!.register(
+      server,
       callback: (args, extra) => guard((clientName) async {
         final timeoutMs = args['timeoutMs'] as num?;
         final output = await bridge.exec(
@@ -419,23 +343,8 @@ class McpServerController extends Notifier<McpServerState> {
       }, extra),
     );
 
-    server.registerTool(
-      'serlink_read_screen',
-      description:
-          'Read the last lines of the terminal screen of an open Serlink '
-          'session. Use after serlink_send_input or to poll long-running '
-          'commands started with serlink_exec.',
-      inputSchema: JsonSchema.object(
-        properties: {
-          'sessionId': JsonSchema.string(
-            description: 'Session id from serlink_open_session.',
-          ),
-          'lines': JsonSchema.integer(
-            description: 'Number of screen lines to return (default 50).',
-          ),
-        },
-        required: ['sessionId'],
-      ),
+    serlinkMcpTools['serlink_read_screen']!.register(
+      server,
       callback: (args, extra) => guard((clientName) async {
         final lines = args['lines'] as num?;
         final screen = await bridge.readScreen(
@@ -447,24 +356,8 @@ class McpServerController extends Notifier<McpServerState> {
       }, extra),
     );
 
-    server.registerTool(
-      'serlink_send_input',
-      description:
-          'Send raw keystrokes to an open Serlink session, for interactive '
-          'programs (e.g. answering a prompt or pressing keys in a TUI). '
-          'Text containing newlines submits commands and is checked against '
-          'the same risk policy as serlink_exec.',
-      inputSchema: JsonSchema.object(
-        properties: {
-          'sessionId': JsonSchema.string(
-            description: 'Session id from serlink_open_session.',
-          ),
-          'text': JsonSchema.string(
-            description: 'Raw input text, e.g. "y\\n" or arrow-key escapes.',
-          ),
-        },
-        required: ['sessionId', 'text'],
-      ),
+    serlinkMcpTools['serlink_send_input']!.register(
+      server,
       callback: (args, extra) => guard((clientName) async {
         await bridge.sendInput(
           clientName: clientName,
@@ -475,33 +368,16 @@ class McpServerController extends Notifier<McpServerState> {
       }, extra),
     );
 
-    server.registerTool(
-      'serlink_close_session',
-      description:
-          'Close a Serlink session opened with serlink_open_session. This '
-          'closes the terminal tab in the Serlink app. Always close sessions '
-          'when you are done with them.',
-      inputSchema: JsonSchema.object(
-        properties: {
-          'sessionId': JsonSchema.string(
-            description: 'Session id from serlink_open_session.',
-          ),
-        },
-        required: ['sessionId'],
-      ),
+    serlinkMcpTools['serlink_close_session']!.register(
+      server,
       callback: (args, extra) => guard((clientName) async {
         await bridge.closeSession(SessionId(args['sessionId'] as String));
         return {'ok': true};
       }, extra),
     );
 
-    server.registerTool(
-      'serlink_list_sessions',
-      description:
-          'List the Serlink sessions currently open for MCP clients, with '
-          'their state. Use serlink_close_session for any session you no '
-          'longer need.',
-      inputSchema: JsonSchema.object(),
+    serlinkMcpTools['serlink_list_sessions']!.register(
+      server,
       callback: (args, extra) => guard((clientName) async {
         return [
           for (final handle in bridge.sessions)

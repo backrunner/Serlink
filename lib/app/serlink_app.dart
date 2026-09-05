@@ -23,10 +23,14 @@ class SerlinkApp extends ConsumerWidget {
     final protectBackground =
         ref.watch(appProtectBackgroundProvider).value ?? false;
     final capabilities = ref.watch(platformCapabilitiesProvider);
-    ref.watch(cloudKitVaultDiscoveryControllerProvider);
-    ref.watch(cloudKitEncryptedSnapshotPrefetchControllerProvider);
+    if (capabilities.cloudKitSync) {
+      ref.watch(cloudKitVaultDiscoveryControllerProvider);
+      ref.watch(cloudKitEncryptedSnapshotPrefetchControllerProvider);
+    }
     ref.watch(autoSyncControllerProvider);
-    ref.watch(macOsSshConfigWritebackProvider);
+    if (capabilities.sshConfigImport) {
+      ref.watch(macOsSshConfigWritebackProvider);
+    }
     // Only macOS ships the MCP server; keep mobile from instantiating the
     // controller at all.
     if (capabilities.mcpServer) {
@@ -35,17 +39,25 @@ class SerlinkApp extends ConsumerWidget {
 
     final brightness = MediaQuery.platformBrightnessOf(context);
     final foruiTheme = switch ((capabilities.prefersTouchUi, brightness)) {
-      (true, Brightness.light) => SerlinkTheme.foruiLightTouch(),
-      (true, Brightness.dark) => SerlinkTheme.foruiDarkTouch(),
-      (false, Brightness.light) => SerlinkTheme.foruiLight(),
-      (false, Brightness.dark) => SerlinkTheme.foruiDark(),
+      (true, Brightness.light) => SerlinkTheme.foruiLightTouch(
+        platform: capabilities.targetPlatform,
+      ),
+      (true, Brightness.dark) => SerlinkTheme.foruiDarkTouch(
+        platform: capabilities.targetPlatform,
+      ),
+      (false, Brightness.light) => SerlinkTheme.foruiLight(
+        platform: capabilities.targetPlatform,
+      ),
+      (false, Brightness.dark) => SerlinkTheme.foruiDark(
+        platform: capabilities.targetPlatform,
+      ),
     };
 
     return MaterialApp.router(
       title: 'Serlink',
       debugShowCheckedModeBanner: false,
-      theme: SerlinkTheme.light(),
-      darkTheme: SerlinkTheme.dark(),
+      theme: SerlinkTheme.light(platform: capabilities.targetPlatform),
+      darkTheme: SerlinkTheme.dark(platform: capabilities.targetPlatform),
       themeMode: ThemeMode.system,
       locale: language.locale,
       localizationsDelegates: const [
@@ -128,16 +140,23 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
         state == AppLifecycleState.hidden) {
       _wasBackgrounded = true;
     }
-    if (!hidden) {
-      ref.read(cloudKitVaultDiscoveryControllerProvider.notifier).refreshNow();
-      ref
-          .read(cloudKitEncryptedSnapshotPrefetchControllerProvider.notifier)
-          .refreshNow();
+    if (state == AppLifecycleState.resumed) {
+      final capabilities = ref.read(platformCapabilitiesProvider);
+      if (capabilities.cloudKitSync) {
+        ref
+            .read(cloudKitVaultDiscoveryControllerProvider.notifier)
+            .refreshNow();
+        ref
+            .read(cloudKitEncryptedSnapshotPrefetchControllerProvider.notifier)
+            .refreshNow();
+      }
       ref
           .read(autoSyncControllerProvider.notifier)
           .requestSync(delay: Duration.zero);
-      ref.read(macOsSshConfigWritebackProvider.notifier).requestReconcile();
-      if (state == AppLifecycleState.resumed && _wasBackgrounded) {
+      if (capabilities.sshConfigImport) {
+        ref.read(macOsSshConfigWritebackProvider.notifier).requestReconcile();
+      }
+      if (_wasBackgrounded) {
         _wasBackgrounded = false;
         // SSH sockets may have died silently while the app was suspended
         // (NAT expiry, network switch); dartssh2's keepalive never times

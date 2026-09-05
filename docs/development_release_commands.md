@@ -215,8 +215,10 @@ SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
   ./tool/build_macos_direct.sh
 ```
 
-This produces the direct channel app build. Package the resulting app into a
-DMG and notarize it before distributing outside the Mac App Store.
+This produces the direct channel app and `build/Serlink-<version>+<build>.dmg`.
+Packaging requires `uv` (`brew install uv`). The DMG has a branded Retina
+background and a single app icon: double-click to install and open. Notarize
+and staple the app and DMG before distribution; see `docs/macos_release.md`.
 
 The script forwards extra arguments to `xcodebuild`, so local/development DMGs
 can override the user-visible app name to avoid confusion with an installed
@@ -233,10 +235,27 @@ For local development DMGs, use the dedicated script instead:
 It builds the direct channel with `SERLINK_APP_DISPLAY_NAME="Serlink (Dev)"`,
 keeps the Xcode development provisioning profile (required for the app to
 launch), embeds and signs the `serlink-mcp` helper, creates
-`build/Serlink-<version>-<arch>-dev.dmg`, installs the branded app into
+`build/Serlink-<version>+<build>-<arch>-dev.dmg`, installs the branded app into
 `/Applications`, and deletes intermediate `.app` copies so LaunchServices does
 not index duplicate Serlink apps. It signs with `Apple Development` by default
 and is not notarized — use `build_macos_direct.sh` for formal releases.
+
+Build the development DMG without replacing the locally installed app:
+
+```sh
+SERLINK_INSTALL_DEV_APP=0 ./tool/build_macos_dev_dmg.sh
+```
+
+Run native installer tests (requires Xcode) and regenerate DMG backgrounds:
+
+```sh
+./tool/test_macos_installer.sh
+swift tool/render_macos_dmg_background.swift
+```
+
+If Command Line Tools is selected, prefix build/test commands with
+`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` (adjust the app name
+for Xcode Beta).
 
 ## App icon checks
 

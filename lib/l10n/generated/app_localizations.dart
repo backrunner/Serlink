@@ -901,7 +901,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpStdioPathHint.
   ///
   /// In en, this message translates to:
-  /// **'This path works while the app stays in place.'**
+  /// **'Serlink opens on demand when a tool is called. Keep the app at this path.'**
   String get settingsMcpStdioPathHint;
 
   /// Hint on the stdio config row when the serlink-mcp helper binary is missing (e.g. debug runs).

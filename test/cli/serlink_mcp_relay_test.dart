@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 import 'package:serlink/features/mcp/data/mcp_server_transport.dart';
 
-import '../../cli/serlink_mcp.dart';
+import 'package:serlink/features/mcp/domain/mcp_contract.dart';
+
+import '../../cli/src/app_connection.dart';
 import '../../cli/src/discovery.dart';
 import '../../cli/src/relay.dart';
 
@@ -62,6 +65,21 @@ void main() {
         () => DiscoveryInfo.parse('{"url": "::", "token": "abc"}'),
         throwsA(isA<FormatException>()),
       );
+    });
+
+    test('rejects non-loopback discovery endpoints', () {
+      for (final url in [
+        'https://127.0.0.1:5123/mcp',
+        'http://192.0.2.1:5123/mcp',
+        'http://127.0.0.1:5123/mcp?redirect=1',
+        'http://user:secret@127.0.0.1:5123/mcp',
+      ]) {
+        expect(
+          () => DiscoveryInfo.parse('{"url": "$url", "token": "abc"}'),
+          throwsA(isA<FormatException>()),
+          reason: url,
+        );
+      }
     });
 
     test('readFile throws for a missing file', () async {
@@ -129,282 +147,7 @@ void main() {
     });
   });
 
-  group('SerlinkMcpRelay', () {
-    test('relays tools/list and tools/call to the embedded server', () async {
-      final server = await _startEchoServer('relay-token');
-      addTearDown(server.stop);
-
-      final pair = _MemoryTransport.pair();
-      final relay = await SerlinkMcpRelay.connect(
-        clientSideTransport: pair.$1,
-        remoteUrl: _serverUrl(server),
-        bearerToken: 'relay-token',
-        log: (_) {},
-      );
-      addTearDown(relay.close);
-
-      final client = McpClient(
-        const Implementation(name: 'test-client', version: '1.0.0'),
-        options: const McpClientOptions(protocol: McpProtocol.legacy),
-      );
-      await client.connect(pair.$2);
-      addTearDown(client.close);
-
-      final tools = await client.listTools();
-      expect(tools.tools.map((tool) => tool.name), contains('echo'));
-
-      final result = await client.callTool(
-        CallToolRequest(name: 'echo', arguments: {'text': 'hello'}),
-      );
-      final content = result.content.single;
-      expect(content, isA<TextContent>());
-      expect((content as TextContent).text, 'echo:hello');
-      expect(result.isError, isFalse);
-    });
-
-    test('relays remote tool errors back to the caller', () async {
-      final server = await _startEchoServer('relay-token');
-      addTearDown(server.stop);
-
-      final pair = _MemoryTransport.pair();
-      final relay = await SerlinkMcpRelay.connect(
-        clientSideTransport: pair.$1,
-        remoteUrl: _serverUrl(server),
-        bearerToken: 'relay-token',
-        log: (_) {},
-      );
-      addTearDown(relay.close);
-
-      final client = McpClient(
-        const Implementation(name: 'test-client', version: '1.0.0'),
-        options: const McpClientOptions(protocol: McpProtocol.legacy),
-      );
-      await client.connect(pair.$2);
-      addTearDown(client.close);
-
-      // The embedded server maps tool exceptions to an error CallToolResult;
-      // the relay must pass that shape through untouched.
-      final result = await client.callTool(
-        CallToolRequest(name: 'boom', arguments: const {}),
-      );
-      expect(result.isError, isTrue);
-      expect(result.content.single, isA<TextContent>());
-    });
-
-    test('mirrors the remote server identity and capabilities', () async {
-      final server = await _startEchoServer('relay-token');
-      addTearDown(server.stop);
-
-      final pair = _MemoryTransport.pair();
-      final relay = await SerlinkMcpRelay.connect(
-        clientSideTransport: pair.$1,
-        remoteUrl: _serverUrl(server),
-        bearerToken: 'relay-token',
-        log: (_) {},
-      );
-      addTearDown(relay.close);
-
-      final client = McpClient(
-        const Implementation(name: 'test-client', version: '1.0.0'),
-        options: const McpClientOptions(protocol: McpProtocol.legacy),
-      );
-      await client.connect(pair.$2);
-      addTearDown(client.close);
-
-      expect(client.getServerVersion()?.name, 'echo-server');
-      expect(client.getServerCapabilities()?.tools, isNotNull);
-    });
-
-    test('connect fails with a wrong bearer token', () async {
-      final server = await _startEchoServer('relay-token');
-      addTearDown(server.stop);
-
-      final pair = _MemoryTransport.pair();
-      await expectLater(
-        SerlinkMcpRelay.connect(
-          clientSideTransport: pair.$1,
-          remoteUrl: _serverUrl(server),
-          bearerToken: 'wrong-token',
-          log: (_) {},
-        ),
-        throwsA(anything),
-      );
-    });
-
-    test('relayForwardsNotification drops only cancellations', () {
-      expect(
-        relayForwardsNotification(
-          JsonRpcNotification(
-            method: Method.notificationsCancelled,
-            params: const {'requestId': 1},
-          ),
-        ),
-        isFalse,
-      );
-      expect(
-        relayForwardsNotification(
-          JsonRpcNotification(method: 'custom/probe'),
-        ),
-        isTrue,
-      );
-    });
-
-    test(
-      'a cancelled notification through the relay never reaches the remote',
-      () async {
-        final remoteNotifications = <JsonRpcNotification>[];
-        final server = await _startEchoServer(
-          'relay-token',
-          onNotification: remoteNotifications.add,
-        );
-        addTearDown(server.stop);
-
-        final pair = _MemoryTransport.pair();
-        final relay = await SerlinkMcpRelay.connect(
-          clientSideTransport: pair.$1,
-          remoteUrl: _serverUrl(server),
-          bearerToken: 'relay-token',
-          log: (_) {},
-        );
-        addTearDown(relay.close);
-
-        final client = McpClient(
-          const Implementation(name: 'test-client', version: '1.0.0'),
-          options: const McpClientOptions(protocol: McpProtocol.legacy),
-        );
-        await client.connect(pair.$2);
-        addTearDown(client.close);
-
-        // Forwarded requests get fresh remote-side request ids, so a
-        // forwarded cancellation would match nothing — or collide with an
-        // unrelated in-flight remote request. It must not cross the relay.
-        await pair.$2.send(
-          JsonRpcNotification(
-            method: Method.notificationsCancelled,
-            params: const {'requestId': 999, 'reason': 'client gave up'},
-          ),
-        );
-        // Give the relay a chance to (wrongly) forward it.
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-        expect(remoteNotifications, isEmpty);
-
-        // The dropped notification must not disturb the relay.
-        final result = await client.callTool(
-          CallToolRequest(name: 'echo', arguments: {'text': 'still alive'}),
-        );
-        final content = result.content.single;
-        expect(content, isA<TextContent>());
-        expect((content as TextContent).text, 'echo:still alive');
-      },
-    );
-  });
-
-  group('pollForRelay', () {
-    test(
-      'picks up a discovery file appearing at the second default candidate',
-      () async {
-        final dir = await Directory.systemTemp.createTemp('serlink-mcp-test');
-        addTearDown(() => dir.delete(recursive: true));
-        final server = await _startEchoServer('relay-token');
-        addTearDown(server.stop);
-
-        // Only the SECOND candidate (`Application Support/Serlink`) gets the
-        // discovery file, shortly after polling starts; the first candidate
-        // never exists. The poll loop must re-check all candidates instead
-        // of re-reading only the one resolved at startup.
-        final secondCandidate =
-            '${dir.path}/Library/Application Support/Serlink/mcp-server.json';
-        unawaited(
-          Future<void>.delayed(const Duration(milliseconds: 300), () async {
-            final file = File(secondCandidate);
-            await file.create(recursive: true);
-            await file.writeAsString(
-              '{"url": "${_serverUrl(server)}", "token": "relay-token"}',
-            );
-          }),
-        );
-
-        final pair = _MemoryTransport.pair();
-        final relay = await pollForRelay(
-          stdioTransport: pair.$1,
-          environment: {'HOME': dir.path},
-          timeout: const Duration(seconds: 10),
-          pollInterval: const Duration(milliseconds: 100),
-          log: (_) {},
-        );
-        addTearDown(() async => relay?.close());
-
-        expect(relay, isNotNull);
-      },
-    );
-
-    test('times out when no discovery file ever appears', () async {
-      final dir = await Directory.systemTemp.createTemp('serlink-mcp-test');
-      addTearDown(() => dir.delete(recursive: true));
-
-      final pair = _MemoryTransport.pair();
-      final relay = await pollForRelay(
-        stdioTransport: pair.$1,
-        environment: {'HOME': dir.path},
-        timeout: const Duration(milliseconds: 300),
-        pollInterval: const Duration(milliseconds: 50),
-        log: (_) {},
-      );
-
-      expect(relay, isNull);
-    });
-  });
-}
-
-Uri _serverUrl(McpServerTransport transport) {
-  return Uri.parse('http://127.0.0.1:${transport.port}/mcp');
-}
-
-Future<McpServerTransport> _startEchoServer(
-  String token, {
-  void Function(JsonRpcNotification notification)? onNotification,
-}) async {
-  final transport = McpServerTransport(
-    bearerToken: token,
-    serverFactory: (_) {
-      final server = McpServer(
-        const Implementation(name: 'echo-server', version: '0.0.1'),
-        options: const McpServerOptions(protocol: McpProtocol.stable),
-      );
-      if (onNotification != null) {
-        // Records every notification the remote side receives that has no
-        // specific protocol handler, so tests can assert what crossed the
-        // relay.
-        server.server.fallbackNotificationHandler = (notification) async {
-          onNotification(notification);
-        };
-      }
-      server.registerTool(
-        'echo',
-        description: 'Echoes the text argument back.',
-        inputSchema: JsonSchema.object(
-          properties: {'text': JsonSchema.string()},
-          required: ['text'],
-        ),
-        callback: (args, extra) async {
-          return CallToolResult.fromContent([
-            TextContent(text: 'echo:${args['text']}'),
-          ]);
-        },
-      );
-      server.registerTool(
-        'boom',
-        description: 'Always fails.',
-        inputSchema: JsonSchema.object(),
-        callback: (args, extra) async {
-          throw StateError('boom');
-        },
-      );
-      return server;
-    },
-  );
-  await transport.start();
-  return transport;
+  _relayTests();
 }
 
 /// In-memory [Transport] pair used in place of the stdio transport so the
@@ -467,4 +210,488 @@ class _MemoryTransport implements Transport {
     }
     onclose?.call();
   }
+}
+
+void _relayTests() {
+  group('Standalone MCP server', () {
+    for (final protocol in [McpProtocol.legacy, McpProtocol.stable]) {
+      test('serves $protocol probes without discovery or app launch', () async {
+        var launches = 0;
+        final harness = await _startRelay(
+          SerlinkAppConnection(
+            environment: const {},
+            launchApp: () async => launches++,
+          ),
+          protocol: protocol,
+        );
+
+        expect(harness.client.getServerVersion()?.name, 'serlink');
+        expect(harness.client.getServerCapabilities()?.tools, isNotNull);
+        expect(harness.client.getInstructions(), serlinkMcpInstructions);
+        final tools = await harness.client.listTools();
+        expect(
+          tools.tools.map((tool) => tool.name),
+          unorderedEquals(serlinkMcpTools.keys),
+        );
+        if (protocol == McpProtocol.legacy) {
+          await harness.client.ping();
+        } else {
+          // Stateless MCP uses server/discover for availability checks.
+          await harness.client.discoverServer();
+        }
+        expect(launches, 0);
+        await harness.client.close();
+        await harness.relay.done.timeout(const Duration(seconds: 1));
+        expect(launches, 0);
+      });
+    }
+
+    test('invalid tools and arguments never launch the app', () async {
+      var launches = 0;
+      final harness = await _startRelay(
+        SerlinkAppConnection(
+          environment: const {},
+          launchApp: () async => launches++,
+        ),
+      );
+      await expectLater(
+        harness.client.callTool(const CallToolRequest(name: 'unknown')),
+        throwsA(isA<McpError>()),
+      );
+      final invalid = await harness.client.callTool(
+        const CallToolRequest(name: 'serlink_open_session'),
+      );
+      expect(invalid.isError, isTrue);
+      await expectLater(
+        harness.client.request(
+          JsonRpcRequest(id: 99, method: 'custom/probe'),
+          EmptyResult.fromJson,
+        ),
+        throwsA(isA<McpError>()),
+      );
+      expect(launches, 0);
+    });
+
+    test(
+      'connects to a running app only on a tool call and keeps identity',
+      () async {
+        final dir = await _tempDirectory();
+        var connections = 0;
+        var launches = 0;
+        String? clientName;
+        final server = await _startBackend(
+          onConnect: () => connections++,
+          callback: (args, extra, server) async {
+            clientName =
+                server.server.getClientVersion()?.name ??
+                extra.clientInfo?.name;
+            return CallToolResult.fromContent([TextContent(text: 'ok')]);
+          },
+        );
+        final discovery = await _writeDiscovery(dir, server);
+        final harness = await _startRelay(
+          SerlinkAppConnection(
+            environment: const {},
+            discoveryArg: discovery,
+            launchApp: () async => launches++,
+          ),
+        );
+        final tools = await harness.client.listTools();
+        await harness.client.ping();
+        expect(connections, 0);
+        final result = await harness.client.callTool(_listHosts);
+        expect((result.content.single as TextContent).text, 'ok');
+        expect(clientName, 'test-client');
+        await harness.client.callTool(_listHosts);
+        // Stateless HTTP creates a backend per request: one discovery and
+        // two tool calls. A duplicate connection would add another discovery.
+        expect(connections, 3);
+        expect(launches, 0);
+        // Catalog and backend use exactly the same tool definitions.
+        final direct = McpClient(
+          const Implementation(name: 'catalog-check', version: '1.0.0'),
+          options: const McpClientOptions(protocol: McpProtocol.legacy),
+        );
+        addTearDown(direct.close);
+        await direct.connect(
+          StreamableHttpClientTransport(
+            _serverUrl(server),
+            opts: const StreamableHttpClientTransportOptions(
+              requestInit: {
+                'headers': {'authorization': 'Bearer relay-token'},
+              },
+            ),
+          ),
+        );
+        expect(
+          tools.tools.map((tool) => tool.toJson()).toList(),
+          (await direct.listTools()).tools
+              .map((tool) => tool.toJson())
+              .toList(),
+        );
+      },
+    );
+
+    test(
+      'concurrent cold calls launch once and find a new default candidate',
+      () async {
+        final dir = await _tempDirectory();
+        final candidates = defaultDiscoveryCandidates({'HOME': dir.path});
+        // A stale first candidate must not hide the newly written second path.
+        await File(candidates.first).create(recursive: true);
+        await File(candidates.first).writeAsString('{}');
+        var launches = 0;
+        var connections = 0;
+        final harness = await _startRelay(
+          SerlinkAppConnection(
+            environment: {'HOME': dir.path},
+            pollInterval: const Duration(milliseconds: 10),
+            launchApp: () async {
+              launches++;
+              final server = await _startBackend(
+                onConnect: () => connections++,
+              );
+              await _writeDiscovery(dir, server, path: candidates.last);
+            },
+          ),
+        );
+        final results = await Future.wait([
+          harness.client.callTool(_listHosts),
+          harness.client.callTool(_listHosts),
+        ]);
+        expect(results.every((result) => result.isError != true), isTrue);
+        expect(launches, 1);
+        // Stateless HTTP creates a backend per request: one discovery and
+        // two tool calls. A duplicate connection would add another discovery.
+        expect(connections, 3);
+      },
+    );
+
+    test('preserves tool errors, result metadata and progress', () async {
+      final dir = await _tempDirectory();
+      Map<String, dynamic>? requestMeta;
+      final server = await _startBackend(
+        callback: (args, extra, server) async {
+          requestMeta = extra.meta;
+          await extra.sendNotification(
+            JsonRpcNotification(
+              method: Method.notificationsProgress,
+              params: {
+                'progressToken': extra.meta!['progressToken'],
+                'progress': 1,
+                'total': 2,
+                'message': 'waiting',
+              },
+            ),
+          );
+          return const CallToolResult(
+            content: [TextContent(text: 'vault_locked')],
+            isError: true,
+            meta: {'detail': 'locked'},
+          );
+        },
+      );
+      final harness = await _startRelay(
+        SerlinkAppConnection(
+          environment: const {},
+          discoveryArg: await _writeDiscovery(dir, server),
+        ),
+      );
+      final progress = <Progress>[];
+      final result = await harness.client.request(
+        JsonRpcRequest(
+          id: 44,
+          method: Method.toolsCall,
+          params: {'name': 'serlink_list_hosts'},
+          meta: {'progressToken': 'caller-progress', 'custom': 'preserved'},
+        ),
+        CallToolResult.fromJson,
+        RequestOptions(onprogress: progress.add),
+      );
+      expect(result.isError, isTrue);
+      expect((result.content.single as TextContent).text, 'vault_locked');
+      expect(result.meta, containsPair('detail', 'locked'));
+      expect(requestMeta?['custom'], 'preserved');
+      expect(progress.single.message, 'waiting');
+    });
+
+    test(
+      'failed launch is a tool error and a later call can recover',
+      () async {
+        final dir = await _tempDirectory();
+        final path = '${dir.path}/mcp-server.json';
+        var launches = 0;
+        final harness = await _startRelay(
+          SerlinkAppConnection(
+            environment: const {},
+            discoveryArg: path,
+            launchApp: () async {
+              launches++;
+              throw StateError('app not installed');
+            },
+          ),
+        );
+        final result = await harness.client.callTool(_listHosts);
+        expect(result.isError, isTrue);
+        expect(
+          (result.content.single as TextContent).text,
+          contains('app_unavailable'),
+        );
+        await harness.client.ping();
+        expect((await harness.client.listTools()).tools, hasLength(7));
+        final server = await _startBackend();
+        await _writeDiscovery(dir, server, path: path);
+        expect((await harness.client.callTool(_listHosts)).isError, isFalse);
+        expect(launches, 1);
+      },
+    );
+
+    test('a missing app times out without terminating the helper', () async {
+      final dir = await _tempDirectory();
+      var launches = 0;
+      final harness = await _startRelay(
+        SerlinkAppConnection(
+          environment: {'HOME': dir.path},
+          timeout: const Duration(milliseconds: 100),
+          pollInterval: const Duration(milliseconds: 10),
+          launchApp: () async => launches++,
+        ),
+      );
+      final result = await harness.client.callTool(_listHosts);
+      expect(
+        (result.content.single as TextContent).text,
+        contains('connect_timeout'),
+      );
+      expect(launches, 1);
+      await harness.client.ping();
+    });
+
+    test('wrong bearer token cannot reach tools', () async {
+      final dir = await _tempDirectory();
+      var calls = 0;
+      final server = await _startBackend(
+        callback: (args, extra, server) async {
+          calls++;
+          return CallToolResult.fromContent([]);
+        },
+      );
+      final path = await _writeDiscovery(dir, server, token: 'wrong');
+      final harness = await _startRelay(
+        SerlinkAppConnection(
+          environment: const {},
+          discoveryArg: path,
+          timeout: const Duration(milliseconds: 100),
+          pollInterval: const Duration(milliseconds: 10),
+          launchApp: () async {},
+        ),
+      );
+      expect((await harness.client.callTool(_listHosts)).isError, isTrue);
+      expect(calls, 0);
+      await harness.client.ping();
+    });
+
+    test('backend loss does not replay tools or stop local probes', () async {
+      final dir = await _tempDirectory();
+      var launches = 0;
+      final server = await _startBackend();
+      final path = await _writeDiscovery(dir, server);
+      final harness = await _startRelay(
+        SerlinkAppConnection(
+          environment: const {},
+          discoveryArg: path,
+          launchApp: () async => launches++,
+        ),
+      );
+      await harness.client.callTool(_listHosts);
+      await server.stop();
+      await harness.client.ping();
+      await harness.client.listTools();
+      final result = await harness.client.callTool(_listHosts);
+      expect(result.isError, isTrue);
+      expect(
+        (result.content.single as TextContent).text,
+        contains('app_connection_lost'),
+      );
+      expect(launches, 0);
+      final restarted = await _startBackend();
+      await _writeDiscovery(dir, restarted, path: path);
+      expect((await harness.client.callTool(_listHosts)).isError, isFalse);
+    });
+
+    test('client disconnect cancels polling while the app starts', () async {
+      final dir = await _tempDirectory();
+      final launched = Completer<void>();
+      final launchGate = Completer<void>();
+      final harness = await _startRelay(
+        SerlinkAppConnection(
+          environment: {'HOME': dir.path},
+          launchApp: () async {
+            launched.complete();
+            await launchGate.future;
+          },
+        ),
+      );
+      final call = expectLater(
+        harness.client.callTool(_listHosts),
+        throwsA(isA<McpError>()),
+      );
+      await launched.future;
+      await harness.client.close();
+      await harness.relay.done.timeout(const Duration(seconds: 1));
+      launchGate.complete();
+      await call;
+    });
+
+    test(
+      'cancellation notifications cannot cancel a backend request id',
+      () async {
+        final dir = await _tempDirectory();
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        final server = await _startBackend(
+          callback: (args, extra, server) async {
+            entered.complete();
+            await release.future;
+            expect(extra.signal.aborted, isFalse);
+            return CallToolResult.fromContent([TextContent(text: 'finished')]);
+          },
+        );
+        final harness = await _startRelay(
+          SerlinkAppConnection(
+            environment: const {},
+            discoveryArg: await _writeDiscovery(dir, server),
+          ),
+        );
+        final call = harness.client.callTool(_listHosts);
+        await entered.future;
+        await harness.client.notification(
+          JsonRpcNotification(
+            method: Method.notificationsCancelled,
+            params: const {'requestId': 999, 'reason': 'probe'},
+          ),
+        );
+        await harness.client.ping();
+        release.complete();
+        expect((await call).isError, isFalse);
+      },
+    );
+  });
+
+  group('SerlinkAppConnection', () {
+    test(
+      'a stalled HTTP handshake is bounded by the connect deadline',
+      () async {
+        final dir = await _tempDirectory();
+        final http = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => http.close(force: true));
+        final subscription = http.listen((_) {}); // Deliberately never respond.
+        addTearDown(subscription.cancel);
+        final path = '${dir.path}/mcp-server.json';
+        await File(path).writeAsString(
+          jsonEncode({
+            'url': 'http://127.0.0.1:${http.port}/mcp',
+            'token': 'unused',
+          }),
+        );
+        var launches = 0;
+        final connection = SerlinkAppConnection(
+          environment: const {},
+          discoveryArg: path,
+          timeout: const Duration(milliseconds: 100),
+          launchApp: () async => launches++,
+        );
+        addTearDown(connection.close);
+        await expectLater(
+          connection
+              .connect(const Implementation(name: 'test', version: '1'))
+              .timeout(const Duration(seconds: 2)),
+          throwsA(
+            isA<TimeoutException>().having(
+              (e) => e.duration,
+              'deadline',
+              const Duration(milliseconds: 100),
+            ),
+          ),
+        );
+        expect(launches, 0);
+      },
+    );
+  });
+}
+
+const _listHosts = CallToolRequest(name: 'serlink_list_hosts');
+
+Future<Directory> _tempDirectory() async {
+  final dir = await Directory.systemTemp.createTemp('serlink-mcp-test');
+  addTearDown(() => dir.delete(recursive: true));
+  return dir;
+}
+
+Future<({McpClient client, SerlinkMcpRelay relay})> _startRelay(
+  SerlinkAppConnection connection, {
+  McpProtocol protocol = McpProtocol.legacy,
+}) async {
+  final pair = _MemoryTransport.pair();
+  final relay = await SerlinkMcpRelay.start(
+    clientSideTransport: pair.$1,
+    connection: connection,
+  );
+  addTearDown(relay.close);
+  final client = McpClient(
+    const Implementation(name: 'test-client', version: '1.0.0'),
+    options: McpClientOptions(protocol: protocol),
+  );
+  addTearDown(client.close);
+  await client.connect(pair.$2);
+  return (client: client, relay: relay);
+}
+
+Uri _serverUrl(McpServerTransport server) =>
+    Uri.parse('http://127.0.0.1:${server.port}/mcp');
+
+Future<String> _writeDiscovery(
+  Directory dir,
+  McpServerTransport server, {
+  String? path,
+  String token = 'relay-token',
+}) async {
+  final file = File(path ?? '${dir.path}/mcp-server.json');
+  await file.create(recursive: true);
+  await file.writeAsString(
+    jsonEncode({'url': '${_serverUrl(server)}', 'token': token}),
+  );
+  return file.path;
+}
+
+Future<McpServerTransport> _startBackend({
+  void Function()? onConnect,
+  Future<CallToolResult> Function(
+    Map<String, dynamic> args,
+    RequestHandlerExtra extra,
+    McpServer server,
+  )?
+  callback,
+}) async {
+  final transport = McpServerTransport(
+    bearerToken: 'relay-token',
+    serverFactory: (_) {
+      onConnect?.call();
+      final server = McpServer(
+        const Implementation(name: 'serlink', version: '1.0.0'),
+        options: const McpServerOptions(protocol: McpProtocol.stable),
+      );
+      for (final tool in serlinkMcpTools.values) {
+        tool.register(
+          server,
+          callback: (args, extra) async => callback != null
+              ? callback(args, extra, server)
+              : CallToolResult.fromContent([TextContent(text: 'ok')]),
+        );
+      }
+      return server;
+    },
+  );
+  await transport.start();
+  addTearDown(transport.stop);
+  return transport;
 }

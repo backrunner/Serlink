@@ -12,11 +12,14 @@ PRODUCT_NAME = serlink
 // development DMG is distinguishable from the App Store install.
 SERLINK_APP_DISPLAY_NAME = Serlink
 
+// Only the direct DMG build scripts enable installation from read-only volumes.
+SERLINK_DMG_INSTALLER_ENABLED = NO
+
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.alkinum.serlink
 
 // macOS App Store Connect build number. Keep this independent from iOS.
-SERLINK_MACOS_BUILD_NUMBER = 14
+SERLINK_MACOS_BUILD_NUMBER = 15
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 BackRunner. All rights reserved.

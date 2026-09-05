@@ -203,11 +203,29 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
         enabled: _enabled,
       );
       if (_enabled) {
-        await ensureRemoteSyncCompatibleForEnable(
-          await ref
-              .read(syncSettingsServiceProvider)
-              .buildWebDavProviderFromDraft(draft),
-        );
+        final provider = await ref
+            .read(syncSettingsServiceProvider)
+            .buildWebDavProviderFromDraft(draft);
+        await ensureRemoteSyncCompatibleForEnable(provider);
+        final discovery = await RemoteVaultDiscoveryService(
+          provider,
+        ).discover();
+        if (discovery != null && _isRemoteVaultMismatch(discovery)) {
+          final handled = await _resolveRemoteVaultMismatch(
+            draft,
+            provider,
+            discovery,
+          );
+          if (!handled) {
+            if (mounted) {
+              setState(() {
+                _saving = false;
+              });
+            }
+            return;
+          }
+          return;
+        }
       }
       await ref.read(syncSettingsServiceProvider).saveWebDav(draft);
       ref.invalidate(webDavSyncSettingsProvider);
@@ -226,6 +244,126 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
         });
       }
     }
+  }
+
+  bool _isRemoteVaultMismatch(RemoteVaultDiscovery discovery) {
+    final localHeader = ref
+        .read(vaultSessionControllerProvider.notifier)
+        .service
+        .header;
+    return localHeader == null ||
+        syncVaultId(discovery.header) != syncVaultId(localHeader);
+  }
+
+  /// Handles a WebDAV remote that already holds a different vault. Returns
+  /// true when the chosen resolution ran to completion; false when the user
+  /// cancelled and the save must be aborted.
+  Future<bool> _resolveRemoteVaultMismatch(
+    WebDavSyncSettingsDraft draft,
+    SyncProvider provider,
+    RemoteVaultDiscovery discovery,
+  ) async {
+    final action = await _showRemoteVaultMismatchDialog();
+    if (action == null || !mounted) {
+      return false;
+    }
+    final l10n = context.l10n;
+    final confirmed = await switch (action) {
+      _WebDavRemoteVaultMismatchAction.replaceRemote => _confirmDialog(
+        context,
+        title: l10n.webDavReplaceRemoteConfirmTitle,
+        body: l10n.webDavReplaceRemoteConfirmBody,
+        confirmLabel: l10n.replaceAction,
+        destructive: true,
+      ),
+      _WebDavRemoteVaultMismatchAction.restoreLocal => _confirmDialog(
+        context,
+        title: l10n.webDavRestoreFromRemoteConfirmTitle,
+        body: l10n.webDavRestoreFromRemoteConfirmBody,
+        confirmLabel: l10n.webDavRestoreFromRemoteAction,
+        destructive: true,
+      ),
+    };
+    if (!confirmed || !mounted) {
+      return false;
+    }
+    // Persist settings (and the keychain password) before any rebuild or
+    // adoption so follow-up sync and the post-adoption unlock can rebuild the
+    // provider from stored configuration.
+    await ref.read(syncSettingsServiceProvider).saveWebDav(draft);
+    ref.invalidate(webDavSyncSettingsProvider);
+    switch (action) {
+      case _WebDavRemoteVaultMismatchAction.replaceRemote:
+        await ref
+            .read(syncRunServiceProvider)
+            .runRepair(provider, SyncRepairAction.rebuildRemoteFromLocal);
+        ref.read(autoSyncControllerProvider.notifier).requestSync();
+        if (mounted) {
+          Navigator.of(context).pop();
+          _showSnackBar(context, l10n.webDavSavedSnack);
+        }
+      case _WebDavRemoteVaultMismatchAction.restoreLocal:
+        await _snapshotLocalVaultBeforeAdoption();
+        await ref
+            .read(vaultSessionControllerProvider.notifier)
+            .adoptRemoteVaultHeader(
+              discovery.header,
+              kind: SyncProviderKind.webDav,
+              notice: VaultSessionNotice.webDavRemoteVaultAdopted,
+            );
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+    }
+    return true;
+  }
+
+  Future<void> _snapshotLocalVaultBeforeAdoption() async {
+    try {
+      await (await ref.read(
+        automaticVaultBackupServiceProvider.future,
+      )).createSnapshot(reason: 'before-remote-restore');
+    } on Object {
+      // The automatic backup is a safety net only; a snapshot failure must not
+      // block an explicit, confirmed restore from the remote vault.
+    }
+  }
+
+  Future<_WebDavRemoteVaultMismatchAction?> _showRemoteVaultMismatchDialog() {
+    return showSerlinkDialog<_WebDavRemoteVaultMismatchAction>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        final l10n = context.l10n;
+        return SerlinkDialog(
+          maxWidth: _adaptiveDialogWidth(context, _dialogWidthPrompt),
+          title: Text(l10n.webDavRemoteVaultMismatchTitle),
+          content: SerlinkAlert.warning(
+            message: l10n.webDavRemoteVaultMismatchBody,
+          ),
+          actions: [
+            SerlinkTextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(l10n.cancelAction),
+            ),
+            SerlinkTextButton(
+              key: const ValueKey('webdav-mismatch-restore-button'),
+              onPressed: () => Navigator.of(
+                context,
+              ).pop(_WebDavRemoteVaultMismatchAction.restoreLocal),
+              child: Text(l10n.webDavRestoreFromRemoteAction),
+            ),
+            SerlinkFilledButton.danger(
+              key: const ValueKey('webdav-mismatch-replace-button'),
+              onPressed: () => Navigator.of(
+                context,
+              ).pop(_WebDavRemoteVaultMismatchAction.replaceRemote),
+              child: Text(l10n.webDavReplaceRemoteAction),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _delete() async {
@@ -261,6 +399,8 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
     }
   }
 }
+
+enum _WebDavRemoteVaultMismatchAction { replaceRemote, restoreLocal }
 
 class _WebDavOptionRow extends StatelessWidget {
   const _WebDavOptionRow({

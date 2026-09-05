@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
@@ -100,7 +101,16 @@ class DatabaseMigrationPreflight {
   final Directory automaticBackupDirectory;
   final DateTime Function() _now;
 
-  Future<void> run({required int targetSchemaVersion}) async {
+  Future<void> run({required int targetSchemaVersion}) {
+    return _runPreflightInBackground(
+      databaseFile.path,
+      automaticBackupDirectory.path,
+      targetSchemaVersion,
+      _now(),
+    );
+  }
+
+  Future<void> _run({required int targetSchemaVersion}) async {
     if (!await databaseFile.exists()) {
       return;
     }
@@ -135,6 +145,23 @@ class DatabaseMigrationPreflight {
       database.close();
     }
   }
+}
+
+// Pass only paths and values to the worker, never a SQLite handle or a clock
+// callback that could capture UI state.
+Future<void> _runPreflightInBackground(
+  String databasePath,
+  String backupPath,
+  int targetSchemaVersion,
+  DateTime now,
+) {
+  return Isolate.run(
+    () => DatabaseMigrationPreflight(
+      databaseFile: File(databasePath),
+      automaticBackupDirectory: Directory(backupPath),
+      now: () => now,
+    )._run(targetSchemaVersion: targetSchemaVersion),
+  );
 }
 
 class DatabaseRecoveryService {

@@ -174,8 +174,56 @@ SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
 
 The direct script uses `SERLINK_DISTRIBUTION=direct`,
 `Runner/Direct.entitlements`, and the `Developer ID Application` signing
-identity by default. Package the resulting `.app` into a DMG and notarize it
-before distributing it outside the Mac App Store.
+identity by default. It enables `SERLINK_DMG_INSTALLER_ENABLED=YES` and produces
+`build/Serlink-<version>+<build>.dmg`. Override the output with `SERLINK_DMG_PATH`.
+Install `uv` first (`brew install uv`); packaging uses pinned `dmgbuild==1.6.7`
+to write Finder metadata without Finder automation permissions.
+
+The DMG uses `macos/dmg/background.png` and `background@2x.png`, a 720 × 480
+Finder window, and a single centered app icon. Regenerate both images with
+`swift tool/render_macos_dmg_background.swift`; layout settings live in
+`macos/dmg/settings.py`.
+
+Double-clicking the app installs and opens it before the Flutter engine, vault,
+or MCP server starts. Installation is enabled only for direct builds launched
+from read-only volumes, including Gatekeeper App Translocation. It copies to
+`/Applications` or, when that is not writable and no system copy exists, to
+`~/Applications`. Existing matching apps require replacement confirmation;
+running apps must be quit first. The installer stages and verifies the complete
+signed bundle before replacing the old app, rolls back failed replacements,
+and preserves quarantine attributes. User data is outside the app bundle and
+is not modified. App Store builds leave the installer disabled.
+
+### Notarization
+
+The build script does not submit to Apple. Notarize and staple the app first,
+then repackage it so the app inside the DMG carries its ticket. For example,
+using an existing `notarytool` keychain profile named `serlink-notary`:
+
+```sh
+APP=build/macos/Build/Products/Release/serlink.app
+DMG=build/Serlink-1.0.0+14.dmg # Use the version/build produced above.
+ditto -c -k --keepParent "$APP" build/Serlink-notary.zip
+xcrun notarytool submit build/Serlink-notary.zip --keychain-profile serlink-notary --wait
+xcrun stapler staple "$APP"
+./tool/package_macos_dmg.sh "$APP" "$DMG"
+codesign --sign 'Developer ID Application' --timestamp "$DMG"
+xcrun notarytool submit "$DMG" --keychain-profile serlink-notary --wait
+xcrun stapler staple "$DMG"
+xcrun stapler validate "$DMG"
+```
+
+For local testing, `SERLINK_INSTALL_DEV_APP=0 ./tool/build_macos_dev_dmg.sh`
+builds the same layout without replacing the development app on the build Mac.
+Development DMGs retain development provisioning and are not public releases.
+
+Run `./tool/test_macos_installer.sh` with Xcode selected to test first installs,
+upgrades, copy/signature failures, rollback, running apps, and unsafe targets.
+Before release, smoke-test a downloaded, quarantined, notarized DMG on a clean
+Mac: verify the background at standard/Retina resolution, double-click install,
+launch from Applications, replacement cancellation, running-app retry, and a
+standard account's `~/Applications` fallback. Eject the DMG and confirm the
+installed app still launches. Gatekeeper prompts are controlled by macOS.
 
 Direct DMG builds can use the same CloudKit data as the App Store build when
 they are signed for the same CloudKit container, use the Production CloudKit

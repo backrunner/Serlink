@@ -184,9 +184,9 @@ class DartSsh2SftpConnection implements SftpConnection {
 
   @override
   Future<void> close() async {
-    _sftp.close();
+    await _sftp.close();
     await _onClose?.call();
-    _sshClient?.close();
+    await _sshClient?.close();
   }
 
   Future<void> _upload({

@@ -112,6 +112,7 @@ class _SingleTerminalViewportState extends State<_SingleTerminalViewport> {
                 onReconnect: widget.onReconnect,
                 onClose: null,
               ),
+            _AgentPaneBadge(sessionId: widget.pane.sessionId),
             if (dropActive) _TerminalPaneDropScrim(placement: _dropPlacement),
           ],
         );
@@ -145,6 +146,83 @@ _TerminalPaneDropPlacement _terminalPaneDropPlacementForOffset(
   return localOffset.dy < box.size.height / 2
       ? _TerminalPaneDropPlacement.top
       : _TerminalPaneDropPlacement.bottom;
+}
+
+/// Small corner chip marking a pane whose session is driven by an approved
+/// MCP agent. The close icon ends the agent session (which closes the tab).
+class _AgentPaneBadge extends ConsumerWidget {
+  const _AgentPaneBadge({required this.sessionId});
+
+  final SessionId sessionId;
+
+  Future<void> _closeAgentSession(WidgetRef ref) async {
+    try {
+      await ref.read(agentSessionBridgeProvider).closeSession(sessionId);
+    } on Object {
+      // The session may already be gone; the badge disappears on refresh.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessions = ref.watch(agentSessionsProvider).value;
+    AgentSessionHandle? handle;
+    for (final candidate in sessions ?? const <AgentSessionHandle>[]) {
+      if (candidate.sessionId == sessionId) {
+        handle = candidate;
+        break;
+      }
+    }
+    if (handle == null) {
+      return const SizedBox.shrink();
+    }
+    final l10n = context.l10n;
+    final t = context.tokens;
+    return Positioned(
+      key: const ValueKey('agent-pane-badge'),
+      top: 6,
+      right: 6,
+      child: SerlinkTooltip(
+        message: l10n.agentPaneBadgeTooltip(handle.clientName),
+        child: Container(
+          padding: const EdgeInsets.only(left: 8, right: 2),
+          decoration: BoxDecoration(
+            color: t.surfaceRaised.withValues(alpha: 0.92),
+            borderRadius: SerlinkRadii.control,
+            border: Border.all(color: t.accentPrimary.withValues(alpha: 0.5)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.smart_toy_outlined, size: 12, color: t.accentPrimary),
+              const SizedBox(width: 4),
+              Text(
+                l10n.hostAuthAgentSegment,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: t.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SerlinkIconButton(
+                key: const ValueKey('agent-pane-badge-close'),
+                tooltip: l10n.agentPaneBadgeCloseTooltip,
+                constraints: const BoxConstraints.tightFor(
+                  width: 20,
+                  height: 20,
+                ),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                iconSize: 12,
+                color: t.textSecondary,
+                onPressed: () => unawaited(_closeAgentSession(ref)),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _TerminalPaneDropScrim extends StatelessWidget {
@@ -710,6 +788,7 @@ class _TerminalViewportPaneState extends State<_TerminalViewportPane> {
                           onReconnect: widget.onReconnect,
                           onClose: widget.canClose ? widget.onClose : null,
                         ),
+                      _AgentPaneBadge(sessionId: widget.pane.sessionId),
                       if (dropActive)
                         _TerminalPaneDropScrim(placement: _dropPlacement),
                     ],

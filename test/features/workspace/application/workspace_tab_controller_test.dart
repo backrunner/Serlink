@@ -229,7 +229,8 @@ void main() {
         .terminalFor(content.primaryPane.sessionId)!;
 
     expect(terminal.platform, TerminalTargetPlatform.ios);
-    expect(terminal.reflowEnabled, isFalse);
+    // History re-wraps when the viewport changes size (window drag, splits).
+    expect(terminal.reflowEnabled, isTrue);
   });
 
   test(

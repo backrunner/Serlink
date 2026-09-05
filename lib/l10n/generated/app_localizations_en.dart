@@ -389,6 +389,130 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsManageAction => 'Manage';
 
   @override
+  String get settingsMcpSection => 'MCP / Agent access';
+
+  @override
+  String get settingsMcpServerTitle => 'Agent server';
+
+  @override
+  String get settingsMcpServerSemantics => 'Enable the agent server';
+
+  @override
+  String settingsMcpServerRunning(String url) {
+    return 'Running at $url';
+  }
+
+  @override
+  String get settingsMcpServerStopped => 'Stopped.';
+
+  @override
+  String settingsMcpServerError(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get settingsMcpTokenTitle => 'Access token';
+
+  @override
+  String get settingsMcpConfigTitle => 'Client config';
+
+  @override
+  String get settingsMcpHttpConfigNeedsServer =>
+      'Start the agent server to use the HTTP config.';
+
+  @override
+  String get settingsMcpInstallTitle => 'Install into agents';
+
+  @override
+  String get settingsMcpInstallAction => 'Install';
+
+  @override
+  String get settingsMcpUpdateAction => 'Update';
+
+  @override
+  String get settingsMcpInstalledLabel => 'Installed';
+
+  @override
+  String get settingsMcpInstallNoneDetected =>
+      'No supported agents detected on this Mac.';
+
+  @override
+  String settingsMcpInstallSuccess(String agent) {
+    return 'Serlink MCP config written to $agent.';
+  }
+
+  @override
+  String settingsMcpInstallFailed(String error) {
+    return 'Failed to write the config: $error';
+  }
+
+  @override
+  String get settingsMcpTokenNotAvailable =>
+      'Start the server to generate a token.';
+
+  @override
+  String get settingsMcpTokenRevealTooltip => 'Show token';
+
+  @override
+  String get settingsMcpTokenHideTooltip => 'Hide token';
+
+  @override
+  String get settingsMcpTokenCopyTooltip => 'Copy token';
+
+  @override
+  String get settingsMcpTokenCopied => 'Token copied to clipboard.';
+
+  @override
+  String get settingsMcpCopyHttpConfigAction => 'Copy HTTP MCP config (JSON)';
+
+  @override
+  String get settingsMcpCopyStdioConfigAction =>
+      'Copy stdio helper config (JSON)';
+
+  @override
+  String get settingsMcpConfigCopied =>
+      'MCP client config copied to clipboard.';
+
+  @override
+  String get settingsMcpStdioPathHint =>
+      'Serlink opens on demand when a tool is called. Keep the app at this path.';
+
+  @override
+  String get settingsMcpStdioNotInstalled =>
+      'The stdio helper ships with Serlink release builds and is not available in this installation.';
+
+  @override
+  String get settingsMcpGrantsTitle => 'Active grants';
+
+  @override
+  String get settingsMcpGrantsEmpty => 'No agents currently have access.';
+
+  @override
+  String get settingsMcpGrantExpiry => 'until app quits';
+
+  @override
+  String get settingsMcpRevokeAction => 'Revoke';
+
+  @override
+  String get settingsMcpSessionsTitle => 'Active agent sessions';
+
+  @override
+  String get settingsMcpSessionsEmpty => 'No active agent sessions.';
+
+  @override
+  String settingsMcpSessionOpenedAt(String time) {
+    return 'opened $time';
+  }
+
+  @override
+  String agentPaneBadgeTooltip(String client) {
+    return 'Controlled by $client.';
+  }
+
+  @override
+  String get agentPaneBadgeCloseTooltip => 'Close agent session';
+
+  @override
   String get settingsDataSection => 'Data';
 
   @override
@@ -578,6 +702,73 @@ class AppLocalizationsEn extends AppLocalizations {
       'WebDAV certificate trust saved.';
 
   @override
+  String get syncErrorVaultDataMissing =>
+      'The vault data needed for sync is missing on this device.';
+
+  @override
+  String get syncErrorRemoteDataUnreadable =>
+      'Remote sync data could not be read.';
+
+  @override
+  String get syncErrorRemoteDataMissing => 'Remote sync data is missing.';
+
+  @override
+  String get syncErrorRemoteWrongVault =>
+      'Remote sync data belongs to another vault.';
+
+  @override
+  String get syncErrorRemoteDataInvalid =>
+      'Remote sync data is invalid or corrupted.';
+
+  @override
+  String get syncErrorRemoteDataMismatch =>
+      'Remote sync data does not match its contents.';
+
+  @override
+  String get syncErrorRemoteVersionUnsupported =>
+      'Remote sync data was written by a newer Serlink version. Update Serlink before syncing, or turn sync off on this device.';
+
+  @override
+  String get syncErrorRemoteVaultDataMissing => 'Remote vault data is missing.';
+
+  @override
+  String get syncErrorRemoteVaultDataInvalid =>
+      'Remote vault data is invalid or corrupted.';
+
+  @override
+  String get syncErrorRemoteResetMarkerInvalid =>
+      'The remote vault reset marker is invalid.';
+
+  @override
+  String get syncErrorRemoteChanged =>
+      'Remote sync data changed while syncing.';
+
+  @override
+  String get syncErrorRemoteVaultReset => 'The remote vault was reset.';
+
+  @override
+  String get syncErrorNoConflictsSelected =>
+      'No sync conflicts were selected for merge.';
+
+  @override
+  String get syncErrorConflictRecordMissing =>
+      'The conflicting record no longer exists on this device.';
+
+  @override
+  String get syncErrorVaultLocked => 'Unlock the vault before syncing.';
+
+  @override
+  String get syncErrorLocalUnhealthy =>
+      'Local vault data needs recovery before it can sync.';
+
+  @override
+  String get syncErrorProviderMissing => 'No sync provider is enabled.';
+
+  @override
+  String get syncErrorStagedProviderInvalid =>
+      'The staged sync provider is invalid.';
+
+  @override
   String get syncICloudEnabledSnack => 'iCloud sync enabled.';
 
   @override
@@ -586,6 +777,20 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get syncICloudRemoteVaultAdoptedSnack =>
       'iCloud already has a Serlink vault. Use that vault passphrase to finish syncing.';
+
+  @override
+  String get syncICloudRemoteVaultAdoptedAfterInitializeSnack =>
+      'Serlink switched to the existing iCloud vault, so the passphrase you just entered was not applied. Unlock with the iCloud vault passphrase.';
+
+  @override
+  String get syncWebDavRemoteVaultAdoptedSnack =>
+      'Serlink switched to the remote vault. Unlock with the remote vault passphrase.';
+
+  @override
+  String get syncICloudUnavailableError => 'iCloud sync is not available.';
+
+  @override
+  String get syncICloudSetupFailedError => 'iCloud sync could not be set up.';
 
   @override
   String syncConflictsResolvedSnack(num count) {
@@ -754,6 +959,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirmAction => 'Confirm';
 
   @override
+  String get denyAction => 'Deny';
+
+  @override
+  String get allowAction => 'Allow';
+
+  @override
   String get applyAction => 'Apply';
 
   @override
@@ -855,6 +1066,42 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String get securityAgentAccessTitle => 'Agent access request';
+
+  @override
+  String securityAgentAccessBody(String client, String host) {
+    return '$client wants to open a session on $host.';
+  }
+
+  @override
+  String securityAgentAccessHostIdLabel(String id) {
+    return 'Host ID: $id';
+  }
+
+  @override
+  String get securityAgentAccessWarning =>
+      'The agent can run commands on this host until the app quits or access is revoked.';
+
+  @override
+  String get securityAgentCommandTitle => 'Agent command confirmation';
+
+  @override
+  String securityAgentCommandBody(String client, String host) {
+    return '$client wants to run a command on $host.';
+  }
+
+  @override
+  String securityAgentCommandRuleLabel(String rule) {
+    return 'Flagged: $rule';
+  }
+
+  @override
+  String get securityAgentAllowOnceAction => 'Allow Once';
+
+  @override
+  String get securityAgentAllowSessionAction => 'Allow for Session';
 
   @override
   String get hostEditTitle => 'Edit Host';
@@ -1289,6 +1536,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get webDavRemovedSnack => 'WebDAV sync settings removed.';
 
   @override
+  String get webDavRemoteVaultMismatchTitle =>
+      'Remote already has another Serlink vault';
+
+  @override
+  String get webDavRemoteVaultMismatchBody =>
+      'This WebDAV location already contains sync data for a different Serlink vault. You can replace the remote data with this device\'s vault, or restore this device from the remote vault.';
+
+  @override
+  String get webDavReplaceRemoteAction => 'Keep Local Data and Replace Remote';
+
+  @override
+  String get webDavRestoreFromRemoteAction => 'Restore This Device from Remote';
+
+  @override
+  String get webDavReplaceRemoteConfirmTitle => 'Replace the remote vault?';
+
+  @override
+  String get webDavReplaceRemoteConfirmBody =>
+      'The remote Serlink sync data will be overwritten with this device\'s vault. This cannot be undone.';
+
+  @override
+  String get webDavRestoreFromRemoteConfirmTitle =>
+      'Restore this device from the remote vault?';
+
+  @override
+  String get webDavRestoreFromRemoteConfirmBody =>
+      'The current vault data on this device will be replaced by the remote vault, and this device will lock. Unlock with the remote vault passphrase. A local backup is created first.';
+
+  @override
   String get credentialsDialogTitle => 'Credentials';
 
   @override
@@ -1324,6 +1600,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get credentialDeleteFailedSnack => 'Credential could not be deleted.';
+
+  @override
+  String get credentialAddedSnack => 'Credential added.';
+
+  @override
+  String get credentialGenerateKeyAction => 'Generate key pair';
+
+  @override
+  String get credentialGeneratedPublicKeyLabel => 'Public key';
+
+  @override
+  String get credentialGeneratedPublicKeyNote =>
+      'Add this public key to the server\'s authorized_keys. The private key stays encrypted in the vault.';
+
+  @override
+  String get credentialCopyPublicKeyTooltip => 'Copy public key';
+
+  @override
+  String get credentialPublicKeyCopiedSnack => 'Public key copied.';
+
+  @override
+  String get credentialKeyGenerationFailed => 'Key generation failed.';
 
   @override
   String get knownHostsDialogTitle => 'Known Hosts';
@@ -1820,6 +2118,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultCreateAction => 'Create Vault';
 
   @override
+  String get vaultCreateICloudVaultExistsTitle =>
+      'An iCloud vault already exists';
+
+  @override
+  String get vaultCreateICloudVaultExistsBody =>
+      'You can restore the existing vault by unlocking it with its own passphrase, or create a brand-new vault. Creating a new vault replaces the sync data stored in iCloud.';
+
+  @override
+  String get vaultCreateRestoreICloudVaultAction => 'Restore iCloud Vault';
+
+  @override
+  String get vaultCreateNewAnywayAction => 'Create New Vault Anyway';
+
+  @override
+  String get vaultCreateReplaceICloudConfirmTitle =>
+      'Replace iCloud sync data?';
+
+  @override
+  String get vaultCreateReplaceICloudConfirmBody =>
+      'The new vault replaces the Serlink sync data already stored in iCloud. This cannot be undone.';
+
+  @override
   String get vaultUnlockAction => 'Unlock';
 
   @override
@@ -1834,6 +2154,28 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get vaultInvalidPassphraseError =>
       'Passphrase did not unlock the vault.';
+
+  @override
+  String get vaultBackupMissingVaultError =>
+      'Create or unlock a vault before exporting a backup.';
+
+  @override
+  String vaultOperationFailedError(String detail) {
+    return 'Vault operation failed: $detail';
+  }
+
+  @override
+  String vaultRecoveryFailedError(String detail) {
+    return 'Vault recovery failed: $detail';
+  }
+
+  @override
+  String get vaultDatabaseUnreadableError =>
+      'The local Serlink database could not be read or restored.';
+
+  @override
+  String get appProfileLockedError =>
+      'This Serlink profile is already open in another window.';
 
   @override
   String get vaultInvalidRecoveryKeyError =>
@@ -1885,42 +2227,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultRecoveryBody => 'Vault recovery tools are available.';
 
   @override
-  String get vaultRecoveryDatabaseTitle => 'Database recovery';
+  String get vaultRecoveryLocalDataTitle => 'Local vault data is damaged';
 
   @override
-  String get vaultRecoveryDatabaseBody =>
-      'Serlink could not open this local database safely.';
+  String get vaultRecoveryLocalDataBody =>
+      'Serlink cannot read the vault data stored on this device. You can usually recover it from the automatic backup or a backup file.';
 
   @override
-  String get vaultRecoveryHeaderTitle => 'Vault header recovery';
+  String get vaultRecoveryCloudSyncTitle => 'Cloud sync data needs repair';
 
   @override
-  String get vaultRecoveryHeaderBody =>
-      'The local vault header is invalid or incomplete.';
+  String get vaultRecoveryCloudSyncBody =>
+      'The vault data on this device is not affected. Open Settings → Sync to repair the cloud sync data.';
 
   @override
-  String get vaultRecoveryRecordsTitle => 'Record recovery';
+  String get vaultRecoveryRecordsDamagedTitle =>
+      'Some vault records are damaged';
 
   @override
-  String vaultRecoveryRecordsBody(num count) {
+  String vaultRecoveryRecordsDamagedBody(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# encrypted records failed authentication.',
-      one: '# encrypted record failed authentication.',
+      other:
+          '# encrypted records could not be read. Quarantine them to keep using the rest of the vault.',
+      one:
+          '# encrypted record could not be read. Quarantine it to keep using the rest of the vault.',
     );
     return '$_temp0';
   }
 
   @override
-  String get vaultRecoveryRemoteTitle => 'Remote sync recovery';
+  String get vaultRecoveryImportBackupAction => 'Import backup file';
 
   @override
-  String get vaultRecoveryRemoteBody =>
-      'The remote sync set needs repair before it can be used.';
+  String get vaultRecoveryViewDetailsAction => 'View details';
 
   @override
-  String get vaultRestoreLatestBackupAction => 'Restore latest backup';
+  String get vaultRecoveryHideDetailsAction => 'Hide details';
+
+  @override
+  String get vaultRestoreLatestBackupAction => 'Restore from automatic backup';
 
   @override
   String get vaultQuarantineRecordsAction => 'Quarantine corrupt records';
@@ -1993,6 +2340,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get credentialEditTitle => 'Edit Credential';
+
+  @override
+  String get credentialAddTitle => 'Add Credential';
+
+  @override
+  String get hostAddCredentialAction => 'Add credential';
 
   @override
   String get credentialLoadingSecretSemantics => 'Loading credential secret';
@@ -2454,7 +2807,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportVaultBackupBody =>
-      'The backup contains encrypted vault records and the vault header. Keep it private.';
+      'The backup contains your encrypted vault data. Keep it private.';
 
   @override
   String get backupExportedSnack => 'Encrypted backup exported.';
@@ -2524,7 +2877,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importEncryptedBackupBody =>
-      'This replaces the local vault header and merges encrypted records from the selected backup.';
+      'This replaces the vault data on this device and merges encrypted records from the selected backup.';
 
   @override
   String get backupImportedSnack => 'Encrypted backup imported.';

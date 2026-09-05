@@ -93,6 +93,38 @@ class FlutterSecurityModalService implements SecurityModalService {
     );
     return decision ?? false;
   }
+
+  @override
+  Future<AgentAccessDecision> confirmAgentAccess(
+    AgentAccessPrompt prompt,
+  ) async {
+    final context = _key.currentContext;
+    if (context == null) {
+      return AgentAccessDecision.deny;
+    }
+    final decision = await showSerlinkDialog<AgentAccessDecision>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _AgentAccessDialog(prompt: prompt),
+    );
+    return decision ?? AgentAccessDecision.deny;
+  }
+
+  @override
+  Future<AgentCommandDecision> confirmAgentCommand(
+    AgentCommandPrompt prompt,
+  ) async {
+    final context = _key.currentContext;
+    if (context == null) {
+      return AgentCommandDecision.deny;
+    }
+    final decision = await showSerlinkDialog<AgentCommandDecision>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _AgentCommandDialog(prompt: prompt),
+    );
+    return decision ?? AgentCommandDecision.deny;
+  }
 }
 
 class _WebDavCertificateDialog extends StatelessWidget {
@@ -333,6 +365,108 @@ class _MultilinePasteDialog extends StatelessWidget {
         SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(l10n.pasteAction),
+        ),
+      ],
+    );
+  }
+}
+
+class _AgentAccessDialog extends StatelessWidget {
+  const _AgentAccessDialog({required this.prompt});
+
+  final AgentAccessPrompt prompt;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return SerlinkDialog(
+      maxWidth: _hostKeyDialogMaxWidth,
+      title: Text(l10n.securityAgentAccessTitle),
+      content: SizedBox(
+        width: _hostKeyDialogContentWidth,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.securityAgentAccessBody(
+                prompt.clientName,
+                prompt.hostDisplayName,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(l10n.securityAgentAccessHostIdLabel(prompt.hostId)),
+            const SizedBox(height: 12),
+            Text(l10n.securityAgentAccessWarning),
+          ],
+        ),
+      ),
+      actions: [
+        SerlinkTextButton(
+          onPressed: () => Navigator.of(context).pop(AgentAccessDecision.deny),
+          child: Text(l10n.denyAction),
+        ),
+        SerlinkFilledButton(
+          onPressed: () => Navigator.of(context).pop(AgentAccessDecision.allow),
+          child: Text(l10n.allowAction),
+        ),
+      ],
+    );
+  }
+}
+
+class _AgentCommandDialog extends StatelessWidget {
+  const _AgentCommandDialog({required this.prompt});
+
+  final AgentCommandPrompt prompt;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return SerlinkDialog(
+      maxWidth: _hostKeyDialogMaxWidth,
+      title: Text(l10n.securityAgentCommandTitle),
+      content: SizedBox(
+        width: _hostKeyDialogContentWidth,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.securityAgentCommandBody(
+                prompt.clientName,
+                prompt.hostDisplayName,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(l10n.securityAgentCommandRuleLabel(prompt.ruleDescription)),
+            const SizedBox(height: 12),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 240),
+              child: SingleChildScrollView(
+                child: SelectableText(
+                  prompt.command,
+                  style: const TextStyle(fontFamily: 'monospace'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        SerlinkTextButton(
+          onPressed: () => Navigator.of(context).pop(AgentCommandDecision.deny),
+          child: Text(l10n.denyAction),
+        ),
+        SerlinkTextButton(
+          onPressed: () =>
+              Navigator.of(context).pop(AgentCommandDecision.allowOnce),
+          child: Text(l10n.securityAgentAllowOnceAction),
+        ),
+        SerlinkFilledButton(
+          onPressed: () =>
+              Navigator.of(context).pop(AgentCommandDecision.allowSession),
+          child: Text(l10n.securityAgentAllowSessionAction),
         ),
       ],
     );

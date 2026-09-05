@@ -151,10 +151,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     super.dispose();
   }
 
-  Widget _buildWriteBackSwitch(
-    AppLocalizations l10n, {
-    required bool blocked,
-  }) {
+  Widget _buildWriteBackSwitch(AppLocalizations l10n, {required bool blocked}) {
     final tile = SerlinkSwitchListTile(
       key: const ValueKey('host-ssh-config-writeback-switch'),
       value: _writeBackToSshConfig,
@@ -217,6 +214,17 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
               padding: layout.sectionPadding,
               child: Column(
                 children: [
+                  SerlinkTextField(
+                    key: const ValueKey('host-display-name-field'),
+                    controller: _displayNameController,
+                    decoration: InputDecoration(
+                      labelText: l10n.hostDisplayNameOptionalLabel,
+                      hintText: l10n.hostDisplayNameHostnameHint,
+                      helperText: l10n.hostDisplayNameHostnameHelper,
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  SizedBox(height: layout.fieldGap),
                   Row(
                     children: [
                       Expanded(
@@ -242,26 +250,6 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                         ),
                       ),
                     ],
-                  ),
-                  SizedBox(height: layout.fieldGap),
-                  SerlinkTextField(
-                    key: const ValueKey('host-display-name-field'),
-                    controller: _displayNameController,
-                    decoration: InputDecoration(
-                      labelText: l10n.hostDisplayNameOptionalLabel,
-                      hintText: l10n.hostDisplayNameHostnameHint,
-                      helperText: l10n.hostDisplayNameHostnameHelper,
-                    ),
-                    textInputAction: TextInputAction.next,
-                  ),
-                  SizedBox(height: layout.fieldGap),
-                  SerlinkTextField(
-                    key: const ValueKey('host-username-field'),
-                    controller: _usernameController,
-                    decoration: InputDecoration(
-                      labelText: l10n.hostUsernameLabel,
-                    ),
-                    textInputAction: TextInputAction.next,
                   ),
                   SizedBox(height: layout.fieldGap),
                   _HostGroupField(
@@ -295,32 +283,48 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             _HostFormSection(
               title: l10n.hostSectionAuthentication,
               padding: layout.sectionPadding,
-              child: _HostAuthenticationFields(
-                useSavedCredentialPicker: _usesSavedCredentialPicker,
-                authMode: _authMode,
-                loadingOptions: _loadingOptions,
-                passwordController: _passwordController,
-                passwordVisible: _passwordVisible,
-                privateKeyController: _privateKeyController,
-                keyPassphraseController: _keyPassphraseController,
-                showSshAgent: capabilities.sshAgentAuth,
-                identityOptions: _identityOptions,
-                selectedIdentityIds: _selectedIdentityIds,
-                onAuthModeChanged: (authMode) {
-                  setState(() {
-                    _authMode = authMode;
-                  });
-                },
-                onImportPrivateKey: _importPrivateKey,
-                onTogglePasswordVisible: () {
-                  setState(() {
-                    _passwordVisible = !_passwordVisible;
-                  });
-                },
-                onToggleIdentity: _toggleIdentity,
-                onEditIdentity: _editIdentity,
-                onSubmit: _save,
-                compact: layout.compact,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SerlinkTextField(
+                    key: const ValueKey('host-username-field'),
+                    controller: _usernameController,
+                    decoration: InputDecoration(
+                      labelText: l10n.hostUsernameLabel,
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  SizedBox(height: layout.fieldGap),
+                  _HostAuthenticationFields(
+                    useSavedCredentialPicker: _usesSavedCredentialPicker,
+                    authMode: _authMode,
+                    loadingOptions: _loadingOptions,
+                    passwordController: _passwordController,
+                    passwordVisible: _passwordVisible,
+                    privateKeyController: _privateKeyController,
+                    keyPassphraseController: _keyPassphraseController,
+                    showSshAgent: capabilities.sshAgentAuth,
+                    identityOptions: _identityOptions,
+                    selectedIdentityIds: _selectedIdentityIds,
+                    onAuthModeChanged: (authMode) {
+                      setState(() {
+                        _authMode = authMode;
+                      });
+                    },
+                    onImportPrivateKey: _importPrivateKey,
+                    onTogglePasswordVisible: () {
+                      setState(() {
+                        _passwordVisible = !_passwordVisible;
+                      });
+                    },
+                    onToggleIdentity: _toggleIdentity,
+                    onEditIdentity: _editIdentity,
+                    onDeleteIdentity: _deleteIdentity,
+                    onAddIdentity: _addIdentity,
+                    onSubmit: _save,
+                    compact: layout.compact,
+                  ),
+                ],
               ),
             ),
             SizedBox(height: layout.sectionGap),
@@ -739,15 +743,15 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
         _jumpHostOptions = List<HostSummary>.unmodifiable(jumpHosts);
         _groupOptions = List<String>.unmodifiable(
           hostConfigs
-                  .map((host) => host.groupId)
-                  .whereType<String>()
-                  .where((groupId) => groupId != _kNewGroupSentinel)
-                  .toSet()
-                  .toList()
-                ..sort(
-                  (left, right) =>
-                      left.toLowerCase().compareTo(right.toLowerCase()),
-                ),
+              .map((host) => host.groupId)
+              .whereType<String>()
+              .where((groupId) => groupId != _kNewGroupSentinel)
+              .toSet()
+              .toList()
+            ..sort(
+              (left, right) =>
+                  left.toLowerCase().compareTo(right.toLowerCase()),
+            ),
         );
         if (hostConfig != null) {
           _selectedGroup = hostConfig.groupId;
@@ -932,6 +936,87 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     });
   }
 
+  Future<void> _deleteIdentity(IdentityConfig identity) async {
+    final hosts = await ref.read(hostRepositoryProvider).list();
+    if (!mounted) {
+      return;
+    }
+    final linkedHosts = [
+      for (final host in hosts)
+        if (host.identityIds.contains(identity.id)) host.displayName,
+    ];
+    final confirmed = await _confirmDialog(
+      context,
+      title: context.l10n.credentialDeleteTitle,
+      body: linkedHosts.isEmpty
+          ? context.l10n.credentialDeleteBody
+          : context.l10n.credentialDeleteLinkedBody(linkedHosts.join(', ')),
+      confirmLabel: linkedHosts.isEmpty
+          ? context.l10n.deleteAction
+          : context.l10n.closeAction,
+      destructive: linkedHosts.isEmpty,
+    );
+    if (!confirmed || linkedHosts.isNotEmpty) {
+      return;
+    }
+    try {
+      if (identity.secretRecordId case final secretRecordId?) {
+        await ref
+            .read(syncDeleteTombstoneRepositoryProvider)
+            .save(
+              SyncDeleteTombstone(
+                targetRecordId: secretRecordId,
+                targetRecordType: 'identity_secret',
+                deletedAt: DateTime.now().toUtc(),
+              ),
+            );
+        await ref.read(vaultRecordRepositoryProvider).delete(secretRecordId);
+      }
+      await ref
+          .read(syncDeleteTombstoneRepositoryProvider)
+          .save(
+            SyncDeleteTombstone(
+              targetRecordId: VaultRecordId('identity:${identity.id.value}'),
+              targetRecordType: 'identity',
+              deletedAt: DateTime.now().toUtc(),
+            ),
+          );
+      await ref.read(identityRepositoryProvider).delete(identity.id);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _identityOptions = List<IdentityConfig>.unmodifiable(
+          _identityOptions.where((option) => option.id != identity.id),
+        );
+        _selectedIdentityIds = {..._selectedIdentityIds}..remove(identity.id);
+      });
+      _showSnackBar(context, context.l10n.credentialDeletedSnack);
+    } on Object {
+      if (mounted) {
+        _showSnackBar(context, context.l10n.credentialDeleteFailedSnack);
+      }
+    }
+  }
+
+  Future<void> _addIdentity() async {
+    final created = await showSerlinkDialog<Object?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const _IdentityEditDialog(),
+    );
+    if (created is! IdentityConfig || !mounted) {
+      return;
+    }
+    await _reloadIdentityOptions();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedIdentityIds = {..._selectedIdentityIds, created.id};
+    });
+  }
+
   Future<void> _editIdentity(IdentityConfig identity) async {
     final updated = await showSerlinkDialog<bool>(
       context: context,
@@ -941,6 +1026,10 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     if (updated != true || !mounted) {
       return;
     }
+    await _reloadIdentityOptions();
+  }
+
+  Future<void> _reloadIdentityOptions() async {
     final capabilities = ref.read(platformCapabilitiesProvider);
     final identities = await ref.read(identityRepositoryProvider).list();
     identities.sort(

@@ -30,6 +30,9 @@
 		42CF3DB321BAC7EC00074985 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CA5B07745411784E4C15197D /* Pods_RunnerTests.framework */; };
 		AA01CK01044A3C60003C0451 /* CloudKitSyncChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA01CK02044A3C60003C0452 /* CloudKitSyncChannel.swift */; };
 		B34EC6D3CECAC0F6C827366F /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2A3DEC802FC7FFD9F0015155 /* Pods_Runner.framework */; };
+		AB10D2000000000000000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB10D1000000000000000001 /* main.swift */; };
+		AB10D2000000000000000002 /* AppInstallation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB10D1000000000000000002 /* AppInstallation.swift */; };
+		AB10D2000000000000000003 /* DirectAppInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB10D1000000000000000003 /* DirectAppInstaller.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -91,6 +94,9 @@
 		B814CE758420F69DC9522BCD /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		CA5B07745411784E4C15197D /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		FD261A2AA08436399AA4E48F /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
+		AB10D1000000000000000001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		AB10D1000000000000000002 /* AppInstallation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInstallation.swift; sourceTree = "<group>"; };
+		AB10D1000000000000000003 /* DirectAppInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectAppInstaller.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -178,6 +184,9 @@
 		33FAB671232836740065AC1E /* Runner */ = {
 			isa = PBXGroup;
 			children = (
+				AB10D1000000000000000001 /* main.swift */,
+				AB10D1000000000000000002 /* AppInstallation.swift */,
+				AB10D1000000000000000003 /* DirectAppInstaller.swift */,
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				AA01CK02044A3C60003C0452 /* CloudKitSyncChannel.swift */,
@@ -443,6 +452,9 @@
 			files = (
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				AA01CK01044A3C60003C0451 /* CloudKitSyncChannel.swift in Sources */,
+				AB10D2000000000000000001 /* main.swift in Sources */,
+				AB10D2000000000000000002 /* AppInstallation.swift in Sources */,
+				AB10D2000000000000000003 /* DirectAppInstaller.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 			);

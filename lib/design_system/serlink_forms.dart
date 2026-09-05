@@ -192,36 +192,50 @@ class SerlinkSelect<T> extends StatelessWidget {
       fontWeight: FontWeight.w600,
       height: 1.12,
     );
+    final highlightRadius = BorderRadius.circular(7);
     return FItemStyleDelta.delta(
-      padding: const EdgeInsetsGeometryDelta.value(EdgeInsets.zero),
+      // Inset every option slightly so hover/selected highlights read as
+      // rounded chips instead of full-bleed square bands.
+      padding: const EdgeInsetsGeometryDelta.value(
+        EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      ),
       contentDecoration: FVariantsDelta.delta([
         FVariantOperation.all(
           const DecorationDelta.shapeDelta(color: Colors.transparent),
         ),
         FVariantOperation.exact(<FTappableVariantConstraint>{
           FTappableVariant.hovered,
-        }, DecorationDelta.shapeDelta(color: t.surfaceOverlay)),
+        }, DecorationDelta.boxDelta(
+          color: t.surfaceOverlay,
+          borderRadius: highlightRadius,
+        )),
         FVariantOperation.exact(<FTappableVariantConstraint>{
           FTappableVariant.focused,
-        }, DecorationDelta.shapeDelta(color: t.surfaceOverlay)),
+        }, DecorationDelta.boxDelta(
+          color: t.surfaceOverlay,
+          borderRadius: highlightRadius,
+        )),
         FVariantOperation.exact(
           <FTappableVariantConstraint>{FTappableVariant.pressed},
-          DecorationDelta.shapeDelta(
+          DecorationDelta.boxDelta(
             color: t.accentPrimary.withValues(alpha: 0.12),
+            borderRadius: highlightRadius,
           ),
         ),
         FVariantOperation.exact(
           <FTappableVariantConstraint>{FTappableVariant.selected},
-          DecorationDelta.shapeDelta(
+          DecorationDelta.boxDelta(
             color: t.accentPrimary.withValues(alpha: 0.1),
+            borderRadius: highlightRadius,
           ),
         ),
         FVariantOperation.exact(
           <FTappableVariantConstraint>{
             FTappableVariant.selected.and(FTappableVariant.pressed),
           },
-          DecorationDelta.shapeDelta(
+          DecorationDelta.boxDelta(
             color: t.accentPrimary.withValues(alpha: 0.16),
+            borderRadius: highlightRadius,
           ),
         ),
       ]),

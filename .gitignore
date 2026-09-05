@@ -38,6 +38,7 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+test/failures/
 **/Flutter/ephemeral/
 linux/flutter/ephemeral/
 macos/Flutter/ephemeral/

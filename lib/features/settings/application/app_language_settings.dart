@@ -40,35 +40,50 @@ abstract interface class AppPrivacySettingsRepository {
 
 class FileAppLanguageSettingsRepository
     implements AppLanguageSettingsRepository, AppPrivacySettingsRepository {
-  const FileAppLanguageSettingsRepository();
+  const FileAppLanguageSettingsRepository({this.preferencesFile});
+
+  final File? preferencesFile;
 
   static const _languageKey = 'language';
   static const _protectBackgroundKey = 'protectBackground';
+  static Future<void> _pendingUpdate = Future<void>.value();
 
   @override
   Future<AppLanguage> read() async {
+    await _pendingUpdate;
     final preferences = await _readPreferences();
     return AppLanguage.fromJson(preferences[_languageKey]);
   }
 
   @override
-  Future<void> save(AppLanguage language) async {
-    final preferences = await _readPreferences();
-    preferences[_languageKey] = language.name;
-    await _writePreferences(preferences);
+  Future<void> save(AppLanguage language) {
+    return _updatePreference(_languageKey, language.name);
   }
 
   @override
   Future<bool> readProtectBackground() async {
+    await _pendingUpdate;
     final preferences = await _readPreferences();
     return preferences[_protectBackgroundKey] == true;
   }
 
   @override
-  Future<void> saveProtectBackground(bool enabled) async {
-    final preferences = await _readPreferences();
-    preferences[_protectBackgroundKey] = enabled;
-    await _writePreferences(preferences);
+  Future<void> saveProtectBackground(bool enabled) {
+    return _updatePreference(_protectBackgroundKey, enabled);
+  }
+
+  Future<void> _updatePreference(String key, Object value) {
+    // Both repositories share this file, so serialize the entire read/update.
+    final result = _pendingUpdate.then((_) async {
+      final preferences = await _readPreferences();
+      preferences[key] = value;
+      await _writePreferences(preferences);
+    });
+    _pendingUpdate = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return result;
   }
 
   Future<Map<String, Object?>> _readPreferences() async {
@@ -93,11 +108,23 @@ class FileAppLanguageSettingsRepository
 
   Future<void> _writePreferences(Map<String, Object?> preferences) async {
     final file = await _preferencesFile();
-    await file.writeAsString(jsonEncode(preferences), flush: true);
-    await LocalFileSecurity.restrictExistingFile(file);
+    final temporary = File('${file.path}.tmp');
+    try {
+      await temporary.writeAsString(jsonEncode(preferences), flush: true);
+      await LocalFileSecurity.restrictExistingFile(temporary);
+      await temporary.rename(file.path);
+    } finally {
+      if (await temporary.exists()) {
+        await temporary.delete();
+      }
+    }
   }
 
   Future<File> _preferencesFile() async {
+    if (preferencesFile case final file?) {
+      await LocalFileSecurity.preparePrivateDirectory(file.parent);
+      return file;
+    }
     final appDir = await getApplicationSupportDirectory();
     final directory = Directory(p.join(appDir.path, 'Serlink'));
     await LocalFileSecurity.preparePrivateDirectory(directory);

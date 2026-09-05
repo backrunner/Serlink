@@ -349,6 +349,124 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsManageAction => '管理';
 
   @override
+  String get settingsMcpSection => 'MCP / 代理访问';
+
+  @override
+  String get settingsMcpServerTitle => '代理服务器';
+
+  @override
+  String get settingsMcpServerSemantics => '启用代理服务器';
+
+  @override
+  String settingsMcpServerRunning(String url) {
+    return '正在 $url 运行';
+  }
+
+  @override
+  String get settingsMcpServerStopped => '已停止。';
+
+  @override
+  String settingsMcpServerError(String error) {
+    return '错误：$error';
+  }
+
+  @override
+  String get settingsMcpTokenTitle => '访问令牌';
+
+  @override
+  String get settingsMcpConfigTitle => '客户端配置';
+
+  @override
+  String get settingsMcpHttpConfigNeedsServer => '启动代理服务器后可使用 HTTP 配置。';
+
+  @override
+  String get settingsMcpInstallTitle => '安装到 Agent';
+
+  @override
+  String get settingsMcpInstallAction => '安装';
+
+  @override
+  String get settingsMcpUpdateAction => '更新';
+
+  @override
+  String get settingsMcpInstalledLabel => '已安装';
+
+  @override
+  String get settingsMcpInstallNoneDetected => '未在这台 Mac 上检测到支持的 Agent。';
+
+  @override
+  String settingsMcpInstallSuccess(String agent) {
+    return '已将 Serlink MCP 配置写入 $agent。';
+  }
+
+  @override
+  String settingsMcpInstallFailed(String error) {
+    return '写入配置失败：$error';
+  }
+
+  @override
+  String get settingsMcpTokenNotAvailable => '启动服务器以生成令牌。';
+
+  @override
+  String get settingsMcpTokenRevealTooltip => '显示令牌';
+
+  @override
+  String get settingsMcpTokenHideTooltip => '隐藏令牌';
+
+  @override
+  String get settingsMcpTokenCopyTooltip => '复制令牌';
+
+  @override
+  String get settingsMcpTokenCopied => '令牌已复制到剪贴板。';
+
+  @override
+  String get settingsMcpCopyHttpConfigAction => '复制 HTTP MCP 配置 (JSON)';
+
+  @override
+  String get settingsMcpCopyStdioConfigAction => '复制 stdio 助手配置 (JSON)';
+
+  @override
+  String get settingsMcpConfigCopied => 'MCP 客户端配置已复制到剪贴板。';
+
+  @override
+  String get settingsMcpStdioPathHint => '仅在调用工具时按需启动 Serlink。请保持应用路径不变。';
+
+  @override
+  String get settingsMcpStdioNotInstalled =>
+      'stdio 助手仅随 Serlink 发布版本提供，当前安装中不可用。';
+
+  @override
+  String get settingsMcpGrantsTitle => '活动授权';
+
+  @override
+  String get settingsMcpGrantsEmpty => '当前没有代理拥有访问权限。';
+
+  @override
+  String get settingsMcpGrantExpiry => '直到应用退出';
+
+  @override
+  String get settingsMcpRevokeAction => '撤销';
+
+  @override
+  String get settingsMcpSessionsTitle => '活动代理会话';
+
+  @override
+  String get settingsMcpSessionsEmpty => '没有活动的代理会话。';
+
+  @override
+  String settingsMcpSessionOpenedAt(String time) {
+    return '于 $time 打开';
+  }
+
+  @override
+  String agentPaneBadgeTooltip(String client) {
+    return '正由 $client 控制。';
+  }
+
+  @override
+  String get agentPaneBadgeCloseTooltip => '关闭代理会话';
+
+  @override
   String get settingsDataSection => '数据';
 
   @override
@@ -531,6 +649,61 @@ class AppLocalizationsZh extends AppLocalizations {
   String get syncWebDavCertificateTrustSaved => 'WebDAV 证书信任已保存。';
 
   @override
+  String get syncErrorVaultDataMissing => '同步所需的保险库数据在本机缺失。';
+
+  @override
+  String get syncErrorRemoteDataUnreadable => '无法读取云端同步数据。';
+
+  @override
+  String get syncErrorRemoteDataMissing => '云端同步数据缺失。';
+
+  @override
+  String get syncErrorRemoteWrongVault => '云端同步数据属于另一个保险库。';
+
+  @override
+  String get syncErrorRemoteDataInvalid => '云端同步数据无效或已损坏。';
+
+  @override
+  String get syncErrorRemoteDataMismatch => '云端同步数据与其内容不一致。';
+
+  @override
+  String get syncErrorRemoteVersionUnsupported =>
+      '云端同步数据由更新版本的 Serlink 写入。请更新 Serlink 后再同步，或在此设备上关闭同步。';
+
+  @override
+  String get syncErrorRemoteVaultDataMissing => '云端保险库数据缺失。';
+
+  @override
+  String get syncErrorRemoteVaultDataInvalid => '云端保险库数据无效或已损坏。';
+
+  @override
+  String get syncErrorRemoteResetMarkerInvalid => '云端保险库的重置标记无效。';
+
+  @override
+  String get syncErrorRemoteChanged => '同步过程中云端数据发生了变化。';
+
+  @override
+  String get syncErrorRemoteVaultReset => '云端保险库已被重置。';
+
+  @override
+  String get syncErrorNoConflictsSelected => '未选择要合并的同步冲突。';
+
+  @override
+  String get syncErrorConflictRecordMissing => '冲突记录在本机上已不存在。';
+
+  @override
+  String get syncErrorVaultLocked => '请先解锁保险库再同步。';
+
+  @override
+  String get syncErrorLocalUnhealthy => '本机保险库数据需要先恢复，然后才能同步。';
+
+  @override
+  String get syncErrorProviderMissing => '未启用任何同步方式。';
+
+  @override
+  String get syncErrorStagedProviderInvalid => '暂存的同步提供方无效。';
+
+  @override
   String get syncICloudEnabledSnack => 'iCloud 同步已启用。';
 
   @override
@@ -539,6 +712,19 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get syncICloudRemoteVaultAdoptedSnack =>
       'iCloud 中已有 Serlink 保险库。请使用那个保险库的密码短语继续同步。';
+
+  @override
+  String get syncICloudRemoteVaultAdoptedAfterInitializeSnack =>
+      '已改用 iCloud 中已有的保险库，本次设置的密码未生效。请使用 iCloud 保险库的密码解锁。';
+
+  @override
+  String get syncWebDavRemoteVaultAdoptedSnack => '已切换为远程保险库。请使用远程保险库的密码解锁。';
+
+  @override
+  String get syncICloudUnavailableError => 'iCloud 同步不可用。';
+
+  @override
+  String get syncICloudSetupFailedError => 'iCloud 同步设置失败。';
 
   @override
   String syncConflictsResolvedSnack(num count) {
@@ -691,6 +877,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get confirmAction => '确认';
 
   @override
+  String get denyAction => '拒绝';
+
+  @override
+  String get allowAction => '允许';
+
+  @override
   String get applyAction => '应用';
 
   @override
@@ -786,6 +978,41 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get securityAgentAccessTitle => '代理访问请求';
+
+  @override
+  String securityAgentAccessBody(String client, String host) {
+    return '$client 请求在 $host 上打开会话。';
+  }
+
+  @override
+  String securityAgentAccessHostIdLabel(String id) {
+    return '主机 ID：$id';
+  }
+
+  @override
+  String get securityAgentAccessWarning => '在应用退出或访问被撤销之前，代理可以在该主机上运行命令。';
+
+  @override
+  String get securityAgentCommandTitle => '代理命令确认';
+
+  @override
+  String securityAgentCommandBody(String client, String host) {
+    return '$client 请求在 $host 上运行命令。';
+  }
+
+  @override
+  String securityAgentCommandRuleLabel(String rule) {
+    return '标记原因：$rule';
+  }
+
+  @override
+  String get securityAgentAllowOnceAction => '仅允许一次';
+
+  @override
+  String get securityAgentAllowSessionAction => '会话期间允许';
+
+  @override
   String get hostEditTitle => '编辑主机';
 
   @override
@@ -822,7 +1049,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostDisplayNameHostnameHelper => '留空则使用主机名。';
 
   @override
-  String get hostHostnameLabel => '主机名';
+  String get hostHostnameLabel => '主机域名/IP';
 
   @override
   String get hostPortLabel => '端口';
@@ -1198,6 +1425,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get webDavRemovedSnack => 'WebDAV 同步设置已移除。';
 
   @override
+  String get webDavRemoteVaultMismatchTitle => '远程已有另一个 Serlink 保险库';
+
+  @override
+  String get webDavRemoteVaultMismatchBody =>
+      '该 WebDAV 位置已包含另一个 Serlink 保险库的同步数据。你可以用本机保险库替换远程数据，或用远程保险库恢复本机。';
+
+  @override
+  String get webDavReplaceRemoteAction => '保留本机数据并替换远程';
+
+  @override
+  String get webDavRestoreFromRemoteAction => '用远程保险库恢复本机';
+
+  @override
+  String get webDavReplaceRemoteConfirmTitle => '替换远程保险库？';
+
+  @override
+  String get webDavReplaceRemoteConfirmBody =>
+      '远程的 Serlink 同步数据将被本机保险库覆盖，此操作无法撤销。';
+
+  @override
+  String get webDavRestoreFromRemoteConfirmTitle => '用远程保险库恢复本机？';
+
+  @override
+  String get webDavRestoreFromRemoteConfirmBody =>
+      '本机当前的保险库数据将被远程保险库替换，本机会随即锁定。请使用远程保险库的密码解锁。操作前会先创建本地备份。';
+
+  @override
   String get credentialsDialogTitle => '凭据';
 
   @override
@@ -1231,6 +1485,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get credentialDeleteFailedSnack => '无法删除凭据。';
+
+  @override
+  String get credentialAddedSnack => '凭据已添加。';
+
+  @override
+  String get credentialGenerateKeyAction => '生成密钥对';
+
+  @override
+  String get credentialGeneratedPublicKeyLabel => '公钥';
+
+  @override
+  String get credentialGeneratedPublicKeyNote =>
+      '将此公钥添加到服务器的 authorized_keys。私钥已加密保存在保险库中。';
+
+  @override
+  String get credentialCopyPublicKeyTooltip => '复制公钥';
+
+  @override
+  String get credentialPublicKeyCopiedSnack => '已复制公钥。';
+
+  @override
+  String get credentialKeyGenerationFailed => '密钥生成失败。';
 
   @override
   String get knownHostsDialogTitle => '已知主机';
@@ -1692,6 +1968,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultCreateAction => '创建保险库';
 
   @override
+  String get vaultCreateICloudVaultExistsTitle => '检测到 iCloud 中已有保险库';
+
+  @override
+  String get vaultCreateICloudVaultExistsBody =>
+      '你可以恢复已有的保险库（用它的密码解锁），或创建全新保险库。创建新保险库将替换 iCloud 中保存的同步数据。';
+
+  @override
+  String get vaultCreateRestoreICloudVaultAction => '恢复 iCloud 保险库';
+
+  @override
+  String get vaultCreateNewAnywayAction => '仍要创建新保险库';
+
+  @override
+  String get vaultCreateReplaceICloudConfirmTitle => '替换 iCloud 同步数据？';
+
+  @override
+  String get vaultCreateReplaceICloudConfirmBody =>
+      '新保险库将替换 iCloud 中已有的 Serlink 同步数据，此操作无法撤销。';
+
+  @override
   String get vaultUnlockAction => '解锁';
 
   @override
@@ -1705,6 +2001,25 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get vaultInvalidPassphraseError => '密码无法解锁保险库。';
+
+  @override
+  String get vaultBackupMissingVaultError => '请先创建或解锁保险库，再导出备份。';
+
+  @override
+  String vaultOperationFailedError(String detail) {
+    return '保险库操作失败：$detail';
+  }
+
+  @override
+  String vaultRecoveryFailedError(String detail) {
+    return '保险库恢复失败：$detail';
+  }
+
+  @override
+  String get vaultDatabaseUnreadableError => '无法读取或恢复本机 Serlink 数据库。';
+
+  @override
+  String get appProfileLockedError => '此 Serlink 配置文件已在另一个窗口中打开。';
 
   @override
   String get vaultInvalidRecoveryKeyError => '恢复密钥无法解锁保险库。';
@@ -1749,33 +2064,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultRecoveryBody => '可使用保险库恢复工具。';
 
   @override
-  String get vaultRecoveryDatabaseTitle => '数据库恢复';
+  String get vaultRecoveryLocalDataTitle => '本地保险库数据损坏';
 
   @override
-  String get vaultRecoveryDatabaseBody => 'Serlink 无法安全打开本地数据库。';
+  String get vaultRecoveryLocalDataBody => '本机保存的保险库数据无法读取，但通常可以从自动备份或备份文件恢复。';
 
   @override
-  String get vaultRecoveryHeaderTitle => '保险库头恢复';
+  String get vaultRecoveryCloudSyncTitle => '云端同步数据需要修复';
 
   @override
-  String get vaultRecoveryHeaderBody => '本地保险库头无效或不完整。';
+  String get vaultRecoveryCloudSyncBody => '本机数据未受影响。请前往「设置 → 同步」修复云端同步数据。';
 
   @override
-  String get vaultRecoveryRecordsTitle => '记录恢复';
+  String get vaultRecoveryRecordsDamagedTitle => '部分保险库记录损坏';
 
   @override
-  String vaultRecoveryRecordsBody(num count) {
-    return '$count 条加密记录未通过认证。';
+  String vaultRecoveryRecordsDamagedBody(num count) {
+    return '$count 条加密记录无法读取。隔离这些记录后，可继续使用保险库中的其他数据。';
   }
 
   @override
-  String get vaultRecoveryRemoteTitle => '远程同步恢复';
+  String get vaultRecoveryImportBackupAction => '导入备份文件';
 
   @override
-  String get vaultRecoveryRemoteBody => '远程同步数据集需要修复后才能使用。';
+  String get vaultRecoveryViewDetailsAction => '查看详情';
 
   @override
-  String get vaultRestoreLatestBackupAction => '恢复最新备份';
+  String get vaultRecoveryHideDetailsAction => '收起详情';
+
+  @override
+  String get vaultRestoreLatestBackupAction => '从自动备份恢复';
 
   @override
   String get vaultQuarantineRecordsAction => '隔离损坏记录';
@@ -1841,6 +2159,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get credentialEditTitle => '编辑凭据';
+
+  @override
+  String get credentialAddTitle => '添加凭据';
+
+  @override
+  String get hostAddCredentialAction => '添加凭据';
 
   @override
   String get credentialLoadingSecretSemantics => '正在加载凭据机密';
@@ -2274,7 +2598,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get exportVaultBackupTitle => '导出加密备份？';
 
   @override
-  String get exportVaultBackupBody => '备份包含加密保险库记录和保险库头部。请妥善保管。';
+  String get exportVaultBackupBody => '备份包含加密的保险库数据。请妥善保管。';
 
   @override
   String get backupExportedSnack => '加密备份已导出。';
@@ -2340,7 +2664,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importEncryptedBackupTitle => '导入加密备份？';
 
   @override
-  String get importEncryptedBackupBody => '这会替换本地保险库头部，并合并所选备份中的加密记录。';
+  String get importEncryptedBackupBody => '这会替换本机的保险库数据，并合并所选备份中的加密记录。';
 
   @override
   String get backupImportedSnack => '加密备份已导入。';

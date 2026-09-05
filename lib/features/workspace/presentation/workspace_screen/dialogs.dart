@@ -482,14 +482,20 @@ String? _defaultImportUsername() {
 }
 
 const double _snackBarMaxWidth = 320;
+const double _snackBarMinWidth = 120;
 const double _snackBarMargin = 16;
 const double _snackBarCloseButtonSize = 22;
 const double _mobileBottomNavigationBaseHeight = 56;
+const Duration _snackBarFadeInDuration = Duration(milliseconds: 180);
+const Duration _snackBarFadeOutDuration = Duration(milliseconds: 140);
+const Duration _snackBarDisplayDuration = Duration(seconds: 4);
 
 /// Fraction of the bottom safe-area inset reserved behind the mobile bottom
 /// navigation bar. The bar already covers part of the gesture area visually,
 /// so only two thirds of the inset is added on top of the bar height.
 const double _mobileBottomNavigationSafeAreaFraction = 2 / 3;
+
+_OverlayToastHandle? _activeToast;
 
 void _showSnackBar(BuildContext context, String message) {
   final t = context.tokens;
@@ -497,48 +503,169 @@ void _showSnackBar(BuildContext context, String message) {
   final bottomMargin = _snackBarMargin + _snackBarBottomReservedHeight(context);
   final screenWidth = MediaQuery.sizeOf(context).width;
   final availableWidth = math.max(0.0, screenWidth - (_snackBarMargin * 2));
-  final snackBarWidth = math.min(_snackBarMaxWidth, availableWidth);
-  final leftMargin = math.max(
-    _snackBarMargin,
-    screenWidth - snackBarWidth - _snackBarMargin,
+  final messageStyle = TextStyle(color: t.textPrimary);
+  final messagePainter = TextPainter(
+    text: TextSpan(text: message, style: messageStyle),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+  )..layout();
+  // 14 + 8 horizontal padding, 10 gap before the close button.
+  final contentWidth =
+      messagePainter.width + 14 + 8 + 10 + _snackBarCloseButtonSize;
+  final snackBarWidth = contentWidth
+      .clamp(_snackBarMinWidth, math.min(_snackBarMaxWidth, availableWidth))
+      .toDouble();
+
+  late final OverlayEntry entry;
+  late final _OverlayToastHandle handle;
+  _activeToast?.dismissImmediately();
+  entry = OverlayEntry(
+    builder: (context) => Positioned(
+      right: _snackBarMargin,
+      bottom: bottomMargin,
+      width: snackBarWidth,
+      child: _OverlayToast(
+        message: message,
+        messageStyle: messageStyle,
+        closeTooltip: l10n.closeAction,
+        onDismissed: () {
+          handle.dismissImmediately();
+          if (identical(_activeToast, handle)) {
+            _activeToast = null;
+          }
+        },
+      ),
+    ),
   );
-  final messenger = ScaffoldMessenger.of(context);
-  messenger
-    ..clearSnackBars()
-    ..showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.fromLTRB(
-          leftMargin,
-          0,
-          _snackBarMargin,
-          bottomMargin,
-        ),
-        backgroundColor: t.surfaceRaised,
-        elevation: 8,
-        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: SerlinkRadii.dialog,
-          side: BorderSide(color: t.borderSubtle),
-        ),
-        content: Row(
-          children: [
-            Expanded(
-              child: Text(message, style: TextStyle(color: t.textPrimary)),
+  handle = _OverlayToastHandle(entry);
+  _activeToast = handle;
+  Overlay.of(context).insert(entry);
+}
+
+class _OverlayToastHandle {
+  _OverlayToastHandle(this.entry);
+
+  final OverlayEntry entry;
+  bool _removed = false;
+
+  void dismissImmediately() {
+    if (_removed) {
+      return;
+    }
+    _removed = true;
+    entry.remove();
+  }
+}
+
+class _OverlayToast extends StatefulWidget {
+  const _OverlayToast({
+    required this.message,
+    required this.messageStyle,
+    required this.closeTooltip,
+    required this.onDismissed,
+  });
+
+  final String message;
+  final TextStyle messageStyle;
+  final String closeTooltip;
+  final VoidCallback onDismissed;
+
+  @override
+  State<_OverlayToast> createState() => _OverlayToastState();
+}
+
+class _OverlayToastState extends State<_OverlayToast>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _snackBarFadeInDuration,
+    reverseDuration: _snackBarFadeOutDuration,
+  );
+  Timer? _autoDismissTimer;
+  bool _dismissing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_controller.forward());
+    _autoDismissTimer = Timer(_snackBarDisplayDuration, _dismiss);
+  }
+
+  @override
+  void dispose() {
+    _autoDismissTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _dismiss() {
+    if (_dismissing || !mounted) {
+      return;
+    }
+    _dismissing = true;
+    _autoDismissTimer?.cancel();
+    unawaited(
+      _controller.reverse().then((_) {
+        if (mounted) {
+          widget.onDismissed();
+        }
+      }),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    // The toast floats above dialogs in the root overlay, so the visual layer
+    // must not absorb pointer events meant for the content behind it; only the
+    // close button is hit-testable.
+    return FadeTransition(
+      opacity: CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOut,
+        reverseCurve: Curves.easeIn,
+      ),
+      child: Stack(
+        children: [
+          IgnorePointer(
+            child: Material(
+              key: const ValueKey('app-toast'),
+              elevation: 8,
+              color: t.surfaceRaised,
+              borderRadius: SerlinkRadii.dialog,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                decoration: BoxDecoration(
+                  borderRadius: SerlinkRadii.dialog,
+                  border: Border.all(color: t.borderSubtle),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(widget.message, style: widget.messageStyle),
+                    ),
+                    const SizedBox(width: 10),
+                    const SizedBox.square(dimension: _snackBarCloseButtonSize),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(width: 10),
-            _SnackBarCloseButton(
-              tooltip: l10n.closeAction,
-              onPressed: () {
-                messenger.hideCurrentSnackBar(
-                  reason: SnackBarClosedReason.hide,
-                );
-              },
+          ),
+          Positioned(
+            right: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: _SnackBarCloseButton(
+                tooltip: widget.closeTooltip,
+                onPressed: _dismiss,
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
 }
 
 double _snackBarBottomReservedHeight(BuildContext context) {

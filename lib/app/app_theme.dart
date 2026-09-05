@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 
@@ -10,37 +11,57 @@ const double _buttonHeight = 42;
 class SerlinkTheme {
   const SerlinkTheme._();
 
-  static ThemeData dark() => _build(SerlinkTokens.dark, Brightness.dark);
+  static final _dark = <TargetPlatform, ThemeData>{};
+  static final _light = <TargetPlatform, ThemeData>{};
 
-  static ThemeData light() => _build(SerlinkTokens.light, Brightness.light);
+  static ThemeData dark({TargetPlatform? platform}) {
+    final target = platform ?? defaultTargetPlatform;
+    return _dark.putIfAbsent(
+      target,
+      () => _build(SerlinkTokens.dark, Brightness.dark, target),
+    );
+  }
 
-  static FThemeData foruiDark() => _buildForui(
-    tokens: SerlinkTokens.dark,
-    baseColors: FThemes.neutral.dark.desktop.colors,
-    debugLabel: 'Serlink Dark Desktop',
-    touch: false,
-  );
+  static ThemeData light({TargetPlatform? platform}) {
+    final target = platform ?? defaultTargetPlatform;
+    return _light.putIfAbsent(
+      target,
+      () => _build(SerlinkTokens.light, Brightness.light, target),
+    );
+  }
 
-  static FThemeData foruiLight() => _buildForui(
-    tokens: SerlinkTokens.light,
-    baseColors: FThemes.neutral.light.desktop.colors,
-    debugLabel: 'Serlink Light Desktop',
-    touch: false,
-  );
+  static final _forui = <(Brightness, bool, TargetPlatform), FThemeData>{};
 
-  static FThemeData foruiDarkTouch() => _buildForui(
-    tokens: SerlinkTokens.dark,
-    baseColors: FThemes.neutral.dark.touch.colors,
-    debugLabel: 'Serlink Dark Touch',
-    touch: true,
-  );
+  static FThemeData foruiDark({TargetPlatform? platform}) =>
+      _foruiTheme(Brightness.dark, false, platform);
+  static FThemeData foruiLight({TargetPlatform? platform}) =>
+      _foruiTheme(Brightness.light, false, platform);
+  static FThemeData foruiDarkTouch({TargetPlatform? platform}) =>
+      _foruiTheme(Brightness.dark, true, platform);
+  static FThemeData foruiLightTouch({TargetPlatform? platform}) =>
+      _foruiTheme(Brightness.light, true, platform);
 
-  static FThemeData foruiLightTouch() => _buildForui(
-    tokens: SerlinkTokens.light,
-    baseColors: FThemes.neutral.light.touch.colors,
-    debugLabel: 'Serlink Light Touch',
-    touch: true,
-  );
+  static FThemeData _foruiTheme(
+    Brightness brightness,
+    bool touch,
+    TargetPlatform? platform,
+  ) {
+    final target = platform ?? defaultTargetPlatform;
+    return _forui.putIfAbsent((brightness, touch, target), () {
+      final base = brightness == Brightness.dark
+          ? FTheme.neutral.dark
+          : FTheme.neutral.light;
+      return _buildForui(
+        tokens: brightness == Brightness.dark
+            ? SerlinkTokens.dark
+            : SerlinkTokens.light,
+        baseColors: (touch ? base.touch : base.desktop).colors,
+        debugLabel: 'Serlink ${brightness.name} ${target.name}',
+        touch: touch,
+        platform: target,
+      );
+    });
+  }
 }
 
 FThemeData _buildForui({
@@ -48,6 +69,7 @@ FThemeData _buildForui({
   required FColors baseColors,
   required String debugLabel,
   required bool touch,
+  required TargetPlatform platform,
 }) {
   final colors = baseColors.copyWith(
     barrier: tokens.shadowColor.withValues(alpha: 0.52),
@@ -66,6 +88,8 @@ FThemeData _buildForui({
     card: tokens.surfaceRaised,
     border: tokens.borderSubtle,
   );
+  // Keep Forui's bundled Inter font deterministic across platforms. Native
+  // system fonts remain available to Material widgets through ThemeData.
   final typography = FTypography.inherit(colors: colors, touch: touch);
   final style =
       FStyle.inherit(
@@ -152,18 +176,27 @@ FDialogStyle _foruiDialogStyle(
   );
 }
 
-ThemeData _build(SerlinkTokens t, Brightness brightness) {
+ThemeData _build(
+  SerlinkTokens t,
+  Brightness brightness,
+  TargetPlatform platform,
+) {
   final scheme = serlinkColorScheme(t, brightness);
   final isDark = brightness == Brightness.dark;
+  final apple =
+      platform == TargetPlatform.macOS || platform == TargetPlatform.iOS;
+  final touch =
+      platform == TargetPlatform.iOS || platform == TargetPlatform.android;
 
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
+    platform: platform,
     colorScheme: scheme,
     scaffoldBackgroundColor: t.surfaceBase,
     canvasColor: t.surfaceBase,
-    visualDensity: VisualDensity.compact,
-    splashFactory: InkRipple.splashFactory,
+    visualDensity: touch ? VisualDensity.standard : VisualDensity.compact,
+    splashFactory: apple ? NoSplash.splashFactory : InkRipple.splashFactory,
     extensions: [t],
     dividerTheme: DividerThemeData(
       color: t.borderSubtle,
@@ -256,7 +289,9 @@ IconButtonThemeData _iconButtonTheme(SerlinkTokens t) {
         if (states.contains(WidgetState.selected)) {
           return t.accentPrimary;
         }
-        return t.textSecondary;
+        return states.contains(WidgetState.disabled)
+            ? t.textMuted.withValues(alpha: 0.5)
+            : t.textSecondary;
       }),
       backgroundColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.hovered) ||
@@ -285,9 +320,17 @@ FilledButtonThemeData _filledButtonTheme(SerlinkTokens t) {
         if (states.contains(WidgetState.disabled)) {
           return t.accentStrong.withValues(alpha: 0.4);
         }
-        if (states.contains(WidgetState.hovered) ||
-            states.contains(WidgetState.pressed)) {
-          return t.accentPrimary;
+        if (states.contains(WidgetState.pressed)) {
+          return Color.alphaBlend(
+            Colors.black.withValues(alpha: 0.12),
+            t.accentStrong,
+          );
+        }
+        if (states.contains(WidgetState.hovered)) {
+          return Color.alphaBlend(
+            Colors.white.withValues(alpha: 0.06),
+            t.accentStrong,
+          );
         }
         return t.accentStrong;
       }),
@@ -297,13 +340,10 @@ FilledButtonThemeData _filledButtonTheme(SerlinkTokens t) {
         if (states.contains(WidgetState.disabled)) {
           return 0;
         }
-        if (states.contains(WidgetState.hovered)) {
-          return 6;
-        }
-        return 2;
+        return 1;
       }),
       shadowColor: WidgetStatePropertyAll(
-        t.accentStrong.withValues(alpha: 0.6),
+        t.shadowColor.withValues(alpha: 0.18),
       ),
       minimumSize: const WidgetStatePropertyAll(Size(0, _buttonHeight)),
       padding: const WidgetStatePropertyAll(

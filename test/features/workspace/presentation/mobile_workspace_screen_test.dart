@@ -121,7 +121,7 @@ void main() {
     await tester.tap(
       find.byKey(const ValueKey('settings-background-privacy-switch')),
     );
-    await _pumpUntilFound(tester, find.byType(SnackBar));
+    await _pumpUntilFound(tester, find.byKey(const ValueKey('app-toast')));
     await tester.pump(const Duration(milliseconds: 300));
 
     final snackBarTextRect = tester.getRect(

@@ -354,6 +354,125 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsManageAction => '管理';
 
   @override
+  String get settingsMcpSection => 'MCP / エージェントアクセス';
+
+  @override
+  String get settingsMcpServerTitle => 'エージェントサーバー';
+
+  @override
+  String get settingsMcpServerSemantics => 'エージェントサーバーを有効にする';
+
+  @override
+  String settingsMcpServerRunning(String url) {
+    return '$url で実行中';
+  }
+
+  @override
+  String get settingsMcpServerStopped => '停止しています。';
+
+  @override
+  String settingsMcpServerError(String error) {
+    return 'エラー: $error';
+  }
+
+  @override
+  String get settingsMcpTokenTitle => 'アクセストークン';
+
+  @override
+  String get settingsMcpConfigTitle => 'クライアント設定';
+
+  @override
+  String get settingsMcpHttpConfigNeedsServer =>
+      'エージェントサーバーを起動すると HTTP 設定を利用できます。';
+
+  @override
+  String get settingsMcpInstallTitle => 'エージェントへインストール';
+
+  @override
+  String get settingsMcpInstallAction => 'インストール';
+
+  @override
+  String get settingsMcpUpdateAction => '更新';
+
+  @override
+  String get settingsMcpInstalledLabel => 'インストール済み';
+
+  @override
+  String get settingsMcpInstallNoneDetected => '対応するエージェントがこの Mac で見つかりません。';
+
+  @override
+  String settingsMcpInstallSuccess(String agent) {
+    return '$agent に Serlink MCP 設定を書き込みました。';
+  }
+
+  @override
+  String settingsMcpInstallFailed(String error) {
+    return '設定の書き込みに失敗しました: $error';
+  }
+
+  @override
+  String get settingsMcpTokenNotAvailable => 'サーバーを起動するとトークンが生成されます。';
+
+  @override
+  String get settingsMcpTokenRevealTooltip => 'トークンを表示';
+
+  @override
+  String get settingsMcpTokenHideTooltip => 'トークンを隠す';
+
+  @override
+  String get settingsMcpTokenCopyTooltip => 'トークンをコピー';
+
+  @override
+  String get settingsMcpTokenCopied => 'トークンをクリップボードにコピーしました。';
+
+  @override
+  String get settingsMcpCopyHttpConfigAction => 'HTTP MCP 設定をコピー (JSON)';
+
+  @override
+  String get settingsMcpCopyStdioConfigAction => 'stdio ヘルパー設定をコピー (JSON)';
+
+  @override
+  String get settingsMcpConfigCopied => 'MCP クライアント設定をクリップボードにコピーしました。';
+
+  @override
+  String get settingsMcpStdioPathHint => 'このパスはアプリが同じ場所にある間有効です。';
+
+  @override
+  String get settingsMcpStdioNotInstalled =>
+      'stdio ヘルパーは Serlink のリリースビルドに同梱されており、このインストールでは利用できません。';
+
+  @override
+  String get settingsMcpGrantsTitle => '有効な許可';
+
+  @override
+  String get settingsMcpGrantsEmpty => '現在アクセス権を持つエージェントはありません。';
+
+  @override
+  String get settingsMcpGrantExpiry => 'アプリ終了まで';
+
+  @override
+  String get settingsMcpRevokeAction => '取り消す';
+
+  @override
+  String get settingsMcpSessionsTitle => 'アクティブなエージェントセッション';
+
+  @override
+  String get settingsMcpSessionsEmpty => 'アクティブなエージェントセッションはありません。';
+
+  @override
+  String settingsMcpSessionOpenedAt(String time) {
+    return '$time に開始';
+  }
+
+  @override
+  String agentPaneBadgeTooltip(String client) {
+    return '$client が操作しています。';
+  }
+
+  @override
+  String get agentPaneBadgeCloseTooltip => 'エージェントセッションを閉じる';
+
+  @override
   String get settingsDataSection => 'データ';
 
   @override
@@ -538,6 +657,61 @@ class AppLocalizationsJa extends AppLocalizations {
   String get syncWebDavCertificateTrustSaved => 'WebDAV 証明書の信頼を保存しました。';
 
   @override
+  String get syncErrorVaultDataMissing => '同期に必要なボールトデータがこのデバイスにありません。';
+
+  @override
+  String get syncErrorRemoteDataUnreadable => 'リモート同期データを読み取れませんでした。';
+
+  @override
+  String get syncErrorRemoteDataMissing => 'リモート同期データが見つかりません。';
+
+  @override
+  String get syncErrorRemoteWrongVault => 'リモート同期データは別のボールトに属しています。';
+
+  @override
+  String get syncErrorRemoteDataInvalid => 'リモート同期データが無効または破損しています。';
+
+  @override
+  String get syncErrorRemoteDataMismatch => 'リモート同期データがその内容と一致しません。';
+
+  @override
+  String get syncErrorRemoteVersionUnsupported =>
+      'リモート同期データは新しいバージョンの Serlink で書き込まれました。同期する前に Serlink を更新するか、このデバイスで同期をオフにしてください。';
+
+  @override
+  String get syncErrorRemoteVaultDataMissing => 'リモートのボールトデータが見つかりません。';
+
+  @override
+  String get syncErrorRemoteVaultDataInvalid => 'リモートのボールトデータが無効または破損しています。';
+
+  @override
+  String get syncErrorRemoteResetMarkerInvalid => 'リモートのボールトリセットマーカーが無効です。';
+
+  @override
+  String get syncErrorRemoteChanged => '同期中にリモートデータが変更されました。';
+
+  @override
+  String get syncErrorRemoteVaultReset => 'リモートのボールトがリセットされました。';
+
+  @override
+  String get syncErrorNoConflictsSelected => 'マージする同期競合が選択されていません。';
+
+  @override
+  String get syncErrorConflictRecordMissing => '競合するレコードはこのデバイスにもう存在しません。';
+
+  @override
+  String get syncErrorVaultLocked => '同期する前にボールトを解除してください。';
+
+  @override
+  String get syncErrorLocalUnhealthy => '同期する前にローカルのボールトデータの復旧が必要です。';
+
+  @override
+  String get syncErrorProviderMissing => '有効な同期プロバイダーがありません。';
+
+  @override
+  String get syncErrorStagedProviderInvalid => 'ステージされた同期プロバイダーが無効です。';
+
+  @override
   String get syncICloudEnabledSnack => 'iCloud 同期を有効にしました。';
 
   @override
@@ -546,6 +720,20 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get syncICloudRemoteVaultAdoptedSnack =>
       'iCloud に既存の Serlink ボールトがあります。そのボールトのパスフレーズで同期を続行してください。';
+
+  @override
+  String get syncICloudRemoteVaultAdoptedAfterInitializeSnack =>
+      'iCloud の既存ボールトに切り替えたため、入力したパスフレーズは適用されませんでした。iCloud ボールトのパスフレーズで解除してください。';
+
+  @override
+  String get syncWebDavRemoteVaultAdoptedSnack =>
+      'リモートのボールトに切り替えました。リモートボールトのパスフレーズで解除してください。';
+
+  @override
+  String get syncICloudUnavailableError => 'iCloud 同期は利用できません。';
+
+  @override
+  String get syncICloudSetupFailedError => 'iCloud 同期を設定できませんでした。';
 
   @override
   String syncConflictsResolvedSnack(num count) {
@@ -700,6 +888,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get confirmAction => '確認';
 
   @override
+  String get denyAction => '拒否';
+
+  @override
+  String get allowAction => '許可';
+
+  @override
   String get applyAction => '適用';
 
   @override
@@ -794,6 +988,42 @@ class AppLocalizationsJa extends AppLocalizations {
   String securityPasteMultipleLinesBody(num count) {
     return '$count 行がアクティブな端末に送信されます。';
   }
+
+  @override
+  String get securityAgentAccessTitle => 'エージェントのアクセス要求';
+
+  @override
+  String securityAgentAccessBody(String client, String host) {
+    return '$client が $host でセッションを開こうとしています。';
+  }
+
+  @override
+  String securityAgentAccessHostIdLabel(String id) {
+    return 'ホスト ID: $id';
+  }
+
+  @override
+  String get securityAgentAccessWarning =>
+      'アプリを終了するかアクセスを取り消すまで、エージェントはこのホストでコマンドを実行できます。';
+
+  @override
+  String get securityAgentCommandTitle => 'エージェントのコマンド確認';
+
+  @override
+  String securityAgentCommandBody(String client, String host) {
+    return '$client が $host でコマンドを実行しようとしています。';
+  }
+
+  @override
+  String securityAgentCommandRuleLabel(String rule) {
+    return 'フラグ: $rule';
+  }
+
+  @override
+  String get securityAgentAllowOnceAction => '今回のみ許可';
+
+  @override
+  String get securityAgentAllowSessionAction => 'セッション中許可';
 
   @override
   String get hostEditTitle => 'ホストを編集';
@@ -1210,6 +1440,33 @@ class AppLocalizationsJa extends AppLocalizations {
   String get webDavRemovedSnack => 'WebDAV 同期設定を削除しました。';
 
   @override
+  String get webDavRemoteVaultMismatchTitle => 'リモートに別の Serlink ボールトがあります';
+
+  @override
+  String get webDavRemoteVaultMismatchBody =>
+      'この WebDAV には別の Serlink ボールトの同期データが保存されています。このデバイスのボールトでリモートデータを置き換えるか、リモートのボールトでこのデバイスを復元できます。';
+
+  @override
+  String get webDavReplaceRemoteAction => 'ローカルを保持してリモートを置換';
+
+  @override
+  String get webDavRestoreFromRemoteAction => 'リモートのボールトでこのデバイスを復元';
+
+  @override
+  String get webDavReplaceRemoteConfirmTitle => 'リモートのボールトを置き換えますか？';
+
+  @override
+  String get webDavReplaceRemoteConfirmBody =>
+      'リモートの Serlink 同期データがこのデバイスのボールトで上書きされます。この操作は取り消せません。';
+
+  @override
+  String get webDavRestoreFromRemoteConfirmTitle => 'リモートのボールトでこのデバイスを復元しますか？';
+
+  @override
+  String get webDavRestoreFromRemoteConfirmBody =>
+      'このデバイスの現在のボールトデータはリモートのボールトに置き換えられ、デバイスはロックされます。リモートボールトのパスフレーズで解除してください。先にローカルバックアップを作成します。';
+
+  @override
   String get credentialsDialogTitle => '認証情報';
 
   @override
@@ -1243,6 +1500,28 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get credentialDeleteFailedSnack => '認証情報を削除できませんでした。';
+
+  @override
+  String get credentialAddedSnack => '認証情報を追加しました。';
+
+  @override
+  String get credentialGenerateKeyAction => '鍵ペアを生成';
+
+  @override
+  String get credentialGeneratedPublicKeyLabel => '公開鍵';
+
+  @override
+  String get credentialGeneratedPublicKeyNote =>
+      'この公開鍵をサーバーの authorized_keys に追加してください。秘密鍵はボールトに暗号化して保存されます。';
+
+  @override
+  String get credentialCopyPublicKeyTooltip => '公開鍵をコピー';
+
+  @override
+  String get credentialPublicKeyCopiedSnack => '公開鍵をコピーしました。';
+
+  @override
+  String get credentialKeyGenerationFailed => '鍵の生成に失敗しました。';
 
   @override
   String get knownHostsDialogTitle => '既知のホスト';
@@ -1711,6 +1990,26 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultCreateAction => 'ボールトを作成';
 
   @override
+  String get vaultCreateICloudVaultExistsTitle => 'iCloud に既存のボールトがあります';
+
+  @override
+  String get vaultCreateICloudVaultExistsBody =>
+      '既存のボールトをそのパスフレーズで解除して復元するか、新しいボールトを作成できます。新しく作成すると iCloud に保存されている同期データが置き換えられます。';
+
+  @override
+  String get vaultCreateRestoreICloudVaultAction => 'iCloud ボールトを復元';
+
+  @override
+  String get vaultCreateNewAnywayAction => 'それでも新しいボールトを作成';
+
+  @override
+  String get vaultCreateReplaceICloudConfirmTitle => 'iCloud の同期データを置き換えますか？';
+
+  @override
+  String get vaultCreateReplaceICloudConfirmBody =>
+      '新しいボールトは iCloud に保存されている既存の Serlink 同期データを置き換えます。この操作は取り消せません。';
+
+  @override
   String get vaultUnlockAction => '解除';
 
   @override
@@ -1724,6 +2023,27 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get vaultInvalidPassphraseError => 'パスフレーズではボールトを解除できませんでした。';
+
+  @override
+  String get vaultBackupMissingVaultError =>
+      'バックアップをエクスポートする前にボールトを作成または解除してください。';
+
+  @override
+  String vaultOperationFailedError(String detail) {
+    return 'ボールト操作に失敗しました: $detail';
+  }
+
+  @override
+  String vaultRecoveryFailedError(String detail) {
+    return 'ボールトの復旧に失敗しました: $detail';
+  }
+
+  @override
+  String get vaultDatabaseUnreadableError =>
+      'ローカルの Serlink データベースを読み取れないか、復元できません。';
+
+  @override
+  String get appProfileLockedError => 'この Serlink プロファイルは別のウィンドウで開かれています。';
 
   @override
   String get vaultInvalidRecoveryKeyError => '復旧キーではボールトを解除できませんでした。';
@@ -1771,33 +2091,38 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultRecoveryBody => 'ボールト復旧ツールを使用できます。';
 
   @override
-  String get vaultRecoveryDatabaseTitle => 'データベース復旧';
+  String get vaultRecoveryLocalDataTitle => 'ローカルのボールトデータが破損しています';
 
   @override
-  String get vaultRecoveryDatabaseBody => 'Serlink はこのローカルデータベースを安全に開けませんでした。';
+  String get vaultRecoveryLocalDataBody =>
+      'このデバイスに保存されたボールトデータを読み取れません。通常は自動バックアップまたはバックアップファイルから復旧できます。';
 
   @override
-  String get vaultRecoveryHeaderTitle => 'ボールトヘッダー復旧';
+  String get vaultRecoveryCloudSyncTitle => 'クラウド同期データの修復が必要です';
 
   @override
-  String get vaultRecoveryHeaderBody => 'ローカルボールトヘッダーが無効または不完全です。';
+  String get vaultRecoveryCloudSyncBody =>
+      'このデバイスのボールトデータに影響はありません。「設定 → 同期」でクラウド同期データを修復してください。';
 
   @override
-  String get vaultRecoveryRecordsTitle => 'レコード復旧';
+  String get vaultRecoveryRecordsDamagedTitle => '一部のボールトレコードが破損しています';
 
   @override
-  String vaultRecoveryRecordsBody(num count) {
-    return '$count 件の暗号化レコードが認証に失敗しました。';
+  String vaultRecoveryRecordsDamagedBody(num count) {
+    return '$count 件の暗号化レコードを読み取れませんでした。隔離すると、ボールトの残りのデータを引き続き使用できます。';
   }
 
   @override
-  String get vaultRecoveryRemoteTitle => 'リモート同期復旧';
+  String get vaultRecoveryImportBackupAction => 'バックアップファイルをインポート';
 
   @override
-  String get vaultRecoveryRemoteBody => 'リモート同期データは使用前に修復が必要です。';
+  String get vaultRecoveryViewDetailsAction => '詳細を表示';
 
   @override
-  String get vaultRestoreLatestBackupAction => '最新バックアップを復元';
+  String get vaultRecoveryHideDetailsAction => '詳細を隠す';
+
+  @override
+  String get vaultRestoreLatestBackupAction => '自動バックアップから復元';
 
   @override
   String get vaultQuarantineRecordsAction => '破損レコードを隔離';
@@ -1866,6 +2191,12 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get credentialEditTitle => '認証情報を編集';
+
+  @override
+  String get credentialAddTitle => '認証情報を追加';
+
+  @override
+  String get hostAddCredentialAction => '認証情報を追加';
 
   @override
   String get credentialLoadingSecretSemantics => '認証情報のシークレットを読み込み中';
@@ -2306,7 +2637,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get exportVaultBackupBody =>
-      'バックアップには暗号化されたボールト記録とボールトヘッダーが含まれます。安全に保管してください。';
+      'バックアップには暗号化されたボールトデータが含まれます。安全に保管してください。';
 
   @override
   String get backupExportedSnack => '暗号化バックアップをエクスポートしました。';
@@ -2373,7 +2704,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get importEncryptedBackupBody =>
-      'ローカルのボールトヘッダーを置き換え、選択したバックアップの暗号化記録をマージします。';
+      'このデバイスのボールトデータを置き換え、選択したバックアップの暗号化レコードをマージします。';
 
   @override
   String get backupImportedSnack => '暗号化バックアップをインポートしました。';

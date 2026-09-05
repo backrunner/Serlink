@@ -76,9 +76,7 @@ WHERE provider_kind = ? AND vault_id = ?
       return null;
     }
     final row = snapshotRows.single;
-    final manifestBytes = List<int>.unmodifiable(
-      row.read<Uint8List>('manifest'),
-    );
+    final manifestBytes = row.read<Uint8List>('manifest').asUnmodifiableView();
     final manifest = RemoteManifest.fromBytes(manifestBytes);
     final objectRows = await _database
         .customSelect(
@@ -100,9 +98,9 @@ ORDER BY path ASC
       manifestFingerprint: row.read<String>('manifest_fingerprint'),
       objects: {
         for (final objectRow in objectRows)
-          objectRow.read<String>('path'): List<int>.unmodifiable(
-            objectRow.read<Uint8List>('bytes'),
-          ),
+          objectRow.read<String>('path'): objectRow
+              .read<Uint8List>('bytes')
+              .asUnmodifiableView(),
       },
       completedAt: DateTime.parse(row.read<String>('completed_at')).toUtc(),
     );

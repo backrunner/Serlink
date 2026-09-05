@@ -39,10 +39,15 @@ profiles, and local entitlements stay aligned.
 8. Select or create the container `iCloud.com.alkinum.serlink`.
 9. Make sure this capability is applied to Debug, Profile, and Release.
 
-For development builds, CloudKit should use the Development environment. Before
-shipping or testing release distribution, deploy the schema in CloudKit Console
-and test against Production. Use `docs/cloudkit_production_release.md` for the
-release gate and smoke plan.
+For local `flutter run` debug/profile builds, CloudKit uses the Development
+environment (see `macos/Runner/DebugProfile.entitlements` and the iOS
+counterpart). The packaged dev DMG (`tool/build_macos_dev_dmg.sh`,
+`macos/Runner/Direct.entitlements`) instead pins
+`com.apple.developer.icloud-container-environment` to `Production` so it
+shares the same vault data as App Store / Developer ID builds. Before shipping
+or changing the schema, deploy the schema in CloudKit Console and test against
+Production. Use `docs/cloudkit_production_release.md` for the release gate and
+smoke plan.
 
 ## Local debug flow
 

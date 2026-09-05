@@ -126,6 +126,86 @@
   "settingsKnownHostsLocked": "Unlock the vault to review trusted host fingerprints.",
   "settingsKnownHostsLockedMobile": "Unlock vault first",
   "settingsManageAction": "Manage",
+  "settingsMcpSection": "MCP / Agent access",
+  "settingsMcpServerTitle": "Agent server",
+  "settingsMcpServerSemantics": "Enable the agent server",
+  "settingsMcpServerRunning": "Running at {url}",
+  "@settingsMcpServerRunning": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMcpServerStopped": "Stopped.",
+  "settingsMcpServerError": "Error: {error}",
+  "@settingsMcpServerError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMcpTokenTitle": "Access token",
+  "settingsMcpConfigTitle": "Client config",
+  "settingsMcpHttpConfigNeedsServer": "Start the agent server to use the HTTP config.",
+  "settingsMcpInstallTitle": "Install into agents",
+  "settingsMcpInstallAction": "Install",
+  "settingsMcpUpdateAction": "Update",
+  "settingsMcpInstalledLabel": "Installed",
+  "settingsMcpInstallNoneDetected": "No supported agents detected on this Mac.",
+  "settingsMcpInstallSuccess": "Serlink MCP config written to {agent}.",
+  "@settingsMcpInstallSuccess": {
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMcpInstallFailed": "Failed to write the config: {error}",
+  "@settingsMcpInstallFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMcpTokenNotAvailable": "Start the server to generate a token.",
+  "settingsMcpTokenRevealTooltip": "Show token",
+  "settingsMcpTokenHideTooltip": "Hide token",
+  "settingsMcpTokenCopyTooltip": "Copy token",
+  "settingsMcpTokenCopied": "Token copied to clipboard.",
+  "settingsMcpCopyHttpConfigAction": "Copy HTTP MCP config (JSON)",
+  "settingsMcpCopyStdioConfigAction": "Copy stdio helper config (JSON)",
+  "settingsMcpConfigCopied": "MCP client config copied to clipboard.",
+  "settingsMcpStdioPathHint": "Serlink opens on demand when a tool is called. Keep the app at this path.",
+  "settingsMcpStdioNotInstalled": "The stdio helper ships with Serlink release builds and is not available in this installation.",
+  "@settingsMcpStdioNotInstalled": {
+    "description": "Hint on the stdio config row when the serlink-mcp helper binary is missing (e.g. debug runs)."
+  },
+  "settingsMcpGrantsTitle": "Active grants",
+  "settingsMcpGrantsEmpty": "No agents currently have access.",
+  "settingsMcpGrantExpiry": "until app quits",
+  "settingsMcpRevokeAction": "Revoke",
+  "settingsMcpSessionsTitle": "Active agent sessions",
+  "settingsMcpSessionsEmpty": "No active agent sessions.",
+  "settingsMcpSessionOpenedAt": "opened {time}",
+  "@settingsMcpSessionOpenedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "agentPaneBadgeTooltip": "Controlled by {client}.",
+  "@agentPaneBadgeTooltip": {
+    "placeholders": {
+      "client": {
+        "type": "String"
+      }
+    }
+  },
+  "agentPaneBadgeCloseTooltip": "Close agent session",
   "settingsDataSection": "Data",
   "settingsImportExportTitle": "Import / Export",
   "settingsImportExportSubtitle": "Backups, OpenSSH files, certificates, known_hosts, and metadata.",
@@ -199,9 +279,97 @@
   "syncRepairRestoreLocalBody": "Local vault data needs recovery before remote sync can be rebuilt. Serlink can restore local encrypted records from the current remote sync set.",
   "syncRemoteRepaired": "Remote sync repaired.",
   "syncWebDavCertificateTrustSaved": "WebDAV certificate trust saved.",
+  "syncErrorVaultDataMissing": "The vault data needed for sync is missing on this device.",
+  "@syncErrorVaultDataMissing": {
+    "description": "Shown when a sync operation cannot find the local vault data."
+  },
+  "syncErrorRemoteDataUnreadable": "Remote sync data could not be read.",
+  "@syncErrorRemoteDataUnreadable": {
+    "description": "Shown when the remote sync manifest cannot be read."
+  },
+  "syncErrorRemoteDataMissing": "Remote sync data is missing.",
+  "@syncErrorRemoteDataMissing": {
+    "description": "Shown when the remote sync manifest is missing."
+  },
+  "syncErrorRemoteWrongVault": "Remote sync data belongs to another vault.",
+  "@syncErrorRemoteWrongVault": {
+    "description": "Shown when the remote sync data belongs to a different vault."
+  },
+  "syncErrorRemoteDataInvalid": "Remote sync data is invalid or corrupted.",
+  "@syncErrorRemoteDataInvalid": {
+    "description": "Shown when remote sync data fails validation."
+  },
+  "syncErrorRemoteDataMismatch": "Remote sync data does not match its contents.",
+  "@syncErrorRemoteDataMismatch": {
+    "description": "Shown when the remote sync manifest does not match its record objects."
+  },
+  "syncErrorRemoteVersionUnsupported": "Remote sync data was written by a newer Serlink version. Update Serlink before syncing, or turn sync off on this device.",
+  "@syncErrorRemoteVersionUnsupported": {
+    "description": "Shown when remote sync data requires a newer app version."
+  },
+  "syncErrorRemoteVaultDataMissing": "Remote vault data is missing.",
+  "@syncErrorRemoteVaultDataMissing": {
+    "description": "Shown when the remote vault metadata is missing."
+  },
+  "syncErrorRemoteVaultDataInvalid": "Remote vault data is invalid or corrupted.",
+  "@syncErrorRemoteVaultDataInvalid": {
+    "description": "Shown when the remote vault metadata fails validation."
+  },
+  "syncErrorRemoteResetMarkerInvalid": "The remote vault reset marker is invalid.",
+  "@syncErrorRemoteResetMarkerInvalid": {
+    "description": "Shown when the remote vault reset marker cannot be parsed."
+  },
+  "syncErrorRemoteChanged": "Remote sync data changed while syncing.",
+  "@syncErrorRemoteChanged": {
+    "description": "Shown when a sync run loses a compare-and-swap race."
+  },
+  "syncErrorRemoteVaultReset": "The remote vault was reset.",
+  "@syncErrorRemoteVaultReset": {
+    "description": "Shown when the remote vault was reset on another device."
+  },
+  "syncErrorNoConflictsSelected": "No sync conflicts were selected for merge.",
+  "@syncErrorNoConflictsSelected": {
+    "description": "Shown when a conflict merge is submitted without a selection."
+  },
+  "syncErrorConflictRecordMissing": "The conflicting record no longer exists on this device.",
+  "@syncErrorConflictRecordMissing": {
+    "description": "Shown when a conflicting record was removed before merging."
+  },
+  "syncErrorVaultLocked": "Unlock the vault before syncing.",
+  "@syncErrorVaultLocked": {
+    "description": "Shown when a sync operation requires an unlocked vault."
+  },
+  "syncErrorLocalUnhealthy": "Local vault data needs recovery before it can sync.",
+  "@syncErrorLocalUnhealthy": {
+    "description": "Shown when damaged local vault data blocks a sync operation."
+  },
+  "syncErrorProviderMissing": "No sync provider is enabled.",
+  "@syncErrorProviderMissing": {
+    "description": "Shown when a sync operation runs without an enabled provider."
+  },
+  "syncErrorStagedProviderInvalid": "The staged sync provider is invalid.",
+  "@syncErrorStagedProviderInvalid": {
+    "description": "Shown when a staged sync snapshot references an invalid provider."
+  },
   "syncICloudEnabledSnack": "iCloud sync enabled.",
   "syncICloudPausedSnack": "iCloud sync paused.",
   "syncICloudRemoteVaultAdoptedSnack": "iCloud already has a Serlink vault. Use that vault passphrase to finish syncing.",
+  "syncICloudRemoteVaultAdoptedAfterInitializeSnack": "Serlink switched to the existing iCloud vault, so the passphrase you just entered was not applied. Unlock with the iCloud vault passphrase.",
+  "@syncICloudRemoteVaultAdoptedAfterInitializeSnack": {
+    "description": "Snack shown after creating a local vault when setup adopted the existing iCloud vault instead."
+  },
+  "syncWebDavRemoteVaultAdoptedSnack": "Serlink switched to the remote vault. Unlock with the remote vault passphrase.",
+  "@syncWebDavRemoteVaultAdoptedSnack": {
+    "description": "Snack shown after WebDAV setup adopted the existing remote vault and locked this device into it."
+  },
+  "syncICloudUnavailableError": "iCloud sync is not available.",
+  "@syncICloudUnavailableError": {
+    "description": "Shown when iCloud is unavailable while setting up sync."
+  },
+  "syncICloudSetupFailedError": "iCloud sync could not be set up.",
+  "@syncICloudSetupFailedError": {
+    "description": "Shown when the initial iCloud sync setup fails for an unknown reason."
+  },
   "syncConflictsResolvedSnack": "{count, plural, =1{Resolved sync conflicts. Synced 1 encrypted record.} other{Resolved sync conflicts. Synced {count} encrypted records.}}",
   "@syncConflictsResolvedSnack": {
     "placeholders": {
@@ -307,6 +475,8 @@
   "skipAction": "Skip",
   "pasteAction": "Paste",
   "confirmAction": "Confirm",
+  "denyAction": "Deny",
+  "allowAction": "Allow",
   "applyAction": "Apply",
   "createAction": "Create",
   "runAction": "Run",
@@ -386,6 +556,49 @@
       }
     }
   },
+  "securityAgentAccessTitle": "Agent access request",
+  "securityAgentAccessBody": "{client} wants to open a session on {host}.",
+  "@securityAgentAccessBody": {
+    "placeholders": {
+      "client": {
+        "type": "String"
+      },
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "securityAgentAccessHostIdLabel": "Host ID: {id}",
+  "@securityAgentAccessHostIdLabel": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "securityAgentAccessWarning": "The agent can run commands on this host until the app quits or access is revoked.",
+  "securityAgentCommandTitle": "Agent command confirmation",
+  "securityAgentCommandBody": "{client} wants to run a command on {host}.",
+  "@securityAgentCommandBody": {
+    "placeholders": {
+      "client": {
+        "type": "String"
+      },
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "securityAgentCommandRuleLabel": "Flagged: {rule}",
+  "@securityAgentCommandRuleLabel": {
+    "placeholders": {
+      "rule": {
+        "type": "String"
+      }
+    }
+  },
+  "securityAgentAllowOnceAction": "Allow Once",
+  "securityAgentAllowSessionAction": "Allow for Session",
   "hostEditTitle": "Edit Host",
   "hostAddTitle": "Add Host",
   "hostSectionConnection": "Connection",
@@ -579,6 +792,38 @@
   "webDavRemoveTitle": "Remove WebDAV sync?",
   "webDavRemoveBody": "This removes the local WebDAV configuration and stored password.",
   "webDavRemovedSnack": "WebDAV sync settings removed.",
+  "webDavRemoteVaultMismatchTitle": "Remote already has another Serlink vault",
+  "@webDavRemoteVaultMismatchTitle": {
+    "description": "Title of the dialog shown when enabling WebDAV sync against a location that already holds a different Serlink vault."
+  },
+  "webDavRemoteVaultMismatchBody": "This WebDAV location already contains sync data for a different Serlink vault. You can replace the remote data with this device''s vault, or restore this device from the remote vault.",
+  "@webDavRemoteVaultMismatchBody": {
+    "description": "Body of the dialog shown when enabling WebDAV sync against a location that already holds a different Serlink vault."
+  },
+  "webDavReplaceRemoteAction": "Keep Local Data and Replace Remote",
+  "@webDavReplaceRemoteAction": {
+    "description": "Button that keeps this device's vault and overwrites the remote WebDAV sync data."
+  },
+  "webDavRestoreFromRemoteAction": "Restore This Device from Remote",
+  "@webDavRestoreFromRemoteAction": {
+    "description": "Button that adopts the remote WebDAV vault and replaces this device's local vault data."
+  },
+  "webDavReplaceRemoteConfirmTitle": "Replace the remote vault?",
+  "@webDavReplaceRemoteConfirmTitle": {
+    "description": "Title of the confirmation shown before overwriting remote WebDAV sync data with the local vault."
+  },
+  "webDavReplaceRemoteConfirmBody": "The remote Serlink sync data will be overwritten with this device''s vault. This cannot be undone.",
+  "@webDavReplaceRemoteConfirmBody": {
+    "description": "Body of the confirmation shown before overwriting remote WebDAV sync data with the local vault."
+  },
+  "webDavRestoreFromRemoteConfirmTitle": "Restore this device from the remote vault?",
+  "@webDavRestoreFromRemoteConfirmTitle": {
+    "description": "Title of the confirmation shown before replacing local vault data with the remote WebDAV vault."
+  },
+  "webDavRestoreFromRemoteConfirmBody": "The current vault data on this device will be replaced by the remote vault, and this device will lock. Unlock with the remote vault passphrase. A local backup is created first.",
+  "@webDavRestoreFromRemoteConfirmBody": {
+    "description": "Body of the confirmation shown before replacing local vault data with the remote WebDAV vault."
+  },
   "credentialsDialogTitle": "Credentials",
   "credentialsEmptyTitle": "No credentials stored",
   "credentialsEmptyBody": "Imported passwords, private keys, certificates, and identity metadata will appear here.",
@@ -597,6 +842,13 @@
   },
   "credentialDeletedSnack": "Credential deleted.",
   "credentialDeleteFailedSnack": "Credential could not be deleted.",
+  "credentialAddedSnack": "Credential added.",
+  "credentialGenerateKeyAction": "Generate key pair",
+  "credentialGeneratedPublicKeyLabel": "Public key",
+  "credentialGeneratedPublicKeyNote": "Add this public key to the server''s authorized_keys. The private key stays encrypted in the vault.",
+  "credentialCopyPublicKeyTooltip": "Copy public key",
+  "credentialPublicKeyCopiedSnack": "Public key copied.",
+  "credentialKeyGenerationFailed": "Key generation failed.",
   "knownHostsDialogTitle": "Known Hosts",
   "knownHostsEmptyTitle": "No trusted fingerprints",
   "knownHostsEmptyBody": "Host fingerprints accepted during connection review will be listed here.",
@@ -773,11 +1025,65 @@
   "vaultNewPassphraseLabel": "New passphrase",
   "vaultPassphraseLabel": "Passphrase",
   "vaultCreateAction": "Create Vault",
+  "vaultCreateICloudVaultExistsTitle": "An iCloud vault already exists",
+  "@vaultCreateICloudVaultExistsTitle": {
+    "description": "Title of the dialog shown when iCloud already contains a Serlink vault while creating a new local vault."
+  },
+  "vaultCreateICloudVaultExistsBody": "You can restore the existing vault by unlocking it with its own passphrase, or create a brand-new vault. Creating a new vault replaces the sync data stored in iCloud.",
+  "@vaultCreateICloudVaultExistsBody": {
+    "description": "Body of the dialog shown when iCloud already contains a Serlink vault while creating a new local vault."
+  },
+  "vaultCreateRestoreICloudVaultAction": "Restore iCloud Vault",
+  "@vaultCreateRestoreICloudVaultAction": {
+    "description": "Button that adopts the existing iCloud vault instead of creating a new local vault."
+  },
+  "vaultCreateNewAnywayAction": "Create New Vault Anyway",
+  "@vaultCreateNewAnywayAction": {
+    "description": "Button that continues creating a new local vault even though iCloud already contains one."
+  },
+  "vaultCreateReplaceICloudConfirmTitle": "Replace iCloud sync data?",
+  "@vaultCreateReplaceICloudConfirmTitle": {
+    "description": "Title of the confirmation shown before creating a new vault that replaces existing iCloud sync data."
+  },
+  "vaultCreateReplaceICloudConfirmBody": "The new vault replaces the Serlink sync data already stored in iCloud. This cannot be undone.",
+  "@vaultCreateReplaceICloudConfirmBody": {
+    "description": "Body of the confirmation shown before creating a new vault that replaces existing iCloud sync data."
+  },
   "vaultUnlockAction": "Unlock",
   "vaultUnlockWithDeviceAction": "Use Face ID",
   "vaultUseRecoveryCodeAction": "Use recovery code",
   "vaultPassphraseRequired": "Enter a vault passphrase to continue.",
   "vaultInvalidPassphraseError": "Passphrase did not unlock the vault.",
+  "vaultBackupMissingVaultError": "Create or unlock a vault before exporting a backup.",
+  "@vaultBackupMissingVaultError": {
+    "description": "Shown when a vault backup export is attempted without a vault."
+  },
+  "vaultOperationFailedError": "Vault operation failed: {detail}",
+  "@vaultOperationFailedError": {
+    "description": "Fallback for a failed vault operation with redacted technical detail.",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultRecoveryFailedError": "Vault recovery failed: {detail}",
+  "@vaultRecoveryFailedError": {
+    "description": "Fallback for a failed vault recovery action with redacted technical detail.",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultDatabaseUnreadableError": "The local Serlink database could not be read or restored.",
+  "@vaultDatabaseUnreadableError": {
+    "description": "Shown when a vault recovery action fails on a damaged local database."
+  },
+  "appProfileLockedError": "This Serlink profile is already open in another window.",
+  "@appProfileLockedError": {
+    "description": "Shown when the active Serlink profile is locked by another window."
+  },
   "vaultInvalidRecoveryKeyError": "Recovery key did not unlock the vault.",
   "vaultInvalidRecoveryKeyFormatError": "Recovery key format is not supported.",
   "vaultLocalUnlockNotEnabledError": "Face ID vault unlock is not enabled on this device.",
@@ -792,22 +1098,48 @@
   "vaultRecoveryKeySavedAction": "I have saved it",
   "vaultRecoveryTitle": "Vault recovery",
   "vaultRecoveryBody": "Vault recovery tools are available.",
-  "vaultRecoveryDatabaseTitle": "Database recovery",
-  "vaultRecoveryDatabaseBody": "Serlink could not open this local database safely.",
-  "vaultRecoveryHeaderTitle": "Vault header recovery",
-  "vaultRecoveryHeaderBody": "The local vault header is invalid or incomplete.",
-  "vaultRecoveryRecordsTitle": "Record recovery",
-  "vaultRecoveryRecordsBody": "{count, plural, one {# encrypted record failed authentication.} other {# encrypted records failed authentication.}}",
-  "@vaultRecoveryRecordsBody": {
+  "vaultRecoveryLocalDataTitle": "Local vault data is damaged",
+  "@vaultRecoveryLocalDataTitle": {
+    "description": "Recovery surface title when local vault data cannot be read."
+  },
+  "vaultRecoveryLocalDataBody": "Serlink cannot read the vault data stored on this device. You can usually recover it from the automatic backup or a backup file.",
+  "@vaultRecoveryLocalDataBody": {
+    "description": "Recovery surface body when local vault data cannot be read."
+  },
+  "vaultRecoveryCloudSyncTitle": "Cloud sync data needs repair",
+  "@vaultRecoveryCloudSyncTitle": {
+    "description": "Recovery surface title when only the cloud sync data is damaged."
+  },
+  "vaultRecoveryCloudSyncBody": "The vault data on this device is not affected. Open Settings → Sync to repair the cloud sync data.",
+  "@vaultRecoveryCloudSyncBody": {
+    "description": "Recovery surface body when only the cloud sync data is damaged."
+  },
+  "vaultRecoveryRecordsDamagedTitle": "Some vault records are damaged",
+  "@vaultRecoveryRecordsDamagedTitle": {
+    "description": "Recovery surface title when some vault records fail authentication."
+  },
+  "vaultRecoveryRecordsDamagedBody": "{count, plural, one {# encrypted record could not be read. Quarantine it to keep using the rest of the vault.} other {# encrypted records could not be read. Quarantine them to keep using the rest of the vault.}}",
+  "@vaultRecoveryRecordsDamagedBody": {
+    "description": "Recovery surface body with the number of damaged vault records.",
     "placeholders": {
       "count": {
         "type": "num"
       }
     }
   },
-  "vaultRecoveryRemoteTitle": "Remote sync recovery",
-  "vaultRecoveryRemoteBody": "The remote sync set needs repair before it can be used.",
-  "vaultRestoreLatestBackupAction": "Restore latest backup",
+  "vaultRecoveryImportBackupAction": "Import backup file",
+  "@vaultRecoveryImportBackupAction": {
+    "description": "Recovery surface action that restores from a backup file."
+  },
+  "vaultRecoveryViewDetailsAction": "View details",
+  "@vaultRecoveryViewDetailsAction": {
+    "description": "Expands the technical failure detail on the recovery surface."
+  },
+  "vaultRecoveryHideDetailsAction": "Hide details",
+  "@vaultRecoveryHideDetailsAction": {
+    "description": "Collapses the technical failure detail on the recovery surface."
+  },
+  "vaultRestoreLatestBackupAction": "Restore from automatic backup",
   "vaultQuarantineRecordsAction": "Quarantine corrupt records",
   "vaultCorruptRecordsQuarantinedSnack": "Corrupt records quarantined.",
   "vaultResetTitle": "Reset Vault",
@@ -842,6 +1174,8 @@
   "vaultResetWarningSecrets": "Reset does not recover your passphrase or reveal existing secrets.",
   "vaultResetWarningBackup": "You will need a backup or a new vault before continuing.",
   "credentialEditTitle": "Edit Credential",
+  "credentialAddTitle": "Add Credential",
+  "hostAddCredentialAction": "Add credential",
   "credentialLoadingSecretSemantics": "Loading credential secret",
   "credentialNameLabel": "Credential name",
   "credentialUsernameHintLabel": "Username hint",
@@ -1100,7 +1434,7 @@
   "dataExchangeImportOpenSshCertificateTitle": "Import OpenSSH certificate",
   "dataExchangeImportOpenSshCertificateSubtitle": "Create an identity from key and certificate.",
   "exportVaultBackupTitle": "Export encrypted backup?",
-  "exportVaultBackupBody": "The backup contains encrypted vault records and the vault header. Keep it private.",
+  "exportVaultBackupBody": "The backup contains your encrypted vault data. Keep it private.",
   "backupExportedSnack": "Encrypted backup exported.",
   "noHostsAvailableExportSnack": "No hosts are available to export.",
   "exportHostMetadataTitle": "Export host metadata?",
@@ -1121,7 +1455,7 @@
   "identityMetadataExportFailed": "Identity metadata could not be exported.",
   "importFailed": "Import failed.",
   "importEncryptedBackupTitle": "Import encrypted backup?",
-  "importEncryptedBackupBody": "This replaces the local vault header and merges encrypted records from the selected backup.",
+  "importEncryptedBackupBody": "This replaces the vault data on this device and merges encrypted records from the selected backup.",
   "backupImportedSnack": "Encrypted backup imported.",
   "noImportableOpenSshHostsSnack": "No importable OpenSSH hosts found.",
   "openSshHostsImportedSnack": "{count, plural, =1{Imported 1 host.} other{Imported {count} hosts.}}",

@@ -39,8 +39,8 @@ class TerminalAdapter {
   final SshShellSession _session;
   final TerminalPasteGuard _pasteGuard;
   final TerminalZModemTransferHandler? _zmodemTransferHandler;
-  StreamSubscription<List<int>>? _stdoutSubscription;
-  StreamSubscription<List<int>>? _stderrSubscription;
+  StreamSubscription<String>? _stdoutSubscription;
+  StreamSubscription<String>? _stderrSubscription;
   ZModemMux? _zmodemMux;
   _SshShellSessionSink? _zmodemStdin;
   final StringBuffer _pendingTerminalWrite = StringBuffer();
@@ -78,11 +78,15 @@ class TerminalAdapter {
     };
 
     if (_zmodemTransferHandler == null) {
-      _stdoutSubscription = _session.stdout.listen(_writeBytesToTerminal);
+      _stdoutSubscription = _session.stdout
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen(_writeTextToTerminal);
     } else {
       _attachZModemMux();
     }
-    _stderrSubscription = _session.stderr.listen(_writeBytesToTerminal);
+    _stderrSubscription = _session.stderr
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .listen(_writeTextToTerminal);
     _syncPreAttachedTerminalSize();
   }
 
@@ -107,6 +111,7 @@ class TerminalAdapter {
     await _stderrSubscription?.cancel();
     _stdoutSubscription = null;
     _stderrSubscription = null;
+    await _zmodemMux?.close();
     await _zmodemStdin?.close();
     _zmodemMux = null;
     _zmodemStdin = null;
@@ -292,13 +297,6 @@ class TerminalAdapter {
 
   void _writeZModemStatus(String message) {
     _writeTextToTerminal('\r\n$message\r\n');
-  }
-
-  void _writeBytesToTerminal(List<int> bytes) {
-    if (!_attached) {
-      return;
-    }
-    _writeTextToTerminal(utf8.decode(bytes, allowMalformed: true));
   }
 
   void _writeTextToTerminal(String text) {

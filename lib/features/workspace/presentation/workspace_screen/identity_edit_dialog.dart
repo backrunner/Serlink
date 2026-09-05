@@ -1,9 +1,9 @@
 part of '../workspace_screen.dart';
 
 class _IdentityEditDialog extends ConsumerStatefulWidget {
-  const _IdentityEditDialog({required this.identity});
+  const _IdentityEditDialog({this.identity});
 
-  final IdentityConfig identity;
+  final IdentityConfig? identity;
 
   @override
   ConsumerState<_IdentityEditDialog> createState() =>
@@ -20,16 +20,28 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
   final TextEditingController _keyboardResponsesController =
       TextEditingController();
 
-  bool _loadingSecret = true;
+  bool _loadingSecret = false;
   bool _saving = false;
   String? _errorMessage;
+  IdentityKind _kind = IdentityKind.password;
+  GeneratedSshKeyType _keyType = GeneratedSshKeyType.ed25519;
+  GeneratedSshKeyPair? _generatedKey;
+  bool _generatingKey = false;
+
+  bool get _creating => widget.identity == null;
 
   @override
   void initState() {
     super.initState();
-    _displayNameController.text = widget.identity.displayName;
-    _usernameHintController.text = widget.identity.usernameHint ?? '';
-    unawaited(_loadSecret());
+    final identity = widget.identity;
+    if (identity == null) {
+      return;
+    }
+    _kind = identity.kind;
+    _loadingSecret = true;
+    _displayNameController.text = identity.displayName;
+    _usernameHintController.text = identity.usernameHint ?? '';
+    unawaited(_loadSecret(identity));
   }
 
   @override
@@ -49,7 +61,9 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
     final l10n = context.l10n;
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthMedium),
-      title: Text(l10n.credentialEditTitle),
+      title: Text(
+        _creating ? l10n.credentialAddTitle : l10n.credentialEditTitle,
+      ),
       content: SizedBox(
         width: 560,
         child: _loadingSecret
@@ -65,6 +79,37 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (_creating) ...[
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: SerlinkSegmentedControl<IdentityKind>(
+                            key: const ValueKey('credential-kind-control'),
+                            value: _kind,
+                            segments: [
+                              for (final kind in const [
+                                IdentityKind.password,
+                                IdentityKind.privateKey,
+                                IdentityKind.openSshCertificate,
+                                IdentityKind.keyboardInteractive,
+                              ])
+                                SerlinkSegment(
+                                  value: kind,
+                                  icon: _identityKindIcon(kind),
+                                  label: _identityKindLabel(l10n, kind),
+                                ),
+                            ],
+                            onChanged: (kind) {
+                              setState(() {
+                                _kind = kind;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     SerlinkTextField(
                       key: const ValueKey('credential-display-name-field'),
                       controller: _displayNameController,
@@ -111,7 +156,7 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
 
   Widget _secretFields() {
     final l10n = context.l10n;
-    return switch (widget.identity.kind) {
+    return switch (_kind) {
       IdentityKind.password => SerlinkTextField(
         key: const ValueKey('credential-password-field'),
         controller: _passwordController,
@@ -119,10 +164,63 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
         obscureText: true,
         onSubmitted: (_) => _save(),
       ),
-      IdentityKind.privateKey => _PrivateKeyFields(
-        privateKeyController: _privateKeyController,
-        passphraseController: _passphraseController,
-        onImportKey: _importPrivateKey,
+      IdentityKind.privateKey => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: SerlinkSegmentedControl<GeneratedSshKeyType>(
+                      key: const ValueKey('credential-key-type-control'),
+                      value: _keyType,
+                      segments: const [
+                        SerlinkSegment(
+                          value: GeneratedSshKeyType.ed25519,
+                          icon: Icons.key_outlined,
+                          label: 'Ed25519',
+                        ),
+                        SerlinkSegment(
+                          value: GeneratedSshKeyType.rsa3072,
+                          icon: Icons.key_outlined,
+                          label: 'RSA 3072',
+                        ),
+                      ],
+                      onChanged: (type) {
+                        setState(() {
+                          _keyType = type;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SerlinkOutlinedButton.icon(
+                key: const ValueKey('credential-generate-key-button'),
+                onPressed: _generatingKey ? null : _generateKey,
+                icon: const Icon(Icons.autorenew_rounded, size: 18),
+                label: Text(l10n.credentialGenerateKeyAction),
+              ),
+            ],
+          ),
+          if (_generatedKey != null) ...[
+            const SizedBox(height: 12),
+            _GeneratedPublicKeyPanel(
+              generatedKey: _generatedKey!,
+              onCopy: _copyPublicKey,
+            ),
+          ],
+          const SizedBox(height: 12),
+          _PrivateKeyFields(
+            privateKeyController: _privateKeyController,
+            passphraseController: _passphraseController,
+            onImportKey: _importPrivateKey,
+          ),
+        ],
       ),
       IdentityKind.openSshCertificate => _CertificateFields(
         privateKeyController: _privateKeyController,
@@ -148,11 +246,52 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
     };
   }
 
-  Future<void> _loadSecret() async {
+  Future<void> _generateKey() async {
+    setState(() {
+      _generatingKey = true;
+      _errorMessage = null;
+    });
+    try {
+      final generated = await const SshKeyPairGenerator().generate(
+        _keyType,
+        comment: _displayNameController.text.trim(),
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _generatedKey = generated;
+        _generatingKey = false;
+        _privateKeyController.text = generated.privateKeyPem;
+        _passphraseController.text = '';
+      });
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _generatingKey = false;
+        _errorMessage = context.l10n.credentialKeyGenerationFailed;
+      });
+    }
+  }
+
+  Future<void> _copyPublicKey() async {
+    final generated = _generatedKey;
+    if (generated == null) {
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: generated.publicKey));
+    if (mounted) {
+      _showSnackBar(context, context.l10n.credentialPublicKeyCopiedSnack);
+    }
+  }
+
+  Future<void> _loadSecret(IdentityConfig identity) async {
     try {
       final secret = await ref
           .read(identityWriteServiceProvider)
-          .readSecretMaterial(widget.identity);
+          .readSecretMaterial(identity);
       if (!mounted) {
         return;
       }
@@ -182,38 +321,65 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
       _errorMessage = null;
     });
     try {
-      await ref
-          .read(identityWriteServiceProvider)
-          .update(
-            IdentityUpdateDraft(
-              id: widget.identity.id,
-              displayName: _displayNameController.text,
-              usernameHint: _usernameHintController.text,
-              password: widget.identity.kind == IdentityKind.password
-                  ? _passwordController.text
-                  : null,
-              privateKeyPem:
-                  widget.identity.kind == IdentityKind.privateKey ||
-                      widget.identity.kind == IdentityKind.openSshCertificate
-                  ? _privateKeyController.text
-                  : null,
-              privateKeyPassphrase:
-                  widget.identity.kind == IdentityKind.privateKey ||
-                      widget.identity.kind == IdentityKind.openSshCertificate
-                  ? _passphraseController.text
-                  : null,
-              openSshCertificate:
-                  widget.identity.kind == IdentityKind.openSshCertificate
-                  ? _certificateController.text
-                  : null,
-              keyboardInteractiveResponses:
-                  widget.identity.kind == IdentityKind.keyboardInteractive
-                  ? _parseSecretLines(_keyboardResponsesController.text)
-                  : null,
-            ),
-          );
+      final service = ref.read(identityWriteServiceProvider);
+      final password = _kind == IdentityKind.password
+          ? _passwordController.text
+          : null;
+      final privateKeyPem =
+          _kind == IdentityKind.privateKey ||
+              _kind == IdentityKind.openSshCertificate
+          ? _privateKeyController.text
+          : null;
+      final privateKeyPassphrase =
+          _kind == IdentityKind.privateKey ||
+              _kind == IdentityKind.openSshCertificate
+          ? _passphraseController.text
+          : null;
+      final openSshCertificate = _kind == IdentityKind.openSshCertificate
+          ? _certificateController.text
+          : null;
+      final keyboardInteractiveResponses =
+          _kind == IdentityKind.keyboardInteractive
+          ? _parseSecretLines(_keyboardResponsesController.text)
+          : null;
+      final publicKeyFingerprint =
+          _kind == IdentityKind.privateKey && _generatedKey != null
+          ? _generatedKey!.fingerprint
+          : null;
+      final identity = widget.identity;
+      final Object result;
+      if (identity == null) {
+        result = await service.create(
+          IdentityCreateDraft(
+            kind: _kind,
+            displayName: _displayNameController.text,
+            usernameHint: _usernameHintController.text,
+            password: password,
+            privateKeyPem: privateKeyPem,
+            privateKeyPassphrase: privateKeyPassphrase,
+            openSshCertificate: openSshCertificate,
+            keyboardInteractiveResponses: keyboardInteractiveResponses,
+            publicKeyFingerprint: publicKeyFingerprint,
+          ),
+        );
+      } else {
+        await service.update(
+          IdentityUpdateDraft(
+            id: identity.id,
+            displayName: _displayNameController.text,
+            usernameHint: _usernameHintController.text,
+            password: password,
+            privateKeyPem: privateKeyPem,
+            privateKeyPassphrase: privateKeyPassphrase,
+            openSshCertificate: openSshCertificate,
+            keyboardInteractiveResponses: keyboardInteractiveResponses,
+            publicKeyFingerprint: publicKeyFingerprint,
+          ),
+        );
+        result = true;
+      }
       if (mounted) {
-        Navigator.of(context).pop(true);
+        Navigator.of(context).pop(result);
       }
     } on IdentityWriteException catch (error) {
       if (mounted) {
@@ -315,6 +481,77 @@ class _CertificateFields extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _GeneratedPublicKeyPanel extends StatelessWidget {
+  const _GeneratedPublicKeyPanel({
+    required this.generatedKey,
+    required this.onCopy,
+  });
+
+  final GeneratedSshKeyPair generatedKey;
+  final VoidCallback onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final t = context.tokens;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: t.surfaceSunken,
+        borderRadius: SerlinkRadii.control,
+        border: Border.all(color: t.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.credentialGeneratedPublicKeyLabel,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: t.textPrimary),
+                ),
+              ),
+              SerlinkTooltip(
+                message: l10n.credentialCopyPublicKeyTooltip,
+                child: SerlinkIconButton(
+                  key: const ValueKey('credential-copy-public-key-button'),
+                  onPressed: onCopy,
+                  icon: const Icon(Icons.copy_outlined, size: 18),
+                ),
+              ),
+            ],
+          ),
+          SelectableText(
+            generatedKey.publicKey,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: t.textPrimary,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            generatedKey.fingerprint,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: t.textMuted),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            l10n.credentialGeneratedPublicKeyNote,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+          ),
+        ],
+      ),
     );
   }
 }

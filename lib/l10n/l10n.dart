@@ -1,10 +1,13 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/widgets.dart';
 
 import '../core/failure/app_failure.dart';
+import '../features/settings/application/app_language_settings.dart';
 import '../features/snippets/application/snippet_write_service.dart';
+import '../features/sync/application/sync_exceptions.dart';
 import '../features/vault/application/vault_service.dart';
 import 'generated/app_localizations.dart';
-import '../features/settings/application/app_language_settings.dart';
 
 export 'generated/app_localizations.dart';
 
@@ -17,9 +20,9 @@ AppLocalizations lookupSerlinkLocalizations(AppLanguage language) {
     AppLanguage.english => const Locale('en'),
     AppLanguage.japanese => const Locale('ja'),
     AppLanguage.simplifiedChinese => const Locale('zh'),
-    AppLanguage.system => _supportedLocaleFor(
-      WidgetsBinding.instance.platformDispatcher.locale,
-    ),
+    // PlatformDispatcher.instance works without an initialized
+    // WidgetsBinding, so non-widget tests can localize failure messages.
+    AppLanguage.system => _supportedLocaleFor(ui.PlatformDispatcher.instance.locale),
   };
   return lookupAppLocalizations(locale);
 }
@@ -46,6 +49,7 @@ String localizedVaultExceptionMessage(AppLocalizations l10n, Object error) {
     'vault.local_unlock_failed' => l10n.vaultLocalUnlockFailedError,
     'vault.local_unlock_unavailable' => l10n.vaultLocalUnlockUnavailableError,
     'vault.empty_passphrase' => l10n.vaultEmptyPassphraseError,
+    'vault_backup.missing_header' => l10n.vaultBackupMissingVaultError,
     _ => error.message,
   };
 }
@@ -61,6 +65,37 @@ String localizedSnippetWriteExceptionMessage(
     'snippet.name_required' => l10n.snippetErrorNameRequired,
     'snippet.command_required' => l10n.snippetErrorCommandRequired,
     'snippet.not_found' => l10n.snippetErrorNotFound,
+    _ => error.message,
+  };
+}
+
+String localizedSyncRunExceptionMessage(AppLocalizations l10n, Object error) {
+  if (error is! SyncRunException) {
+    return error.toString();
+  }
+  return switch (error.code) {
+    'sync.vault_header_missing' => l10n.syncErrorVaultDataMissing,
+    'sync.remote_manifest_unavailable' => l10n.syncErrorRemoteDataUnreadable,
+    'sync.remote_manifest_missing' => l10n.syncErrorRemoteDataMissing,
+    'sync.remote_manifest_wrong_vault' => l10n.syncErrorRemoteWrongVault,
+    'sync.remote_manifest_invalid' => l10n.syncErrorRemoteDataInvalid,
+    'sync.remote_manifest_mismatch' => l10n.syncErrorRemoteDataMismatch,
+    'sync.remote_protocol_unsupported' ||
+    'sync.remote_vault_schema_unsupported' =>
+      l10n.syncErrorRemoteVersionUnsupported,
+    'sync.remote_header_missing' => l10n.syncErrorRemoteVaultDataMissing,
+    'sync.remote_header_invalid' => l10n.syncErrorRemoteVaultDataInvalid,
+    'sync.remote_reset_marker_invalid' =>
+      l10n.syncErrorRemoteResetMarkerInvalid,
+    'sync.provider.conflict' => l10n.syncErrorRemoteChanged,
+    'sync.remote_vault_reset' => l10n.syncErrorRemoteVaultReset,
+    'sync.conflict_merge_empty' => l10n.syncErrorNoConflictsSelected,
+    'sync.conflict.record_missing' => l10n.syncErrorConflictRecordMissing,
+    'sync.vault_locked' => l10n.syncErrorVaultLocked,
+    'sync.local_unhealthy' => l10n.syncErrorLocalUnhealthy,
+    'sync.provider_missing' => l10n.syncErrorProviderMissing,
+    'sync.staged_snapshot_provider_invalid' =>
+      l10n.syncErrorStagedProviderInvalid,
     _ => error.message,
   };
 }

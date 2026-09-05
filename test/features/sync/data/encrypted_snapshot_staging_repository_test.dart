@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/database/serlink_database.dart';
@@ -57,6 +59,10 @@ void main() {
     expect(restored!.manifestFingerprint, manifestFingerprint(manifest));
     expect(restored.manifest.snapshotObjectPaths, manifest.snapshotObjectPaths);
     expect(restored.objects['records/host%3A1-rev.json'], [6, 7]);
+    expect(restored.manifestBytes, isA<Uint8List>());
+    final bytes = restored.objects['records/host%3A1-rev.json']!;
+    expect(bytes, isA<Uint8List>());
+    expect(() => bytes[0] = 99, throwsUnsupportedError);
 
     final provider = StagedSnapshotSyncProvider(restored);
     expect(await provider.readManifest(), isNotNull);

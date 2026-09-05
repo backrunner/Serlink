@@ -28,11 +28,9 @@ class WorkspaceRuntimeRegistry {
     bool echoInput = false,
     int maxLines = 10000,
   }) {
-    final terminal = Terminal(
-      maxLines: maxLines,
-      platform: terminalPlatform,
-      reflowEnabled: false,
-    );
+    // Reflow stays enabled (the xterm default) so history re-wraps when the
+    // user drags the window or splits panes to a new width.
+    final terminal = Terminal(maxLines: maxLines, platform: terminalPlatform);
     if (echoInput) {
       terminal.write(r'$ ');
       terminal.onOutput = (data) {

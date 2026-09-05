@@ -108,9 +108,8 @@ class _SettingsSurface extends ConsumerWidget {
                         onChanged: (value) =>
                             unawaited(_setAppLanguage(context, ref, value)),
                       ),
-                      actionWidth: mobile
-                          ? _settingsMobileSelectActionWidth
-                          : 220,
+                      actionWidth: mobile ? null : 220,
+                      compactActionWidth: _settingsMobileSelectActionWidth,
                       actionHeight: mobile
                           ? _settingsMobileSelectActionHeight
                           : null,
@@ -259,6 +258,10 @@ class _SettingsSurface extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: _settingsSectionGap),
+                if (capabilities.mcpServer) ...[
+                  const _McpSettingsSection(),
+                  const SizedBox(height: _settingsSectionGap),
+                ],
                 _SyncSettingsSection(vaultState: vaultState),
                 const SizedBox(height: _settingsSectionGap),
                 SurfaceSection(

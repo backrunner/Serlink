@@ -34,109 +34,37 @@ class WorkspaceScreen extends ConsumerWidget {
     return _NativeTerminationGuard(
       child: _SshConfigImportPromptGate(
         child: Scaffold(
-          body: DecoratedBox(
-            decoration: serlinkBackdrop(context.tokens),
-            child: Stack(
-              children: [
-                const Positioned.fill(child: _BackdropGlow()),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-                  child: Row(
+          body: Row(
+            children: [
+              _Sidebar(
+                selected: state.area,
+                onSelected: (area) {
+                  if (area != state.area) {
+                    ref
+                        .read(vaultSessionControllerProvider.notifier)
+                        .resetUnlockFailureState();
+                  }
+                  controller.selectArea(area);
+                },
+              ),
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: context.tokens.borderSubtle,
+              ),
+              Expanded(
+                child: Material(
+                  color: context.tokens.surfaceBase,
+                  child: Column(
                     children: [
-                      _Sidebar(
-                        selected: state.area,
-                        onSelected: (area) {
-                          if (area != state.area) {
-                            ref
-                                .read(vaultSessionControllerProvider.notifier)
-                                .resetUnlockFailureState();
-                          }
-                          controller.selectArea(area);
-                        },
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: SerlinkRadii.card,
-                            boxShadow: serlinkShadow(
-                              context.tokens,
-                              elevation: 20,
-                            ),
-                          ),
-                          child: Material(
-                            color: context.tokens.surfaceRaised,
-                            elevation: 0,
-                            clipBehavior: Clip.antiAlias,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: SerlinkRadii.card,
-                              side: BorderSide(
-                                color: context.tokens.borderSubtle,
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                if (showTopBar) const _TopBar(),
-                                Expanded(child: _MainSurface(state: state)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                      if (showTopBar) const _TopBar(),
+                      Expanded(child: _MainSurface(state: state)),
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A soft, blurred accent glow anchored to the top-left of the window, giving
-/// the backdrop a subtle sense of light and depth behind the panels.
-class _BackdropGlow extends StatelessWidget {
-  const _BackdropGlow();
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          Positioned(
-            top: -160,
-            left: -120,
-            child: _GlowBlob(color: t.accentPrimary, size: 460),
-          ),
-          Positioned(
-            bottom: -200,
-            right: -140,
-            child: _GlowBlob(color: t.accentSecondary, size: 520),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GlowBlob extends StatelessWidget {
-  const _GlowBlob({required this.color, required this.size});
-
-  final Color color;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color.withValues(alpha: 0.16), color.withValues(alpha: 0)],
         ),
       ),
     );
@@ -173,45 +101,47 @@ class _Sidebar extends StatelessWidget {
     final l10n = context.l10n;
     return SizedBox(
       width: SerlinkSizes.sidebarWidth,
-      child: GlassPanel(
-        elevation: 20,
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _BrandHeader(),
-            _NavItem(
-              icon: Icons.dns_outlined,
-              label: l10n.navHosts,
-              selected: selected == WorkspaceArea.hosts,
-              onTap: () => onSelected(WorkspaceArea.hosts),
-            ),
-            _NavItem(
-              icon: Icons.terminal_outlined,
-              label: l10n.navSessions,
-              selected: selected == WorkspaceArea.sessions,
-              onTap: () => onSelected(WorkspaceArea.sessions),
-            ),
-            _NavItem(
-              icon: Icons.sync_alt_outlined,
-              label: l10n.navTransfers,
-              selected: selected == WorkspaceArea.transfers,
-              onTap: () => onSelected(WorkspaceArea.transfers),
-            ),
-            _NavItem(
-              icon: Icons.code_outlined,
-              label: l10n.navSnippets,
-              selected: selected == WorkspaceArea.snippets,
-              onTap: () => onSelected(WorkspaceArea.snippets),
-            ),
-            const Spacer(),
-            _NavItem(
-              icon: Icons.settings_outlined,
-              label: l10n.navSettings,
-              selected: selected == WorkspaceArea.settings,
-              onTap: () => onSelected(WorkspaceArea.settings),
-            ),
-          ],
+      child: DecoratedBox(
+        decoration: serlinkBackdrop(context.tokens),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _BrandHeader(),
+              _NavItem(
+                icon: Icons.dns_outlined,
+                label: l10n.navHosts,
+                selected: selected == WorkspaceArea.hosts,
+                onTap: () => onSelected(WorkspaceArea.hosts),
+              ),
+              _NavItem(
+                icon: Icons.terminal_outlined,
+                label: l10n.navSessions,
+                selected: selected == WorkspaceArea.sessions,
+                onTap: () => onSelected(WorkspaceArea.sessions),
+              ),
+              _NavItem(
+                icon: Icons.sync_alt_outlined,
+                label: l10n.navTransfers,
+                selected: selected == WorkspaceArea.transfers,
+                onTap: () => onSelected(WorkspaceArea.transfers),
+              ),
+              _NavItem(
+                icon: Icons.code_outlined,
+                label: l10n.navSnippets,
+                selected: selected == WorkspaceArea.snippets,
+                onTap: () => onSelected(WorkspaceArea.snippets),
+              ),
+              const Spacer(),
+              _NavItem(
+                icon: Icons.settings_outlined,
+                label: l10n.navSettings,
+                selected: selected == WorkspaceArea.settings,
+                onTap: () => onSelected(WorkspaceArea.settings),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -287,7 +217,7 @@ class _BrandMark extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
               color: t.textPrimary,
-              letterSpacing: 0.2,
+              letterSpacing: 0,
             ),
           ),
         ),
@@ -318,14 +248,17 @@ class _NavItem extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
         decoration: BoxDecoration(
-          gradient: selected ? serlinkAccentGradient(t) : null,
+          color: selected ? t.surfaceRaised : Colors.transparent,
           borderRadius: SerlinkRadii.control,
+          border: Border.all(
+            color: selected ? t.borderSubtle : Colors.transparent,
+          ),
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: t.accentPrimary.withValues(alpha: 0.35),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+                    color: t.shadowColor.withValues(alpha: 0.06),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
                   ),
                 ]
               : null,
@@ -346,7 +279,7 @@ class _NavItem extends StatelessWidget {
                 Icon(
                   icon,
                   size: 18,
-                  color: selected ? t.onAccent : t.textSecondary,
+                  color: selected ? t.accentPrimary : t.textSecondary,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -355,8 +288,8 @@ class _NavItem extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                     style: TextStyle(
-                      color: selected ? t.onAccent : t.textSecondary,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? t.textPrimary : t.textSecondary,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                 ),

@@ -175,6 +175,115 @@ void main() {
 
     await expectLater(decisionFuture, completion(ExportDecision.confirm));
   });
+
+  testWidgets('agent access dialog allows access only after Allow', (
+    tester,
+  ) async {
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
+
+    final service = FlutterSecurityModalService(key: navigatorKey);
+    final decisionFuture = service.confirmAgentAccess(
+      const AgentAccessPrompt(
+        clientName: 'claude-code',
+        hostDisplayName: 'Bastion',
+        hostId: 'host-1',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Agent access request'), findsOneWidget);
+    expect(
+      find.text('claude-code wants to open a session on Bastion.'),
+      findsOneWidget,
+    );
+    expect(find.text('Host ID: host-1'), findsOneWidget);
+
+    await tester.tap(find.text('Allow'));
+    await tester.pumpAndSettle();
+
+    await expectLater(decisionFuture, completion(AgentAccessDecision.allow));
+  });
+
+  testWidgets('agent access dialog denies access when Deny is chosen', (
+    tester,
+  ) async {
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
+
+    final service = FlutterSecurityModalService(key: navigatorKey);
+    final decisionFuture = service.confirmAgentAccess(
+      const AgentAccessPrompt(
+        clientName: 'claude-code',
+        hostDisplayName: 'Bastion',
+        hostId: 'host-1',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Deny'));
+    await tester.pumpAndSettle();
+
+    await expectLater(decisionFuture, completion(AgentAccessDecision.deny));
+  });
+
+  testWidgets('agent command dialog shows flagged command and allows once', (
+    tester,
+  ) async {
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
+
+    final service = FlutterSecurityModalService(key: navigatorKey);
+    final decisionFuture = service.confirmAgentCommand(
+      const AgentCommandPrompt(
+        clientName: 'claude-code',
+        hostDisplayName: 'Bastion',
+        command: 'rm -rf /var/tmp/build',
+        ruleDescription: 'recursive force delete',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Agent command confirmation'), findsOneWidget);
+    expect(
+      find.text('claude-code wants to run a command on Bastion.'),
+      findsOneWidget,
+    );
+    expect(find.text('Flagged: recursive force delete'), findsOneWidget);
+    expect(find.text('rm -rf /var/tmp/build'), findsOneWidget);
+
+    await tester.tap(find.text('Allow Once'));
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      decisionFuture,
+      completion(AgentCommandDecision.allowOnce),
+    );
+  });
+
+  testWidgets('agent command dialog allows for session', (tester) async {
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
+
+    final service = FlutterSecurityModalService(key: navigatorKey);
+    final decisionFuture = service.confirmAgentCommand(
+      const AgentCommandPrompt(
+        clientName: 'claude-code',
+        hostDisplayName: 'Bastion',
+        command: 'rm -rf /var/tmp/build',
+        ruleDescription: 'recursive force delete',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Allow for Session'));
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      decisionFuture,
+      completion(AgentCommandDecision.allowSession),
+    );
+  });
 }
 
 class _TestApp extends StatelessWidget {
@@ -195,11 +304,12 @@ class _TestApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      home: FTheme(
+      builder: (context, child) => FTheme(
         data: SerlinkTheme.foruiDark(),
         platform: FPlatformVariant.macOS,
-        child: const Scaffold(body: SizedBox.shrink()),
+        child: child ?? const SizedBox.shrink(),
       ),
+      home: const Scaffold(body: SizedBox.shrink()),
     );
   }
 }

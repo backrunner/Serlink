@@ -12,15 +12,96 @@ import 'package:serlink/features/transfers/domain/transfer_task.dart';
 void main() {
   late TransferQueueController queue;
   late _FakeSftpConnection connection;
+  late DateTime now;
 
   setUp(() {
-    queue = TransferQueueController(maxConcurrentTransfers: 1);
+    now = DateTime.utc(2026);
+    queue = TransferQueueController(maxConcurrentTransfers: 1, now: () => now);
     connection = _FakeSftpConnection();
   });
 
   tearDown(() async {
     await queue.dispose();
   });
+
+  for (final clearAll in [false, true]) {
+    test('cleanup waits for in-flight persistence (clear=$clearAll)', () async {
+      final repository = _GatedRepository();
+      final localQueue = TransferQueueController(repository: repository);
+      addTearDown(localQueue.dispose);
+      final id = localQueue.enqueueUpload(
+        connection: connection,
+        localPath: '/local/a',
+        remotePath: '/remote/a',
+      );
+      await repository.started.future;
+      final cleanup = clearAll ? localQueue.clear() : localQueue.delete(id);
+      await Future<void>.delayed(Duration.zero);
+      repository.release.complete();
+      await cleanup;
+
+      expect(localQueue.state.tasks, isEmpty);
+      expect(await repository.list(), isEmpty);
+    });
+  }
+
+  test(
+    'coalesces progress and persists completion after an older write',
+    () async {
+      final repository = _GatedRepository();
+      final localQueue = TransferQueueController(repository: repository);
+      addTearDown(localQueue.dispose);
+      final id = localQueue.enqueueUpload(
+        connection: connection,
+        localPath: '/local/a',
+        remotePath: '/remote/a',
+      );
+      await repository.started.future;
+      for (var i = 1; i <= 100; i++) {
+        connection.emit(
+          TransferProgress(
+            taskId: id,
+            state: i == 100 ? TransferState.completed : TransferState.running,
+            transferredBytes: i,
+            totalBytes: 100,
+          ),
+        );
+      }
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.saveCount, 1);
+      repository.release.complete();
+      await localQueue.flushPersistence();
+      await localQueue.dispose();
+
+      expect(repository.saveCount, 2);
+      expect((await repository.list()).single.state, TransferState.completed);
+      expect((await repository.list()).single.transferredBytes, 100);
+    },
+  );
+
+  test(
+    'clear prevents a pending restore from resurrecting old history',
+    () async {
+      final repository = _GatedRestoreRepository();
+      final localQueue = TransferQueueController(repository: repository);
+      addTearDown(localQueue.dispose);
+      final restore = localQueue.restorePersistedTasks();
+      await localQueue.clear();
+      repository.release.complete([
+        TransferTask(
+          id: TransferTaskId('old'),
+          direction: TransferDirection.upload,
+          localPath: '/local/a',
+          remotePath: '/remote/a',
+          state: TransferState.completed,
+          transferredBytes: 100,
+          createdAt: DateTime.utc(2026),
+        ),
+      ]);
+      await restore;
+      expect(localQueue.state.tasks, isEmpty);
+    },
+  );
 
   test('updates upload progress and completion', () async {
     final taskId = queue.enqueueUpload(
@@ -31,6 +112,7 @@ void main() {
 
     expect(queue.state.byId(taskId)!.state, TransferState.running);
 
+    now = now.add(const Duration(seconds: 1));
     connection.emit(
       TransferProgress(
         taskId: taskId,
@@ -338,6 +420,29 @@ void main() {
       expect(restoredQueue.canRetry(taskId), isFalse);
     },
   );
+}
+
+class _GatedRepository extends InMemoryTransferTaskRepository {
+  final started = Completer<void>();
+  final release = Completer<void>();
+  var saveCount = 0;
+
+  @override
+  Future<void> save(TransferTask task) async {
+    saveCount++;
+    if (saveCount == 1) {
+      started.complete();
+      await release.future;
+    }
+    await super.save(task);
+  }
+}
+
+class _GatedRestoreRepository extends InMemoryTransferTaskRepository {
+  final release = Completer<List<TransferTask>>();
+
+  @override
+  Future<List<TransferTask>> list() => release.future;
 }
 
 class _FakeSftpConnection implements SftpConnection {

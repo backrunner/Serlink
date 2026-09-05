@@ -100,7 +100,10 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     state = state.copyWith(area: area);
   }
 
-  Future<void> openTerminal(HostSummary host) async {
+  /// Opens a terminal tab for [host] and returns the tab state that will
+  /// host the session (a reused failed tab or a freshly created one), so
+  /// callers can act on the exact tab instead of racing [state.activeTabId].
+  Future<WorkspaceTabState?> openTerminal(HostSummary host) async {
     final reusableTab = state.tabs
         .where(
           (tab) =>
@@ -110,8 +113,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         )
         .firstOrNull;
     if (reusableTab != null) {
-      await _reuseFailedTerminalTab(reusableTab, host);
-      return;
+      return _reuseFailedTerminalTab(reusableTab, host);
     }
     final hostSettings = await _readTerminalDisplaySettingsForHost(host.id);
     final effectiveSettings =
@@ -147,6 +149,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       switchArea: WorkspaceArea.sessions,
     );
     unawaited(_connect(tab, _nextConnectionToken(tab.id)));
+    return tab;
   }
 
   bool _canReuseFailedTerminalTab(WorkspaceTabState tab) {
@@ -161,7 +164,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .hasAttachedTerminal(content.primaryPane.sessionId);
   }
 
-  Future<void> _reuseFailedTerminalTab(
+  Future<WorkspaceTabState?> _reuseFailedTerminalTab(
     WorkspaceTabState tab,
     HostSummary host,
   ) async {
@@ -172,7 +175,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .where((candidate) => candidate.id == tab.id)
         .firstOrNull;
     if (current == null || !_canReuseFailedTerminalTab(current)) {
-      return;
+      return null;
     }
     final content = current.content as TerminalTabContent;
     final pane = content.primaryPane;
@@ -213,6 +216,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       activeTabId: retrying.id,
     );
     unawaited(_connect(retrying, _nextConnectionToken(retrying.id)));
+    return retrying;
   }
 
   Future<void> openTerminalFromTab(WorkspaceTabId tabId) async {

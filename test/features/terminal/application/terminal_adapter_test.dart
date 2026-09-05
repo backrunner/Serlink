@@ -8,6 +8,38 @@ import 'package:serlink/features/terminal/application/terminal_zmodem_transfer.d
 import 'package:xterm/xterm.dart';
 
 void main() {
+  for (final useZModem in [false, true]) {
+    test(
+      'decodes split UTF-8 independently on stdout and stderr (zmodem=$useZModem)',
+      () async {
+        final terminal = Terminal();
+        final session = _FakeShellSession();
+        final adapter = TerminalAdapter(
+          terminal: terminal,
+          session: session,
+          zmodemTransferHandler: useZModem
+              ? const _NoopZModemTransferHandler()
+              : null,
+        );
+        adapter.attach();
+        addTearDown(adapter.close);
+        final stdout = utf8.encode('\u4e2d\u6587');
+        final stderr = utf8.encode('\u65e5\u672c');
+        session.emitStdout(stdout.sublist(0, 1));
+        session.emitStderr(stderr.sublist(0, 2));
+        await Future<void>.delayed(Duration.zero);
+        session.emitStdout(stdout.sublist(1));
+        session.emitStderr(stderr.sublist(2));
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(terminal.buffer.getText(), contains('\u4e2d\u6587'));
+        expect(terminal.buffer.getText(), contains('\u65e5\u672c'));
+        expect(terminal.buffer.getText(), isNot(contains('\ufffd')));
+      },
+    );
+  }
+
   test('forwards terminal output to shell session', () async {
     final terminal = Terminal();
     final session = _FakeShellSession();

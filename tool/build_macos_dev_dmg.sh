@@ -24,6 +24,8 @@
 #     lipo whose -verify_arch accepts only one architecture, which breaks
 #     universal (arm64+x86_64) Flutter framework thinning. Override with
 #     ARCHS="arm64 x86_64" once the toolchain is fixed.
+#   - Set SERLINK_INSTALL_DEV_APP=0 to only build the DMG without replacing
+#     the development app already installed on this Mac.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,6 +34,11 @@ cd "$ROOT_DIR"
 DISPLAY_NAME="${SERLINK_APP_DISPLAY_NAME:-Serlink (Dev)}"
 CODE_SIGN_IDENTITY="${SERLINK_MACOS_CODE_SIGN_IDENTITY:-Apple Development}"
 ARCHS="${ARCHS:-arm64}"
+INSTALL_APP="${SERLINK_INSTALL_DEV_APP:-1}"
+if [[ "$INSTALL_APP" != 0 && "$INSTALL_APP" != 1 ]]; then
+  echo "error: SERLINK_INSTALL_DEV_APP must be 0 or 1" >&2
+  exit 1
+fi
 case "$ARCHS" in
   arm64) ARCH_SUFFIX=arm64 ;;
   x86_64) ARCH_SUFFIX=x86_64 ;;
@@ -59,6 +66,7 @@ xcodebuild archive \
   -archivePath "$ARCHIVE_PATH" \
   SERLINK_MACOS_ENTITLEMENTS=Runner/Direct.entitlements \
   SERLINK_APP_DISPLAY_NAME="$DISPLAY_NAME" \
+  SERLINK_DMG_INSTALLER_ENABLED=YES \
   ARCHS="$ARCHS" \
   -allowProvisioningUpdates
 
@@ -108,25 +116,24 @@ BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$STAGED_APP/C
 DMG_PATH="$ROOT_DIR/build/Serlink-$VERSION+$BUILD_NUMBER-$ARCH_SUFFIX-dev.dmg"
 
 echo "== create $DMG_PATH =="
-rm -f "$DMG_PATH"
-ln -s /Applications "$WORK_DIR/Applications"
-hdiutil create \
-  -volname "$DISPLAY_NAME" \
-  -srcfolder "$WORK_DIR" \
-  -ov \
-  -format UDZO \
-  "$DMG_PATH"
+"$ROOT_DIR/tool/package_macos_dmg.sh" "$STAGED_APP" "$DMG_PATH"
 
-echo "== install to /Applications/$BUNDLE_NAME =="
-if pgrep -f "/Applications/$BUNDLE_NAME/Contents/MacOS/" > /dev/null; then
-  echo "error: /Applications/$BUNDLE_NAME is currently running; quit it first" >&2
-  exit 1
+if [[ "$INSTALL_APP" == 1 ]]; then
+  echo "== install to /Applications/$BUNDLE_NAME =="
+  # pgrep takes a regular expression; the default app name contains parentheses.
+  RUNNING_PATTERN="$(printf '%s' "/Applications/$BUNDLE_NAME/Contents/MacOS/" | sed 's/[][(){}.^$*+?|\\]/\\&/g')"
+  if pgrep -f "$RUNNING_PATTERN" > /dev/null; then
+    echo "error: /Applications/$BUNDLE_NAME is currently running; quit it first" >&2
+    exit 1
+  fi
+  rm -rf "/Applications/$BUNDLE_NAME"
+  ditto "$STAGED_APP" "/Applications/$BUNDLE_NAME"
 fi
-rm -rf "/Applications/$BUNDLE_NAME"
-ditto "$STAGED_APP" "/Applications/$BUNDLE_NAME"
 
 echo "== remove intermediate .app copies =="
 rm -rf "$WORK_DIR" "$ARCHIVE_PATH"
 
 echo "done: $DMG_PATH"
-echo "installed: /Applications/$BUNDLE_NAME"
+if [[ "$INSTALL_APP" == 1 ]]; then
+  echo "installed: /Applications/$BUNDLE_NAME"
+fi

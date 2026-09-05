@@ -15,9 +15,9 @@ List<BoxShadow> serlinkShadow(
   double opacity = 1,
 }) {
   final base = t.shadowColor;
-  final isDark = base.computeLuminance() < 0.2;
-  final ambient = isDark ? 0.44 : 0.16;
-  final contact = isDark ? 0.34 : 0.12;
+  final isDark = t.surfaceBase.computeLuminance() < 0.2;
+  final ambient = isDark ? 0.28 : 0.10;
+  final contact = isDark ? 0.18 : 0.07;
   return [
     BoxShadow(
       color: base.withValues(alpha: ambient * opacity),
@@ -101,9 +101,7 @@ class GlassPanel extends StatelessWidget {
             decoration: BoxDecoration(
               color: tint ?? t.surfaceGlass,
               borderRadius: borderRadius,
-              border: Border.all(
-                color: t.borderSubtle.withValues(alpha: 0.9),
-              ),
+              border: Border.all(color: t.borderSubtle.withValues(alpha: 0.9)),
             ),
             child: padding == null
                 ? child

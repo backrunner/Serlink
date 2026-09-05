@@ -23,17 +23,16 @@ abstract final class SerlinkSpacing {
   static const double xxl = 32;
 }
 
-/// Corner radii. Serlink leans into a soft, premium web aesthetic with
-/// generous rounding:
+/// Corner radii for controls, transient surfaces, and framed tools:
 ///
-/// * [control] (10px) — buttons, inputs, list rows, nav items, tabs.
+/// * [control] (8px) — buttons, inputs, list rows, nav items, tabs.
 /// * [dialog]  (14px) — dialogs, popovers, sections.
-/// * [card]    (20px) — floating shell panels and feature cards.
+/// * [card]    (8px) — framed tools and repeated items.
 /// * [pill]    (full) — status pills only.
 abstract final class SerlinkRadii {
-  static const Radius controlR = Radius.circular(10);
+  static const Radius controlR = Radius.circular(8);
   static const Radius dialogR = Radius.circular(14);
-  static const Radius cardR = Radius.circular(20);
+  static const Radius cardR = Radius.circular(8);
   static const Radius pillR = Radius.circular(999);
 
   static const BorderRadius control = BorderRadius.all(controlR);

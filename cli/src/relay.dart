@@ -1,262 +1,147 @@
-// The relay's local side is a custom protocol implementation (generic
-// method forwarding), which is the documented carve-out for using the
-// deprecated low-level `Server` class instead of `McpServer`.
-// ignore_for_file: deprecated_member_use
-
 import 'dart:async';
 
 import 'package:mcp_dart/mcp_dart.dart';
+import 'package:serlink/features/mcp/domain/mcp_contract.dart';
 
-/// JSON-RPC result that passes the remote server's result payload through
-/// untouched, so relayed responses keep their exact shape.
-class RawResult implements BaseResultData {
-  const RawResult(this._json);
+import 'app_connection.dart';
 
-  final Map<String, dynamic> _json;
-
-  factory RawResult.fromJson(Map<String, dynamic> json) => RawResult(json);
-
-  @override
-  Map<String, dynamic>? get meta =>
-      _json['_meta'] as Map<String, dynamic>?;
-
-  @override
-  Map<String, dynamic> toJson() => _json;
-}
-
-/// Transparent MCP relay: an MCP server on the client-facing [Transport]
-/// (stdio in the compiled helper) bridged to the Serlink app's embedded
-/// Streamable HTTP MCP server.
-///
-/// The relay performs no MCP handshakes of its own beyond what the two
-/// endpoints require:
-///
-/// - Toward Serlink it is an [McpClient]; `connect` performs the full
-///   negotiation (including the bearer-authenticated HTTP transport), so a
-///   successful [connect] proves the app is reachable.
-/// - Toward the MCP client it is a low-level [Server] that mirrors the
-///   remote server's identity and capabilities, answers `initialize`,
-///   `server/discover`, and `ping` locally, and forwards every other
-///   request and notification through the generic [Protocol] fallback
-///   handlers, preserving method names, params, `_meta`, and result JSON.
-///
-/// Progress notifications are re-issued toward the MCP client with the
-/// original progress token. Protocol-level request timeouts are disabled on
-/// forwarded requests because Serlink tool calls can block on user approval
-/// dialogs; the MCP client enforces its own timeouts.
-///
-/// `notifications/cancelled` is intentionally not propagated in either
-/// direction: forwarded requests get fresh request ids on the other side,
-/// so a forwarded cancellation would match nothing — or worse, collide
-/// with an unrelated in-flight request and cancel the wrong operation.
-/// Dropping cancellations is a deliberate v1 limitation; wrong-namespace
-/// forwarding is worse than not forwarding.
-///
-/// The local side intentionally uses the low-level `Server` protocol rather
-/// than `McpServer`: the relay forwards arbitrary methods generically
-/// instead of registering concrete tools, which is the custom protocol
-/// implementation case `McpServer` does not cover.
+/// Standalone stdio MCP server with a lazy connection to the desktop backend.
+/// Initialization, discovery, ping and tool enumeration are all local. Only a
+/// validated tool call can connect to or launch the app.
 class SerlinkMcpRelay {
-  SerlinkMcpRelay._({
-    required this._remoteClient,
-    required this._localServer,
-    required this._log,
-  });
+  SerlinkMcpRelay._(this._connection, this._log)
+    : _localServer = McpServer(
+        const Implementation(name: 'serlink', version: '1.0.0'),
+        options: const McpServerOptions(
+          protocol: McpProtocol.stable,
+          instructions: serlinkMcpInstructions,
+        ),
+      );
 
-  final McpClient _remoteClient;
-  final Server _localServer;
+  final SerlinkAppConnection _connection;
+  final McpServer _localServer;
   final void Function(String message) _log;
   final Completer<void> _doneCompleter = Completer<void>();
   bool _closed = false;
 
-  /// Connects to the Serlink app at [remoteUrl] with [bearerToken] and
-  /// starts serving MCP on [clientSideTransport].
-  ///
-  /// Throws when the remote server is unreachable or rejects the token; in
-  /// that case [clientSideTransport] is left untouched (never started), so
-  /// callers can retry with the same transport.
-  static Future<SerlinkMcpRelay> connect({
+  /// Starts serving immediately, without reading discovery or contacting the
+  /// app. The helper owns [connection] and closes it when the client leaves.
+  static Future<SerlinkMcpRelay> start({
     required Transport clientSideTransport,
-    required Uri remoteUrl,
-    required String bearerToken,
+    required SerlinkAppConnection connection,
     void Function(String message)? log,
   }) async {
-    final logFn = log ?? (_) {};
-    final httpTransport = StreamableHttpClientTransport(
-      remoteUrl,
-      opts: StreamableHttpClientTransportOptions(
-        requestInit: {
-          'headers': {'authorization': 'Bearer $bearerToken'},
-        },
-      ),
-    );
-    final remoteClient = McpClient(
-      const Implementation(name: 'serlink-mcp', version: '1.0.0'),
-      options: const McpClientOptions(protocol: McpProtocol.stable),
-    );
+    final relay = SerlinkMcpRelay._(connection, log ?? ((_) {}));
+    for (final tool in serlinkMcpTools.values) {
+      tool.register(
+        relay._localServer,
+        callback: (args, extra) => relay._callTool(tool.name, args, extra),
+      );
+    }
+    relay._localServer.server.onclose = () => unawaited(relay.close());
+    // Unsupported requests are rejected locally by the SDK. Notifications
+    // never establish a backend connection; this includes cancellations,
+    // whose request ids belong to the client-facing protocol session.
     try {
-      await remoteClient.connect(httpTransport);
+      await relay._localServer.connect(clientSideTransport);
     } on Object {
-      try {
-        await httpTransport.close();
-      } on Object {
-        // The transport is already broken; nothing to salvage.
-      }
+      await relay.close();
       rethrow;
     }
-
-    final remoteVersion = remoteClient.getServerVersion();
-    final localServer = Server(
-      remoteVersion ?? const Implementation(name: 'serlink', version: '0.0.0'),
-      options: McpServerOptions(
-        capabilities:
-            remoteClient.getServerCapabilities() ?? const ServerCapabilities(),
-        protocol: McpProtocol.stable,
-      ),
-    );
-    final relay = SerlinkMcpRelay._(
-      remoteClient: remoteClient,
-      localServer: localServer,
-      log: logFn,
-    );
-
-    localServer.fallbackRequestHandler = relay._forwardToRemote;
-    localServer.fallbackNotificationHandler =
-        relay._forwardNotificationToRemote;
-    remoteClient.fallbackRequestHandler = relay._forwardToLocalClient;
-    remoteClient.fallbackNotificationHandler =
-        relay._forwardNotificationToLocalClient;
-
-    localServer.onclose = () {
-      logFn('serlink-mcp: client-side transport closed');
-      relay._finish();
-    };
-    remoteClient.onclose = () {
-      logFn('serlink-mcp: connection to Serlink closed');
-      relay._finish();
-    };
-
-    try {
-      await localServer.connect(clientSideTransport);
-    } on Object {
-      try {
-        await remoteClient.close();
-      } on Object {
-        // Best-effort cleanup of the remote half.
-      }
-      rethrow;
-    }
-    logFn('serlink-mcp: relaying to $remoteUrl');
     return relay;
   }
 
-  /// Completes when either side of the relay closes.
   Future<void> get done => _doneCompleter.future;
 
-  /// Closes both sides. Safe to call more than once.
   Future<void> close() async {
     if (_closed) {
       return;
     }
     _closed = true;
     try {
-      await _localServer.close();
+      await _connection.close();
     } on Object catch (error) {
-      _log('serlink-mcp: error closing local server: $error');
+      _log('serlink-mcp: error closing backend connection: $error');
     }
     try {
-      await _remoteClient.close();
+      await _localServer.close();
     } on Object catch (error) {
-      _log('serlink-mcp: error closing remote connection: $error');
-    }
-    _finish();
-  }
-
-  void _finish() {
-    if (!_doneCompleter.isCompleted) {
+      _log('serlink-mcp: error closing helper: $error');
+    } finally {
       _doneCompleter.complete();
     }
   }
 
-  Future<BaseResultData> _forwardToRemote(JsonRpcRequest request) {
-    final progressToken = request.meta?['progressToken'];
-    return _remoteClient.request(
-      request,
-      RawResult.fromJson,
-      RequestOptions(
-        // Serlink tool calls can block on user approval, so only the MCP
-        // client's own timeout applies.
-        timeoutEnabled: false,
-        onprogress: progressToken == null
-            ? null
-            : (progress) {
-                unawaited(
-                  _localServer
-                      .notification(
-                        JsonRpcNotification(
-                          method: Method.notificationsProgress,
-                          params: {
-                            'progressToken': progressToken,
-                            'progress': progress.progress,
-                            if (progress.total != null)
-                              'total': progress.total,
-                            if (progress.message != null)
-                              'message': progress.message,
-                          },
-                        ),
-                      )
-                      .catchError((Object error) {
-                        _log('serlink-mcp: failed to forward progress: $error');
-                      }),
-                );
-              },
-      ),
-    );
-  }
-
-  Future<BaseResultData> _forwardToLocalClient(JsonRpcRequest request) {
-    return _localServer.request(
-      request,
-      RawResult.fromJson,
-      RequestOptions(timeoutEnabled: false),
-    );
-  }
-
-  Future<void> _forwardNotificationToRemote(
-    JsonRpcNotification notification,
+  Future<CallToolResult> _callTool(
+    String name,
+    Map<String, dynamic> args,
+    RequestHandlerExtra extra,
   ) async {
-    if (!relayForwardsNotification(notification)) {
-      _log(
-        'serlink-mcp: dropping ${notification.method} '
-        '(cancellation is not propagated across the relay)',
+    final McpClient remote;
+    try {
+      remote = await _connection.connect(
+        _localServer.server.getClientVersion() ??
+            extra.clientInfo ??
+            const Implementation(name: 'serlink-mcp', version: '1.0.0'),
       );
-      return;
+    } on Object catch (error) {
+      final code = error is TimeoutException
+          ? 'connect_timeout'
+          : 'app_unavailable';
+      return _toolError('$code: $error');
     }
-    await _remoteClient.notification(notification);
+
+    final progressToken = extra.meta?['progressToken'];
+    try {
+      // Preserve request metadata and progress tokens across the two protocol
+      // sessions. The SDK assigns fresh request ids on the backend connection.
+      return await remote.request(
+        JsonRpcRequest(
+          id: extra.requestId,
+          method: Method.toolsCall,
+          params: {'name': name, 'arguments': args},
+          meta: extra.meta,
+        ),
+        CallToolResult.fromJson,
+        RequestOptions(
+          // An approval dialog can take as long as the user needs.
+          timeoutEnabled: false,
+          onprogress: progressToken == null
+              ? null
+              : (progress) {
+                  unawaited(
+                    extra
+                        .sendNotification(
+                          JsonRpcNotification(
+                            method: Method.notificationsProgress,
+                            params: {
+                              'progressToken': progressToken,
+                              'progress': progress.progress,
+                              if (progress.total != null)
+                                'total': progress.total,
+                              if (progress.message != null)
+                                'message': progress.message,
+                            },
+                          ),
+                        )
+                        .catchError((Object error) {
+                          _log(
+                            'serlink-mcp: failed to forward progress: $error',
+                          );
+                        }),
+                  );
+                },
+        ),
+      );
+    } on Object catch (error) {
+      await _connection.invalidate(remote);
+      return _toolError(
+        'app_connection_lost: $error. The tool call was not retried; '
+        'its outcome may be unknown. Check the session before retrying.',
+      );
+    }
   }
 
-  Future<void> _forwardNotificationToLocalClient(
-    JsonRpcNotification notification,
-  ) async {
-    if (!relayForwardsNotification(notification)) {
-      _log(
-        'serlink-mcp: dropping ${notification.method} '
-        '(cancellation is not propagated across the relay)',
-      );
-      return;
-    }
-    await _localServer.notification(notification);
-  }
-}
-
-/// Whether the relay forwards [notification] to the other side.
-///
-/// `notifications/cancelled` is intentionally not propagated: forwarded
-/// requests get fresh request ids on the other side, so a forwarded
-/// cancellation would match nothing — or worse, collide with an unrelated
-/// in-flight request and cancel the wrong operation. Dropping cancellations
-/// is a deliberate v1 limitation; wrong-namespace forwarding is worse than
-/// not forwarding.
-bool relayForwardsNotification(JsonRpcNotification notification) {
-  return notification.method != Method.notificationsCancelled;
+  static CallToolResult _toolError(String message) =>
+      CallToolResult(content: [TextContent(text: message)], isError: true);
 }

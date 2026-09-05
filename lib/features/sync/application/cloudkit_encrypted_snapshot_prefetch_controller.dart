@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import '../../../platform/platform_capabilities.dart';
 import '../../vault/application/vault_service.dart';
@@ -123,12 +124,15 @@ class CloudKitEncryptedSnapshotPrefetchController {
     final objects = <String, List<int>>{};
     var totalBytes = manifest.toBytes().length;
     for (final path in objectPaths) {
+      if (!shouldAcceptSnapshot(vaultId)) {
+        return _PrefetchResult.skipped;
+      }
       final bytes = await provider.readObject(RemoteObjectRef(path));
       totalBytes += bytes.length;
       if (totalBytes > maxBytes) {
         return _PrefetchResult.skipped;
       }
-      objects[path] = List<int>.unmodifiable(bytes);
+      objects[path] = Uint8List.fromList(bytes).asUnmodifiableView();
     }
     final after = await provider.readManifest();
     if (after == null ||

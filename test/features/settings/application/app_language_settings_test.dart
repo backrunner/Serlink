@@ -1,9 +1,54 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/features/settings/application/app_language_settings.dart';
 
 void main() {
+  test(
+    'concurrent language and privacy writes preserve both settings',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('serlink-prefs-');
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/preferences.json');
+      await file.writeAsString(jsonEncode({'futurePreference': 'preserved'}));
+      final language = FileAppLanguageSettingsRepository(preferencesFile: file);
+      final privacy = FileAppLanguageSettingsRepository(preferencesFile: file);
+
+      await Future.wait([
+        language.save(AppLanguage.japanese),
+        privacy.saveProtectBackground(true),
+      ]);
+
+      expect(await language.read(), AppLanguage.japanese);
+      expect(await privacy.readProtectBackground(), isTrue);
+      expect(
+        jsonDecode(await file.readAsString())['futurePreference'],
+        'preserved',
+      );
+      expect(await File('${file.path}.tmp').exists(), isFalse);
+    },
+  );
+
+  test('a failed preference write does not block later updates', () async {
+    final directory = await Directory.systemTemp.createTemp('serlink-prefs-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/preferences.json');
+    final repository = FileAppLanguageSettingsRepository(preferencesFile: file);
+    final blocker = Directory('${file.path}.tmp');
+    await blocker.create();
+
+    await expectLater(
+      repository.save(AppLanguage.japanese),
+      throwsA(isA<FileSystemException>()),
+    );
+    await blocker.delete();
+    await repository.saveProtectBackground(true);
+    expect(await repository.readProtectBackground(), isTrue);
+  });
+
   test(
     'app language controller reads and saves the selected language',
     () async {

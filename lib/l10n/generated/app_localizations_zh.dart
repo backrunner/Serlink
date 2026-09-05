@@ -429,7 +429,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsMcpConfigCopied => 'MCP 客户端配置已复制到剪贴板。';
 
   @override
-  String get settingsMcpStdioPathHint => '只要应用保持在此位置，该路径即有效。';
+  String get settingsMcpStdioPathHint => '仅在调用工具时按需启动 Serlink。请保持应用路径不变。';
 
   @override
   String get settingsMcpStdioNotInstalled =>

@@ -31,21 +31,28 @@ class TransferQueueController {
   TransferQueueController({
     this.maxConcurrentTransfers = 2,
     TransferTaskRepository? repository,
+    DateTime Function()? now,
   }) : _repository = repository ?? InMemoryTransferTaskRepository(),
+       _now = now ?? DateTime.now,
        _state = const TransferQueueState(tasks: []);
 
   static const _uuid = Uuid();
 
   final int maxConcurrentTransfers;
   final TransferTaskRepository _repository;
+  final DateTime Function() _now;
   final StreamController<TransferQueueState> _stateController =
       StreamController<TransferQueueState>.broadcast();
   final List<_TransferOperation> _operations = [];
   final Map<TransferTaskId, StreamSubscription<TransferProgress>>
   _subscriptions = {};
+  final Map<TransferTaskId, TransferTask> _pendingTaskSaves = {};
+  Future<void> _pendingPersistence = Future<void>.value();
 
   TransferQueueState _state;
   bool _restoreStarted = false;
+  bool _disposed = false;
+  int _restoreGeneration = 0;
 
   TransferQueueState get state => _state;
 
@@ -55,13 +62,17 @@ class TransferQueueController {
   }
 
   Future<void> restorePersistedTasks() async {
-    if (_restoreStarted) {
+    if (_restoreStarted || _disposed) {
       return;
     }
     _restoreStarted = true;
+    final generation = _restoreGeneration;
     try {
-      final now = DateTime.now().toUtc();
+      final now = _now().toUtc();
       final persisted = await _repository.list();
+      if (_disposed || generation != _restoreGeneration) {
+        return;
+      }
       final currentIds = {for (final task in _state.tasks) task.id.value};
       final restored = <TransferTask>[];
       for (final task in persisted) {
@@ -146,10 +157,7 @@ class TransferQueueController {
     await _subscriptions.remove(taskId)?.cancel();
     _removeQueuedOperation(taskId);
     _replaceTask(
-      task.copyWith(
-        state: TransferState.canceled,
-        completedAt: DateTime.now().toUtc(),
-      ),
+      task.copyWith(state: TransferState.canceled, completedAt: _now().toUtc()),
     );
     _pump();
   }
@@ -176,13 +184,16 @@ class TransferQueueController {
   }
 
   Future<void> clear() async {
-    for (final subscription in _subscriptions.values) {
-      await subscription.cancel();
-    }
+    _restoreGeneration += 1;
+    final subscriptions = _subscriptions.values.toList();
     _subscriptions.clear();
     _operations.clear();
     _setState(const TransferQueueState(tasks: []));
-    await _clearPersistedTasks();
+    final persistence = _clearPersistedTasks();
+    for (final subscription in subscriptions) {
+      await subscription.cancel();
+    }
+    await persistence;
   }
 
   Future<void> retry(TransferTaskId taskId) async {
@@ -224,12 +235,21 @@ class TransferQueueController {
   }
 
   Future<void> dispose() async {
-    for (final subscription in _subscriptions.values) {
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
+    final subscriptions = _subscriptions.values.toList();
+    _subscriptions.clear();
+    _operations.clear();
+    for (final subscription in subscriptions) {
       await subscription.cancel();
     }
-    _subscriptions.clear();
     await _stateController.close();
   }
+
+  /// Waits for already queued history writes without changing transfer state.
+  Future<void> flushPersistence() => _pendingPersistence;
 
   TransferTaskId _enqueue({
     required SftpConnection connection,
@@ -240,7 +260,7 @@ class TransferQueueController {
     required String localPath,
     required String remotePath,
   }) {
-    final now = DateTime.now().toUtc();
+    final now = _now().toUtc();
     final task = TransferTask(
       id: TransferTaskId(_uuid.v4()),
       direction: direction,
@@ -261,6 +281,9 @@ class TransferQueueController {
   }
 
   void _pump() {
+    if (_disposed) {
+      return;
+    }
     final activeCount = _state.tasks
         .where(
           (task) =>
@@ -287,7 +310,7 @@ class TransferQueueController {
   }
 
   void _start(_TransferOperation operation) {
-    final now = DateTime.now().toUtc();
+    final now = _now().toUtc();
     final task = operation.task.copyWith(
       state: TransferState.running,
       startedAt: now,
@@ -328,7 +351,7 @@ class TransferQueueController {
     if (task == null || _isTerminal(task.state)) {
       return;
     }
-    final now = DateTime.now().toUtc();
+    final now = _now().toUtc();
     final startedAt = task.startedAt ?? task.createdAt;
     final elapsedSeconds = now.difference(startedAt).inMilliseconds / 1000;
     final bytesPerSecond = elapsedSeconds <= 0
@@ -373,7 +396,7 @@ class TransferQueueController {
         state: TransferState.failed,
         clearEta: true,
         failure: failure,
-        completedAt: DateTime.now().toUtc(),
+        completedAt: _now().toUtc(),
       ),
     );
     _pump();
@@ -391,7 +414,7 @@ class TransferQueueController {
         task.state == TransferState.paused ||
         total == null ||
         transferred < total) {
-      final now = DateTime.now().toUtc();
+      final now = _now().toUtc();
       _replaceTask(
         task.copyWith(
           state: TransferState.failed,
@@ -412,13 +435,16 @@ class TransferQueueController {
       task.copyWith(
         state: TransferState.completed,
         clearEta: true,
-        completedAt: DateTime.now().toUtc(),
+        completedAt: _now().toUtc(),
       ),
     );
     _pump();
   }
 
   void _replaceTask(TransferTask task) {
+    if (task.state == TransferState.completed) {
+      _operations.removeWhere((operation) => operation.task.id == task.id);
+    }
     for (final operation in _operations) {
       if (operation.task.id == task.id) {
         operation.task = task;
@@ -442,7 +468,7 @@ class TransferQueueController {
           operation.task.state == TransferState.queued) {
         operation.task = operation.task.copyWith(
           state: TransferState.canceled,
-          completedAt: DateTime.now().toUtc(),
+          completedAt: _now().toUtc(),
         );
         break;
       }
@@ -450,39 +476,51 @@ class TransferQueueController {
   }
 
   void _setState(TransferQueueState nextState) {
+    if (_disposed) {
+      return;
+    }
     _state = nextState;
     _stateController.add(nextState);
   }
 
   void _persistTask(TransferTask task) {
-    unawaited(_saveTask(task));
+    if (_disposed) {
+      return;
+    }
+    final alreadyPending = _pendingTaskSaves.containsKey(task.id);
+    _pendingTaskSaves[task.id] = task;
+    if (alreadyPending) {
+      return;
+    }
+    // Keep only the latest progress while encryption or disk writes are busy.
+    unawaited(
+      _enqueuePersistence(() async {
+        final latest = _pendingTaskSaves.remove(task.id);
+        if (latest != null) {
+          await _repository.save(latest);
+        }
+      }),
+    );
   }
 
-  Future<void> _saveTask(TransferTask task) async {
-    try {
-      await _repository.save(task);
-    } on Object {
-      // Transfer persistence is best-effort so vault locking never interrupts
-      // already-established SSH/SFTP connections.
-    }
+  Future<void> _enqueuePersistence(Future<void> Function() action) {
+    final result = _pendingPersistence.then((_) => action()).catchError((
+      Object _,
+    ) {
+      // Locking the vault must not interrupt established transfers.
+    });
+    _pendingPersistence = result;
+    return result;
   }
 
-  Future<void> _deletePersistedTask(TransferTaskId taskId) async {
-    try {
-      await _repository.delete(taskId);
-    } on Object {
-      // Transfer persistence is best-effort so UI cleanup can still proceed
-      // when the vault is unavailable.
-    }
+  Future<void> _deletePersistedTask(TransferTaskId taskId) {
+    _pendingTaskSaves.remove(taskId);
+    return _enqueuePersistence(() => _repository.delete(taskId));
   }
 
-  Future<void> _clearPersistedTasks() async {
-    try {
-      await _repository.clear();
-    } on Object {
-      // Transfer persistence is best-effort so UI cleanup can still proceed
-      // when the vault is unavailable.
-    }
+  Future<void> _clearPersistedTasks() {
+    _pendingTaskSaves.clear();
+    return _enqueuePersistence(_repository.clear);
   }
 }
 

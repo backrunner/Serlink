@@ -54,5 +54,13 @@ The script builds with:
 This channel keeps desktop-local features enabled, including local terminal
 tabs and SSH agent authentication. It can still use CloudKit as long as the
 app is signed with the required CloudKit entitlements and a Developer ID
-provisioning profile. Package the resulting app into a DMG and notarize it
-before distribution.
+provisioning profile. The script also produces
+`build/Serlink-<version>+<build>.dmg` with a branded Retina background and a
+single app icon. Install `uv` before packaging (`brew install uv`). Notarize
+and staple the app and DMG before distribution; see `docs/macos_release.md`.
+
+Double-clicking the app in the DMG installs it into `/Applications` and opens
+the installed copy. If that directory is not writable and there is no system
+install, it uses `~/Applications`. Existing apps require replacement
+confirmation and must be quit first. Installation happens before Flutter
+starts; App Store builds and apps on writable volumes launch normally.

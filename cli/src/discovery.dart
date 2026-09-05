@@ -24,7 +24,7 @@ class DiscoveryInfo {
       throw const FormatException('discovery file is missing "url"');
     }
     final url = Uri.tryParse(urlValue);
-    if (url == null || !url.hasScheme || url.host.isEmpty) {
+    if (url == null || !_isAllowedEndpoint(url)) {
       throw FormatException('discovery file has an invalid "url": $urlValue');
     }
     final token = json['token'];
@@ -32,11 +32,19 @@ class DiscoveryInfo {
       throw const FormatException('discovery file is missing "token"');
     }
     final pid = json['pid'];
-    return DiscoveryInfo(
-      url: url,
-      token: token,
-      pid: pid is int ? pid : null,
-    );
+    return DiscoveryInfo(url: url, token: token, pid: pid is int ? pid : null);
+  }
+
+  /// Discovery files are local trust-boundary inputs. The bearer token must
+  /// never be sent to a remote host, redirected endpoint, or another URL
+  /// scheme, even if a stale or tampered file contains one.
+  static bool _isAllowedEndpoint(Uri url) {
+    return url.scheme == 'http' &&
+        const {'127.0.0.1', 'localhost', '::1'}.contains(url.host) &&
+        url.userInfo.isEmpty &&
+        url.path == '/mcp' &&
+        url.query.isEmpty &&
+        url.fragment.isEmpty;
   }
 
   /// Parses the discovery file contents, throwing [FormatException] on

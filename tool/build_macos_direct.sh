@@ -20,11 +20,12 @@ xcodebuild \
   -configuration Release \
   SERLINK_MACOS_CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
   SERLINK_MACOS_ENTITLEMENTS=Runner/Direct.entitlements \
+  SERLINK_DMG_INSTALLER_ENABLED=YES \
   "$@"
 
 # Build and embed the serlink-mcp stdio helper. Direct (non-App-Store) builds
-# ship it next to the main executable so MCP clients can relay stdio to the
-# app's loopback MCP server; the App Store build excludes it by design.
+# ship it next to the main executable as a standalone MCP server that connects
+# to the app only for tool calls; the App Store build excludes it by design.
 APP_PATH="$ROOT_DIR/build/macos/Build/Products/Release/serlink.app"
 HELPER_PATH="$APP_PATH/Contents/MacOS/serlink-mcp"
 
@@ -57,3 +58,9 @@ codesign \
   --timestamp \
   --entitlements "$ROOT_DIR/macos/Runner/Direct.entitlements" \
   "$APP_PATH"
+
+VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP_PATH/Contents/Info.plist")
+BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$APP_PATH/Contents/Info.plist")
+DMG_PATH="${SERLINK_DMG_PATH:-$ROOT_DIR/build/Serlink-$VERSION+$BUILD_NUMBER.dmg}"
+"$ROOT_DIR/tool/package_macos_dmg.sh" "$APP_PATH" "$DMG_PATH"
+echo "Notarize and staple the app and DMG before distribution; see docs/macos_release.md."

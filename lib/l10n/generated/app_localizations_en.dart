@@ -475,7 +475,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsMcpStdioPathHint =>
-      'This path works while the app stays in place.';
+      'Serlink opens on demand when a tool is called. Keep the app at this path.';
 
   @override
   String get settingsMcpStdioNotInstalled =>

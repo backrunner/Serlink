@@ -258,14 +258,18 @@ LazyDatabase _open() {
     await LocalFileSecurity.preparePrivateDirectory(paths.directory);
     await LocalFileSecurity.restrictFile(paths.databaseFile);
     final profileLock = AppProfileLock.acquire(paths.lockFile);
-    await DatabaseMigrationPreflight(
-      databaseFile: paths.databaseFile,
-      automaticBackupDirectory: paths.automaticBackupDirectory,
-    ).run(targetSchemaVersion: SerlinkDatabase.currentSchemaVersion);
-    final database = NativeDatabase.createInBackground(
-      paths.databaseFile,
-    ).interceptWith(_CloseCallbackQueryInterceptor(profileLock.release));
-    return database;
+    try {
+      await DatabaseMigrationPreflight(
+        databaseFile: paths.databaseFile,
+        automaticBackupDirectory: paths.automaticBackupDirectory,
+      ).run(targetSchemaVersion: SerlinkDatabase.currentSchemaVersion);
+      return NativeDatabase.createInBackground(
+        paths.databaseFile,
+      ).interceptWith(_CloseCallbackQueryInterceptor(profileLock.release));
+    } on Object {
+      await profileLock.release();
+      rethrow;
+    }
   });
 }
 

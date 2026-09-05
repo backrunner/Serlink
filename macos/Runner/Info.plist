@@ -38,5 +38,7 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>SerlinkDMGInstallerEnabled</key>
+	<string>$(SERLINK_DMG_INSTALLER_ENABLED)</string>
 </dict>
 </plist>

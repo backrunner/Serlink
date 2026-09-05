@@ -17,6 +17,7 @@ import 'package:serlink/features/mcp/application/mcp_server_controller.dart';
 import 'package:serlink/features/mcp/data/command_risk_policy.dart';
 import 'package:serlink/features/mcp/data/mcp_server_transport.dart';
 import 'package:serlink/features/mcp/domain/agent_session.dart';
+import 'package:serlink/features/mcp/domain/mcp_contract.dart';
 import 'package:serlink/features/security/application/security_modal_service.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
@@ -53,24 +54,38 @@ void main() {
       expect(harness.bridge!.lastOpenClientName, 'test-client');
     });
 
-    test('server sends agent behavior instructions at initialization', () async {
-      final container = _container(harness: _Harness());
-      addTearDown(container.dispose);
-      final controller = container.read(mcpServerControllerProvider.notifier);
-      await controller.start();
-      final state = container.read(mcpServerControllerProvider);
-      final client = await _connectClient(state.port!, state.token!);
-      addTearDown(client.close);
+    test(
+      'server sends agent behavior instructions at initialization',
+      () async {
+        final container = _container(harness: _Harness());
+        addTearDown(container.dispose);
+        final controller = container.read(mcpServerControllerProvider.notifier);
+        await controller.start();
+        final state = container.read(mcpServerControllerProvider);
+        final client = await _connectClient(state.port!, state.token!);
+        addTearDown(client.close);
 
-      final instructions = client.getInstructions();
-      expect(instructions, isNotNull);
-      expect(instructions, contains('serlink_list_hosts'));
-      expect(instructions, contains('serlink_open_session'));
-      expect(instructions, contains('serlink_close_session'));
-      expect(instructions, contains('NEVER connect to any host yourself'));
-      expect(instructions, contains('vault_locked'));
-      expect(instructions, contains('authorization_denied'));
-    });
+        final instructions = client.getInstructions();
+        expect(instructions, isNotNull);
+        expect(instructions, contains('serlink_list_hosts'));
+        expect(instructions, contains('serlink_open_session'));
+        expect(instructions, contains('serlink_close_session'));
+        expect(instructions, contains('NEVER connect to any host yourself'));
+        expect(instructions, contains('vault_locked'));
+        expect(instructions, contains('authorization_denied'));
+
+        final tools = (await client.listTools()).tools;
+        expect(
+          tools.map((tool) => tool.name),
+          unorderedEquals(serlinkMcpTools.keys),
+        );
+        for (final tool in tools) {
+          final definition = serlinkMcpTools[tool.name]!;
+          expect(tool.description, definition.description);
+          expect(tool.inputSchema.toJson(), definition.inputSchema.toJson());
+        }
+      },
+    );
 
     test('serlink_list_hosts surfaces vault_locked through the tool', () async {
       final container = _container(harness: _Harness());
@@ -92,7 +107,8 @@ void main() {
       expect(text, contains('vault_locked'));
     });
 
-    test('serlink_exec clamps timeoutMs to 500..120000', () async {      final harness = _Harness();
+    test('serlink_exec clamps timeoutMs to 500..120000', () async {
+      final harness = _Harness();
       final container = _container(harness: harness);
       addTearDown(container.dispose);
       final controller = container.read(mcpServerControllerProvider.notifier);
@@ -115,11 +131,7 @@ void main() {
       await client.callTool(
         CallToolRequest(
           name: 'serlink_exec',
-          arguments: {
-            'sessionId': 's1',
-            'command': 'ls',
-            'timeoutMs': 600000,
-          },
+          arguments: {'sessionId': 's1', 'command': 'ls', 'timeoutMs': 600000},
         ),
       );
       expect(

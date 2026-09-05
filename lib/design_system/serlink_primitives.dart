@@ -108,7 +108,7 @@ class SurfaceSection extends StatelessWidget {
               color: t.textMuted,
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.4,
+              letterSpacing: 0,
             ),
           ),
         ),

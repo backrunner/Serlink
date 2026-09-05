@@ -133,7 +133,7 @@
   "settingsMcpCopyHttpConfigAction": "复制 HTTP MCP 配置 (JSON)",
   "settingsMcpCopyStdioConfigAction": "复制 stdio 助手配置 (JSON)",
   "settingsMcpConfigCopied": "MCP 客户端配置已复制到剪贴板。",
-  "settingsMcpStdioPathHint": "只要应用保持在此位置，该路径即有效。",
+  "settingsMcpStdioPathHint": "仅在调用工具时按需启动 Serlink。请保持应用路径不变。",
   "settingsMcpStdioNotInstalled": "stdio 助手仅随 Serlink 发布版本提供，当前安装中不可用。",
   "settingsMcpGrantsTitle": "活动授权",
   "settingsMcpGrantsEmpty": "当前没有代理拥有访问权限。",

@@ -13,20 +13,21 @@ class MobileWorkspaceScreen extends ConsumerWidget {
     final session = ref.watch(vaultSessionControllerProvider).value;
     if (session != null && !session.localDataHealthy) {
       return Scaffold(
-        body: DecoratedBox(
-          decoration: BoxDecoration(color: context.tokens.surfaceBase),
+        body: SerlinkWindowBackdrop(
           child: _VaultAccessSurface(session: session),
         ),
       );
     }
 
     return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(color: context.tokens.surfaceBase),
+      body: SerlinkWindowBackdrop(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= _tabletBreakpoint;
             return FScaffold(
+              scaffoldStyle: const FScaffoldStyleDelta.delta(
+                backgroundColor: Colors.transparent,
+              ),
               childPad: false,
               sidebar: wide
                   ? _MobileSidebar(
@@ -338,23 +339,14 @@ class _MobileMainSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: context.tokens.surfaceBase,
-        border: Border(top: BorderSide(color: context.tokens.borderSubtle)),
-      ),
-      child: Column(
-        children: [
-          if (_showsMobileWorkspaceSearch(state.area))
-            _MobileWorkspaceSearchBar(
-              placeholder: _workspaceSearchPlaceholder(
-                context.l10n,
-                state.area,
-              ),
-            ),
-          Expanded(child: _MainSurface(state: state)),
-        ],
-      ),
+    return Column(
+      children: [
+        if (_showsMobileWorkspaceSearch(state.area))
+          _MobileWorkspaceSearchBar(
+            placeholder: _workspaceSearchPlaceholder(context.l10n, state.area),
+          ),
+        Expanded(child: _MainSurface(state: state)),
+      ],
     );
   }
 }
@@ -427,10 +419,7 @@ class _MobileSidebar extends StatelessWidget {
     return SizedBox(
       width: 220,
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: context.tokens.surfaceBase,
-          border: Border(right: BorderSide(color: context.tokens.borderSubtle)),
-        ),
+        decoration: BoxDecoration(color: context.tokens.surfaceSunken),
         child: SafeArea(
           right: false,
           child: Padding(

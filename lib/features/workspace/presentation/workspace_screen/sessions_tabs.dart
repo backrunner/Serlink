@@ -30,6 +30,7 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
 
     if (state.tabs.isEmpty || active == null) {
       return _PlaceholderSurface(
+        icon: Icons.terminal_rounded,
         title: context.l10n.sessionsEmptyTitle,
         body: context.l10n.sessionsEmptyBody,
       );
@@ -39,12 +40,7 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
       children: [
         Container(
           height: 44,
-          decoration: BoxDecoration(
-            color: context.tokens.surfaceBase,
-            border: Border(
-              bottom: BorderSide(color: context.tokens.borderSubtle),
-            ),
-          ),
+          decoration: BoxDecoration(color: context.tokens.surfaceBase),
           child: Row(
             children: [
               Expanded(
@@ -80,11 +76,7 @@ class _WorkspaceTabsState extends ConsumerState<_WorkspaceTabs> {
                 ),
               ),
               if (toolbar != null) ...[
-                VerticalDivider(
-                  width: 1,
-                  thickness: 1,
-                  color: context.tokens.borderSubtle,
-                ),
+                const SizedBox(width: SerlinkSpacing.sm),
                 _TerminalToolbar(snapshot: toolbar),
               ],
             ],
@@ -168,23 +160,14 @@ class _TabPill extends StatelessWidget {
     Widget pill = DecoratedBox(
       key: ValueKey('workspace-tab-${tab.id.value}'),
       decoration: BoxDecoration(
-        color: selected ? t.accentPrimary.withValues(alpha: 0.16) : null,
+        color: selected ? t.surfaceRaised : Colors.transparent,
         borderRadius: SerlinkRadii.control,
-        border: Border.all(
-          color: selected
-              ? t.accentPrimary.withValues(alpha: 0.5)
-              : t.borderSubtle,
-        ),
       ),
       child: SerlinkPressable(
         onTap: onTap,
         borderRadius: SerlinkRadii.control,
-        hoverColor: selected
-            ? t.accentPrimary.withValues(alpha: 0.08)
-            : t.accentPrimary.withValues(alpha: 0.06),
-        pressedColor: selected
-            ? t.accentPrimary.withValues(alpha: 0.14)
-            : t.accentPrimary.withValues(alpha: 0.1),
+        hoverColor: t.surfaceOverlay,
+        pressedColor: t.surfaceOverlay,
         child: SizedBox(
           height: 30,
           child: Padding(

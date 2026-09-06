@@ -167,6 +167,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
         width: contentWidth,
         height: viewportHeight,
         controller: _scrollController,
+        fillHeight: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

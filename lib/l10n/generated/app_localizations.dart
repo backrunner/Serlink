@@ -2410,6 +2410,42 @@ abstract class AppLocalizations {
   /// **'Confirm before run'**
   String get snippetConfirmBeforeRun;
 
+  /// No description provided for @snippetCollapseEditorTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show snippet details'**
+  String get snippetCollapseEditorTooltip;
+
+  /// No description provided for @snippetEditorKeysHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tab / Shift+Tab indent · Esc next field'**
+  String get snippetEditorKeysHint;
+
+  /// No description provided for @snippetCursorPosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Ln {line}, Col {column}'**
+  String snippetCursorPosition(int line, int column);
+
+  /// No description provided for @snippetDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get snippetDiscardTitle;
+
+  /// No description provided for @snippetDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your changes to this snippet have not been saved.'**
+  String get snippetDiscardBody;
+
+  /// No description provided for @snippetDiscardAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes'**
+  String get snippetDiscardAction;
+
   /// No description provided for @snippetExpandEditorTooltip.
   ///
   /// In en, this message translates to:

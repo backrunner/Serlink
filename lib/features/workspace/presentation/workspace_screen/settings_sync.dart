@@ -110,8 +110,9 @@ class _SyncSettingsSection extends ConsumerWidget {
       },
     );
 
-    return SurfaceSection(
+    return _SettingsSection(
       title: l10n.syncSectionTitle,
+      icon: Icons.cloud_sync_outlined,
       children: [
         webDavRow,
         ?iCloudRow,
@@ -166,11 +167,7 @@ class _SyncSettingsSection extends ConsumerWidget {
                 return _SettingsActionRow(
                   icon: Icons.devices_outlined,
                   title: l10n.syncDevicesTitle,
-                  subtitle: _syncDevicesSubtitle(
-                    l10n,
-                    devices,
-                    mobile: mobile,
-                  ),
+                  subtitle: _syncDevicesSubtitle(l10n, devices, mobile: true),
                   action: compactActions
                       ? viewButton
                       : Wrap(

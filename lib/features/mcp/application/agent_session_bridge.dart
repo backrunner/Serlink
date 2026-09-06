@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/app_dependencies.dart';
 import '../../../core/ids/entity_id.dart';
+import '../../../core/logging/offline_diagnostic_logger.dart';
 import '../../hosts/application/host_store.dart';
 import '../../hosts/domain/host.dart';
 import '../../security/application/security_modal_service.dart';
@@ -98,15 +99,13 @@ class AgentSessionBridge {
   final StreamController<List<AgentSessionHandle>> _sessionsChanged =
       StreamController<List<AgentSessionHandle>>.broadcast();
 
-  List<AgentSessionHandle> get sessions => List.unmodifiable(
-    _sessions.values.map((entry) => entry.handle),
-  );
+  List<AgentSessionHandle> get sessions =>
+      List.unmodifiable(_sessions.values.map((entry) => entry.handle));
 
   /// Emits the current session list on every open/close/state change. New
   /// listeners only see later mutations; read [sessions] for the initial
   /// snapshot.
-  Stream<List<AgentSessionHandle>> get watchSessions =>
-      _sessionsChanged.stream;
+  Stream<List<AgentSessionHandle>> get watchSessions => _sessionsChanged.stream;
 
   void _emitSessions() {
     _sessionsChanged.add(sessions);
@@ -168,7 +167,20 @@ class AgentSessionBridge {
     }
     final tabId = tab.id;
     final sessionId = content.primaryPane.sessionId;
-    await _waitForAttach(tabId, sessionId);
+    final logger = _ref.read(offlineDiagnosticLoggerProvider);
+    final details = {'sessionId': sessionId.value, 'hostId': hostId.value};
+    await logger.record('mcp.session.open.start', details: details);
+    try {
+      await _waitForAttach(tabId, sessionId);
+    } on McpBridgeException catch (error) {
+      await logger.record(
+        'mcp.session.open.failure',
+        level: DiagnosticLogLevel.error,
+        details: {...details, 'code': error.code},
+      );
+      rethrow;
+    }
+    await logger.record('mcp.session.open.success', details: details);
 
     final handle = AgentSessionHandle(
       sessionId: sessionId,
@@ -390,7 +402,8 @@ class AgentSessionBridge {
     );
   }
 
-  VaultSessionState _requireUnlockedVault() {    final vault = _ref.read(vaultSessionControllerProvider).value;
+  VaultSessionState _requireUnlockedVault() {
+    final vault = _ref.read(vaultSessionControllerProvider).value;
     if (vault == null || vault.vaultState != VaultState.unlocked) {
       throw const McpBridgeException('vault_locked');
     }

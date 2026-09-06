@@ -6,6 +6,7 @@ class _SettingsActionRow extends StatelessWidget {
     required this.title,
     required this.action,
     this.subtitle,
+    this.helpText,
     this.subtitleWidget,
     this.actionWidth,
     this.compactActionWidth,
@@ -16,6 +17,7 @@ class _SettingsActionRow extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
+  final String? helpText;
   final Widget? subtitleWidget;
   final Widget? action;
   final double? actionWidth;
@@ -29,6 +31,21 @@ class _SettingsActionRow extends StatelessWidget {
     final subtitleStyle = Theme.of(
       context,
     ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
+    Widget rowTitle({bool compact = false}) {
+      final label = Text(
+        title,
+        maxLines: compact ? 2 : null,
+        overflow: compact ? TextOverflow.ellipsis : null,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w500,
+          color: t.textPrimary,
+        ),
+      );
+      return helpText == null
+          ? label
+          : Tooltip(message: helpText!, child: label);
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < _settingsRowCompactBreakpoint;
@@ -48,13 +65,7 @@ class _SettingsActionRow extends StatelessWidget {
               ),
               subtitleGap: 1,
               leading: _SettingsRowIcon(icon: icon),
-              title: Text(
-                title,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: t.textPrimary,
-                ),
-              ),
+              title: rowTitle(),
               subtitle: desktopSubtitle,
               trailing: action == null
                   ? null
@@ -72,11 +83,14 @@ class _SettingsActionRow extends StatelessWidget {
             subtitleWidget ??
             (subtitle == null || subtitle!.trim().isEmpty
                 ? null
-                : Text(
-                    subtitle!,
-                    maxLines: 1,
-                    overflow: compact ? TextOverflow.ellipsis : null,
-                    style: subtitleStyle,
+                : Tooltip(
+                    message: subtitle!,
+                    child: Text(
+                      subtitle!,
+                      maxLines: _settingsUseCompactControls(context) ? 1 : 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: subtitleStyle,
+                    ),
                   ));
         final configuredActionWidth = compactActionWidth ?? actionWidth;
         final slotWidth = math.min(
@@ -124,15 +138,7 @@ class _SettingsActionRow extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: t.textPrimary,
-                      ),
-                    ),
+                    rowTitle(compact: true),
                     if (effectiveSubtitle != null) ...[
                       const SizedBox(height: 2),
                       effectiveSubtitle,
@@ -348,7 +354,10 @@ bool _settingsUseCompactControls(BuildContext context) {
 
 List<SerlinkSelectItem<AppLanguage>> _languageItems(AppLocalizations l10n) {
   return [
-    SerlinkSelectItem(value: AppLanguage.system, label: l10n.settingsLanguageSystem),
+    SerlinkSelectItem(
+      value: AppLanguage.system,
+      label: l10n.settingsLanguageSystem,
+    ),
     SerlinkSelectItem(
       value: AppLanguage.english,
       label: l10n.settingsLanguageEnglish,
@@ -505,13 +514,6 @@ String _localUnlockLabel(
     return l10n.settingsLocalUnlockUnavailable;
   }
   return l10n.settingsLocalUnlockDisabled;
-}
-
-String _settingsLanguageSubtitle(AppLocalizations l10n, bool mobile) {
-  if (!mobile) {
-    return l10n.settingsLanguageSubtitle;
-  }
-  return l10n.settingsLanguageSubtitleMobile;
 }
 
 String _settingsCredentialsLocked(AppLocalizations l10n, bool mobile) {

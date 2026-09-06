@@ -34,36 +34,39 @@ class WorkspaceScreen extends ConsumerWidget {
     return _NativeTerminationGuard(
       child: _SshConfigImportPromptGate(
         child: Scaffold(
-          body: Row(
-            children: [
-              _Sidebar(
-                selected: state.area,
-                onSelected: (area) {
-                  if (area != state.area) {
-                    ref
-                        .read(vaultSessionControllerProvider.notifier)
-                        .resetUnlockFailureState();
-                  }
-                  controller.selectArea(area);
-                },
-              ),
-              VerticalDivider(
-                width: 1,
-                thickness: 1,
-                color: context.tokens.borderSubtle,
-              ),
-              Expanded(
-                child: Material(
-                  color: context.tokens.surfaceBase,
-                  child: Column(
-                    children: [
-                      if (showTopBar) const _TopBar(),
-                      Expanded(child: _MainSurface(state: state)),
-                    ],
+          body: SerlinkWindowBackdrop(
+            backgroundColor: context.tokens.surfaceSunken,
+            child: Row(
+              children: [
+                _Sidebar(
+                  selected: state.area,
+                  onSelected: (area) {
+                    if (area != state.area) {
+                      ref
+                          .read(vaultSessionControllerProvider.notifier)
+                          .resetUnlockFailureState();
+                    }
+                    controller.selectArea(area);
+                  },
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+                    child: Material(
+                      color: context.tokens.surfaceBase,
+                      borderRadius: SerlinkRadii.workspace,
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          if (showTopBar) const _TopBar(),
+                          Expanded(child: _MainSurface(state: state)),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -101,47 +104,44 @@ class _Sidebar extends StatelessWidget {
     final l10n = context.l10n;
     return SizedBox(
       width: SerlinkSizes.sidebarWidth,
-      child: DecoratedBox(
-        decoration: serlinkBackdrop(context.tokens),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _BrandHeader(),
-              _NavItem(
-                icon: Icons.dns_outlined,
-                label: l10n.navHosts,
-                selected: selected == WorkspaceArea.hosts,
-                onTap: () => onSelected(WorkspaceArea.hosts),
-              ),
-              _NavItem(
-                icon: Icons.terminal_outlined,
-                label: l10n.navSessions,
-                selected: selected == WorkspaceArea.sessions,
-                onTap: () => onSelected(WorkspaceArea.sessions),
-              ),
-              _NavItem(
-                icon: Icons.sync_alt_outlined,
-                label: l10n.navTransfers,
-                selected: selected == WorkspaceArea.transfers,
-                onTap: () => onSelected(WorkspaceArea.transfers),
-              ),
-              _NavItem(
-                icon: Icons.code_outlined,
-                label: l10n.navSnippets,
-                selected: selected == WorkspaceArea.snippets,
-                onTap: () => onSelected(WorkspaceArea.snippets),
-              ),
-              const Spacer(),
-              _NavItem(
-                icon: Icons.settings_outlined,
-                label: l10n.navSettings,
-                selected: selected == WorkspaceArea.settings,
-                onTap: () => onSelected(WorkspaceArea.settings),
-              ),
-            ],
-          ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _BrandHeader(),
+            _NavItem(
+              icon: Icons.dns_outlined,
+              label: l10n.navHosts,
+              selected: selected == WorkspaceArea.hosts,
+              onTap: () => onSelected(WorkspaceArea.hosts),
+            ),
+            _NavItem(
+              icon: Icons.terminal_outlined,
+              label: l10n.navSessions,
+              selected: selected == WorkspaceArea.sessions,
+              onTap: () => onSelected(WorkspaceArea.sessions),
+            ),
+            _NavItem(
+              icon: Icons.sync_alt_outlined,
+              label: l10n.navTransfers,
+              selected: selected == WorkspaceArea.transfers,
+              onTap: () => onSelected(WorkspaceArea.transfers),
+            ),
+            _NavItem(
+              icon: Icons.code_outlined,
+              label: l10n.navSnippets,
+              selected: selected == WorkspaceArea.snippets,
+              onTap: () => onSelected(WorkspaceArea.snippets),
+            ),
+            const Spacer(),
+            _NavItem(
+              icon: Icons.settings_outlined,
+              label: l10n.navSettings,
+              selected: selected == WorkspaceArea.settings,
+              onTap: () => onSelected(WorkspaceArea.settings),
+            ),
+          ],
         ),
       ),
     );
@@ -245,33 +245,19 @@ class _NavItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 120),
         curve: Curves.easeOut,
         decoration: BoxDecoration(
           color: selected ? t.surfaceRaised : Colors.transparent,
           borderRadius: SerlinkRadii.control,
-          border: Border.all(
-            color: selected ? t.borderSubtle : Colors.transparent,
-          ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: t.shadowColor.withValues(alpha: 0.06),
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
-                  ),
-                ]
-              : null,
         ),
         child: SerlinkPressable(
           onTap: onTap,
           borderRadius: SerlinkRadii.control,
-          hoverColor: selected
-              ? t.accentSecondary.withValues(alpha: 0.1)
-              : t.accentPrimary.withValues(alpha: 0.06),
-          pressedColor: selected
-              ? t.accentStrong.withValues(alpha: 0.14)
-              : t.accentPrimary.withValues(alpha: 0.1),
+          hoverColor: selected ? Colors.transparent : t.surfaceOverlay,
+          pressedColor: t.surfaceOverlay,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             child: Row(
@@ -314,12 +300,106 @@ class _MainSurface extends ConsumerWidget {
     if (session != null && !session.localDataHealthy) {
       return _VaultAccessSurface(session: session);
     }
-    return switch (state.area) {
-      WorkspaceArea.hosts => const _HostsSurface(),
-      WorkspaceArea.sessions => _WorkspaceTabs(state: state),
-      WorkspaceArea.transfers => const _TransfersSurface(),
-      WorkspaceArea.snippets => const _SnippetsSurface(),
-      WorkspaceArea.settings => const _SettingsSurface(),
-    };
+    if (ref.watch(platformCapabilitiesProvider).prefersMobileWorkspaceShell) {
+      return _buildWorkspaceArea(state.area, state);
+    }
+    return _WorkspaceAreaStack(
+      state: state,
+      vaultUnlocked: session?.vaultState == VaultState.unlocked,
+    );
+  }
+}
+
+Widget _buildWorkspaceArea(WorkspaceArea area, WorkspaceState state) {
+  return switch (area) {
+    WorkspaceArea.hosts => const _HostsSurface(),
+    WorkspaceArea.sessions => _WorkspaceTabs(state: state),
+    WorkspaceArea.transfers => const _TransfersSurface(),
+    WorkspaceArea.snippets => const _SnippetsSurface(),
+    WorkspaceArea.settings => const _SettingsSurface(),
+  };
+}
+
+/// Mount each area on its first visit and retain its scroll, selection, and
+/// terminal viewport state. Hidden areas neither animate nor receive input.
+class _WorkspaceAreaStack extends StatefulWidget {
+  const _WorkspaceAreaStack({required this.state, required this.vaultUnlocked});
+
+  final WorkspaceState state;
+  final bool vaultUnlocked;
+
+  @override
+  State<_WorkspaceAreaStack> createState() => _WorkspaceAreaStackState();
+}
+
+class _WorkspaceAreaStackState extends State<_WorkspaceAreaStack> {
+  final _visited = <WorkspaceArea>{};
+  final _focusScopes = <WorkspaceArea, FocusScopeNode>{};
+  final _lastFocused = <WorkspaceArea, FocusNode>{};
+
+  @override
+  void didUpdateWidget(_WorkspaceAreaStack oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final area = widget.state.area;
+    if (oldWidget.state.area != area) {
+      final previousFocus = _focusScopes[oldWidget.state.area]?.focusedChild;
+      if (previousFocus != null) {
+        _lastFocused[oldWidget.state.area] = previousFocus;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.state.area == area) {
+          final focus = _lastFocused[area];
+          if (focus?.context != null && focus!.canRequestFocus) {
+            focus.requestFocus();
+          } else {
+            _focusScopes[area]?.requestFocus();
+          }
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final scope in _focusScopes.values) {
+      scope.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Never retain an inactive unlock form (including its passphrase), or
+    // decrypted host/snippet views after the vault has been locked.
+    if (!widget.vaultUnlocked) {
+      _visited.removeAll([WorkspaceArea.hosts, WorkspaceArea.snippets]);
+      _lastFocused.remove(WorkspaceArea.hosts);
+      _lastFocused.remove(WorkspaceArea.snippets);
+    }
+    _visited.add(widget.state.area);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (final area in WorkspaceArea.values)
+          if (_visited.contains(area))
+            Offstage(
+              key: ValueKey('workspace-area-${area.name}'),
+              offstage: area != widget.state.area,
+              child: TickerMode(
+                enabled: area == widget.state.area,
+                child: FocusScope(
+                  node: _focusScopes.putIfAbsent(
+                    area,
+                    () => FocusScopeNode(debugLabel: 'workspace-${area.name}'),
+                  ),
+                  canRequestFocus: area == widget.state.area,
+                  descendantsAreFocusable: area == widget.state.area,
+                  skipTraversal: area != widget.state.area,
+                  child: _buildWorkspaceArea(area, widget.state),
+                ),
+              ),
+            ),
+      ],
+    );
   }
 }

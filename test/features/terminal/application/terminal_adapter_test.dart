@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
@@ -8,6 +9,32 @@ import 'package:serlink/features/terminal/application/terminal_zmodem_transfer.d
 import 'package:xterm/xterm.dart';
 
 void main() {
+  for (final useZModem in [false, true]) {
+    test('accepts real SSH Uint8List streams (zmodem=$useZModem)', () async {
+      final terminal = Terminal();
+      final session = _TypedShellSession();
+      final adapter = TerminalAdapter(
+        terminal: terminal,
+        session: session,
+        zmodemTransferHandler: useZModem
+            ? const _NoopZModemTransferHandler()
+            : null,
+      );
+      adapter.attach();
+      addTearDown(adapter.close);
+      final bytes = utf8.encode('中文🙂');
+      session.emitStdout(bytes.sublist(0, 1));
+      session.emitStdout(bytes.sublist(1));
+      session.emitStderr(utf8.encode('stderr-ready'));
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(terminal.buffer.getText(), contains('中文🙂'));
+      expect(terminal.buffer.getText(), contains('stderr-ready'));
+      terminal.textInput('typed-input\r');
+      await Future<void>.delayed(Duration.zero);
+      expect(utf8.decode(session.writes.single), 'typed-input\r');
+    });
+  }
   for (final useZModem in [false, true]) {
     test(
       'decodes split UTF-8 independently on stdout and stderr (zmodem=$useZModem)',
@@ -324,4 +351,11 @@ class _FakeShellSession implements SshShellSession {
     await _stdout.close();
     await _stderr.close();
   }
+}
+
+class _TypedShellSession extends _FakeShellSession {
+  @override
+  Stream<Uint8List> get stdout => super.stdout.map(Uint8List.fromList);
+  @override
+  Stream<Uint8List> get stderr => super.stderr.map(Uint8List.fromList);
 }

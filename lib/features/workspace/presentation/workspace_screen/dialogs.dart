@@ -719,8 +719,7 @@ class _PlaceholderSurface extends StatelessWidget {
   final String title;
   final String body;
 
-  /// Optional semantic icon; when present it renders in the same accent
-  /// square used by `_DialogStateView` so both empty states share a layout.
+  /// Optional semantic icon in a quiet, rounded tile above the empty state.
   final IconData? icon;
   final bool loading;
   final Widget? action;
@@ -749,13 +748,10 @@ class _PlaceholderSurface extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: t.accentPrimary.withValues(alpha: 0.12),
-                  borderRadius: SerlinkRadii.control,
-                  border: Border.all(
-                    color: t.accentPrimary.withValues(alpha: 0.28),
-                  ),
+                  color: t.surfaceRaised,
+                  borderRadius: SerlinkRadii.workspace,
                 ),
-                child: Icon(icon, size: 26, color: t.accentPrimary),
+                child: Icon(icon, size: 26, color: t.textMuted),
               ),
               const SizedBox(height: 14),
             ],

@@ -24,7 +24,6 @@ class _HostRow extends StatelessWidget {
     final l10n = context.l10n;
     final t = context.tokens;
     final subtitle = '${host.username}@${host.hostname}:${host.port}';
-    final trustState = _visibleTrustState(host.trustState);
     final row = ListRow(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
@@ -69,9 +68,9 @@ class _HostRow extends StatelessWidget {
               ],
             ),
           ),
-          if (trustState != null) ...[
+          if (host.trustState == HostTrustState.changed) ...[
             const SizedBox(width: 12),
-            _TrustText(state: trustState),
+            StatusPill(label: l10n.hostTrustChanged, color: t.statusDanger),
           ],
           const SizedBox(width: 12),
           _HostActionButton(
@@ -289,13 +288,6 @@ class _SwipeHostAction extends StatelessWidget {
   }
 }
 
-HostTrustState? _visibleTrustState(HostTrustState state) {
-  return switch (state) {
-    HostTrustState.unknown => null,
-    HostTrustState.trusted || HostTrustState.changed => state,
-  };
-}
-
 class _HostActionButton extends StatelessWidget {
   const _HostActionButton({
     super.key,
@@ -345,14 +337,8 @@ class _HostActionButton extends StatelessWidget {
           );
     final button = DecoratedBox(
       decoration: BoxDecoration(
-        gradient: primary ? serlinkAccentGradient(t) : null,
-        color: primary ? null : t.surfaceRaised,
+        color: primary ? t.accentStrong : t.surfaceSunken,
         borderRadius: SerlinkRadii.control,
-        border: Border.all(
-          color: primary
-              ? t.accentPrimary.withValues(alpha: 0.5)
-              : t.borderStrong,
-        ),
       ),
       child: SerlinkPressable(
         onTap: onPressed,
@@ -374,27 +360,5 @@ class _HostActionButton extends StatelessWidget {
       return button;
     }
     return SerlinkTooltip(message: label, child: button);
-  }
-}
-
-class _TrustText extends StatelessWidget {
-  const _TrustText({required this.state});
-
-  final HostTrustState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final color = switch (state) {
-      HostTrustState.trusted => t.statusSuccess,
-      HostTrustState.unknown => t.statusWarning,
-      HostTrustState.changed => t.statusDanger,
-    };
-    final label = switch (state) {
-      HostTrustState.trusted => context.l10n.hostTrustTrusted,
-      HostTrustState.unknown => context.l10n.hostTrustVerify,
-      HostTrustState.changed => context.l10n.hostTrustChanged,
-    };
-    return StatusPill(label: label, color: color);
   }
 }

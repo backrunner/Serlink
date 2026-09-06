@@ -8,10 +8,12 @@ import 'package:uuid/uuid.dart';
 import '../../../app/app_dependencies.dart';
 import '../../../core/failure/app_failure.dart';
 import '../../../core/ids/entity_id.dart';
+import '../../../core/logging/offline_diagnostic_logger.dart';
 import '../../hosts/domain/host.dart';
 import '../../ssh/application/connection_profile_resolver.dart';
 import '../../ssh/application/ssh_session_service.dart';
 import '../../ssh/data/dartssh2_ssh_session_service.dart';
+import '../../ssh/data/ssh_diagnostic_details.dart';
 import '../../ssh/domain/connection_profile.dart';
 import '../../terminal/application/local_terminal_service.dart';
 import '../../terminal/application/terminal_display_settings.dart';
@@ -1861,6 +1863,27 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     int paneIndex,
     Object error,
   ) {
+    if (ref.mounted) {
+      final tab = state.tabs.where((tab) => tab.id == tabId).firstOrNull;
+      final panes = tab == null ? null : _terminalPanesOf(tab.content);
+      if (panes != null && paneIndex >= 0 && paneIndex < panes.length) {
+        final pane = panes[paneIndex];
+        unawaited(
+          ref
+              .read(offlineDiagnosticLoggerProvider)
+              .record(
+                'workspace.ssh.failure',
+                level: DiagnosticLogLevel.error,
+                details: {
+                  'sessionId': pane.sessionId.value,
+                  'hostId': (pane.endpoint?.hostId ?? tab!.hostId)?.value,
+                  'stage': pane.lifecycle.name,
+                  ...sshDiagnosticDetails(error),
+                },
+              ),
+        );
+      }
+    }
     _setTerminalPaneLifecycle(
       tabId,
       paneIndex,

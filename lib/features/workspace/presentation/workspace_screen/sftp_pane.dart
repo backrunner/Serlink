@@ -158,7 +158,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
                   ),
           ),
         ),
-        const Divider(height: 1),
+        const SizedBox(height: SerlinkSpacing.xs),
         Expanded(
           child: _buildDropUploadTarget(
             enabled: canDropUpload,
@@ -356,7 +356,8 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
         }
         return ListView.separated(
           itemCount: _showParentEntry ? entries.length + 1 : entries.length,
-          separatorBuilder: (context, index) => const Divider(height: 1),
+          separatorBuilder: (context, index) =>
+              const SizedBox(height: SerlinkSpacing.xs),
           itemBuilder: (context, index) {
             if (_showParentEntry && index == 0) {
               return _SftpEntryRow(

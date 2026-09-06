@@ -6,9 +6,8 @@ import 'serlink_dimensions.dart';
 import 'serlink_effects.dart';
 import 'serlink_tokens.dart';
 
-/// A raised surface: filled with `surfaceRaised`, a hairline border, generous
-/// rounding, and an optional soft drop shadow. The premium replacement for
-/// Material `Card` chrome on primary work surfaces.
+/// A rounded surface separated by its fill and, for floating content, an
+/// optional soft shadow. Nested panels stay flat and omit decorative borders.
 class SurfacePanel extends StatelessWidget {
   const SurfacePanel({
     super.key,
@@ -34,10 +33,7 @@ class SurfacePanel extends StatelessWidget {
         decoration: DecorationDelta.value(
           ShapeDecoration(
             color: t.surfaceRaised,
-            shape: RoundedRectangleBorder(
-              borderRadius: borderRadius,
-              side: BorderSide(color: t.borderSubtle),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: borderRadius),
           ),
         ),
       ),
@@ -64,7 +60,7 @@ class SurfaceSection extends StatelessWidget {
     required this.title,
     required this.children,
     this.dividerIndent = SerlinkSizes.dividerIndent,
-    this.showDividers = true,
+    this.showDividers = false,
     this.contentPadding,
   });
 
@@ -72,8 +68,7 @@ class SurfaceSection extends StatelessWidget {
   final List<Widget> children;
   final double dividerIndent;
 
-  /// Whether to insert hairline dividers between [children]. Turn off for
-  /// sections whose children are self-spaced blocks (e.g. form fields).
+  /// Opt in to separators when densely related rows need an explicit boundary.
   final bool showDividers;
 
   /// Optional padding inside the panel, for self-spaced block content.
@@ -299,7 +294,6 @@ class SerlinkTag extends StatelessWidget {
       decoration: BoxDecoration(
         color: t.surfaceOverlay,
         borderRadius: SerlinkRadii.pill,
-        border: Border.all(color: t.borderSubtle),
       ),
       child: Text(
         label,
@@ -451,23 +445,24 @@ class SerlinkSegmentedControl<T> extends StatelessWidget {
         decoration: BoxDecoration(
           color: t.surfaceSunken,
           borderRadius: SerlinkRadii.control,
-          border: Border.all(color: t.borderSubtle),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var index = 0; index < segments.length; index += 1) ...[
-              _SerlinkSegmentButton<T>(
-                segment: segments[index],
-                selected: segments[index].value == value,
-                enabled: interactive,
-                onSelected: onChanged,
-                compact: compact,
-              ),
-              if (index < segments.length - 1)
-                Container(width: 1, height: 26, color: t.borderSubtle),
+        child: Padding(
+          padding: const EdgeInsets.all(3),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var index = 0; index < segments.length; index += 1) ...[
+                _SerlinkSegmentButton<T>(
+                  segment: segments[index],
+                  selected: segments[index].value == value,
+                  enabled: interactive,
+                  onSelected: onChanged,
+                  compact: compact,
+                ),
+                if (index < segments.length - 1) const SizedBox(width: 2),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -495,7 +490,7 @@ class _SerlinkSegmentButton<T> extends StatelessWidget {
     final foreground = selected ? t.accentPrimary : t.textSecondary;
     return SerlinkPressable(
       onTap: enabled ? () => onSelected?.call(segment.value) : null,
-      borderRadius: BorderRadius.zero,
+      borderRadius: SerlinkRadii.control,
       hoverColor: selected
           ? t.accentPrimary.withValues(alpha: 0.12)
           : t.accentPrimary.withValues(alpha: 0.06),
@@ -505,11 +500,12 @@ class _SerlinkSegmentButton<T> extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
         curve: Curves.easeOut,
-        height: compact ? 32 : 34,
+        height: compact ? 26 : 28,
         padding: EdgeInsets.symmetric(horizontal: compact ? 9 : 12),
-        color: selected
-            ? t.accentPrimary.withValues(alpha: 0.12)
-            : Colors.transparent,
+        decoration: BoxDecoration(
+          color: selected ? t.surfaceRaised : Colors.transparent,
+          borderRadius: SerlinkRadii.control,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -536,8 +532,8 @@ class _SerlinkSegmentButton<T> extends StatelessWidget {
 }
 
 /// A raised, optionally tappable list row used on primary surfaces (hosts,
-/// snippets, transfers). Rounded card with a hairline border that lifts with a
-/// soft shadow on hover and tints with the accent when selected.
+/// snippets, transfers). Fill changes provide hover feedback without moving
+/// the content. Selection retains an accent edge for a clear interaction cue.
 class ListRow extends StatefulWidget {
   const ListRow({
     super.key,
@@ -563,18 +559,18 @@ class _ListRowState extends State<ListRow> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final interactive = widget.onTap != null;
-    final lifted = _hovered && interactive;
+    final hovered = _hovered && interactive;
     final fill = widget.selected
         ? Color.alphaBlend(
             t.accentPrimary.withValues(alpha: 0.12),
             t.surfaceRaised,
           )
+        : hovered
+        ? Color.alphaBlend(t.surfaceOverlay, t.surfaceRaised)
         : t.surfaceRaised;
     final borderColor = widget.selected
         ? t.accentPrimary.withValues(alpha: 0.6)
-        : lifted
-        ? t.borderStrong
-        : t.borderSubtle;
+        : Colors.transparent;
 
     final content = Padding(padding: widget.padding, child: widget.child);
 
@@ -582,20 +578,14 @@ class _ListRowState extends State<ListRow> {
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 120),
         curve: Curves.easeOut,
-        transform: lifted
-            ? (Matrix4.identity()..translateByDouble(0.0, -2.0, 0.0, 1.0))
-            : Matrix4.identity(),
         decoration: BoxDecoration(
           color: fill,
           borderRadius: SerlinkRadii.dialog,
           border: Border.all(color: borderColor),
-          boxShadow: widget.selected
-              ? serlinkShadow(t, elevation: 8, opacity: 0.7)
-              : lifted
-              ? serlinkShadow(t, elevation: 10)
-              : null,
         ),
         child: !interactive
             ? content
@@ -610,7 +600,7 @@ class _ListRowState extends State<ListRow> {
   }
 }
 
-/// Compact status badge: tinted fill + border in a status color, pill radius.
+/// Compact status badge with a tinted fill and pill radius.
 /// Replaces `_SettingsStatusPill` and the inline trust/health markers.
 class StatusPill extends StatelessWidget {
   const StatusPill({super.key, required this.label, required this.color});
@@ -624,7 +614,6 @@ class StatusPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.14),
         borderRadius: SerlinkRadii.pill,
-        border: Border.all(color: color.withValues(alpha: 0.32)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -829,18 +818,20 @@ IconData _alertToneIcon(SerlinkAlertTone tone) {
   };
 }
 
-/// Horizontal toolbar/header strip: fixed height, raised fill, bottom hairline.
+/// Header controls share the page canvas so spacing defines their grouping.
 class SurfaceToolbar extends StatelessWidget {
   const SurfaceToolbar({
     super.key,
     required this.child,
     this.height = SerlinkSizes.toolbarHeight,
     this.padding = const EdgeInsets.symmetric(horizontal: SerlinkSpacing.md),
+    this.backgroundColor,
   });
 
   final Widget child;
   final double height;
   final EdgeInsetsGeometry padding;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -849,10 +840,7 @@ class SurfaceToolbar extends StatelessWidget {
       width: double.infinity,
       height: height,
       padding: padding,
-      decoration: BoxDecoration(
-        color: t.surfaceRaised,
-        border: Border(bottom: BorderSide(color: t.borderSubtle)),
-      ),
+      decoration: BoxDecoration(color: backgroundColor ?? t.surfaceBase),
       child: child,
     );
   }

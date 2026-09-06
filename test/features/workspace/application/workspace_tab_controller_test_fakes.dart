@@ -113,11 +113,15 @@ class _FakeSshSessionService implements SshSessionService {
 
 class _FakeShellSession implements SshShellSession {
   final Completer<void> _done = Completer<void>();
+  final _stdout = StreamController<List<int>>();
+  final _stderr = StreamController<List<int>>();
   final List<String> writes = [];
 
   void completeDone() {
     if (!_done.isCompleted) {
       _done.complete();
+      unawaited(_stdout.close());
+      unawaited(_stderr.close());
     }
   }
 
@@ -125,10 +129,10 @@ class _FakeShellSession implements SshShellSession {
   Future<void> get done => _done.future;
 
   @override
-  Stream<List<int>> get stderr => const Stream<List<int>>.empty();
+  Stream<List<int>> get stderr => _stderr.stream;
 
   @override
-  Stream<List<int>> get stdout => const Stream<List<int>>.empty();
+  Stream<List<int>> get stdout => _stdout.stream;
 
   @override
   Future<void> close() async {

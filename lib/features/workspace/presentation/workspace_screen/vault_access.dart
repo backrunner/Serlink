@@ -24,17 +24,17 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
   VaultSessionNotice? _lastShownNotice;
   bool _didRequestInitialPassphraseFocus = false;
   bool _probingRemoteVault = false;
+  bool _passphraseVisible = false;
 
   // Created lazily so the recovery-surface early return (which never reaches
   // the AnimatedBuilder below) does not allocate a controller, and so dispose
   // never has to create one on a deactivated widget.
   AnimationController? _shakeController;
 
-  AnimationController get _shake =>
-      _shakeController ??= AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 480),
-      );
+  AnimationController get _shake => _shakeController ??= AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 480),
+  );
   String? _lastShownError;
 
   @override
@@ -90,8 +90,8 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     final t = context.tokens;
     final asyncState = ref.watch(vaultSessionControllerProvider);
     final session = asyncState.value ?? widget.session;
-    final busy = (session?.isBusy ?? asyncState.isLoading) ||
-        _probingRemoteVault;
+    final busy =
+        (session?.isBusy ?? asyncState.isLoading) || _probingRemoteVault;
     final isInitializing = session?.vaultState == VaultState.uninitialized;
     final recoveryKey = session?.recoveryKey;
     final showRecoveryCodeAccess =
@@ -120,111 +120,124 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
-        child: EntranceFade(
-          offsetY: 24,
-          beginScale: 0.94,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: AnimatedBuilder(
-              animation: _shake,
-              builder: (context, child) {
-                // Damped oscillation: amplitude decays as the controller runs.
-                final decay = 1 - _shake.value;
-                final dx = decay * 10 * _sineShake(_shake.value);
-                return Transform.translate(offset: Offset(dx, 0), child: child);
-              },
-              child: GlassPanel(
-                elevation: 28,
-                padding: const EdgeInsets.fromLTRB(32, 36, 32, 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _VaultLockBadge(initializing: isInitializing),
-                    const SizedBox(height: 22),
-                    Text(
-                      isInitializing
-                          ? l10n.vaultCreateTitle
-                          : l10n.vaultUnlockTitle,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: t.textPrimary,
-                          ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: AnimatedBuilder(
+            animation: _shake,
+            builder: (context, child) {
+              // Damped oscillation: amplitude decays as the controller runs.
+              final decay = 1 - _shake.value;
+              final dx = decay * 10 * _sineShake(_shake.value);
+              return Transform.translate(offset: Offset(dx, 0), child: child);
+            },
+            child: GlassPanel(
+              elevation: 28,
+              padding: const EdgeInsets.fromLTRB(32, 36, 32, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _VaultLockBadge(initializing: isInitializing),
+                  const SizedBox(height: 22),
+                  Text(
+                    isInitializing
+                        ? l10n.vaultCreateTitle
+                        : l10n.vaultUnlockTitle,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: t.textPrimary,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      isInitializing
-                          ? l10n.vaultCreateSubtitle
-                          : l10n.vaultUnlockSubtitle,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: t.textSecondary,
-                        height: 1.4,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    isInitializing
+                        ? l10n.vaultCreateSubtitle
+                        : l10n.vaultUnlockSubtitle,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: t.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SerlinkTextField(
+                    key: const ValueKey('vault-passphrase-field'),
+                    controller: _passphraseController,
+                    focusNode: _passphraseFocusNode,
+                    obscureText: !_passphraseVisible,
+                    keyboardType: TextInputType.visiblePassword,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: isInitializing
+                          ? l10n.vaultNewPassphraseLabel
+                          : l10n.vaultPassphraseLabel,
+                      prefixIcon: const Icon(Icons.lock_outline, size: 19),
+                      suffixIcon: SerlinkIconButton(
+                        key: const ValueKey('vault-passphrase-visibility-toggle'),
+                        tooltip: _passphraseVisible
+                            ? l10n.hostHidePasswordTooltip
+                            : l10n.hostShowPasswordTooltip,
+                        onPressed: () => setState(() {
+                          _passphraseVisible = !_passphraseVisible;
+                        }),
+                        icon: Icon(
+                          _passphraseVisible
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: 19,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    SerlinkTextField(
-                      key: const ValueKey('vault-passphrase-field'),
-                      controller: _passphraseController,
-                      focusNode: _passphraseFocusNode,
-                      obscureText: true,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        labelText: isInitializing
-                            ? l10n.vaultNewPassphraseLabel
-                            : l10n.vaultPassphraseLabel,
-                        prefixIcon: const Icon(Icons.lock_outline, size: 19),
-                      ),
-                      onSubmitted: (_) => _submit(isInitializing),
+                    onSubmitted: (_) => _submit(isInitializing),
+                  ),
+                  const SizedBox(height: 14),
+                  _VaultPrimaryButton(
+                    key: const ValueKey('vault-submit-button'),
+                    label: isInitializing
+                        ? l10n.vaultCreateAction
+                        : l10n.vaultUnlockAction,
+                    loading: busy,
+                    onPressed: busy ? null : () => _submit(isInitializing),
+                  ),
+                  if (!isInitializing &&
+                      session?.localUnlockAvailable == true) ...[
+                    const SizedBox(height: 10),
+                    SerlinkOutlinedButton.icon(
+                      key: const ValueKey('vault-local-unlock-button'),
+                      onPressed: busy
+                          ? null
+                          : () => ref
+                                .read(vaultSessionControllerProvider.notifier)
+                                .unlockWithLocalKey(),
+                      icon: const Icon(Icons.fingerprint, size: 19),
+                      label: Text(l10n.vaultUnlockWithDeviceAction),
                     ),
-                    const SizedBox(height: 14),
-                    _VaultPrimaryButton(
-                      key: const ValueKey('vault-submit-button'),
-                      label: isInitializing
-                          ? l10n.vaultCreateAction
-                          : l10n.vaultUnlockAction,
-                      loading: busy,
-                      onPressed: busy ? null : () => _submit(isInitializing),
-                    ),
-                    if (!isInitializing &&
-                        session?.localUnlockAvailable == true) ...[
-                      const SizedBox(height: 10),
-                      SerlinkOutlinedButton.icon(
-                        key: const ValueKey('vault-local-unlock-button'),
-                        onPressed: busy
-                            ? null
-                            : () => ref
-                                  .read(vaultSessionControllerProvider.notifier)
-                                  .unlockWithLocalKey(),
-                        icon: const Icon(Icons.fingerprint, size: 19),
-                        label: Text(l10n.vaultUnlockWithDeviceAction),
-                      ),
-                    ],
-                    if (showRecoveryCodeAccess) ...[
-                      const SizedBox(height: 10),
-                      SerlinkTextButton.icon(
-                        key: const ValueKey('vault-recovery-code-button'),
-                        onPressed: busy ? null : _showRecoveryCodeDialog,
-                        icon: const Icon(Icons.key_outlined, size: 19),
-                        label: Text(l10n.vaultUseRecoveryCodeAction),
-                      ),
-                    ],
-                    _VaultErrorText(message: errorMessage),
-                    if (recoveryKey != null) ...[
-                      const SizedBox(height: 20),
-                      _RecoveryKeyValueBox(recoveryKey: recoveryKey.value),
-                      const SizedBox(height: 8),
-                      SerlinkOutlinedButton(
-                        onPressed: () => ref
-                            .read(vaultSessionControllerProvider.notifier)
-                            .dismissRecoveryKey(),
-                        child: Text(l10n.doneAction),
-                      ),
-                    ],
                   ],
-                ),
+                  if (showRecoveryCodeAccess) ...[
+                    const SizedBox(height: 10),
+                    SerlinkTextButton.icon(
+                      key: const ValueKey('vault-recovery-code-button'),
+                      onPressed: busy ? null : _showRecoveryCodeDialog,
+                      icon: const Icon(Icons.key_outlined, size: 19),
+                      label: Text(l10n.vaultUseRecoveryCodeAction),
+                    ),
+                  ],
+                  _VaultErrorText(message: errorMessage),
+                  if (recoveryKey != null) ...[
+                    const SizedBox(height: 20),
+                    _RecoveryKeyValueBox(recoveryKey: recoveryKey.value),
+                    const SizedBox(height: 8),
+                    SerlinkOutlinedButton(
+                      onPressed: () => ref
+                          .read(vaultSessionControllerProvider.notifier)
+                          .dismissRecoveryKey(),
+                      child: Text(l10n.doneAction),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),

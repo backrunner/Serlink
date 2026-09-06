@@ -78,15 +78,18 @@ class TerminalAdapter {
     };
 
     if (_zmodemTransferHandler == null) {
-      _stdoutSubscription = _session.stdout
-          .transform(const Utf8Decoder(allowMalformed: true))
-          .listen(_writeTextToTerminal);
+      // dartssh2 returns Stream<Uint8List> at runtime. Calling transform on
+      // that covariant stream rejects Utf8Decoder's List<int> input type.
+      // Binding the decoder accepts both List<int> and Uint8List streams.
+      _stdoutSubscription = const Utf8Decoder(
+        allowMalformed: true,
+      ).bind(_session.stdout).listen(_writeTextToTerminal);
     } else {
       _attachZModemMux();
     }
-    _stderrSubscription = _session.stderr
-        .transform(const Utf8Decoder(allowMalformed: true))
-        .listen(_writeTextToTerminal);
+    _stderrSubscription = const Utf8Decoder(
+      allowMalformed: true,
+    ).bind(_session.stderr).listen(_writeTextToTerminal);
     _syncPreAttachedTerminalSize();
   }
 

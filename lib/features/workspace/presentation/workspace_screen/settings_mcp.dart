@@ -10,9 +10,10 @@ class _McpSettingsSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final serverState = ref.watch(mcpServerControllerProvider);
-    return SurfaceSection(
+    return _SettingsSection(
       key: const ValueKey('settings-mcp-section'),
       title: l10n.settingsMcpSection,
+      icon: Icons.hub_outlined,
       children: [
         _SettingsActionRow(
           icon: Icons.hub_outlined,
@@ -157,12 +158,11 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
               key: const ValueKey('settings-mcp-server-switch'),
               semanticsLabel: l10n.settingsMcpServerSemantics,
               value: running,
-              onChanged: (value) =>
-                  unawaited(_setMcpServerEnabled(ref, value)),
+              onChanged: (value) => unawaited(_setMcpServerEnabled(ref, value)),
             ),
           ],
         ),
-        const _McpCardDivider(),
+        const _McpCardGap(),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -233,12 +233,10 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
     final helperPath = _mcpStdioHelperPath();
     final helperInstalled = mcpStdioHelperFileExists(helperPath);
     final config = switch (effectiveTab) {
-      _McpConfigTab.http => url == null
-          ? null
-          : _mcpHttpClientConfig(url, serverState.token),
-      _McpConfigTab.stdio => helperInstalled
-          ? _mcpStdioClientConfig(helperPath)
-          : null,
+      _McpConfigTab.http =>
+        url == null ? null : _mcpHttpClientConfig(url, serverState.token),
+      _McpConfigTab.stdio =>
+        helperInstalled ? _mcpStdioClientConfig(helperPath) : null,
     };
     final unavailableHint = switch (effectiveTab) {
       _McpConfigTab.http => l10n.settingsMcpHttpConfigNeedsServer,
@@ -406,9 +404,11 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
                               index < targets.length;
                               index += 1
                             ) ...[
-                              if (index > 0) const _McpCardDivider(),
+                              if (index > 0) const _McpCardGap(),
                               _McpListItem.branded(
-                                iconAsset: _mcpAgentIconAsset(targets[index].id),
+                                iconAsset: _mcpAgentIconAsset(
+                                  targets[index].id,
+                                ),
                                 title: targets[index].displayName,
                                 subtitle: _mcpShortPath(
                                   targets[index].configPath,
@@ -504,7 +504,7 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
           _McpCard(
             children: [
               for (var index = 0; index < grants.length; index += 1) ...[
-                if (index > 0) const _McpCardDivider(),
+                if (index > 0) const _McpCardGap(),
                 _McpListItem(
                   icon: Icons.verified_user_outlined,
                   title: grants[index].clientName,
@@ -544,7 +544,7 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
           _McpCard(
             children: [
               for (var index = 0; index < sessions.length; index += 1) ...[
-                if (index > 0) const _McpCardDivider(),
+                if (index > 0) const _McpCardGap(),
                 _McpListItem(
                   icon: Icons.smart_toy_outlined,
                   title: sessions[index].clientName,
@@ -583,7 +583,6 @@ class _McpCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: t.surfaceSunken,
         borderRadius: SerlinkRadii.control,
-        border: Border.all(color: t.borderSubtle),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(
@@ -594,16 +593,12 @@ class _McpCard extends StatelessWidget {
   }
 }
 
-class _McpCardDivider extends StatelessWidget {
-  const _McpCardDivider();
+class _McpCardGap extends StatelessWidget {
+  const _McpCardGap();
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Container(height: 1, color: t.borderSubtle),
-    );
+    return const SizedBox(height: 20);
   }
 }
 
@@ -623,12 +618,7 @@ class _McpStatusDot extends StatelessWidget {
         color: color,
         shape: BoxShape.circle,
         boxShadow: active
-            ? [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.45),
-                  blurRadius: 6,
-                ),
-              ]
+            ? [BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 6)]
             : null,
       ),
     );
@@ -795,7 +785,12 @@ List<TextSpan> _jsonHighlightSpans(String text, SerlinkTokens t) {
     } else {
       color = t.accentSecondary;
     }
-    spans.add(TextSpan(text: token, style: TextStyle(color: color)));
+    spans.add(
+      TextSpan(
+        text: token,
+        style: TextStyle(color: color),
+      ),
+    );
     index = match.end;
   }
   if (index < text.length) {
@@ -821,9 +816,7 @@ Map<HostId, String> _mcpHostDisplayNames(WidgetRef ref) {
   if (vault == null || vault.vaultState != VaultState.unlocked) {
     return const {};
   }
-  final hosts = ref
-      .watch(hostSummariesProvider(vault.unlockGeneration))
-      .value;
+  final hosts = ref.watch(hostSummariesProvider(vault.unlockGeneration)).value;
   return {
     for (final host in hosts ?? const <HostSummary>[])
       host.id: host.displayName,

@@ -137,10 +137,7 @@ FCardStyle _foruiCardStyle(
     decoration: DecorationDelta.value(
       ShapeDecoration(
         color: tokens.surfaceRaised,
-        shape: RoundedRectangleBorder(
-          borderRadius: SerlinkRadii.dialog,
-          side: BorderSide(color: tokens.borderSubtle),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: SerlinkRadii.dialog),
       ),
     ),
   );
@@ -163,10 +160,7 @@ FDialogStyle _foruiDialogStyle(
     decoration: DecorationDelta.value(
       ShapeDecoration(
         color: tokens.surfaceRaised,
-        shape: RoundedRectangleBorder(
-          borderRadius: SerlinkRadii.dialog,
-          side: BorderSide(color: tokens.borderSubtle),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: SerlinkRadii.dialog),
         shadows: serlinkShadow(tokens, elevation: 24),
       ),
     ),
@@ -233,10 +227,7 @@ ThemeData _build(
       color: t.surfaceRaised,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        side: BorderSide(color: t.borderSubtle),
-        borderRadius: SerlinkRadii.dialog,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: SerlinkRadii.dialog),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: t.surfaceRaised,
@@ -244,10 +235,7 @@ ThemeData _build(
       elevation: 24,
       shadowColor: t.shadowColor,
       actionsPadding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
-      shape: RoundedRectangleBorder(
-        borderRadius: SerlinkRadii.dialog,
-        side: BorderSide(color: t.borderSubtle),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: SerlinkRadii.dialog),
     ),
     inputDecorationTheme: _inputDecorationTheme(t),
     iconButtonTheme: _iconButtonTheme(t),

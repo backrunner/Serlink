@@ -28,6 +28,7 @@ abstract final class SerlinkSpacing {
 /// * [control] (8px) — buttons, inputs, list rows, nav items, tabs.
 /// * [dialog]  (14px) — dialogs, popovers, sections.
 /// * [card]    (8px) — framed tools and repeated items.
+/// * [workspace] (16px) — the inset desktop canvas and section groups.
 /// * [pill]    (full) — status pills only.
 abstract final class SerlinkRadii {
   static const Radius controlR = Radius.circular(8);
@@ -38,6 +39,7 @@ abstract final class SerlinkRadii {
   static const BorderRadius control = BorderRadius.all(controlR);
   static const BorderRadius dialog = BorderRadius.all(dialogR);
   static const BorderRadius card = BorderRadius.all(cardR);
+  static const BorderRadius workspace = BorderRadius.all(Radius.circular(16));
   static const BorderRadius pill = BorderRadius.all(pillR);
 }
 
@@ -47,6 +49,7 @@ abstract final class SerlinkRadii {
 abstract final class SerlinkSizes {
   static const double sidebarWidth = 240;
   static const double toolbarHeight = 44;
+  static const double pageHeaderHeight = 56;
   static const double controlHeight = 32;
   static const double compactControlHeight = 28;
 

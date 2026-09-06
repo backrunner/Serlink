@@ -153,6 +153,7 @@ class _WorkspaceListHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return SurfaceToolbar(
+      height: SerlinkSizes.pageHeaderHeight,
       child: Row(
         children: [
           Text(
@@ -199,7 +200,6 @@ class _CountBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: t.surfaceSunken,
         borderRadius: SerlinkRadii.pill,
-        border: Border.all(color: t.borderSubtle),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -281,6 +281,7 @@ class _SnippetRow extends ConsumerWidget {
     final t = context.tokens;
     if (!ref.watch(platformCapabilitiesProvider).prefersMobileWorkspaceShell) {
       return ListRow(
+        onTap: onEdit,
         child: Row(
           children: [
             Expanded(
@@ -295,15 +296,7 @@ class _SnippetRow extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    _singleLineCommand(snippet.command),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      color: t.textSecondary,
-                    ),
-                  ),
+                  ShellCodePreview(code: snippet.command),
                   if (snippet.tags.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
@@ -331,6 +324,7 @@ class _SnippetRow extends ConsumerWidget {
     }
 
     return ListRow(
+      onTap: onEdit,
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -362,15 +356,7 @@ class _SnippetRow extends ConsumerWidget {
           const SizedBox(height: 6),
           Padding(
             padding: const EdgeInsets.only(left: 28),
-            child: Text(
-              _singleLineCommand(snippet.command),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontFamily: 'monospace',
-                color: t.textSecondary,
-              ),
-            ),
+            child: ShellCodePreview(code: snippet.command),
           ),
           if (snippet.tags.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -618,13 +604,19 @@ class _SnippetDialog extends ConsumerStatefulWidget {
 
 class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
   late final TextEditingController _nameController;
-  late final _BashHighlightController _commandController;
+  late final ShellCodeController _commandController;
   late final TextEditingController _tagsController;
   late final FocusNode _commandFocusNode;
   late final FocusNode _tagsFocusNode;
   late final List<String> _tags;
   late bool _confirmBeforeRun;
   final ScrollController _scrollController = ScrollController();
+  final _nameFocusNode = FocusNode();
+  final _editorKey = GlobalKey();
+  bool _editorExpanded = false;
+  bool _allowClose = false;
+  bool _checkingClose = false;
+  String? _nameError;
   var _saving = false;
   String? _errorMessage;
 
@@ -635,12 +627,15 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
     super.initState();
     final snippet = widget.snippet;
     _nameController = TextEditingController(text: snippet?.name ?? '');
-    _commandController = _BashHighlightController(text: snippet?.command ?? '');
+    _commandController = ShellCodeController(text: snippet?.command ?? '');
     _tagsController = TextEditingController();
     _commandFocusNode = FocusNode();
     _tagsFocusNode = FocusNode();
     _tags = (snippet?.tags.toList() ?? [])..sort();
     _confirmBeforeRun = snippet?.confirmBeforeRun ?? true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _commandFocusNode.requestFocus();
+    });
   }
 
   @override
@@ -649,6 +644,7 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
     _commandController.dispose();
     _tagsController.dispose();
     _commandFocusNode.dispose();
+    _nameFocusNode.dispose();
     _tagsFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -657,103 +653,223 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final compact = MediaQuery.sizeOf(context).width < 600;
-    final horizontalPadding = compact ? 16.0 : 24.0;
-    final fieldGap = compact ? 12.0 : 14.0;
-    return SerlinkDialog(
-      maxWidth: _adaptiveDialogWidth(context, _dialogWidthSmall),
-      titlePadding: EdgeInsets.fromLTRB(
-        horizontalPadding,
-        compact ? 18 : 22,
-        horizontalPadding,
-        0,
-      ),
-      contentPadding: EdgeInsets.fromLTRB(
-        horizontalPadding,
-        compact ? 14 : 18,
-        horizontalPadding,
-        0,
-      ),
-      actionsPadding: EdgeInsets.fromLTRB(
-        horizontalPadding,
-        14,
-        horizontalPadding,
-        compact ? 16 : 24,
-      ),
-      title: _SnippetDialogTitle(
-        title: _isEditing
-            ? l10n.snippetDialogEditTitle
-            : l10n.snippetDialogAddTitle,
-      ),
-      content: _DialogScrollFrame(
-        width: 520,
-        height: math.max(
-          200.0,
-          math.min(520.0, MediaQuery.sizeOf(context).height - 180),
-        ),
-        controller: _scrollController,
-        fillHeight: false,
-        padding: const EdgeInsets.only(right: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SerlinkTextField(
-              key: const ValueKey('snippet-name-field'),
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: l10n.snippetNameLabel,
-                hintText: l10n.snippetNamePlaceholder,
-              ),
-              textInputAction: TextInputAction.next,
-            ),
-            SizedBox(height: fieldGap),
-            _SnippetCommandField(
-              label: l10n.snippetCommandLabel,
-              controller: _commandController,
-              focusNode: _commandFocusNode,
-            ),
-            SizedBox(height: fieldGap),
-            _SnippetTagsField(
-              controller: _tagsController,
-              focusNode: _tagsFocusNode,
-              tags: _tags,
-              onChanged: _handleTagInputChanged,
-              onRemoveTag: _removeTag,
-              onSubmitted: _handleTagInputSubmitted,
-            ),
-            SizedBox(height: compact ? 14 : 18),
-            _SnippetConfirmOption(
-              value: _confirmBeforeRun,
-              label: l10n.snippetConfirmBeforeRun,
-              onChanged: (value) {
-                setState(() {
-                  _confirmBeforeRun = value;
-                });
+    final media = MediaQuery.of(context);
+    final compact = media.size.width < 600;
+    final padding = compact ? 16.0 : 24.0;
+    final height = math.max(
+      120.0,
+      math.min(540.0, media.size.height - media.viewInsets.bottom - 200),
+    );
+    final apple =
+        Theme.of(context).platform == TargetPlatform.macOS ||
+        Theme.of(context).platform == TargetPlatform.iOS;
+    return PopScope(
+      canPop: _allowClose,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_requestClose());
+      },
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.enter, meta: true): _save,
+          const SingleActivator(LogicalKeyboardKey.enter, control: true): _save,
+        },
+        child: SerlinkDialog(
+          maxWidth: _adaptiveDialogWidth(context, 1000),
+          titlePadding: EdgeInsets.fromLTRB(padding, 20, padding, 0),
+          contentPadding: EdgeInsets.fromLTRB(padding, 18, padding, 0),
+          actionsPadding: EdgeInsets.fromLTRB(padding, 16, padding, 20),
+          title: _SnippetDialogTitle(
+            title: _isEditing
+                ? l10n.snippetDialogEditTitle
+                : l10n.snippetDialogAddTitle,
+          ),
+          content: SizedBox(
+            width: 960,
+            height: height,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final wide =
+                    constraints.maxWidth >= 720 &&
+                    media.textScaler.scale(14) <= 18;
+                final editor = SnippetCodeEditor(
+                  key: _editorKey,
+                  controller: _commandController,
+                  focusNode: _commandFocusNode,
+                  expanded: _editorExpanded,
+                  enabled: !_saving,
+                  onToggleExpanded: () {
+                    setState(() => _editorExpanded = !_editorExpanded);
+                    _commandFocusNode.requestFocus();
+                  },
+                );
+                final details = _buildDetails(context);
+                final Widget content;
+                if (_editorExpanded) {
+                  content = editor;
+                } else if (wide) {
+                  content = Row(
+                    key: const ValueKey('snippet-editor-columns'),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: editor),
+                      const SizedBox(width: 24),
+                      SizedBox(
+                        width: 240,
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          child: details,
+                        ),
+                      ),
+                    ],
+                  );
+                } else {
+                  content = SingleChildScrollView(
+                    controller: _scrollController,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: math.min(300, math.max(210, height * 0.62)),
+                          child: editor,
+                        ),
+                        const SizedBox(height: 20),
+                        details,
+                      ],
+                    ),
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: content),
+                    if (_errorMessage != null) ...[
+                      const SizedBox(height: 8),
+                      SerlinkAlert.danger(
+                        message: _errorMessage!,
+                        compact: true,
+                      ),
+                    ],
+                  ],
+                );
               },
             ),
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 8),
-              SerlinkAlert.danger(message: _errorMessage!, compact: true),
-            ],
+          ),
+          actions: [
+            SerlinkTextButton(
+              key: const ValueKey('snippet-cancel-button'),
+              onPressed: _saving ? null : _requestClose,
+              child: Text(l10n.cancelAction),
+            ),
+            SerlinkTooltip(
+              message: '${l10n.saveAction} (${apple ? '⌘' : 'Ctrl'} + Enter)',
+              child: SerlinkFilledButton(
+                key: const ValueKey('snippet-save-button'),
+                onPressed: _saving ? null : _save,
+                child: Text(_saving ? l10n.savingAction : l10n.saveAction),
+              ),
+            ),
           ],
         ),
       ),
-      actions: [
-        SerlinkTextButton(
-          onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: Text(l10n.cancelAction),
+    );
+  }
+
+  Widget _buildDetails(BuildContext context) {
+    final l10n = context.l10n;
+    return Column(
+      key: const ValueKey('snippet-details'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SerlinkTextField(
+          key: const ValueKey('snippet-name-field'),
+          controller: _nameController,
+          focusNode: _nameFocusNode,
+          enabled: !_saving,
+          decoration: InputDecoration(
+            labelText: l10n.snippetNameLabel,
+            hintText: l10n.snippetNamePlaceholder,
+            errorText: _nameError,
+          ),
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => _tagsFocusNode.requestFocus(),
         ),
-        SerlinkFilledButton(
-          key: const ValueKey('snippet-save-button'),
-          onPressed: _saving ? null : _save,
-          child: Text(_saving ? l10n.savingAction : l10n.saveAction),
+        const SizedBox(height: 20),
+        IgnorePointer(
+          ignoring: _saving,
+          child: _SnippetTagsField(
+            controller: _tagsController,
+            focusNode: _tagsFocusNode,
+            tags: _tags,
+            onChanged: _handleTagInputChanged,
+            onRemoveTag: _removeTag,
+            onSubmitted: _handleTagInputSubmitted,
+          ),
+        ),
+        const SizedBox(height: 20),
+        IgnorePointer(
+          ignoring: _saving,
+          child: _SnippetConfirmOption(
+            value: _confirmBeforeRun,
+            label: l10n.snippetConfirmBeforeRun,
+            onChanged: (value) => setState(() => _confirmBeforeRun = value),
+          ),
         ),
       ],
     );
   }
 
+  Future<void> _requestClose() async {
+    if (_saving || _checkingClose) return;
+    final original = widget.snippet;
+    final changed =
+        _nameController.text != (original?.name ?? '') ||
+        _commandController.text != (original?.command ?? '') ||
+        _confirmBeforeRun != (original?.confirmBeforeRun ?? true) ||
+        _currentTags().difference(original?.tags ?? {}).isNotEmpty ||
+        (original?.tags ?? <String>{}).difference(_currentTags()).isNotEmpty;
+    if (changed) {
+      _checkingClose = true;
+      final discard = await _confirmDialog(
+        context,
+        title: context.l10n.snippetDiscardTitle,
+        body: context.l10n.snippetDiscardBody,
+        confirmLabel: context.l10n.snippetDiscardAction,
+      );
+      _checkingClose = false;
+      if (!discard || !mounted) return;
+    }
+    _close();
+  }
+
+  void _close() {
+    setState(() => _allowClose = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
   Future<void> _save() async {
+    if (_saving || _checkingClose) return;
+    final nameMissing = _nameController.text.trim().isEmpty;
+    final commandMissing = _commandController.text.trim().isEmpty;
+    setState(() {
+      _nameError = nameMissing ? context.l10n.snippetErrorNameRequired : null;
+      _errorMessage = commandMissing
+          ? context.l10n.snippetErrorCommandRequired
+          : null;
+      if (nameMissing) _editorExpanded = false;
+    });
+    if (commandMissing || nameMissing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final focus = commandMissing ? _commandFocusNode : _nameFocusNode;
+        focus.requestFocus();
+        if (focus.context case final context?) {
+          Scrollable.ensureVisible(context, alignment: 0.2);
+        }
+      });
+      return;
+    }
     setState(() {
       _saving = true;
       _errorMessage = null;
@@ -774,7 +890,7 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
       }
       ref.invalidate(snippetsProvider);
       if (mounted) {
-        Navigator.of(context).pop();
+        _close();
       }
     } on SnippetWriteException catch (error) {
       if (mounted) {
@@ -785,7 +901,6 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
             error,
           );
         });
-        _revealError();
       }
     } on Object {
       if (mounted) {
@@ -793,24 +908,8 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
           _saving = false;
           _errorMessage = context.l10n.snippetSaveFailed;
         });
-        _revealError();
       }
     }
-  }
-
-  /// The error line sits below the form fields; make sure it is visible by
-  /// scrolling the dialog content to the bottom once it appears.
-  void _revealError() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) {
-        return;
-      }
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-      );
-    });
   }
 
   void _handleTagInputChanged(String value) {
@@ -829,10 +928,7 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
   }
 
   void _handleTagInputSubmitted(String value) {
-    if (_commitPendingTags()) {
-      return;
-    }
-    _save();
+    _commitPendingTags();
   }
 
   bool _commitPendingTags() {
@@ -885,114 +981,12 @@ class _SnippetDialogTitle extends StatelessWidget {
           decoration: BoxDecoration(
             color: t.accentPrimary.withValues(alpha: 0.13),
             borderRadius: SerlinkRadii.control,
-            border: Border.all(color: t.accentPrimary.withValues(alpha: 0.26)),
           ),
           child: Icon(Icons.terminal_rounded, size: 20, color: t.accentPrimary),
         ),
         const SizedBox(width: 12),
         Expanded(child: Text(title)),
       ],
-    );
-  }
-}
-
-class _SnippetCommandField extends StatelessWidget {
-  const _SnippetCommandField({
-    required this.label,
-    required this.controller,
-    required this.focusNode,
-  });
-
-  final String label;
-  final TextEditingController controller;
-  final FocusNode focusNode;
-
-  @override
-  Widget build(BuildContext context) {
-    return SerlinkLabeledField(
-      label: label,
-      child: ListenableBuilder(
-        listenable: focusNode,
-        builder: (context, _) {
-          final t = context.tokens;
-          final focused = focusNode.hasFocus;
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: focusNode.requestFocus,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              curve: Curves.easeOut,
-              padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
-              decoration: BoxDecoration(
-                color: t.surfaceSunken,
-                borderRadius: SerlinkRadii.control,
-                border: Border.all(
-                  color: focused
-                      ? t.accentPrimary.withValues(alpha: 0.72)
-                      : t.borderSubtle,
-                ),
-                boxShadow: focused
-                    ? [
-                        BoxShadow(
-                          color: t.accentPrimary.withValues(alpha: 0.08),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Icon(
-                      Icons.chevron_right_rounded,
-                      size: 18,
-                      color: t.accentPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SerlinkTextField(
-                      key: const ValueKey('snippet-command-field'),
-                      controller: controller,
-                      focusNode: focusNode,
-                      minLines: 4,
-                      maxLines: 8,
-                      decoration: InputDecoration.collapsed(
-                        hintText: context.l10n.snippetCommandPlaceholder,
-                        hintStyle: _snippetMonoTextStyle(
-                          context,
-                        )?.copyWith(color: t.textMuted),
-                      ),
-                      style: _snippetMonoTextStyle(context),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 1),
-                    child: SerlinkTooltip(
-                      message: context.l10n.snippetExpandEditorTooltip,
-                      child: SerlinkIconButton(
-                        key: const ValueKey('snippet-expand-editor-button'),
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () =>
-                            _showSnippetScriptEditor(context, controller),
-                        icon: Icon(
-                          Icons.open_in_full_rounded,
-                          size: 15,
-                          color: t.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }
@@ -1024,11 +1018,6 @@ class _SnippetConfirmOption extends StatelessWidget {
             t.surfaceSunken,
           ),
           borderRadius: SerlinkRadii.control,
-          border: Border.all(
-            color: value
-                ? t.accentPrimary.withValues(alpha: 0.34)
-                : t.borderSubtle,
-          ),
         ),
         child: Row(
           children: [
@@ -1185,7 +1174,6 @@ class _SnippetTagChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: t.accentPrimary.withValues(alpha: 0.11),
           borderRadius: SerlinkRadii.pill,
-          border: Border.all(color: t.accentPrimary.withValues(alpha: 0.28)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1291,103 +1279,4 @@ Future<void> _deleteSnippet(
 
 String _singleLineCommand(String command) {
   return command.trim().split(RegExp(r'\s+')).join(' ');
-}
-
-TextStyle? _snippetMonoTextStyle(BuildContext context) {
-  return Theme.of(context).textTheme.bodyMedium?.copyWith(
-    color: context.tokens.textPrimary,
-    fontFamily: 'SF Mono',
-    fontFamilyFallback: const [
-      'Menlo',
-      'Cascadia Mono',
-      'Consolas',
-      'monospace',
-    ],
-    fontWeight: FontWeight.w500,
-    height: 1.38,
-  );
-}
-
-Future<void> _showSnippetScriptEditor(
-  BuildContext context,
-  TextEditingController controller,
-) {
-  return showSerlinkDialog<void>(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => _SnippetScriptEditorDialog(controller: controller),
-  );
-}
-
-/// Large script editor for long commands: fills most of the window and shares
-/// the snippet dialog's controller, so edits apply instantly on close.
-class _SnippetScriptEditorDialog extends StatelessWidget {
-  const _SnippetScriptEditorDialog({required this.controller});
-
-  final TextEditingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final t = context.tokens;
-    final height = math.max(
-      240.0,
-      math.min(560.0, MediaQuery.sizeOf(context).height * 0.66),
-    );
-    return SerlinkDialog(
-      maxWidth: _adaptiveDialogWidth(context, 920),
-      title: Text(l10n.snippetCommandLabel),
-      content: SizedBox(
-        width: 860,
-        height: height,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: t.surfaceSunken,
-            borderRadius: SerlinkRadii.control,
-            border: Border.all(color: t.borderSubtle),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
-                    color: t.accentPrimary,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SerlinkTextField(
-                    key: const ValueKey('snippet-script-editor-field'),
-                    controller: controller,
-                    autofocus: true,
-                    expands: true,
-                    minLines: null,
-                    maxLines: null,
-                    decoration: InputDecoration.collapsed(
-                      hintText: l10n.snippetCommandPlaceholder,
-                      hintStyle: _snippetMonoTextStyle(
-                        context,
-                      )?.copyWith(color: t.textMuted),
-                    ),
-                    style: _snippetMonoTextStyle(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      actions: [
-        SerlinkFilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.doneAction),
-        ),
-      ],
-    );
-  }
 }

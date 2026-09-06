@@ -51,19 +51,35 @@ LinearGradient serlinkAccentGradient(SerlinkTokens t) {
   );
 }
 
-/// The ambient full-window backdrop gradient with a subtle accent glow.
+/// Neutral canvas shared by workspace areas and their empty states.
 BoxDecoration serlinkBackdrop(SerlinkTokens t) {
-  return BoxDecoration(
-    gradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [t.backdropTop, t.backdropBottom],
-    ),
-  );
+  return BoxDecoration(color: t.surfaceBase);
 }
 
-/// A frosted-glass surface: blurred translucent fill, hairline highlight
-/// border, generous rounding, and a soft drop shadow. Use for floating chrome
+/// A solid workspace background that stays consistent behind every surface.
+class SerlinkWindowBackdrop extends StatelessWidget {
+  const SerlinkWindowBackdrop({
+    super.key,
+    required this.child,
+    this.backgroundColor,
+  });
+
+  final Widget child;
+  final Color? backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: backgroundColor == null
+          ? serlinkBackdrop(context.tokens)
+          : BoxDecoration(color: backgroundColor),
+      child: child,
+    );
+  }
+}
+
+/// A frosted-glass surface with translucent fill, generous rounding, and a
+/// soft drop shadow. Use for floating chrome
 /// (panels, dialogs, the vault card) over the [serlinkBackdrop].
 class GlassPanel extends StatelessWidget {
   const GlassPanel({
@@ -101,7 +117,6 @@ class GlassPanel extends StatelessWidget {
             decoration: BoxDecoration(
               color: tint ?? t.surfaceGlass,
               borderRadius: borderRadius,
-              border: Border.all(color: t.borderSubtle.withValues(alpha: 0.9)),
             ),
             child: padding == null
                 ? child

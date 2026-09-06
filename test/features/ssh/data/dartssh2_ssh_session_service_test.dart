@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -183,6 +184,42 @@ void main() {
     );
   });
 
+  test(
+    'a socket that closes before authentication never logs success',
+    () async {
+      final logger = _CapturingDiagnosticLogger();
+      final socket = _ClosingSocket();
+      final service = DartSsh2SessionService(
+        socketFactory: (_, _, {timeout}) async => socket,
+        diagnosticLogger: logger,
+      );
+
+      await expectLater(
+        service.openShell(
+          _profile([
+            SshPasswordAuth(password: SecretBytes(utf8.encode('test-secret'))),
+          ]),
+        ),
+        throwsA(isA<SSHAuthAbortError>()),
+      );
+
+      expect(logger.events.map((event) => event.event), [
+        'ssh.connect.start',
+        'ssh.transport.closed',
+        'ssh.connect.failure',
+      ]);
+      expect(
+        logger.events.last.details,
+        containsPair('stage', 'authentication'),
+      );
+      expect(
+        logger.events.last.details,
+        containsPair('code', 'ssh.authentication_aborted'),
+      );
+      expect(socket.closed, isTrue);
+    },
+  );
+
   test('dynamic forwarding requires an active SSH session', () async {
     final service = DartSsh2SessionService();
 
@@ -217,6 +254,36 @@ void main() {
       completes,
     );
   });
+}
+
+class _ClosingSocket implements SSHSocket {
+  final _outgoing = StreamController<List<int>>();
+  final _done = Completer<void>();
+  bool closed = false;
+
+  _ClosingSocket() {
+    _outgoing.stream.listen((_) {});
+  }
+
+  @override
+  Stream<Uint8List> get stream => const Stream.empty();
+  @override
+  StreamSink<List<int>> get sink => _outgoing.sink;
+  @override
+  Future<void> get done => _done.future;
+  @override
+  Future<void> close() async {
+    if (!closed) {
+      closed = true;
+      _done.complete();
+      await _outgoing.close();
+    }
+  }
+
+  @override
+  void destroy() => unawaited(close());
+  @override
+  Future<void> flush() async {}
 }
 
 ConnectionProfileSnapshot _profile(List<SshAuthMethod> authMethods) {

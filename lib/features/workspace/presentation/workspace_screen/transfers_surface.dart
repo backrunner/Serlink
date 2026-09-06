@@ -43,6 +43,7 @@ class _TransfersSurface extends ConsumerWidget {
             data: (state) {
               if (state.tasks.isEmpty) {
                 return _PlaceholderSurface(
+                  icon: Icons.swap_vert_rounded,
                   title: l10n.transfersEmptyTitle,
                   body: l10n.transfersEmptyBody,
                 );

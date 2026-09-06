@@ -1273,6 +1273,26 @@ class AppLocalizationsJa extends AppLocalizations {
   String get snippetConfirmBeforeRun => '実行前に確認';
 
   @override
+  String get snippetCollapseEditorTooltip => 'スニペット情報を表示';
+
+  @override
+  String get snippetEditorKeysHint => 'Tab / Shift+Tab インデント · Esc 次の項目';
+
+  @override
+  String snippetCursorPosition(int line, int column) {
+    return '$line 行、$column 列';
+  }
+
+  @override
+  String get snippetDiscardTitle => '変更を破棄しますか？';
+
+  @override
+  String get snippetDiscardBody => 'このスニペットの変更は保存されていません。';
+
+  @override
+  String get snippetDiscardAction => '変更を破棄';
+
+  @override
   String get snippetExpandEditorTooltip => 'エディターを拡大';
 
   @override

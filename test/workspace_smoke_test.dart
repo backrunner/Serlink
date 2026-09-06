@@ -560,6 +560,8 @@ void main() {
     expect(find.text('Known hosts'), findsOneWidget);
     expect(find.text('Credentials'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Lock'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Lock'));
     await tester.pumpAndSettle();
 
@@ -1345,6 +1347,7 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('settings-columns')), findsOneWidget);
     await expectLater(
       find.byType(SerlinkApp),
       matchesGoldenFile('goldens/settings_desktop.png'),
@@ -1370,10 +1373,40 @@ void main() {
     tester.view.physicalSize = const Size(800, 600);
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('settings-columns')), findsNothing);
     await expectLater(
       find.byType(SerlinkApp),
       matchesGoldenFile('goldens/settings_compact.png'),
     );
+
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    tester.view.physicalSize = const Size(1280, 960);
+    await tester.pumpAndSettle();
+    await expectLater(
+      find.byType(SerlinkApp),
+      matchesGoldenFile('goldens/settings_desktop_dark.png'),
+    );
+
+    tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+    tester.view.physicalSize = const Size(1280, 960);
+    for (final locale in [
+      const Locale('en'),
+      const Locale('zh'),
+      const Locale('ja'),
+    ]) {
+      tester.platformDispatcher.localesTestValue = [locale];
+      await tester.pumpAndSettle();
+      // Large text uses the full width, including when the window is wide.
+      expect(find.byKey(const ValueKey('settings-columns')), findsNothing);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('settings-about-version-label')),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('background privacy screen is off by default', (tester) async {
@@ -1501,15 +1534,16 @@ void main() {
     expect(find.text('Crash reporting'), findsNothing);
   });
 
-  testWidgets('settings shows app version in about section', (tester) async {
+  testWidgets('settings shows app version in the footer', (tester) async {
     await _pumpLockedVaultApp(tester);
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('About'));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('settings-about-version-label')),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.text('About'), findsOneWidget);
     expect(find.text('Serlink'), findsOneWidget);
     expect(find.text('GitHub'), findsOneWidget);
     expect(find.text('https://github.com/backrunner/serlink'), findsNothing);
@@ -2497,6 +2531,125 @@ void main() {
       expect(find.text('ops@persisted.internal:22'), findsOneWidget);
     },
   );
+
+  testWidgets('sidebar retains scroll positions and clears locked content', (
+    tester,
+  ) async {
+    final hosts = _DelayedHostRepository([
+      for (var i = 0; i < 30; i++)
+        _hostConfig(
+          id: 'retained-$i',
+          displayName: 'Retained Host $i',
+          hostname: 'host-$i.internal',
+          createdAt: DateTime.utc(2026, 1, 1).add(Duration(minutes: i)),
+        ),
+    ])..completeList();
+    await _pumpLockedVaultApp(tester, hostRepository: hosts);
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await tester.pumpAndSettle();
+
+    final hostList = find.byType(AnimatedList);
+    final listState = tester.state(hostList);
+    final hostScroll = tester.state<ScrollableState>(
+      find.descendant(of: hostList, matching: find.byType(Scrollable)),
+    );
+    await tester.drag(hostList, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    final hostOffset = hostScroll.position.pixels;
+    expect(hostOffset, greaterThan(0));
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AnimatedList), findsNothing);
+    final version = find.byKey(const ValueKey('settings-about-version-label'));
+    await tester.ensureVisible(version);
+    await tester.pumpAndSettle();
+    final settingsScroll = tester.state<ScrollableState>(
+      find
+          .descendant(
+            of: find.byKey(const PageStorageKey('settings-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    final settingsOffset = settingsScroll.position.pixels;
+    expect(settingsOffset, greaterThan(0));
+
+    await tester.tap(find.text('Hosts'));
+    await tester.pump();
+    expect(tester.state(hostList), same(listState));
+    expect(hostScroll.position.pixels, hostOffset);
+    expect(find.byType(SerlinkLoadingIndicator), findsNothing);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pump();
+    expect(settingsScroll.position.pixels, settingsOffset);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SerlinkApp)),
+    );
+    await container.read(vaultSessionControllerProvider.notifier).lock();
+    await tester.pumpAndSettle();
+    expect(find.byType(AnimatedList, skipOffstage: false), findsNothing);
+    expect(
+      find.byKey(const ValueKey('vault-passphrase-field'), skipOffstage: false),
+      findsNothing,
+    );
+    await tester.tap(find.text('Hosts'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('vault-passphrase-field')),
+      'unfinished passphrase',
+    );
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hosts'));
+    await tester.pump();
+    expect(
+      tester
+          .widget<SerlinkTextField>(
+            find.byKey(const ValueKey('vault-passphrase-field')),
+          )
+          .controller
+          ?.text,
+      isEmpty,
+    );
+    expect(find.byType(EntranceFade), findsNothing);
+  });
+
+  testWidgets('sidebar retains terminal state and restores keyboard focus', (
+    tester,
+  ) async {
+    final localTerminal = _FakeLocalTerminalService();
+    await _pumpLockedVaultApp(tester, localTerminal: localTerminal);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SerlinkApp)),
+    );
+    await container
+        .read(workspaceTabControllerProvider.notifier)
+        .openLocalTerminal();
+    await tester.pumpAndSettle();
+    final terminalView = find.byType(TerminalView);
+    final terminalState = tester.state(terminalView);
+    final focus = tester.widget<TerminalView>(terminalView).focusNode!;
+    expect(focus.hasFocus, isTrue);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(focus.hasFocus, isFalse);
+    expect(focus.canRequestFocus, isFalse);
+    expect(find.byType(TerminalView), findsNothing);
+    localTerminal.shells.single.writes.clear();
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    expect(localTerminal.shells.single.writes, isEmpty);
+
+    await tester.tap(find.text('Sessions'));
+    await tester.pump();
+    await tester.pump();
+    expect(tester.state(terminalView), same(terminalState));
+    expect(focus.hasFocus, isTrue);
+    expect(localTerminal.shells, hasLength(1));
+  });
 
   testWidgets('hosts entrance animation plays once per unlock', (tester) async {
     final now = DateTime.utc(2026);

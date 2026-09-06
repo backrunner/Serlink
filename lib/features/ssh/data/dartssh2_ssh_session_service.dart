@@ -14,6 +14,7 @@ import '../../sftp/data/dartssh2_sftp_connection.dart';
 import '../application/ssh_session_service.dart';
 import '../domain/connection_profile.dart';
 import 'ssh_agent_client.dart';
+import 'ssh_diagnostic_details.dart';
 
 typedef SshSocketFactory =
     Future<SSHSocket> Function(String host, int port, {Duration? timeout});
@@ -58,22 +59,55 @@ class DartSsh2SessionService implements SshSessionService {
           height: profile.terminalRows,
         ),
       );
-    } on Object {
+    } on Object catch (error, stackTrace) {
+      await _logSessionFailure(
+        profile,
+        'shell',
+        'openChannel',
+        error,
+        stackTrace,
+      );
       await chain.close();
       rethrow;
     }
     _clientChains[profile.sessionId] = chain;
     try {
       await _startProfileForwarding(profile, chain.target);
-    } on Object {
+    } on Object catch (error, stackTrace) {
+      await _logSessionFailure(
+        profile,
+        'shell',
+        'forwarding',
+        error,
+        stackTrace,
+      );
       session.close();
       await _closeSessionResources(profile.sessionId);
       rethrow;
     }
-    return DartSsh2ShellSession(
+    await _diagnosticLogger.record(
+      'ssh.shell.ready',
+      details: _connectionLogDetails(profile, purpose: 'shell'),
+    );
+    final shell = DartSsh2ShellSession(
       session: session,
       onClose: () => _closeSessionResources(profile.sessionId),
     );
+    unawaited(
+      shell.done.then(
+        (_) => _diagnosticLogger.record(
+          'ssh.shell.closed',
+          details: {
+            ..._connectionLogDetails(profile, purpose: 'shell'),
+            'exitCode': session.exitCode,
+            'exitSignal': session.exitSignal?.signalName,
+          },
+        ),
+        onError: (Object error, StackTrace stackTrace) =>
+            _logSessionFailure(profile, 'shell', 'session', error, stackTrace),
+      ),
+    );
+    return shell;
   }
 
   @override
@@ -82,14 +116,28 @@ class DartSsh2SessionService implements SshSessionService {
     late final SftpClient sftp;
     try {
       sftp = await chain.target.sftp();
-    } on Object {
+    } on Object catch (error, stackTrace) {
+      await _logSessionFailure(
+        profile,
+        'sftp',
+        'openChannel',
+        error,
+        stackTrace,
+      );
       await chain.close();
       rethrow;
     }
     _clientChains[profile.sessionId] = chain;
     try {
       await _startProfileForwarding(profile, chain.target);
-    } on Object {
+    } on Object catch (error, stackTrace) {
+      await _logSessionFailure(
+        profile,
+        'sftp',
+        'forwarding',
+        error,
+        stackTrace,
+      );
       await sftp.close();
       await _closeSessionResources(profile.sessionId);
       rethrow;
@@ -351,6 +399,9 @@ class DartSsh2SessionService implements SshSessionService {
     final details = _connectionLogDetails(profile, purpose: purpose);
     await _diagnosticLogger.record('ssh.connect.start', details: details);
     final clients = <SSHClient>[];
+    final stopwatch = Stopwatch()..start();
+    var stage = 'socket';
+    var hop = 0;
     try {
       SSHSocket socket;
       if (profile.jumpHosts.isEmpty) {
@@ -368,11 +419,16 @@ class DartSsh2SessionService implements SshSessionService {
         );
         for (var index = 0; index < profile.jumpHosts.length; index += 1) {
           final jump = profile.jumpHosts[index];
+          hop = index;
+          stage = 'authentication';
           final jumpClient = _createClient(socket, _SshEndpoint.fromJump(jump));
           clients.add(jumpClient);
+          _observeTransport(jumpClient, details: details, hop: hop);
+          await jumpClient.authenticated;
           final nextJump = index + 1 < profile.jumpHosts.length
               ? profile.jumpHosts[index + 1]
               : null;
+          stage = 'jumpForward';
           socket = await jumpClient.forwardLocal(
             nextJump?.hostname ?? profile.hostname,
             nextJump?.port ?? profile.port,
@@ -380,15 +436,29 @@ class DartSsh2SessionService implements SshSessionService {
         }
       }
 
-      clients.add(_createClient(socket, _SshEndpoint.fromProfile(profile)));
+      hop = profile.jumpHosts.length;
+      stage = 'authentication';
+      final target = _createClient(socket, _SshEndpoint.fromProfile(profile));
+      clients.add(target);
+      _observeTransport(target, details: details, hop: hop);
+      await target.authenticated;
       final chain = _SshClientChain(clients);
-      await _diagnosticLogger.record('ssh.connect.success', details: details);
+      await _diagnosticLogger.record(
+        'ssh.connect.success',
+        details: {...details, 'elapsedMs': stopwatch.elapsedMilliseconds},
+      );
       return chain;
-    } on Object catch (error) {
+    } on Object catch (error, stackTrace) {
       await _diagnosticLogger.record(
         'ssh.connect.failure',
         level: DiagnosticLogLevel.error,
-        details: {...details, ..._sshErrorDetails(error)},
+        details: {
+          ...details,
+          'stage': stage,
+          'hop': hop,
+          'elapsedMs': stopwatch.elapsedMilliseconds,
+          ...sshDiagnosticDetails(error, stackTrace: stackTrace),
+        },
       );
       await _SshClientChain(clients).close();
       rethrow;
@@ -401,12 +471,38 @@ class DartSsh2SessionService implements SshSessionService {
   }) {
     return {
       'sessionId': profile.sessionId.value,
+      'hostId': profile.hostId.value,
       'purpose': purpose,
       'jumpHosts': profile.jumpHosts.length,
       'authMethods': _authMethodKinds(profile.authMethods),
       'automaticReconnect': profile.reconnectPolicy.isAutomatic,
       'connectTimeoutSeconds': profile.connectTimeout.inSeconds,
     };
+  }
+
+  void _observeTransport(
+    SSHClient client, {
+    required Map<String, Object?> details,
+    required int hop,
+  }) {
+    unawaited(
+      client.done.then(
+        (_) => _diagnosticLogger.record(
+          'ssh.transport.closed',
+          details: {...details, 'hop': hop},
+        ),
+        onError: (Object error, StackTrace stackTrace) =>
+            _diagnosticLogger.record(
+              'ssh.transport.failure',
+              level: DiagnosticLogLevel.error,
+              details: {
+                ...details,
+                'hop': hop,
+                ...sshDiagnosticDetails(error, stackTrace: stackTrace),
+              },
+            ),
+      ),
+    );
   }
 
   List<String> _authMethodKinds(List<SshAuthMethod> authMethods) {
@@ -423,19 +519,21 @@ class DartSsh2SessionService implements SshSessionService {
     ];
   }
 
-  Map<String, Object?> _sshErrorDetails(Object error) {
-    return switch (error) {
-      UnsupportedSshAuthException(:final code) => {
-        'errorType': 'UnsupportedSshAuthException',
-        'code': code,
-      },
-      SshAgentException(:final code) => {
-        'errorType': 'SshAgentException',
-        'code': code,
-      },
-      _ => {'errorType': error.runtimeType.toString()},
-    };
-  }
+  Future<void> _logSessionFailure(
+    ConnectionProfileSnapshot profile,
+    String purpose,
+    String stage,
+    Object error,
+    StackTrace stackTrace,
+  ) => _diagnosticLogger.record(
+    'ssh.$purpose.failure',
+    level: DiagnosticLogLevel.error,
+    details: {
+      ..._connectionLogDetails(profile, purpose: purpose),
+      'stage': stage,
+      ...sshDiagnosticDetails(error, stackTrace: stackTrace),
+    },
+  );
 
   SSHClient _createClient(SSHSocket socket, _SshEndpoint endpoint) {
     final material = DartSsh2AuthMaterial.fromAuthMethods(

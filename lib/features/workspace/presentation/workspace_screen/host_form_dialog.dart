@@ -205,6 +205,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
         width: layout.contentWidth,
         height: layout.contentHeight,
         controller: _scrollController,
+        fillHeight: true,
         padding: layout.scrollPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

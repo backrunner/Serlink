@@ -92,10 +92,7 @@ List<_HostListEntry> _buildHostListEntries(
     return [for (final host in hosts) _HostEntry(host)];
   }
   final groupIds = grouped.keys.toList()
-    ..sort(
-      (left, right) =>
-          left.toLowerCase().compareTo(right.toLowerCase()),
-    );
+    ..sort((left, right) => left.toLowerCase().compareTo(right.toLowerCase()));
   final entries = <_HostListEntry>[];
   void addGroup(String? groupId, String label, List<HostSummary> members) {
     final key = groupId ?? '';
@@ -294,6 +291,19 @@ class _HostListState extends ConsumerState<_HostList> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // A return visit should reveal the settled list, even if navigation
+    // interrupted its initial entrance animation.
+    if (!TickerMode.valuesOf(context).enabled ||
+        MediaQuery.disableAnimationsOf(context)) {
+      _settleTimer?.cancel();
+      _playEntrance = false;
+      _entranceHostIds = const {};
+    }
+  }
+
+  @override
   void didUpdateWidget(covariant _HostList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.unlockGeneration != widget.unlockGeneration) {
@@ -384,10 +394,7 @@ class _HostListState extends ConsumerState<_HostList> {
     }
   }
 
-  bool _sameEntryOrder(
-    List<_HostListEntry> left,
-    List<_HostListEntry> right,
-  ) {
+  bool _sameEntryOrder(List<_HostListEntry> left, List<_HostListEntry> right) {
     if (left.length != right.length) {
       return false;
     }
@@ -643,6 +650,7 @@ class _HostsHeader extends ConsumerWidget {
       workspaceTabControllerProvider.notifier,
     );
     return SurfaceToolbar(
+      height: SerlinkSizes.pageHeaderHeight,
       child: Row(
         children: [
           Text(

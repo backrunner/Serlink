@@ -721,7 +721,7 @@ class _TerminalViewportPaneState extends State<_TerminalViewportPane> {
             ? t.accentPrimary.withValues(alpha: 0.72)
             : widget.active
             ? t.accentPrimary.withValues(alpha: 0.5)
-            : t.borderSubtle;
+            : Colors.transparent;
         return Material(
           color: t.surfaceSunken,
           clipBehavior: Clip.antiAlias,
@@ -827,7 +827,6 @@ class _TerminalPaneHeader extends StatelessWidget {
       padding: const EdgeInsets.only(left: 10, right: 8),
       decoration: BoxDecoration(
         color: active ? t.accentPrimary.withValues(alpha: 0.16) : t.surfaceBase,
-        border: Border(bottom: BorderSide(color: t.borderSubtle)),
       ),
       child: Row(
         children: [

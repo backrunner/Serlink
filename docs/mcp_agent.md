@@ -74,6 +74,28 @@ The feature stays inside the sandbox (loopback server, user-selected authorizati
 
 ## Limitations
 
+### Connection diagnostics
+
+The app writes private, rotated JSON-lines logs under
+`<Application Support>/Serlink/logs/serlink-YYYY-MM-DD.log` (UTC dates). On macOS
+the default directory is
+`~/Library/Application Support/com.alkinum.serlink/Serlink/logs/`.
+
+Correlate `mcp.session.open.*`, `workspace.ssh.failure`, and `ssh.*` events by
+`sessionId` and `hostId`. `ssh.connect.success` means SSH authentication has
+completed; `ssh.shell.ready` means the terminal channel and configured forwards
+are ready. Failures include the operation stage, exception type, structured
+nested causes, and protocol/OS error codes where available. Transport closure
+and shell exit are logged separately, including the remote exit status when
+provided. A closed transport alone does not identify who initiated the close.
+
+Diagnostic entries omit credentials, terminal contents, commands, and arbitrary
+exception messages. If a client only receives `connect_failed: Connection
+failed.`, inspect the matching app log entries to distinguish authentication,
+transport, channel, forwarding, and workspace failures.
+
+### Runtime constraints
+
 - `serlink_exec` detects "command finished" by output quiescence, not by shell exit status; long-running or streaming commands need an explicit `timeoutMs`. Shell-integration markers (OSC 133) are a possible future upgrade.
 - The exec result is screen text (last N lines), not a byte-exact stream capture.
 - Agent sessions do not use tmux/screen remote persistence; a dropped connection ends the session.

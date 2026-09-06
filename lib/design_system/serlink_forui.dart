@@ -634,7 +634,6 @@ class _SerlinkContextMenuOverlay extends StatelessWidget {
           decoration: BoxDecoration(
             color: t.surfaceRaised,
             borderRadius: SerlinkRadii.control,
-            border: Border.all(color: t.borderSubtle),
             boxShadow: serlinkShadow(t, elevation: 12),
           ),
           child: ClipRRect(

@@ -1358,6 +1358,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get snippetConfirmBeforeRun => 'Confirm before run';
 
   @override
+  String get snippetCollapseEditorTooltip => 'Show snippet details';
+
+  @override
+  String get snippetEditorKeysHint => 'Tab / Shift+Tab indent · Esc next field';
+
+  @override
+  String snippetCursorPosition(int line, int column) {
+    return 'Ln $line, Col $column';
+  }
+
+  @override
+  String get snippetDiscardTitle => 'Discard changes?';
+
+  @override
+  String get snippetDiscardBody =>
+      'Your changes to this snippet have not been saved.';
+
+  @override
+  String get snippetDiscardAction => 'Discard changes';
+
+  @override
   String get snippetExpandEditorTooltip => 'Expand editor';
 
   @override

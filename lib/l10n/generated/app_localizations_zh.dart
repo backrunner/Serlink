@@ -1259,6 +1259,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get snippetConfirmBeforeRun => '运行前确认';
 
   @override
+  String get snippetCollapseEditorTooltip => '显示片段信息';
+
+  @override
+  String get snippetEditorKeysHint => 'Tab / Shift+Tab 缩进 · Esc 跳到下一项';
+
+  @override
+  String snippetCursorPosition(int line, int column) {
+    return '第 $line 行，第 $column 列';
+  }
+
+  @override
+  String get snippetDiscardTitle => '放弃更改？';
+
+  @override
+  String get snippetDiscardBody => '此片段的更改尚未保存。';
+
+  @override
+  String get snippetDiscardAction => '放弃更改';
+
+  @override
   String get snippetExpandEditorTooltip => '放大编辑器';
 
   @override

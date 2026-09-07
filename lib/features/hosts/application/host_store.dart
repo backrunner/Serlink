@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/app_dependencies.dart';
 import '../../vault/application/vault_service.dart';
+import 'host_repository.dart';
 import '../domain/host.dart';
 
 final hostSummariesProvider = FutureProvider.autoDispose
@@ -16,7 +17,9 @@ final hostSummariesProvider = FutureProvider.autoDispose
         // list for a frame before the real records finish loading.
         return Completer<List<HostSummary>>().future;
       }
-      ref.watch(vaultRecordChangesProvider);
+      ref.watch(
+        vaultRecordChangesByTypeProvider(EncryptedHostRepository.recordType),
+      );
       final hosts = await ref.watch(hostRepositoryProvider).list();
       hosts.sort((left, right) {
         final byCreatedAt = right.createdAt.compareTo(left.createdAt);

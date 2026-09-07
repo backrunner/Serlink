@@ -103,6 +103,14 @@ final vaultRecordChangesProvider = StreamProvider<VaultRecordChange>((ref) {
   return ref.watch(vaultRecordChangeBusProvider).stream;
 });
 
+final vaultRecordChangesByTypeProvider = StreamProvider.autoDispose
+    .family<VaultRecordChange, String>((ref, type) {
+      return ref
+          .watch(vaultRecordChangeBusProvider)
+          .stream
+          .where((change) => change.type == null || change.type == type);
+    });
+
 final _driftVaultRecordRepositoryProvider = Provider<VaultRecordRepository>((
   ref,
 ) {
@@ -814,7 +822,9 @@ final snippetsProvider = FutureProvider.autoDispose
           vaultSession.unlockGeneration != unlockGeneration) {
         return Completer<List<CommandSnippet>>().future;
       }
-      ref.watch(vaultRecordChangesProvider);
+      ref.watch(
+        vaultRecordChangesByTypeProvider(EncryptedSnippetRepository.recordType),
+      );
       final snippets = await ref.watch(snippetRepositoryProvider).list();
       ref.keepAlive();
       return snippets;
@@ -1237,6 +1247,7 @@ class CloudKitEncryptedSnapshotPrefetchNotifier extends Notifier<void> {
 
 class AutoSyncController extends Notifier<AutoSyncStatus> {
   Timer? _debounceTimer;
+  Timer? _transferSyncTimer;
   bool _running = false;
   bool _rerunRequested = false;
   bool _configureQueued = false;
@@ -1247,6 +1258,7 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
   AutoSyncStatus build() {
     ref.onDispose(() {
       _debounceTimer?.cancel();
+      _transferSyncTimer?.cancel();
     });
     ref.listen<AsyncValue<VaultSessionState>>(
       vaultSessionControllerProvider,
@@ -1266,6 +1278,15 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
     ) {
       if (change.hasValue &&
           change.value?.origin == VaultRecordChangeOrigin.local) {
+        if (change.value?.type == 'transfer_task') {
+          // Coalesce checkpoints with a fixed deadline, even during a long
+          // transfer. Host edits and explicit sync requests remain immediate.
+          _transferSyncTimer ??= Timer(const Duration(seconds: 2), () {
+            _transferSyncTimer = null;
+            if (ref.mounted) requestSync(delay: Duration.zero);
+          });
+          return;
+        }
         _scheduleConfigure();
         requestSync(delay: Duration.zero);
       }

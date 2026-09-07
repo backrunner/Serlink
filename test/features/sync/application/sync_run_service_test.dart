@@ -37,6 +37,97 @@ void main() {
     }
   });
 
+  test(
+    'sync uploads only changed objects and bounds concurrent reads',
+    () async {
+      for (var i = 0; i < 12; i++) {
+        await records.upsert(
+          await vault.encryptRecord(
+            id: VaultRecordId('host:$i'),
+            type: 'host',
+            plaintext: utf8.encode('{"updatedAt":"2026-01-01T00:00:00Z"}'),
+          ),
+        );
+      }
+      final provider = _MeasuredSyncProvider(tempDir);
+      await service.syncEncryptedSnapshot(provider);
+      expect(provider.maxWrites, 4);
+      provider.recordWrites = 0;
+      provider.recordReads = 0;
+      await records.upsert(
+        await vault.encryptRecord(
+          id: VaultRecordId('host:0'),
+          type: 'host',
+          plaintext: utf8.encode('{"updatedAt":"2026-01-02T00:00:00Z"}'),
+        ),
+      );
+      final result = await service.syncEncryptedSnapshot(provider);
+      expect(result.recordsUploaded, 1);
+      expect(provider.recordWrites, 1);
+      expect(provider.recordReads, 12);
+      expect(provider.maxReads, 4);
+      provider.recordWrites = 0;
+      final unchanged = await service.syncEncryptedSnapshot(provider);
+      expect(unchanged.recordsUploaded, 0);
+      expect(provider.recordWrites, 0);
+    },
+  );
+
+  test(
+    'unchanged revisions still detect corrupted or missing remote objects',
+    () async {
+      final envelope = await vault.encryptRecord(
+        id: VaultRecordId('host:checked'),
+        type: 'host',
+        plaintext: utf8.encode('{}'),
+      );
+      await records.upsert(envelope);
+      final provider = LocalDirectorySyncProvider(tempDir);
+      await service.syncEncryptedSnapshot(provider);
+      final ref = await _manifestRecordRef(
+        provider: provider,
+        vault: vault,
+        id: envelope.id,
+      );
+      final original = await provider.readObject(ref);
+      final json = jsonDecode(utf8.decode(original)) as Map<String, Object?>;
+      json['ciphertext'] = base64Encode([0, 1, 2]);
+      await provider.writeObject(ref, utf8.encode(jsonEncode(json)));
+      await expectLater(
+        service.syncEncryptedSnapshot(provider),
+        throwsA(isA<SyncRunException>()),
+      );
+      await provider.deleteObject(ref);
+      await expectLater(
+        service.syncEncryptedSnapshot(provider),
+        throwsA(isA<SyncRunException>()),
+      );
+    },
+  );
+
+  test(
+    'initial publication waits for in-flight uploads before cleanup',
+    () async {
+      for (var i = 0; i < 8; i++) {
+        await records.upsert(
+          await vault.encryptRecord(
+            id: VaultRecordId('host:$i'),
+            type: 'host',
+            plaintext: utf8.encode('{}'),
+          ),
+        );
+      }
+      final provider = _MeasuredSyncProvider(tempDir, failFirstWrite: true);
+      await expectLater(
+        service.publishInitialEncryptedSnapshot(provider),
+        throwsA(isA<SyncProviderException>()),
+      );
+      expect(provider.activeWrites, 0);
+      expect(await provider.listRecordObjects(prefix: 'records/'), isEmpty);
+      expect(await provider.readManifest(), isNull);
+    },
+  );
+
   test('pushes encrypted vault header, records, and manifest', () async {
     final envelope = await vault.encryptRecord(
       id: VaultRecordId('host:1'),
@@ -339,7 +430,7 @@ void main() {
       reportConflicts: true,
     );
 
-    expect(result.recordsUploaded, 2);
+    expect(result.recordsUploaded, 1);
     final manifestIds = await _manifestRecordIds(
       provider: provider,
       vault: vault,
@@ -479,7 +570,7 @@ void main() {
         acceptedConflicts: reported.conflicts,
       );
 
-      expect(result.recordsUploaded, 3);
+      expect(result.recordsUploaded, 2);
       final manifestIds = await _manifestRecordIds(
         provider: provider,
         vault: vault,
@@ -609,7 +700,7 @@ void main() {
         reportConflicts: true,
       );
 
-      expect(result.recordsUploaded, 2);
+      expect(result.recordsUploaded, 1);
       final manifestIds = await _manifestRecordIds(
         provider: provider,
         vault: vault,
@@ -1680,7 +1771,7 @@ void main() {
       final result = await service.syncEncryptedSnapshot(provider);
 
       expect(result.recordsDownloaded, 1);
-      expect(result.recordsUploaded, 2);
+      expect(result.recordsUploaded, 1);
       expect(await records.read(remoteEnvelope.id), isNotNull);
       expect(vault.state, VaultState.unlocked);
     },
@@ -1736,7 +1827,7 @@ void main() {
 
       final result = await service.syncEncryptedSnapshot(provider);
 
-      expect(result.recordsUploaded, 2);
+      expect(result.recordsUploaded, 1);
       expect(await deviceService.readLocalDevice(), isNotNull);
       final refs = await provider.listRecordObjects(prefix: 'records/');
       expect(
@@ -2740,6 +2831,51 @@ void main() {
       isNot(contains(startsWith('records/sync%3Atombstone%3A'))),
     );
   });
+}
+
+class _MeasuredSyncProvider extends LocalDirectorySyncProvider {
+  _MeasuredSyncProvider(super.rootDirectory, {this.failFirstWrite = false});
+  final bool failFirstWrite;
+  int recordReads = 0;
+  int recordWrites = 0;
+  int activeReads = 0;
+  int activeWrites = 0;
+  int maxReads = 0;
+  int maxWrites = 0;
+
+  @override
+  Future<List<int>> readObject(RemoteObjectRef ref) async {
+    if (!ref.path.startsWith('records/')) return super.readObject(ref);
+    recordReads++;
+    activeReads++;
+    if (activeReads > maxReads) maxReads = activeReads;
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+      return await super.readObject(ref);
+    } finally {
+      activeReads--;
+    }
+  }
+
+  @override
+  Future<void> writeObject(RemoteObjectRef ref, List<int> bytes) async {
+    if (!ref.path.startsWith('records/')) return super.writeObject(ref, bytes);
+    recordWrites++;
+    activeWrites++;
+    if (activeWrites > maxWrites) maxWrites = activeWrites;
+    try {
+      if (failFirstWrite && recordWrites == 1) {
+        throw const SyncProviderException(
+          'test.failure',
+          'Synthetic upload failure',
+        );
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+      await super.writeObject(ref, bytes);
+    } finally {
+      activeWrites--;
+    }
+  }
 }
 
 Future<RemoteObjectRef> _manifestRecordRef({

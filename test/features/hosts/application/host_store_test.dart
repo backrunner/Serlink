@@ -60,6 +60,11 @@ void main() {
       expect(session.vaultState, VaultState.unlocked);
 
       final generation = session.unlockGeneration;
+      final subscription = container.listen(
+        hostSummariesProvider(generation),
+        (_, _) {},
+      );
+      addTearDown(subscription.close);
       expect(
         await container.read(hostSummariesProvider(generation).future),
         isEmpty,
@@ -88,6 +93,29 @@ void main() {
       expect(refreshed, hasLength(1));
       expect(refreshed.single.displayName, 'Remote Host');
       expect(refreshed.single.hostname, 'remote.example.test');
+
+      final transfer = await vault.encryptRecord(
+        id: VaultRecordId('transfer_task:unrelated'),
+        type: 'transfer_task',
+        plaintext: utf8.encode('{}'),
+      );
+      await container.read(vaultRecordRepositoryProvider).upsert(transfer);
+      await _drainMicrotasks();
+      expect(
+        identical(
+          refreshed,
+          await container.read(hostSummariesProvider(generation).future),
+        ),
+        isTrue,
+        reason: 'Transfer progress must not reload and decrypt all hosts.',
+      );
+
+      await container.read(vaultRecordRepositoryProvider).delete(envelope.id);
+      await _drainMicrotasks();
+      expect(
+        await container.read(hostSummariesProvider(generation).future),
+        isEmpty,
+      );
 
       final afterSync = container
           .read(vaultSessionControllerProvider)

@@ -27,12 +27,10 @@ class _SftpPane extends ConsumerStatefulWidget {
 }
 
 class _SftpPaneState extends ConsumerState<_SftpPane> {
-  static const _listCacheTtl = Duration(seconds: 5);
-
   final TextEditingController _filterController = TextEditingController();
   final TextEditingController _pathController = TextEditingController();
   final FocusNode _pathFocusNode = FocusNode();
-  final Map<String, _SftpListCacheEntry> _listCache = {};
+  final _listCache = SftpDirectoryCache();
   Future<List<SftpEntry>>? _entriesFuture;
   String _filterText = '';
   String? _promptedDefaultDirectoryForPath;
@@ -555,26 +553,20 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   }) async {
     final normalizedPath = _joinRemotePath(path);
     if (!bypassCache) {
-      final cached = _listCache[normalizedPath];
-      if (cached != null &&
-          DateTime.now().difference(cached.cachedAt) < _listCacheTtl) {
-        return cached.entries;
-      }
+      final cached = _listCache.read(normalizedPath);
+      if (cached != null) return cached;
     }
     final entries = await connection.list(normalizedPath);
-    _listCache[normalizedPath] = _SftpListCacheEntry(
-      entries: List<SftpEntry>.unmodifiable(entries),
-      cachedAt: DateTime.now(),
-    );
+    _listCache.store(normalizedPath, entries);
     return entries;
   }
 
   void _invalidateListCache([String? path]) {
     if (path == null) {
-      _listCache.clear();
+      _listCache.invalidate();
       return;
     }
-    _listCache.remove(_joinRemotePath(path));
+    _listCache.invalidate(_joinRemotePath(path));
   }
 
   void _openParentDirectory() {
@@ -1150,13 +1142,6 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     );
     return entries.any((entry) => entry.path == remotePath);
   }
-}
-
-class _SftpListCacheEntry {
-  const _SftpListCacheEntry({required this.entries, required this.cachedAt});
-
-  final List<SftpEntry> entries;
-  final DateTime cachedAt;
 }
 
 class _SftpToolbarIcon extends StatelessWidget {

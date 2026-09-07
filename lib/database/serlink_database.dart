@@ -80,7 +80,7 @@ class QuarantinedRecords extends Table {
 class SerlinkDatabase extends _$SerlinkDatabase {
   SerlinkDatabase([QueryExecutor? executor]) : super(executor ?? _open());
 
-  static const currentSchemaVersion = 6;
+  static const currentSchemaVersion = 7;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -90,6 +90,7 @@ class SerlinkDatabase extends _$SerlinkDatabase {
     onCreate: (migrator) async {
       await migrator.createAll();
       await _createSyncAuxiliaryTables();
+      await _createRecordTypeIndex();
     },
     onUpgrade: (migrator, from, to) async {
       var current = from;
@@ -116,6 +117,10 @@ class SerlinkDatabase extends _$SerlinkDatabase {
         await _createSyncRecordBaselinesTable();
         current = 6;
       }
+      if (current == 6 && to >= 7) {
+        await _createRecordTypeIndex();
+        current = 7;
+      }
       if (current == to) {
         return;
       }
@@ -128,6 +133,11 @@ class SerlinkDatabase extends _$SerlinkDatabase {
     beforeOpen: (_) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },
+  );
+
+  Future<void> _createRecordTypeIndex() => customStatement(
+    'CREATE INDEX IF NOT EXISTS encrypted_records_type_id '
+    'ON encrypted_records(type, id)',
   );
 
   Future<void> _createSyncAuxiliaryTables() async {

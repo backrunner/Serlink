@@ -34,6 +34,56 @@ class TerminalController with ChangeNotifier {
 
   List<TerminalHighlight> get highlights => _highlights;
   final _highlights = <TerminalHighlight>[];
+  int _batchDepth = 0;
+  bool _notificationPending = false;
+
+  /// Applies related selection/highlight changes with a single notification.
+  T batch<T>(T Function() action) {
+    _batchDepth++;
+    try {
+      return action();
+    } finally {
+      _batchDepth--;
+      if (_batchDepth == 0 && _notificationPending) {
+        _notificationPending = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  @override
+  void notifyListeners() {
+    if (_batchDepth > 0) {
+      _notificationPending = true;
+      return;
+    }
+    super.notifyListeners();
+  }
+
+  /// Removes an owned group in one pass without shifting the list per match.
+  void removeHighlights(Iterable<TerminalHighlight> highlights) {
+    final removed = highlights.where((h) => h.owner == this).toSet();
+    batch(() {
+      _highlights.removeWhere(removed.contains);
+      for (final highlight in removed) {
+        highlight._registered = false;
+        highlight.dispose();
+      }
+      if (removed.isNotEmpty) notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _selectionBase?.dispose();
+    _selectionExtent?.dispose();
+    for (final highlight in _highlights) {
+      highlight._registered = false;
+      highlight.dispose();
+    }
+    _highlights.clear();
+    super.dispose();
+  }
 
   BufferRange? get selection {
     final base = _selectionBase;
@@ -122,7 +172,7 @@ class TerminalController with ChangeNotifier {
 
   /// Creates a new highlight on the terminal from [p1] to [p2] with the given
   /// [color]. The highlight will be removed when the returned object is
-  /// disposed.
+  /// disposed. This takes ownership of both anchors and disposes them too.
   TerminalHighlight highlight({
     required CellAnchor p1,
     required CellAnchor p2,
@@ -136,11 +186,15 @@ class TerminalController with ChangeNotifier {
     );
 
     _highlights.add(highlight);
+    highlight._registered = true;
     notifyListeners();
 
     highlight.registerCallback(() {
-      _highlights.remove(highlight);
-      notifyListeners();
+      if (highlight._registered) {
+        highlight._registered = false;
+        _highlights.remove(highlight);
+        notifyListeners();
+      }
     });
 
     return highlight;
@@ -148,6 +202,7 @@ class TerminalController with ChangeNotifier {
 }
 
 class TerminalHighlight with Disposable {
+  bool _registered = false;
   final TerminalController owner;
 
   final CellAnchor p1;
@@ -162,6 +217,14 @@ class TerminalHighlight with Disposable {
     required this.p2,
     required this.color,
   });
+
+  @override
+  void dispose() {
+    if (disposed) return;
+    p1.dispose();
+    p2.dispose();
+    super.dispose();
+  }
 
   /// Returns the range of the highlight. May be null if the anchors that
   /// define the highlight are not attached to the terminal.

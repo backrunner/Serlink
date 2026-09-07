@@ -32,6 +32,10 @@ class TerminalBufferSearchController {
   int _currentIndex = -1;
 
   TerminalSearchResult search(String query) {
+    return controller.batch(() => _search(query));
+  }
+
+  TerminalSearchResult _search(String query) {
     _clearHighlights(clearQuery: false);
     _query = query;
 
@@ -100,7 +104,7 @@ class TerminalBufferSearchController {
   }
 
   void clear() {
-    _clearHighlights(clearQuery: true);
+    controller.batch(() => _clearHighlights(clearQuery: true));
   }
 
   TerminalSearchResult get _result {
@@ -125,9 +129,7 @@ class TerminalBufferSearchController {
   }
 
   void _clearHighlights({required bool clearQuery}) {
-    for (final highlight in _highlights) {
-      highlight.dispose();
-    }
+    controller.removeHighlights(_highlights);
     _highlights.clear();
     _matches.clear();
     _currentIndex = -1;

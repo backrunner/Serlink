@@ -24,6 +24,7 @@ void main() {
       await connection.mkdir(runRoot);
       try {
         await _exerciseFileUpload(connection, runRoot);
+        await _exerciseBatchedDownload(connection, runRoot);
         await _exerciseDirectoryTransfer(connection, runRoot);
         await _exerciseOverwrite(connection, runRoot);
         await _exerciseFailureMapping(connection, runRoot);
@@ -36,6 +37,72 @@ void main() {
         ? false
         : 'Set SERLINK_SFTP_INTEGRATION=1 and start test/fixtures/sftp.',
     timeout: const Timeout(Duration(minutes: 2)),
+  );
+}
+
+Future<void> _exerciseBatchedDownload(
+  DartSsh2SftpConnection connection,
+  String runRoot,
+) async {
+  final directory = await Directory.systemTemp.createTemp(
+    'serlink-sftp-batch-',
+  );
+  addTearDown(() => directory.delete(recursive: true));
+  final bytes = List<int>.generate(1024 * 1024 + 37, (index) => index % 251);
+  final source = File(p.join(directory.path, 'source.bin'));
+  await source.writeAsBytes(bytes);
+  final remote = p.posix.join(runRoot, 'batch.bin');
+  await _expectCompleted(
+    connection.upload(
+      taskId: TransferTaskId('batch-upload'),
+      itemKind: TransferItemKind.file,
+      localPath: source.path,
+      remotePath: remote,
+    ),
+  );
+  final target = File(p.join(directory.path, 'target.bin'));
+  final done = Completer<void>();
+  var paused = false;
+  TransferProgress? last;
+  late StreamSubscription<TransferProgress> subscription;
+  subscription = connection
+      .download(
+        taskId: TransferTaskId('batch-download'),
+        itemKind: TransferItemKind.file,
+        remotePath: remote,
+        localPath: target.path,
+      )
+      .listen(
+        (progress) {
+          last = progress;
+          if (!paused &&
+              progress.transferredBytes > 0 &&
+              progress.state == TransferState.running) {
+            paused = true;
+            subscription.pause(
+              Future<void>.delayed(const Duration(milliseconds: 10)),
+            );
+          }
+        },
+        onError: done.completeError,
+        onDone: done.complete,
+      );
+  await done.future;
+  expect(paused, isTrue);
+  expect(last!.state, TransferState.completed);
+  expect(last!.transferredBytes, bytes.length);
+  expect(await target.readAsBytes(), bytes);
+  // A sink can fail before a batch reaches the flush threshold.
+  await expectLater(
+    connection
+        .download(
+          taskId: TransferTaskId('batch-invalid-local-target'),
+          itemKind: TransferItemKind.file,
+          remotePath: remote,
+          localPath: directory.path,
+        )
+        .drain<void>(),
+    throwsA(isA<SftpFailureException>()),
   );
 }
 

@@ -587,6 +587,7 @@ class DartSsh2SftpConnection implements SftpConnection {
     StreamSubscription<Uint8List>? subscription;
     final done = Completer<void>();
     var transferredBytes = 0;
+    var bufferedBytes = 0;
     var completed = false;
 
     Future<void> fail(Object error, StackTrace stackTrace) async {
@@ -602,6 +603,18 @@ class DartSsh2SftpConnection implements SftpConnection {
         mode: ssh.SftpFileOpenMode.read,
       );
       sink = localFile.openWrite();
+      // Observe asynchronous sink failures even between checkpoint flushes.
+      unawaited(
+        sink.done.then<void>(
+          (_) {},
+          onError: (Object error, StackTrace stack) {
+            return fail(error, stack);
+          },
+        ),
+      );
+      // Start consuming immediately so an asynchronous file-open failure is
+      // observed even before the first remote packet arrives.
+      sink.add(const []);
       subscription = remoteFile
           .read(length: fileBytes == 0 ? null : fileBytes)
           .listen(
@@ -623,7 +636,13 @@ class DartSsh2SftpConnection implements SftpConnection {
           try {
             await transfer.waitIfPaused();
             sink!.add(chunk);
-            await sink.flush();
+            bufferedBytes += chunk.length;
+            // Keep writes bounded while allowing the sink to combine small
+            // SFTP packets. The final partial batch is flushed below.
+            if (bufferedBytes >= 256 * 1024) {
+              await sink.flush();
+              bufferedBytes = 0;
+            }
             transferredBytes += chunk.length;
             _emitTransferProgress(
               controller,
@@ -652,6 +671,7 @@ class DartSsh2SftpConnection implements SftpConnection {
       );
       await done.future;
       transfer.throwIfCanceled();
+      await sink.flush();
       completed = true;
     } finally {
       await subscription?.cancel();

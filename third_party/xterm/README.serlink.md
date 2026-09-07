@@ -3,6 +3,9 @@ terminal compatibility patches.
 
 Current patches:
 
+- Release highlight anchors on disposal and support batched selection/highlight
+  changes, including linear-time removal of a group of search highlights.
+
 - Paint terminal line backgrounds before foreground glyphs. This prevents
   adjacent colored cells from shaving Nerd Font and Powerline glyph overhangs.
 - Pass the Flutter view id to text input configuration so terminal text input

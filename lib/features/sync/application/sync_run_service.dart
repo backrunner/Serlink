@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import '../../../core/logging/offline_diagnostic_logger.dart';
@@ -64,7 +65,10 @@ class SyncPullResult {
     required this.conflicts,
     this.remoteDevice,
     this.remoteManifest,
+    this.verifiedRemoteRecords = const {},
   });
+
+  final Map<String, VaultRecordEnvelope> verifiedRemoteRecords;
 
   final int recordsDownloaded;
   final int recordsUnchanged;
@@ -385,6 +389,7 @@ class SyncRunService {
       provider,
       pruneRemote: true,
       expectedRemoteManifest: pull.remoteManifest,
+      verifiedRemoteRecords: pull.verifiedRemoteRecords,
     );
     return SyncRunResult(
       recordsUploaded: push.recordsUploaded,
@@ -424,6 +429,25 @@ class SyncRunService {
     SyncProvider provider, {
     bool missingManifestOk = false,
     _SyncConflictPolicy conflictPolicy = _SyncConflictPolicy.report,
+  }) {
+    // A fresh cache for each pull, including retries. Never hide corruption or
+    // missing objects behind data cached by an earlier sync or another server.
+    return runZoned(
+      () => _pullEncryptedSnapshotOnce(
+        provider,
+        missingManifestOk: missingManifestOk,
+        conflictPolicy: conflictPolicy,
+      ),
+      zoneValues: {
+        _remoteEnvelopeCacheKey: <String, Future<VaultRecordEnvelope>>{},
+      },
+    );
+  }
+
+  Future<SyncPullResult> _pullEncryptedSnapshotOnce(
+    SyncProvider provider, {
+    required bool missingManifestOk,
+    required _SyncConflictPolicy conflictPolicy,
   }) async {
     _ensureUnlocked();
     if (await isRemoteReset(provider)) {
@@ -462,6 +486,28 @@ class SyncRunService {
     final remoteDevice = _manifestWriterDevice(manifestData);
     final localTombstones = await _localTombstones();
     await _rejectIfRemoteRevokesLocalDevice(provider, recordEntries);
+    final remoteEnvelopes = <String, VaultRecordEnvelope>{};
+    await _forEachSyncObject(
+      recordEntries
+          .where(
+            (entry) =>
+                !_isLocalOnlySnapshotRecord(id: entry.id, type: entry.type),
+          )
+          .toList(),
+      (entry) async {
+        final envelope = await _readRemoteEnvelope(provider, entry.ref);
+        _validateRemoteEnvelopeEntry(envelope, entry);
+        try {
+          await _vault.decryptRecord(envelope);
+        } on VaultException {
+          throw const SyncRunException(
+            'sync.remote_manifest_invalid',
+            'Remote sync record is invalid or corrupted.',
+          );
+        }
+        remoteEnvelopes[entry.ref.path] = envelope;
+      },
+    );
     final tombstonesToDelete = <VaultRecordId>{};
     final conflicts = <SyncRecordConflict>[];
     final remoteTombstones = <SyncDeleteTombstone>[];
@@ -473,8 +519,7 @@ class SyncRunService {
       if (_isLocalOnlySnapshotRecord(id: entry.id, type: entry.type)) {
         continue;
       }
-      final remoteEnvelope = await _readRemoteEnvelope(provider, entry.ref);
-      _validateRemoteEnvelopeEntry(remoteEnvelope, entry);
+      final remoteEnvelope = remoteEnvelopes[entry.ref.path]!;
       remoteBaselineEnvelopes.add(remoteEnvelope);
 
       if (remoteEnvelope.type ==
@@ -630,6 +675,7 @@ class SyncRunService {
       conflicts: conflicts,
       remoteDevice: remoteDevice,
       remoteManifest: manifest,
+      verifiedRemoteRecords: remoteEnvelopes,
     );
   }
 
@@ -718,6 +764,7 @@ class SyncRunService {
               provider,
               pruneRemote: true,
               expectedRemoteManifest: pull.remoteManifest,
+              verifiedRemoteRecords: pull.verifiedRemoteRecords,
             );
             return SyncRunResult(
               recordsUploaded: push.recordsUploaded,
@@ -758,6 +805,7 @@ class SyncRunService {
       provider,
       pruneRemote: true,
       expectedRemoteManifest: pull.remoteManifest,
+      verifiedRemoteRecords: pull.verifiedRemoteRecords,
     );
     return SyncRunResult(
       recordsUploaded: push.recordsUploaded,
@@ -786,6 +834,7 @@ class SyncRunService {
       provider,
       pruneRemote: true,
       expectedRemoteManifest: pull.remoteManifest,
+      verifiedRemoteRecords: pull.verifiedRemoteRecords,
     );
     return SyncRunResult(
       recordsUploaded: push.recordsUploaded,
@@ -831,6 +880,7 @@ class SyncRunService {
     required bool pruneRemote,
     RemoteManifest? expectedRemoteManifest,
     bool cleanupPartialRemoteObjectsOnFailure = false,
+    Map<String, VaultRecordEnvelope> verifiedRemoteRecords = const {},
     _RemoteCompatibilityPolicy compatibilityPolicy =
         _RemoteCompatibilityPolicy.strict,
   }) async {
@@ -863,6 +913,7 @@ class SyncRunService {
     final manifestRecords = <Map<String, Object?>>[];
     final desiredRecordPaths = <String>{};
     final uploadedRefs = <RemoteObjectRef>[];
+    final recordsToUpload = <(RemoteObjectRef, VaultRecordEnvelope)>[];
     final vaultId = syncVaultId(header);
     final headerRef = RemoteObjectRef(_headerObjectPath(vaultId));
     try {
@@ -870,12 +921,11 @@ class SyncRunService {
         final ref = RemoteObjectRef(
           _recordObjectPath(envelope.id.value, envelope.revision),
         );
-        await _writeUploadedObject(
-          provider,
-          ref,
-          utf8.encode(jsonEncode(envelope.toJson())),
-        );
-        uploadedRefs.add(ref);
+        final verified = verifiedRemoteRecords[ref.path];
+        if (verified == null ||
+            jsonEncode(verified.toJson()) != jsonEncode(envelope.toJson())) {
+          recordsToUpload.add((ref, envelope));
+        }
         desiredRecordPaths.add(ref.path);
         manifestRecords.add({
           'id': envelope.id.value,
@@ -884,6 +934,16 @@ class SyncRunService {
           'path': ref.path,
         });
       }
+
+      await _forEachSyncObject(recordsToUpload, (record) async {
+        final (ref, envelope) = record;
+        await _writeUploadedObject(
+          provider,
+          ref,
+          utf8.encode(jsonEncode(envelope.toJson())),
+        );
+        uploadedRefs.add(ref);
+      });
 
       await _writeUploadedObject(
         provider,
@@ -940,7 +1000,7 @@ class SyncRunService {
     );
 
     return SyncRunResult(
-      recordsUploaded: envelopes.length,
+      recordsUploaded: recordsToUpload.length,
       headerUploaded: true,
       completedAt: DateTime.now().toUtc(),
       writerDevice: writerDevice,
@@ -1077,6 +1137,7 @@ class SyncRunService {
         provider,
         pruneRemote: true,
         expectedRemoteManifest: pull.remoteManifest,
+        verifiedRemoteRecords: pull.verifiedRemoteRecords,
       );
       return SyncRunResult(
         recordsUploaded: push.recordsUploaded,
@@ -1341,6 +1402,20 @@ class SyncRunService {
   }
 
   Future<VaultRecordEnvelope> _readRemoteEnvelope(
+    SyncProvider provider,
+    RemoteObjectRef ref,
+  ) {
+    final cache =
+        Zone.current[_remoteEnvelopeCacheKey]
+            as Map<String, Future<VaultRecordEnvelope>>?;
+    return cache?.putIfAbsent(
+          ref.path,
+          () => _readRemoteEnvelopeUncached(provider, ref),
+        ) ??
+        _readRemoteEnvelopeUncached(provider, ref);
+  }
+
+  Future<VaultRecordEnvelope> _readRemoteEnvelopeUncached(
     SyncProvider provider,
     RemoteObjectRef ref,
   ) async {
@@ -1969,4 +2044,18 @@ List<SyncRecordConflict> _unacceptedConflicts(
       ))
         conflict,
   ];
+}
+
+final _remoteEnvelopeCacheKey = Object();
+
+Future<void> _forEachSyncObject<T>(
+  List<T> objects,
+  Future<void> Function(T) action,
+) async {
+  const concurrency = 4;
+  for (var offset = 0; offset < objects.length; offset += concurrency) {
+    // Wait for every in-flight request before returning errors so failed
+    // publication cleanup cannot race a late successful upload.
+    await Future.wait(objects.skip(offset).take(concurrency).map(action));
+  }
 }

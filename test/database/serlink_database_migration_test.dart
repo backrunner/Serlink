@@ -7,7 +7,42 @@ import 'package:serlink/database/serlink_database.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 void main() {
-  test('migrates v2 databases to v6 auxiliary and preference tables', () async {
+  test('v6 migration adds the type index and preserves encrypted rows', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'serlink-v6-index-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File(p.join(directory.path, 'serlink.sqlite'));
+    final initial = SerlinkDatabase(NativeDatabase(file));
+    await initial.customStatement(
+      'INSERT INTO encrypted_records VALUES '
+      "('host:1', 'host', 1, 'revision', x'01', x'02', x'03', x'04', 0)",
+    );
+    await initial.close();
+    final legacy = sqlite3.open(file.path);
+    legacy.execute('DROP INDEX encrypted_records_type_id');
+    legacy.execute('PRAGMA user_version = 6');
+    legacy.close();
+
+    final upgraded = SerlinkDatabase(NativeDatabase(file));
+    addTearDown(upgraded.close);
+    final rows = await upgraded.select(upgraded.encryptedRecords).get();
+    expect(rows.single.ciphertext, [4]);
+    expect(await _userVersion(file), 7);
+    final plan = await upgraded
+        .customSelect(
+          "EXPLAIN QUERY PLAN SELECT * FROM encrypted_records WHERE type = 'host' ORDER BY type, id",
+        )
+        .get();
+    expect(
+      plan.single.data['detail'],
+      contains(
+        'SEARCH encrypted_records USING INDEX encrypted_records_type_id',
+      ),
+    );
+  });
+
+  test('migrates v2 databases to v7 auxiliary and preference tables', () async {
     final tempDir = await Directory.systemTemp.createTemp(
       'serlink-database-migration-test-',
     );
@@ -23,7 +58,7 @@ void main() {
     addTearDown(database.close);
     await database.customSelect('SELECT 1').get();
 
-    expect(await _userVersion(file), 6);
+    expect(await _userVersion(file), 7);
     expect(
       await _tableNames(file),
       containsAll(<String>[
@@ -39,7 +74,7 @@ void main() {
     );
   });
 
-  test('migrates v3 databases to v6 local preference tables', () async {
+  test('migrates v3 databases to v7 local preference tables', () async {
     final tempDir = await Directory.systemTemp.createTemp(
       'serlink-database-migration-test-',
     );
@@ -55,7 +90,7 @@ void main() {
     addTearDown(database.close);
     await database.customSelect('SELECT 1').get();
 
-    expect(await _userVersion(file), 6);
+    expect(await _userVersion(file), 7);
     expect(
       await _tableNames(file),
       containsAll([
@@ -68,7 +103,7 @@ void main() {
   });
 
   test(
-    'migrates v4 databases to v6 local WebDAV and baseline tables',
+    'migrates v4 databases to v7 local WebDAV and baseline tables',
     () async {
       final tempDir = await Directory.systemTemp.createTemp(
         'serlink-database-migration-test-',
@@ -85,7 +120,7 @@ void main() {
       addTearDown(database.close);
       await database.customSelect('SELECT 1').get();
 
-      expect(await _userVersion(file), 6);
+      expect(await _userVersion(file), 7);
       expect(
         await _tableNames(file),
         containsAll(['local_webdav_sync_settings', 'sync_record_baselines']),
@@ -93,7 +128,7 @@ void main() {
     },
   );
 
-  test('migrates v5 databases to v6 sync record baseline table', () async {
+  test('migrates v5 databases to v7 sync record baseline table', () async {
     final tempDir = await Directory.systemTemp.createTemp(
       'serlink-database-migration-test-',
     );
@@ -109,7 +144,7 @@ void main() {
     addTearDown(database.close);
     await database.customSelect('SELECT 1').get();
 
-    expect(await _userVersion(file), 6);
+    expect(await _userVersion(file), 7);
     expect(await _tableNames(file), contains('sync_record_baselines'));
   });
 }

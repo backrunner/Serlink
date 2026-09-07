@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
@@ -10,6 +11,91 @@ import 'package:serlink/features/transfers/application/transfer_task_repository.
 import 'package:serlink/features/transfers/domain/transfer_task.dart';
 
 void main() {
+  test(
+    'throttles continuous progress and checkpoints but saves completion',
+    () {
+      fakeAsync((async) {
+        final repository = _CountingRepository();
+        final connection = _FakeSftpConnection();
+        final queue = TransferQueueController(repository: repository);
+        final states = <TransferQueueState>[];
+        final listener = queue.watchState().listen(states.add);
+        async.flushMicrotasks();
+        final id = queue.enqueueUpload(
+          connection: connection,
+          localPath: '/a',
+          remotePath: '/b',
+        );
+        async.flushMicrotasks();
+        final initialSaves = repository.saveCount;
+        for (var i = 1; i <= 100; i++) {
+          connection.emit(
+            TransferProgress(
+              taskId: id,
+              state: TransferState.running,
+              transferredBytes: i,
+              totalBytes: 101,
+            ),
+          );
+          async.elapse(const Duration(milliseconds: 10));
+        }
+        expect(states.length, lessThan(16));
+        expect(repository.saveCount - initialSaves, 1);
+        connection.emit(
+          TransferProgress(
+            taskId: id,
+            state: TransferState.completed,
+            transferredBytes: 101,
+            totalBytes: 101,
+          ),
+        );
+        async.flushMicrotasks();
+        expect(queue.state.byId(id)!.transferredBytes, 101);
+        expect(repository.saved.last.state, TransferState.completed);
+        final savedCount = repository.saveCount;
+        async.elapse(const Duration(seconds: 2));
+        expect(repository.saveCount, savedCount);
+        unawaited(listener.cancel());
+        unawaited(queue.dispose());
+        async.flushMicrotasks();
+        expect(async.pendingTimers, isEmpty);
+      });
+    },
+  );
+
+  test(
+    'pause flushes latest progress and deletion cancels checkpoints',
+    () async {
+      final repository = _CountingRepository();
+      final connection = _FakeSftpConnection();
+      final queue = TransferQueueController(repository: repository);
+      addTearDown(queue.dispose);
+      final id = queue.enqueueUpload(
+        connection: connection,
+        localPath: '/a',
+        remotePath: '/b',
+      );
+      for (var i = 1; i <= 2; i++) {
+        connection.emit(
+          TransferProgress(
+            taskId: id,
+            state: TransferState.running,
+            transferredBytes: i,
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+      }
+      await queue.pause(id);
+      await queue.flushPersistence();
+      expect(repository.saved.last.transferredBytes, 2);
+      expect(repository.saved.last.state, TransferState.paused);
+      await queue.delete(id);
+      await queue.flushPersistence();
+      expect(await repository.list(), isEmpty);
+      expect(queue.state.tasks, isEmpty);
+    },
+  );
+
   late TransferQueueController queue;
   late _FakeSftpConnection connection;
   late DateTime now;
@@ -443,6 +529,17 @@ class _GatedRestoreRepository extends InMemoryTransferTaskRepository {
 
   @override
   Future<List<TransferTask>> list() => release.future;
+}
+
+class _CountingRepository extends InMemoryTransferTaskRepository {
+  final saved = <TransferTask>[];
+  int get saveCount => saved.length;
+
+  @override
+  Future<void> save(TransferTask task) async {
+    saved.add(task);
+    await super.save(task);
+  }
 }
 
 class _FakeSftpConnection implements SftpConnection {

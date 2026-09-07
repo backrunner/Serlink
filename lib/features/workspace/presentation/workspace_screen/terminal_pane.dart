@@ -42,6 +42,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane>
   BoxConstraints? _terminalViewportConstraints;
   var _showSearch = false;
   var _searchResult = const TerminalSearchResult.empty();
+  Timer? _searchRefreshTimer;
   final Map<SessionId, _LocalForwardDraft> _localForwards = {};
   final Map<SessionId, _RemoteForwardDraft> _remoteForwards = {};
   final Map<SessionId, _DynamicForwardDraft> _dynamicForwards = {};
@@ -62,6 +63,7 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane>
 
   @override
   void dispose() {
+    _searchRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     for (final terminal in _terminals()) {
       terminal.removeListener(_refreshSearchAfterTerminalChange);
@@ -80,6 +82,9 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _softwareKeyboardVisible = View.of(context).viewInsets.bottom > 0;
+    if (TickerMode.valuesOf(context).enabled) {
+      _refreshSearchAfterTerminalChange();
+    }
   }
 
   @override
@@ -466,6 +471,8 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane>
   }
 
   void _search(String query) {
+    _searchRefreshTimer?.cancel();
+    _searchRefreshTimer = null;
     setState(() {
       _searchResult = _activeSearchController.search(query);
     });
@@ -729,8 +736,17 @@ class _TerminalPaneState extends ConsumerState<_TerminalPane>
     if (!_showSearch || _searchTextController.text.trim().isEmpty || !mounted) {
       return;
     }
-    setState(() {
-      _searchResult = _activeSearchController.refresh();
+    // Throttle rather than debounce so continuous output cannot starve search.
+    _searchRefreshTimer ??= Timer(const Duration(milliseconds: 100), () {
+      _searchRefreshTimer = null;
+      if (!mounted || !_showSearch || !TickerMode.valuesOf(context).enabled) {
+        return;
+      }
+      setState(() {
+        _searchResult = _activeSearchController.search(
+          _searchTextController.text,
+        );
+      });
     });
   }
 

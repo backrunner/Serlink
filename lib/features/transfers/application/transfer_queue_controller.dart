@@ -47,6 +47,12 @@ class TransferQueueController {
   final Map<TransferTaskId, StreamSubscription<TransferProgress>>
   _subscriptions = {};
   final Map<TransferTaskId, TransferTask> _pendingTaskSaves = {};
+  final Map<TransferTaskId, TransferTask> _checkpoints = {};
+  final Map<TransferTaskId, TransferProgress> _pendingProgress = {};
+  final Map<TransferTaskId, Timer> _progressTimers = {};
+  Timer? _checkpointTimer;
+  static const _progressInterval = Duration(milliseconds: 100);
+  static const _checkpointInterval = Duration(seconds: 1);
   Future<void> _pendingPersistence = Future<void>.value();
 
   TransferQueueState _state;
@@ -75,17 +81,20 @@ class TransferQueueController {
       }
       final currentIds = {for (final task in _state.tasks) task.id.value};
       final restored = <TransferTask>[];
+      final interrupted = <TransferTask>[];
       for (final task in persisted) {
         if (currentIds.contains(task.id.value)) {
           continue;
         }
-        restored.add(_markInterruptedIfActive(task, now));
+        final updated = _markInterruptedIfActive(task, now);
+        restored.add(updated);
+        if (!identical(updated, task)) interrupted.add(updated);
       }
       if (restored.isEmpty) {
         return;
       }
       _setState(TransferQueueState(tasks: [...restored, ..._state.tasks]));
-      for (final task in restored) {
+      for (final task in interrupted) {
         _persistTask(task);
       }
     } on Object {
@@ -132,6 +141,7 @@ class TransferQueueController {
   }
 
   Future<void> pause(TransferTaskId taskId) async {
+    _flushProgress(taskId);
     final task = _state.byId(taskId);
     if (task == null || task.state != TransferState.running) {
       return;
@@ -150,6 +160,7 @@ class TransferQueueController {
   }
 
   Future<void> cancel(TransferTaskId taskId) async {
+    _flushProgress(taskId);
     final task = _state.byId(taskId);
     if (task == null || _isTerminal(task.state)) {
       return;
@@ -163,6 +174,8 @@ class TransferQueueController {
   }
 
   Future<void> delete(TransferTaskId taskId) async {
+    _discardProgress(taskId);
+    _checkpoints.remove(taskId);
     final task = _state.byId(taskId);
     if (task == null) {
       return;
@@ -184,6 +197,12 @@ class TransferQueueController {
   }
 
   Future<void> clear() async {
+    for (final taskId in _progressTimers.keys.toList()) {
+      _discardProgress(taskId);
+    }
+    _checkpointTimer?.cancel();
+    _checkpointTimer = null;
+    _checkpoints.clear();
     _restoreGeneration += 1;
     final subscriptions = _subscriptions.values.toList();
     _subscriptions.clear();
@@ -238,6 +257,9 @@ class TransferQueueController {
     if (_disposed) {
       return;
     }
+    // Disposal schedules the latest checkpoint. Call flushPersistence before
+    // shutting down the repository when durable completion is required.
+    unawaited(flushPersistence());
     _disposed = true;
     final subscriptions = _subscriptions.values.toList();
     _subscriptions.clear();
@@ -249,7 +271,13 @@ class TransferQueueController {
   }
 
   /// Waits for already queued history writes without changing transfer state.
-  Future<void> flushPersistence() => _pendingPersistence;
+  Future<void> flushPersistence() {
+    for (final taskId in _progressTimers.keys.toList()) {
+      _flushProgress(taskId);
+    }
+    _flushCheckpoints();
+    return _pendingPersistence;
+  }
 
   TransferTaskId _enqueue({
     required SftpConnection connection,
@@ -347,6 +375,43 @@ class TransferQueueController {
   }
 
   void _handleProgress(TransferTaskId taskId, TransferProgress progress) {
+    if (_disposed) return;
+    final task = _state.byId(taskId);
+    if (task == null || _isTerminal(task.state)) return;
+    if (progress.state != task.state || _isTerminal(progress.state)) {
+      _discardProgress(taskId);
+      _applyProgress(taskId, progress);
+    } else if (_progressTimers.containsKey(taskId)) {
+      _pendingProgress[taskId] = progress;
+    } else {
+      _applyProgress(taskId, progress);
+      _scheduleProgress(taskId);
+    }
+  }
+
+  void _scheduleProgress(TransferTaskId taskId) {
+    _progressTimers[taskId] = Timer(_progressInterval, () {
+      _progressTimers.remove(taskId);
+      final progress = _pendingProgress.remove(taskId);
+      if (progress != null && !_disposed) {
+        _applyProgress(taskId, progress);
+        _scheduleProgress(taskId);
+      }
+    });
+  }
+
+  void _discardProgress(TransferTaskId taskId) {
+    _progressTimers.remove(taskId)?.cancel();
+    _pendingProgress.remove(taskId);
+  }
+
+  void _flushProgress(TransferTaskId taskId) {
+    final progress = _pendingProgress[taskId];
+    _discardProgress(taskId);
+    if (progress != null) _applyProgress(taskId, progress);
+  }
+
+  void _applyProgress(TransferTaskId taskId, TransferProgress progress) {
     final task = _state.byId(taskId);
     if (task == null || _isTerminal(task.state)) {
       return;
@@ -374,7 +439,7 @@ class TransferQueueController {
       updatedAt: now,
       completedAt: completedAt,
     );
-    _replaceTask(updated);
+    _replaceTask(updated, progressOnly: progress.state == task.state);
     if (_isTerminal(progress.state)) {
       // Terminal progress means the transfer completed on its own. Let the
       // source stream close normally so SFTP implementations do not interpret
@@ -385,6 +450,7 @@ class TransferQueueController {
   }
 
   void _handleError(TransferTaskId taskId, Object error) {
+    _flushProgress(taskId);
     final task = _state.byId(taskId);
     if (task == null || _isTerminal(task.state)) {
       return;
@@ -403,6 +469,7 @@ class TransferQueueController {
   }
 
   void _handleDone(TransferTaskId taskId) {
+    _flushProgress(taskId);
     final task = _state.byId(taskId);
     if (task == null || _isTerminal(task.state)) {
       return;
@@ -441,7 +508,7 @@ class TransferQueueController {
     _pump();
   }
 
-  void _replaceTask(TransferTask task) {
+  void _replaceTask(TransferTask task, {bool progressOnly = false}) {
     if (task.state == TransferState.completed) {
       _operations.removeWhere((operation) => operation.task.id == task.id);
     }
@@ -459,7 +526,12 @@ class TransferQueueController {
         ],
       ),
     );
-    _persistTask(task);
+    if (progressOnly) {
+      _checkpoints[task.id] = task;
+      _checkpointTimer ??= Timer(_checkpointInterval, _flushCheckpoints);
+    } else {
+      _persistTask(task);
+    }
   }
 
   void _removeQueuedOperation(TransferTaskId taskId) {
@@ -487,6 +559,11 @@ class TransferQueueController {
     if (_disposed) {
       return;
     }
+    _checkpoints.remove(task.id);
+    if (_checkpoints.isEmpty) {
+      _checkpointTimer?.cancel();
+      _checkpointTimer = null;
+    }
     final alreadyPending = _pendingTaskSaves.containsKey(task.id);
     _pendingTaskSaves[task.id] = task;
     if (alreadyPending) {
@@ -501,6 +578,16 @@ class TransferQueueController {
         }
       }),
     );
+  }
+
+  void _flushCheckpoints() {
+    _checkpointTimer?.cancel();
+    _checkpointTimer = null;
+    final tasks = _checkpoints.values.toList();
+    _checkpoints.clear();
+    for (final task in tasks) {
+      _persistTask(task);
+    }
   }
 
   Future<void> _enqueuePersistence(Future<void> Function() action) {

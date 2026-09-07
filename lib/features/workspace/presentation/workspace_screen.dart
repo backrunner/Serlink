@@ -40,6 +40,7 @@ import '../../mcp/domain/agent_grant.dart';
 import '../../mcp/domain/agent_session.dart';
 import '../../security/application/security_modal_service.dart';
 import '../../sftp/application/sftp_connection.dart';
+import '../../sftp/application/sftp_directory_cache.dart';
 import '../../sftp/application/sftp_failure.dart';
 import '../../sftp/domain/sftp_entry.dart';
 import '../../snippets/application/snippet_write_service.dart';

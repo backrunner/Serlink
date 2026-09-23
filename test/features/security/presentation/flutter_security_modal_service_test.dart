@@ -15,6 +15,42 @@ import 'package:serlink/l10n/l10n.dart';
 const double _expectedHostKeyDialogDesktopWidth = 520;
 
 void main() {
+  testWidgets('certificate details scroll on a narrow enlarged viewport', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(375, 600);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
+    final decision = FlutterSecurityModalService(key: navigatorKey)
+        .confirmWebDavCertificate(
+          WebDavTlsCertificateDetails(
+            endpoint: Uri.parse('https://dav.example.test/a/long/sync/path'),
+            fingerprint: 'SHA256:${'abcdef0123456789' * 4}',
+            expectedFingerprint: 'SHA256:${'0123456789abcdef' * 4}',
+            algorithm: 'SHA256',
+            subject: 'CN=dav.example.test, O=Example Organization',
+            issuer: 'CN=Example Certificate Authority',
+            validFrom: DateTime.utc(2026),
+            validUntil: DateTime.utc(2027),
+            reason: 'untrusted',
+          ),
+        );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final issuer = find.text('Issuer: CN=Example Certificate Authority');
+    await tester.ensureVisible(issuer);
+    await tester.pumpAndSettle();
+    expect(issuer.hitTestable(), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await expectLater(decision, completion(CertificateTrustDecision.cancel));
+  });
+
   testWidgets('host key confirmation blocks until user chooses a decision', (
     tester,
   ) async {

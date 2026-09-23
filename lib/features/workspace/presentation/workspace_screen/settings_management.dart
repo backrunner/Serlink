@@ -1,5 +1,146 @@
 part of '../workspace_screen.dart';
 
+class _IOSLanguagePicker extends StatelessWidget {
+  const _IOSLanguagePicker({required this.language, required this.onChanged});
+
+  final AppLanguage language;
+  final ValueChanged<AppLanguage> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _languageItems(context.l10n);
+    final t = context.tokens;
+    return CupertinoButton(
+      key: const ValueKey('settings-language-select'),
+      padding: EdgeInsets.zero,
+      minimumSize: const Size(44, 44),
+      onPressed: () async {
+        final result = await showCupertinoModalPopup<AppLanguage>(
+          context: context,
+          builder: (context) => CupertinoActionSheet(
+            title: Text(context.l10n.settingsLanguageTitle),
+            actions: [
+              for (final item in items)
+                CupertinoActionSheetAction(
+                  isDefaultAction: item.value == language,
+                  onPressed: () => Navigator.of(context).pop(item.value),
+                  child: Text(item.label),
+                ),
+            ],
+            cancelButton: CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(context.l10n.cancelAction),
+            ),
+          ),
+        );
+        if (result != null) onChanged(result);
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              items.firstWhere((item) => item.value == language).label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: t.textSecondary, fontSize: 17),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Icon(CupertinoIcons.chevron_down, color: t.textMuted, size: 12),
+        ],
+      ),
+    );
+  }
+}
+
+class _IOSSettingsRow extends StatelessWidget {
+  const _IOSSettingsRow({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.subtitleWidget,
+    this.action,
+    this.leadingKey,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? subtitleWidget;
+  final Widget? action;
+  final Key? leadingKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stacked =
+            action != null && MediaQuery.textScalerOf(context).scale(17) > 23;
+        final description =
+            subtitleWidget ??
+            (subtitle == null
+                ? null
+                : Text(
+                    subtitle!,
+                    style: TextStyle(color: t.textSecondary, fontSize: 13),
+                  ));
+        final labels = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: TextStyle(color: t.textPrimary, fontSize: 17)),
+            if (description != null) ...[
+              const SizedBox(height: 3),
+              description,
+            ],
+          ],
+        );
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox.square(
+                  key: leadingKey,
+                  dimension: 28,
+                  child: Icon(icon, size: 21, color: t.textSecondary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: stacked
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            labels,
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: action,
+                            ),
+                          ],
+                        )
+                      : labels,
+                ),
+                if (!stacked && action != null) ...[
+                  const SizedBox(width: 12),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: constraints.maxWidth * 0.42,
+                    ),
+                    child: action!,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _SettingsActionRow extends StatelessWidget {
   const _SettingsActionRow({
     required this.icon,
@@ -28,6 +169,16 @@ class _SettingsActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return _IOSSettingsRow(
+        icon: icon,
+        title: title,
+        subtitle: subtitle,
+        subtitleWidget: subtitleWidget,
+        action: action,
+        leadingKey: leadingKey,
+      );
+    }
     final subtitleStyle = Theme.of(
       context,
     ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
@@ -56,11 +207,11 @@ class _SettingsActionRow extends StatelessWidget {
                 : Text(subtitle!, style: subtitleStyle));
         if (!compact) {
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: SerlinkListTile(
               minLeadingWidth: 28,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 2,
+                horizontal: 0,
                 vertical: 2,
               ),
               subtitleGap: 1,
@@ -115,7 +266,7 @@ class _SettingsActionRow extends StatelessWidget {
               );
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
           child: Row(
             crossAxisAlignment:
                 (effectiveSubtitle == null || actionSlot != null)
@@ -170,7 +321,7 @@ class _SettingsRowIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return SizedBox.square(
-      dimension: compact ? 28 : 30,
+      dimension: 28,
       child: Icon(icon, size: compact ? 17 : 18, color: t.textSecondary),
     );
   }
@@ -193,7 +344,10 @@ class _SettingsActionSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: width,
-      height: height,
+      // Preserve compact controls at the default size, but leave room for
+      // scaled select labels instead of clipping their internal FLabel.
+      height:
+          height * math.max(1, MediaQuery.textScalerOf(context).scale(14) / 14),
       child: Align(alignment: alignment, child: child),
     );
   }
@@ -274,6 +428,21 @@ class _SettingsControlButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return CupertinoButton(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        minimumSize: const Size(44, 44),
+        onPressed: onPressed,
+        child: DefaultTextStyle.merge(
+          style: TextStyle(
+            color: onPressed == null ? t.textMuted : t.accentPrimary,
+            fontSize: 17,
+            fontWeight: FontWeight.w400,
+          ),
+          child: child,
+        ),
+      );
+    }
     final enabled = onPressed != null;
     // Buttons hug their label in both layouts: no fixed width, just symmetric
     // horizontal padding, so the label sits centered inside the button (and
@@ -706,7 +875,7 @@ class _IdentityManagerDialog extends ConsumerWidget {
 }
 
 Future<void> _addManagedIdentity(BuildContext context, WidgetRef ref) async {
-  final created = await showSerlinkDialog<Object?>(
+  final created = await showSerlinkFormDialog<Object?>(
     context: context,
     barrierDismissible: false,
     builder: (context) => const _IdentityEditDialog(),
@@ -723,7 +892,7 @@ Future<void> _editManagedIdentity(
   WidgetRef ref,
   IdentityConfig identity,
 ) async {
-  final updated = await showSerlinkDialog<bool>(
+  final updated = await showSerlinkFormDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (context) => _IdentityEditDialog(identity: identity),

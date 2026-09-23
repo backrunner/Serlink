@@ -31,47 +31,91 @@ class _HostRow extends StatelessWidget {
           Icon(Icons.dns_outlined, size: 18, color: t.textMuted),
           const SizedBox(width: 12),
           Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  flex: 2,
-                  child: Text(
-                    host.displayName,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: t.textPrimary,
-                    ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact =
+                    mobile ||
+                    constraints.maxWidth < 420 ||
+                    MediaQuery.textScalerOf(context).scale(14) > 18;
+                final title = Text(
+                  host.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: t.textPrimary,
                   ),
-                ),
-                const SizedBox(width: 10),
-                Flexible(
-                  flex: 3,
-                  child: Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: t.textSecondary,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                );
+                final address = Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: t.textSecondary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
-                ),
-                if (host.tags.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  for (final tag in host.tags.take(2)) ...[
-                    SerlinkTag(label: tag),
-                    const SizedBox(width: 6),
+                );
+                final hasMetadata =
+                    host.tags.isNotEmpty ||
+                    host.trustState == HostTrustState.changed;
+                final tags = host.tags.toList()..sort();
+                final metadata = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (host.trustState == HostTrustState.changed) ...[
+                      Text(
+                        l10n.hostTrustChanged,
+                        style: TextStyle(
+                          color: t.statusDanger,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (tags.isNotEmpty) const SizedBox(height: 3),
+                    ],
+                    if (tags.isNotEmpty)
+                      SerlinkTooltip(
+                        message: tags.join(' · '),
+                        child: Text(
+                          tags.join(' · '),
+                          key: ValueKey('host-tags-${host.id.value}'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: t.textMuted, fontSize: 12),
+                        ),
+                      ),
                   ],
-                  if (host.tags.length > 2)
-                    SerlinkTag(label: '+${host.tags.length - 2}'),
-                ],
-              ],
+                );
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      title,
+                      const SizedBox(height: SerlinkSpacing.xs),
+                      address,
+                      if (hasMetadata) ...[
+                        const SizedBox(height: SerlinkSpacing.sm),
+                        metadata,
+                      ],
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Flexible(flex: 2, child: title),
+                    const SizedBox(width: 10),
+                    Flexible(flex: 3, child: address),
+                    if (hasMetadata) ...[
+                      const SizedBox(width: SerlinkSpacing.sm),
+                      Flexible(flex: 2, child: metadata),
+                    ],
+                  ],
+                );
+              },
             ),
           ),
-          if (host.trustState == HostTrustState.changed) ...[
-            const SizedBox(width: 12),
-            StatusPill(label: l10n.hostTrustChanged, color: t.statusDanger),
-          ],
           const SizedBox(width: 12),
           _HostActionButton(
             key: mobile ? const ValueKey('mobile-host-terminal-button') : null,
@@ -250,7 +294,7 @@ class _SwipeHostAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final background = danger ? t.statusDanger : t.surfaceRaised;
+    final background = danger ? t.statusDangerFill : t.surfaceRaised;
     final foreground = danger ? t.onAccent : t.textPrimary;
     final borderColor = danger
         ? t.statusDanger.withValues(alpha: 0.7)
@@ -311,6 +355,10 @@ class _HostActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final controlHeight =
+        iconOnly && Theme.of(context).platform == TargetPlatform.iOS
+        ? 44.0
+        : height;
     final foreground = primary ? t.onAccent : t.textPrimary;
     final iconWidget = Icon(icon, key: iconKey, size: 16, color: foreground);
     final content = iconOnly
@@ -350,8 +398,8 @@ class _HostActionButton extends StatelessWidget {
             ? Colors.black.withValues(alpha: 0.1)
             : t.accentPrimary.withValues(alpha: 0.14),
         child: SizedBox(
-          width: iconOnly ? height : null,
-          height: height,
+          width: iconOnly ? controlHeight : null,
+          height: controlHeight,
           child: content,
         ),
       ),

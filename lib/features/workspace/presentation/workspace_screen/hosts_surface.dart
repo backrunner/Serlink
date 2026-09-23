@@ -41,6 +41,10 @@ class _CollapsedHostGroupsController extends Notifier<Set<String>> {
     }
     state = next;
   }
+
+  void expand(String groupKey) {
+    state = {...state}..remove(groupKey);
+  }
 }
 
 sealed class _HostListEntry {
@@ -77,8 +81,11 @@ List<_HostListEntry> _buildHostListEntries(
   List<HostSummary> hosts,
   Set<String> collapsedGroups, {
   required String ungroupedLabel,
+  required List<String> savedGroups,
 }) {
-  final grouped = <String, List<HostSummary>>{};
+  final grouped = <String, List<HostSummary>>{
+    for (final name in savedGroups) name: [],
+  };
   final ungrouped = <HostSummary>[];
   for (final host in hosts) {
     final groupId = host.groupId;
@@ -113,9 +120,7 @@ List<_HostListEntry> _buildHostListEntries(
   for (final groupId in groupIds) {
     addGroup(groupId, groupId, grouped[groupId]!);
   }
-  if (ungrouped.isNotEmpty) {
-    addGroup(null, ungroupedLabel, ungrouped);
-  }
+  addGroup(null, ungroupedLabel, ungrouped);
   return entries;
 }
 
@@ -174,6 +179,9 @@ class _HostsSurface extends ConsumerWidget {
         final hostsAsync = ref.watch(
           hostSummariesProvider(session.unlockGeneration),
         );
+        final groupsAsync = ref.watch(
+          hostGroupNamesProvider(session.unlockGeneration),
+        );
         final content = hostsAsync.when(
           skipLoadingOnReload: true,
           skipLoadingOnRefresh: true,
@@ -187,6 +195,16 @@ class _HostsSurface extends ConsumerWidget {
             body: error.toString(),
           ),
           data: (hosts) {
+            if (!groupsAsync.hasValue) {
+              return _PlaceholderSurface(
+                title: l10n.hostsTitle,
+                body: groupsAsync.hasError
+                    ? l10n.hostGroupLoadFailed
+                    : l10n.hostsLoading,
+                loading: !groupsAsync.hasError,
+              );
+            }
+            final savedGroups = groupsAsync.requireValue;
             final filteredHosts = _sortHostSummaries(
               filterHostSummaries(hosts, searchQuery),
               sortOrder,
@@ -212,38 +230,58 @@ class _HostsSurface extends ConsumerWidget {
                     onAddHost: () => _showAddHostDialog(context),
                   ),
                 Expanded(
-                  child: AnimatedSwitcher(
-                    duration: contentChangeDuration,
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    child: hosts.isEmpty
-                        ? KeyedSubtree(
-                            key: const ValueKey('hosts-empty'),
-                            child: _HostsEmptyState(
-                              onAddHost: () => _showAddHostDialog(context),
+                  child: SerlinkContextMenu(
+                    key: const ValueKey('hosts-background-menu'),
+                    enabled: !mobile,
+                    actions: [
+                      SerlinkMenuAction(
+                        label: l10n.hostGroupNew,
+                        icon: Icons.create_new_folder_outlined,
+                        onPressed: () => _showCreateHostGroupDialog(context),
+                      ),
+                    ],
+                    child: AnimatedSwitcher(
+                      duration: contentChangeDuration,
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      child: hosts.isEmpty && savedGroups.isEmpty
+                          ? KeyedSubtree(
+                              key: const ValueKey('hosts-empty'),
+                              child: _HostsEmptyState(
+                                onAddHost: () => _showAddHostDialog(context),
+                              ),
+                            )
+                          : filteredHosts.isEmpty &&
+                                normalizeWorkspaceSearchQuery(searchQuery) !=
+                                    null
+                          ? KeyedSubtree(
+                              key: const ValueKey('hosts-no-matches'),
+                              child: _PlaceholderSurface(
+                                icon: Icons.search_off_outlined,
+                                title: l10n.hostsNoMatchesTitle,
+                                body: l10n.hostsNoMatchesBody,
+                              ),
+                            )
+                          : _HostList(
+                              key: PageStorageKey(
+                                'hosts-list-${session.unlockGeneration}',
+                              ),
+                              entries: _buildHostListEntries(
+                                filteredHosts,
+                                collapsedGroups,
+                                ungroupedLabel: l10n.hostsUngroupedGroup,
+                                savedGroups:
+                                    normalizeWorkspaceSearchQuery(
+                                          searchQuery,
+                                        ) ==
+                                        null
+                                    ? savedGroups
+                                    : const [],
+                              ),
+                              unlockGeneration: session.unlockGeneration,
+                              mobile: mobile,
                             ),
-                          )
-                        : filteredHosts.isEmpty
-                        ? KeyedSubtree(
-                            key: const ValueKey('hosts-no-matches'),
-                            child: _PlaceholderSurface(
-                              icon: Icons.search_off_outlined,
-                              title: l10n.hostsNoMatchesTitle,
-                              body: l10n.hostsNoMatchesBody,
-                            ),
-                          )
-                        : _HostList(
-                            key: PageStorageKey(
-                              'hosts-list-${session.unlockGeneration}',
-                            ),
-                            entries: _buildHostListEntries(
-                              filteredHosts,
-                              collapsedGroups,
-                              ungroupedLabel: l10n.hostsUngroupedGroup,
-                            ),
-                            unlockGeneration: session.unlockGeneration,
-                            mobile: mobile,
-                          ),
+                    ),
                   ),
                 ),
               ],
@@ -412,7 +450,7 @@ class _HostListState extends ConsumerState<_HostList> {
       key: _listKey,
       padding: widget.mobile
           ? _mobileSurfaceListPadding
-          : const EdgeInsets.all(16),
+          : SerlinkSizes.listPadding,
       initialItemCount: _displayedEntries.length,
       itemBuilder: (context, index, animation) => _buildAnimatedEntry(
         context,
@@ -450,23 +488,56 @@ class _HostListState extends ConsumerState<_HostList> {
       onToggle: () => ref
           .read(_collapsedHostGroupsProvider.notifier)
           .toggle(entry.groupId ?? ''),
+      onDrop: widget.mobile ? null : (host) => _moveHost(host, entry.groupId),
     );
+  }
+
+  Future<void> _moveHost(HostSummary host, String? groupId) async {
+    try {
+      await ref
+          .read(hostWriteServiceProvider)
+          .moveHostToGroup(host.id, groupId);
+      if (!mounted) return;
+      ref.invalidate(hostSummariesProvider);
+      ref.invalidate(hostGroupNamesProvider);
+      ref.read(_collapsedHostGroupsProvider.notifier).expand(groupId ?? '');
+    } on Object {
+      if (mounted) _showSnackBar(context, context.l10n.hostGroupMoveFailed);
+    }
   }
 
   Widget _buildHostRow(BuildContext context, HostSummary host, int index) {
     final controller = ref.read(workspaceTabControllerProvider.notifier);
-    Widget row = KeyedSubtree(
-      key: ValueKey('host-row-${host.id.value}'),
-      child: _HostRow(
-        mobile: widget.mobile,
-        host: host,
-        onTerminal: () => controller.openTerminal(host),
-        onSftp: () => controller.openSftp(host),
-        onEdit: () => _showEditHostDialog(context, host),
-        onDuplicate: () => _showDuplicateHostDialog(context, host),
-        onDelete: () => _confirmDeleteHost(context, ref, host),
-      ),
+    Widget row = _HostRow(
+      mobile: widget.mobile,
+      host: host,
+      onTerminal: () => controller.openTerminal(host),
+      onSftp: () => controller.openSftp(host),
+      onEdit: () => _showEditHostDialog(context, host),
+      onDuplicate: () => _showDuplicateHostDialog(context, host),
+      onDelete: () => _confirmDeleteHost(context, ref, host),
     );
+    if (!widget.mobile) {
+      row = _HostDraggable(
+        data: host,
+        feedback: Material(
+          color: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 280),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: context.tokens.surfaceRaised,
+              borderRadius: SerlinkRadii.control,
+              border: Border.all(color: context.tokens.accentPrimary),
+            ),
+            child: Text(host.displayName, overflow: TextOverflow.ellipsis),
+          ),
+        ),
+        childWhenDragging: Opacity(opacity: 0.4, child: row),
+        child: row,
+      );
+    }
+    row = KeyedSubtree(key: ValueKey('host-row-${host.id.value}'), child: row);
     if (_playEntrance && _entranceHostIds.contains(host.id)) {
       row = EntranceFade(
         duration: _hostListEntranceDuration,
@@ -482,20 +553,41 @@ class _HostListState extends ConsumerState<_HostList> {
   }
 }
 
+class _HostDraggable extends Draggable<HostSummary> {
+  const _HostDraggable({
+    required super.data,
+    required super.feedback,
+    required super.childWhenDragging,
+    required super.child,
+  }) : super(maxSimultaneousDrags: 1);
+
+  @override
+  MultiDragGestureRecognizer createRecognizer(
+    GestureMultiDragStartCallback onStart,
+  ) {
+    return ImmediateMultiDragGestureRecognizer(
+      supportedDevices: const {PointerDeviceKind.mouse},
+      allowedButtonsFilter: (buttons) => buttons == kPrimaryButton,
+    )..onStart = onStart;
+  }
+}
+
 class _HostGroupHeader extends StatelessWidget {
   const _HostGroupHeader({
     super.key,
     required this.entry,
     required this.onToggle,
+    this.onDrop,
   });
 
   final _HostGroupEntry entry;
   final VoidCallback onToggle;
+  final ValueChanged<HostSummary>? onDrop;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return SerlinkPressable(
+    final header = SerlinkPressable(
       onTap: onToggle,
       borderRadius: SerlinkRadii.control,
       hoverColor: t.surfaceOverlay,
@@ -530,6 +622,26 @@ class _HostGroupHeader extends StatelessWidget {
             _CountBadge(count: entry.count),
           ],
         ),
+      ),
+    );
+    if (onDrop == null) return header;
+    return DragTarget<HostSummary>(
+      onWillAcceptWithDetails: (details) =>
+          details.data.groupId != entry.groupId,
+      onAcceptWithDetails: (details) => onDrop!(details.data),
+      builder: (context, candidates, rejected) => AnimatedContainer(
+        key: ValueKey('host-group-drop-${entry.groupId ?? ''}'),
+        duration: const Duration(milliseconds: 120),
+        decoration: BoxDecoration(
+          color: candidates.isEmpty
+              ? Colors.transparent
+              : t.accentPrimary.withValues(alpha: 0.14),
+          borderRadius: SerlinkRadii.control,
+          border: Border.all(
+            color: candidates.isEmpty ? Colors.transparent : t.accentPrimary,
+          ),
+        ),
+        child: header,
       ),
     );
   }
@@ -572,7 +684,7 @@ class _HostListChangeTransition extends StatelessWidget {
 }
 
 Future<void> _showAddHostDialog(BuildContext context) {
-  return showSerlinkDialog<void>(
+  return showSerlinkFormDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => const _HostFormDialog(),
@@ -580,7 +692,7 @@ Future<void> _showAddHostDialog(BuildContext context) {
 }
 
 Future<void> _showEditHostDialog(BuildContext context, HostSummary host) {
-  return showSerlinkDialog<void>(
+  return showSerlinkFormDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => _HostFormDialog(host: host, mode: _HostFormMode.edit),
@@ -588,7 +700,7 @@ Future<void> _showEditHostDialog(BuildContext context, HostSummary host) {
 }
 
 Future<void> _showDuplicateHostDialog(BuildContext context, HostSummary host) {
-  return showSerlinkDialog<void>(
+  return showSerlinkFormDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) =>
@@ -768,37 +880,15 @@ class _HostsEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final t = context.tokens;
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              l10n.hostsEmptyTitle,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: t.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.hostsEmptyBody,
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: t.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            SerlinkFilledButton.icon(
-              key: const ValueKey('empty-add-host-button'),
-              onPressed: onAddHost,
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(l10n.hostsAddAction),
-            ),
-          ],
-        ),
+    return _PlaceholderSurface(
+      icon: Icons.dns_outlined,
+      title: l10n.hostsEmptyTitle,
+      body: l10n.hostsEmptyBody,
+      action: SerlinkFilledButton.icon(
+        key: const ValueKey('empty-add-host-button'),
+        onPressed: onAddHost,
+        icon: const Icon(Icons.add, size: 18),
+        label: Text(l10n.hostsAddAction),
       ),
     );
   }

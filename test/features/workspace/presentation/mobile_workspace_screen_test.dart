@@ -1,5 +1,5 @@
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -19,6 +19,10 @@ void main() {
   testWidgets('iOS uses the mobile workspace shell', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
+    tester.view.padding = const FakeViewPadding(bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
@@ -61,13 +65,30 @@ void main() {
         .height;
     expect(headerHeight, greaterThanOrEqualTo(46));
     expect(headerHeight, lessThanOrEqualTo(64));
-    expect(find.byType(FBottomNavigationBar), findsOneWidget);
+    expect(find.byType(CupertinoTabBar), findsOneWidget);
+    final bar = tester.getRect(find.byType(CupertinoTabBar));
+    expect(bar.height, 49 + 34);
+    expect(bar.bottom, 844);
+    expect(
+      tester.getRect(find.text('Settings')).bottom,
+      lessThanOrEqualTo(810),
+    );
     expect(find.text('Hosts'), findsWidgets);
     expect(find.text('Sessions'), findsOneWidget);
     expect(find.text('Transfers'), findsOneWidget);
     expect(find.text('Snippets'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
     expect(find.text('Local Shell'), findsNothing);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pump();
+    expect(find.byType(CupertinoTabBar), findsNothing);
+    final mobileScaffold = tester.widget<FScaffold>(find.byType(FScaffold));
+    expect(mobileScaffold.resizeToAvoidBottomInset, isFalse);
+    tester.view.viewInsets = const FakeViewPadding();
+    await tester.pump();
+    expect(find.byType(CupertinoTabBar), findsOneWidget);
   });
 
   testWidgets('iOS snack bars float above the bottom navigation', (

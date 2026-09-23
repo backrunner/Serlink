@@ -1104,6 +1104,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostGroupNewHint => '分组名称';
 
   @override
+  String get hostGroupCreateTitle => '新建分组';
+
+  @override
+  String get hostGroupNameRequired => '请输入有效的分组名称。';
+
+  @override
+  String get hostGroupNameExists => '该分组名称已存在。';
+
+  @override
+  String get hostGroupSaveFailed => '无法创建分组。';
+
+  @override
+  String get hostGroupLoadFailed => '无法加载分组。';
+
+  @override
+  String get hostGroupMoveFailed => '无法将主机移入分组。';
+
+  @override
   String get hostsUngroupedGroup => '未分组';
 
   @override

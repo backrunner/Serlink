@@ -2110,6 +2110,42 @@ abstract class AppLocalizations {
   /// **'Group name'**
   String get hostGroupNewHint;
 
+  /// No description provided for @hostGroupCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New Group'**
+  String get hostGroupCreateTitle;
+
+  /// No description provided for @hostGroupNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid group name.'**
+  String get hostGroupNameRequired;
+
+  /// No description provided for @hostGroupNameExists.
+  ///
+  /// In en, this message translates to:
+  /// **'A group with this name already exists.'**
+  String get hostGroupNameExists;
+
+  /// No description provided for @hostGroupSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Group could not be created.'**
+  String get hostGroupSaveFailed;
+
+  /// No description provided for @hostGroupLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Groups could not be loaded.'**
+  String get hostGroupLoadFailed;
+
+  /// No description provided for @hostGroupMoveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Host could not be moved to the group.'**
+  String get hostGroupMoveFailed;
+
   /// No description provided for @hostsUngroupedGroup.
   ///
   /// In en, this message translates to:

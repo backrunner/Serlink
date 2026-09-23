@@ -259,7 +259,9 @@ class _DialogScrollFrameState extends State<_DialogScrollFrame> {
           behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
           child: SingleChildScrollView(
             controller: widget.controller,
-            physics: const ClampingScrollPhysics(),
+            physics: Theme.of(context).platform == TargetPlatform.iOS
+                ? const BouncingScrollPhysics()
+                : const ClampingScrollPhysics(),
             padding: widget.padding,
             child: widget.child,
           ),
@@ -284,12 +286,16 @@ class _DialogScrollFrameState extends State<_DialogScrollFrame> {
         framed,
         _ScrollFadeEdge(
           visible: _showTopFade,
-          color: t.surfaceRaised,
+          color: Theme.of(context).platform == TargetPlatform.iOS
+              ? t.surfaceBase
+              : t.surfaceRaised,
           alignment: Alignment.topCenter,
         ),
         _ScrollFadeEdge(
           visible: _showBottomFade,
-          color: t.surfaceRaised,
+          color: Theme.of(context).platform == TargetPlatform.iOS
+              ? t.surfaceBase
+              : t.surfaceRaised,
           alignment: Alignment.bottomCenter,
         ),
       ],
@@ -726,49 +732,13 @@ class _PlaceholderSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    final icon = this.icon;
-    final bodyStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: t.textSecondary, height: 1.4);
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (loading) ...[
-              SerlinkLoadingIndicator(
-                semanticsLabel: context.l10n.loadingSemantics,
-              ),
-              const SizedBox(height: 16),
-            ],
-            if (icon != null) ...[
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: t.surfaceRaised,
-                  borderRadius: SerlinkRadii.workspace,
-                ),
-                child: Icon(icon, size: 26, color: t.textMuted),
-              ),
-              const SizedBox(height: 14),
-            ],
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: t.textPrimary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(body, textAlign: TextAlign.center, style: bodyStyle),
-            if (action != null) ...[const SizedBox(height: 14), action!],
-          ],
-        ),
-      ),
+    return SerlinkEmptyState(
+      title: title,
+      body: body,
+      icon: icon,
+      loading: loading,
+      loadingLabel: context.l10n.loadingSemantics,
+      action: action,
     );
   }
 }

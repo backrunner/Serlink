@@ -215,57 +215,40 @@ class _HostCollapsibleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final headerPadding = compact
-        ? const EdgeInsets.fromLTRB(12, 10, 10, 10)
-        : const EdgeInsets.fromLTRB(14, 12, 12, 12);
-    final contentPadding = EdgeInsets.all(compact ? 10 : 14);
-    return SurfacePanel(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SerlinkPressable(
-            onTap: onToggle,
-            borderRadius: expanded
-                ? const BorderRadius.vertical(top: SerlinkRadii.controlR)
-                : SerlinkRadii.control,
-            hoverColor: t.surfaceOverlay,
-            pressedColor: t.textPrimary.withValues(alpha: 0.12),
-            child: Padding(
-              padding: headerPadding,
-              child: Row(
-                children: [
-                  _SettingsRowIcon(icon: icon, compact: compact),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: t.textPrimary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  AnimatedRotation(
-                    turns: expanded ? 0.25 : 0,
-                    duration: const Duration(milliseconds: 160),
-                    curve: Curves.easeOut,
-                    child: Icon(
-                      Icons.arrow_forward_ios,
-                      size: 13,
-                      color: t.textMuted,
-                    ),
-                  ),
-                ],
+    final inset = Theme.of(context).platform == TargetPlatform.iOS
+        ? 16.0
+        : (compact ? 12.0 : 16.0);
+    return _HostSectionFrame(
+      padding: EdgeInsets.all(inset),
+      header: Semantics(
+        expanded: expanded,
+        child: SerlinkPressable(
+          onTap: onToggle,
+          borderRadius: expanded
+              ? const BorderRadius.vertical(top: SerlinkRadii.dialogR)
+              : SerlinkRadii.dialog,
+          hoverColor: t.surfaceOverlay,
+          pressedColor: t.textPrimary.withValues(alpha: 0.12),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: inset, vertical: 12),
+            child: _HostSectionHeading(
+              title: title,
+              icon: icon,
+              trailing: AnimatedRotation(
+                turns: expanded ? 0.25 : 0,
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOut,
+                child: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 13,
+                  color: t.textMuted,
+                ),
               ),
             ),
           ),
-          if (expanded) ...[
-            Divider(height: 1, color: t.borderSubtle),
-            Padding(padding: contentPadding, child: child),
-          ],
-        ],
+        ),
       ),
+      child: expanded ? child : null,
     );
   }
 }
@@ -682,37 +665,106 @@ class _HostForwardingRuleList extends StatelessWidget {
 class _HostFormSection extends StatelessWidget {
   const _HostFormSection({
     required this.title,
+    required this.icon,
     required this.child,
     required this.padding,
   });
 
   final String title;
+  final IconData icon;
   final Widget child;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
+    final insets = padding.resolve(Directionality.of(context));
+    return _HostSectionFrame(
+      padding: padding,
+      header: Padding(
+        padding: EdgeInsets.fromLTRB(insets.left, 12, insets.right, 12),
+        child: _HostSectionHeading(title: title, icon: icon),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Keep the title and its fields in one visibly bounded group, including when
+/// the surrounding dialog uses the same raised surface as the form body.
+class _HostSectionFrame extends StatelessWidget {
+  const _HostSectionFrame({
+    required this.header,
+    required this.padding,
+    this.child,
+  });
+
+  final Widget header;
+  final EdgeInsetsGeometry padding;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
     final t = context.tokens;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: t.surfaceRaised,
+        border: Border.all(color: t.borderSubtle),
+        borderRadius: SerlinkRadii.dialog,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ColoredBox(
+            color: Color.alphaBlend(
+              t.surfaceBase.withValues(alpha: 0.7),
+              t.surfaceRaised,
+            ),
+            child: header,
+          ),
+          if (child != null) ...[
+            Divider(height: 1, color: t.borderSubtle),
+            Padding(padding: padding, child: child),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HostSectionHeading extends StatelessWidget {
+  const _HostSectionHeading({
+    required this.title,
+    required this.icon,
+    this.trailing,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Row(
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 8),
-          child: Text(
-            title,
-            style: TextStyle(
-              color: t.textMuted,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
+        Icon(icon, size: 18, color: t.textSecondary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: TextStyle(
+                color: t.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
+              ),
             ),
           ),
         ),
-        SurfacePanel(
-          borderRadius: SerlinkRadii.dialog,
-          padding: padding,
-          child: child,
-        ),
+        if (trailing != null) ...[const SizedBox(width: 12), trailing!],
       ],
     );
   }

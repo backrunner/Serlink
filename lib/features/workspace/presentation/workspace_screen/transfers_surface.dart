@@ -35,6 +35,7 @@ class _TransfersSurface extends ConsumerWidget {
             loading: () => _PlaceholderSurface(
               title: l10n.transfersTitle,
               body: l10n.transfersPreparing,
+              loading: true,
             ),
             error: (error, stackTrace) => _PlaceholderSurface(
               title: l10n.transfersTitle,
@@ -121,9 +122,7 @@ class _TransferTaskList extends ConsumerWidget {
     );
     return ListView.builder(
       key: const PageStorageKey('transfers-list'),
-      padding: compact
-          ? _mobileSurfaceListPadding
-          : const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: compact ? _mobileSurfaceListPadding : SerlinkSizes.listPadding,
       scrollCacheExtent: const ScrollCacheExtent.pixels(960),
       itemCount: tasks.length,
       addAutomaticKeepAlives: false,

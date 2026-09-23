@@ -45,18 +45,24 @@ class _SettingsSurface extends ConsumerWidget {
           leadingKey: mobile ? const ValueKey('settings-language-icon') : null,
           title: l10n.settingsLanguageTitle,
           helpText: l10n.settingsLanguageSubtitle,
-          action: SerlinkSelect<AppLanguage>(
-            key: const ValueKey('settings-language-select'),
-            value: language,
-            items: _languageItems(l10n),
-            hintText: l10n.selectAction,
-            searchHint: l10n.searchAction,
-            size: FTextFieldSizeVariant.sm,
-            compact: true,
-            menuMinWidth: 196,
-            onChanged: (value) =>
-                unawaited(_setAppLanguage(context, ref, value)),
-          ),
+          action: capabilities.isIOS
+              ? _IOSLanguagePicker(
+                  language: language,
+                  onChanged: (value) =>
+                      unawaited(_setAppLanguage(context, ref, value)),
+                )
+              : SerlinkSelect<AppLanguage>(
+                  key: const ValueKey('settings-language-select'),
+                  value: language,
+                  items: _languageItems(l10n),
+                  hintText: l10n.selectAction,
+                  searchHint: l10n.searchAction,
+                  size: FTextFieldSizeVariant.sm,
+                  compact: true,
+                  menuMinWidth: 196,
+                  onChanged: (value) =>
+                      unawaited(_setAppLanguage(context, ref, value)),
+                ),
           actionWidth: mobile ? null : 220,
           compactActionWidth: mobile ? _settingsMobileSelectActionWidth : 160,
           actionHeight: mobile ? _settingsMobileSelectActionHeight : null,
@@ -331,6 +337,44 @@ class _SettingsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Text(
+              title,
+              style: TextStyle(
+                color: t.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+          ClipRRect(
+            borderRadius: SerlinkRadii.dialog,
+            child: ColoredBox(
+              color: t.surfaceRaised,
+              child: Column(
+                children: [
+                  for (var i = 0; i < children.length; i++) ...[
+                    if (i > 0)
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        indent: 56,
+                        color: t.borderSubtle,
+                      ),
+                    children[i],
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     return DecoratedBox(
       decoration: BoxDecoration(
         color: t.surfaceRaised,
@@ -350,7 +394,7 @@ class _SettingsSection extends StatelessWidget {
                     height: 28,
                     decoration: BoxDecoration(
                       color: t.accentPrimary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: SerlinkRadii.control,
                     ),
                     child: Icon(icon, size: 16, color: t.accentPrimary),
                   ),

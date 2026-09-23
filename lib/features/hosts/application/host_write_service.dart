@@ -12,6 +12,7 @@ import '../../vault/application/vault_record_repository.dart';
 import '../../vault/application/vault_service.dart';
 import '../domain/host.dart';
 import 'host_repository.dart';
+import 'host_group_repository.dart';
 
 final hostWriteServiceProvider = Provider<HostWriteService>((ref) {
   return HostWriteService(
@@ -623,6 +624,29 @@ class HostWriteService {
     return updated.toSummary();
   }
 
+  Future<HostSummary> moveHostToGroup(HostId id, String? groupId) async {
+    final existing = await _hosts.read(id);
+    if (existing == null) {
+      throw const HostWriteException('host.not_found', 'Host does not exist.');
+    }
+    final normalized = _normalizeGroupId(groupId);
+    if (existing.groupId == normalized) return existing.toSummary();
+    final groups = EncryptedHostGroupRepository(
+      vault: _vault,
+      records: _records,
+    );
+    for (final name in {existing.groupId, normalized}.whereType<String>()) {
+      await groups.save(name);
+    }
+    final updated = HostConfig.fromJson({
+      ...existing.toJson(),
+      'groupId': normalized,
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    });
+    await _hosts.save(updated);
+    return updated.toSummary();
+  }
+
   Future<HostSummary> updateSftpDefaultDirectory(
     HostId id,
     String sftpDefaultDirectory,
@@ -746,7 +770,8 @@ String? _normalizeGroupId(String? groupId) {
   return trimmed == null || trimmed.isEmpty ? null : trimmed;
 }
 
-List<String> _normalizeStartupCommands(List<String> commands) {  return List<String>.unmodifiable([
+List<String> _normalizeStartupCommands(List<String> commands) {
+  return List<String>.unmodifiable([
     for (final command in commands)
       if (command.trim().isNotEmpty) command.trimRight(),
   ]);

@@ -70,7 +70,7 @@ class _SnippetsSurface extends ConsumerWidget {
                           key: const PageStorageKey('snippets-list'),
                           padding: mobile
                               ? _mobileSurfaceListPadding
-                              : const EdgeInsets.all(12),
+                              : SerlinkSizes.listPadding,
                           itemCount: filteredItems.length,
                           separatorBuilder: (context, index) =>
                               const SizedBox(height: 8),
@@ -225,37 +225,15 @@ class _SnippetsEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final t = context.tokens;
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              l10n.snippetsEmptyTitle,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: t.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.snippetsEmptyBody,
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: t.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            SerlinkFilledButton.icon(
-              key: const ValueKey('empty-add-snippet-button'),
-              onPressed: onAdd,
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(l10n.snippetsAddAction),
-            ),
-          ],
-        ),
+    return _PlaceholderSurface(
+      icon: Icons.code_rounded,
+      title: l10n.snippetsEmptyTitle,
+      body: l10n.snippetsEmptyBody,
+      action: SerlinkFilledButton.icon(
+        key: const ValueKey('empty-add-snippet-button'),
+        onPressed: onAdd,
+        icon: const Icon(Icons.add, size: 18),
+        label: Text(l10n.snippetsAddAction),
       ),
     );
   }
@@ -438,7 +416,7 @@ Future<void> _showSnippetDialog(
   BuildContext context, {
   CommandSnippet? snippet,
 }) {
-  return showSerlinkDialog<void>(
+  return showSerlinkFormDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => _SnippetDialog(snippet: snippet),
@@ -685,7 +663,9 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
           ),
           content: SizedBox(
             width: 960,
-            height: height,
+            height: Theme.of(context).platform == TargetPlatform.iOS
+                ? double.infinity
+                : height,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final wide =
@@ -972,6 +952,9 @@ class _SnippetDialogTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return Text(title, maxLines: 1, overflow: TextOverflow.ellipsis);
+    }
     final t = context.tokens;
     return Row(
       children: [

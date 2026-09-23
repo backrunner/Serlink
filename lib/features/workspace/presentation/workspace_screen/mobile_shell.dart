@@ -10,6 +10,10 @@ class MobileWorkspaceScreen extends ConsumerWidget {
     final state = ref.watch(workspaceTabControllerProvider);
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     final selectedIndex = _mobileAreaIndex(state.area);
+    // Read before Scaffold removes the consumed insets from its descendants.
+    final hideBottomNavigation =
+        Theme.of(context).platform == TargetPlatform.iOS &&
+        MediaQuery.viewInsetsOf(context).bottom > 0;
     final session = ref.watch(vaultSessionControllerProvider).value;
     if (session != null && !session.localDataHealthy) {
       return Scaffold(
@@ -25,8 +29,11 @@ class MobileWorkspaceScreen extends ConsumerWidget {
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= _tabletBreakpoint;
             return FScaffold(
+              // The outer Material scaffold already applies keyboard insets.
+              resizeToAvoidBottomInset: false,
               scaffoldStyle: const FScaffoldStyleDelta.delta(
                 backgroundColor: Colors.transparent,
+                footerDecoration: DecorationDelta.value(BoxDecoration()),
               ),
               childPad: false,
               sidebar: wide
@@ -41,7 +48,7 @@ class MobileWorkspaceScreen extends ConsumerWidget {
                     )
                   : null,
               header: _MobileHeader(area: state.area),
-              footer: wide
+              footer: wide || hideBottomNavigation
                   ? null
                   : _MobileBottomNavigation(
                       index: selectedIndex,
@@ -291,10 +298,10 @@ class _MobileHeaderActionGroup extends StatelessWidget {
   }
 }
 
-const double _mobileHeaderActionSide = 38;
+const double _mobileHeaderActionSide = 44;
 const double _mobileHeaderActionIconSize = 19;
 const double _mobileHeaderControlGap = 10;
-const double _mobileSurfaceHorizontalPadding = 12;
+const double _mobileSurfaceHorizontalPadding = 16;
 const double _mobileSurfaceTopGap = 8;
 const double _mobileSurfaceBottomPadding = 12;
 const EdgeInsets _mobileSurfaceListPadding = EdgeInsets.fromLTRB(
@@ -480,6 +487,56 @@ class _MobileBottomNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      final t = context.tokens;
+      return IosNativeTabBar(
+        key: const ValueKey('mobile-workspace-bottom-navigation'),
+        index: index,
+        labels: [
+          l10n.navHosts,
+          l10n.navSessions,
+          l10n.navTransfers,
+          l10n.navSnippets,
+          l10n.navSettings,
+        ],
+        onChanged: onChange,
+        tint: t.accentPrimary,
+        brightness: Theme.of(context).brightness,
+        fallback: CupertinoTabBar(
+          currentIndex: index,
+          height: 49,
+          onTap: onChange,
+          activeColor: t.accentPrimary,
+          inactiveColor: t.textSecondary,
+          backgroundColor: t.surfaceRaised.withValues(alpha: 0.96),
+          border: Border(top: BorderSide(color: t.borderSubtle, width: 0.5)),
+          items: [
+            BottomNavigationBarItem(
+              icon: const Icon(CupertinoIcons.square_stack_3d_up),
+              activeIcon: const Icon(CupertinoIcons.square_stack_3d_up_fill),
+              label: l10n.navHosts,
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(CupertinoIcons.macwindow),
+              label: l10n.navSessions,
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(CupertinoIcons.arrow_up_arrow_down),
+              label: l10n.navTransfers,
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(CupertinoIcons.chevron_left_slash_chevron_right),
+              label: l10n.navSnippets,
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(CupertinoIcons.gear_alt),
+              activeIcon: const Icon(CupertinoIcons.gear_alt_fill),
+              label: l10n.navSettings,
+            ),
+          ],
+        ),
+      );
+    }
     return FBottomNavigationBar(
       key: const ValueKey('mobile-workspace-bottom-navigation'),
       index: index,

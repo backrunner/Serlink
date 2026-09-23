@@ -16,6 +16,9 @@ import UIKit
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     let messenger = engineBridge.applicationRegistrar.messenger()
+    engineBridge.applicationRegistrar.register(
+      NativeTabBarFactory(messenger: messenger), withId: "serlink/native_tab_bar"
+    )
     registerPlatformChannel(with: messenger)
     cloudKitChannel.register(with: messenger)
   }
@@ -26,6 +29,17 @@ import UIKit
       switch call.method {
       case "displayName":
         result(UIDevice.current.name)
+      case "supportsLiquidGlassTabBar":
+        // Liquid Glass requires linking with the iOS 26 SDK or later.
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+          result(true)
+        } else {
+          result(false)
+        }
+        #else
+        result(false)
+        #endif
       default:
         result(FlutterMethodNotImplemented)
       }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,7 @@ import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/database/serlink_database.dart';
 import 'package:serlink/design_system/design_system.dart';
 import 'package:serlink/features/hosts/application/host_repository.dart';
+import 'package:serlink/features/hosts/application/host_group_repository.dart';
 import 'package:serlink/features/hosts/application/host_write_service.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/identities/application/identity_repository.dart';
@@ -47,8 +49,182 @@ import 'package:serlink/platform/platform_capabilities.dart';
 import 'package:xterm/xterm.dart';
 
 part 'workspace_smoke_test_fakes.dart';
+part 'workspace_smoke_test_host_groups.dart';
 
 void main() {
+  _hostGroupTests();
+  testWidgets(
+    'iOS snippet and credential editors use modal navigation actions',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await _pumpLockedVaultApp(
+        tester,
+        capabilities: const PlatformCapabilities(
+          operatingSystem: 'ios',
+          targetPlatform: TargetPlatform.iOS,
+        ),
+      );
+      await _submitVaultPassphrase(tester, 'correct horse battery staple');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Snippets'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('add-snippet-button')));
+      await tester.pumpAndSettle();
+      expect(find.byType(CupertinoNavigationBar), findsOneWidget);
+      expect(
+        tester
+            .getRect(find.byKey(const ValueKey('snippet-save-button')))
+            .bottom,
+        lessThan(100),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const ValueKey('snippet-cancel-button')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Manage').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('credentials-add-button')));
+      await tester.pumpAndSettle();
+      expect(find.byType(CupertinoNavigationBar), findsOneWidget);
+      expect(
+        tester
+            .getRect(find.byKey(const ValueKey('credential-save-button')))
+            .bottom,
+        lessThan(100),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Credentials'), findsWidgets);
+    },
+  );
+
+  testWidgets('iOS settings align rows and use full size native controls', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await _pumpLockedVaultApp(
+      tester,
+      capabilities: const PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    final language = find.byKey(const ValueKey('settings-language-select'));
+    final toggle = find.byKey(const ValueKey('settings-local-unlock-switch'));
+    expect(tester.getRect(language).height, greaterThanOrEqualTo(44));
+    expect(tester.getRect(toggle).height, greaterThanOrEqualTo(44));
+    expect(find.byType(CupertinoSwitch), findsWidgets);
+    final titleLeft = tester.getRect(find.text('Language')).left;
+    for (final label in ['Vault', 'Face ID unlock', 'Background privacy']) {
+      expect(tester.getRect(find.text(label)).left, titleLeft);
+    }
+    // Group headings sit outside the rows, without another column of icons.
+    expect(find.byIcon(Icons.tune_outlined), findsNothing);
+    await tester.tap(language);
+    await tester.pumpAndSettle();
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    expect(find.text('Simplified Chinese'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final mobile in [false, true]) {
+    testWidgets(
+      '${mobile ? 'mobile' : 'desktop'} pages fit with enlarged localized text',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = mobile
+            ? const Size(375, 667)
+            : const Size(800, 600);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        await _pumpLockedVaultApp(
+          tester,
+          hostRepository: _DelayedHostRepository([
+            HostConfig.fromJson({
+              ..._hostConfig(
+                id: 'review-host',
+                displayName: 'Production application server',
+                hostname: 'application.production.internal',
+                createdAt: DateTime.utc(2026),
+              ).toJson(),
+              'tags': [
+                'production-with-a-long-environment-label',
+                'ap-southeast-1',
+              ],
+              'trustState': 'changed',
+            }),
+          ])..completeList(),
+          capabilities: PlatformCapabilities(
+            operatingSystem: mobile ? 'ios' : 'macos',
+            targetPlatform: mobile ? TargetPlatform.iOS : TargetPlatform.macOS,
+          ),
+        );
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        });
+        await _submitVaultPassphrase(tester, 'correct horse battery staple');
+        await tester.pumpAndSettle();
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(SerlinkApp)),
+        );
+        final controller = container.read(
+          workspaceTabControllerProvider.notifier,
+        );
+        tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+        for (final brightness in Brightness.values) {
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          for (final locale in AppLocalizations.supportedLocales) {
+            tester.platformDispatcher.localesTestValue = [locale];
+            for (final area in WorkspaceArea.values) {
+              controller.selectArea(area);
+              await tester.pumpAndSettle();
+              expect(
+                tester.takeException(),
+                isNull,
+                reason: '${area.name}, $locale, ${brightness.name}',
+              );
+            }
+            controller.selectArea(WorkspaceArea.hosts);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const ValueKey('add-host-button')));
+            await tester.pumpAndSettle();
+            expect(
+              tester.takeException(),
+              isNull,
+              reason: 'host form, $locale, ${brightness.name}',
+            );
+            await tester.tap(
+              find.text(
+                tester.element(find.byType(SerlinkDialog)).l10n.cancelAction,
+              ),
+            );
+            await tester.pumpAndSettle();
+          }
+        }
+      },
+    );
+  }
+
   testWidgets('settings prompts vault creation when iCloud has no vault', (
     tester,
   ) async {
@@ -1348,6 +1524,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('settings-columns')), findsOneWidget);
+    expect(
+      tester.getRect(find.byIcon(Icons.tune_outlined)).center.dx,
+      tester.getRect(find.byIcon(Icons.language_outlined)).center.dx,
+    );
+    expect(
+      tester.getRect(find.text('General')).left,
+      tester.getRect(find.text('Language')).left,
+    );
+
     await expectLater(
       find.byType(SerlinkApp),
       matchesGoldenFile('goldens/settings_desktop.png'),
@@ -1670,7 +1855,9 @@ void main() {
     );
   });
 
-  testWidgets('iOS add host form uses compact wide dialog', (tester) async {
+  testWidgets('iOS host form uses top actions and avoids the keyboard', (
+    tester,
+  ) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
     addTearDown(tester.view.resetPhysicalSize);
@@ -1696,11 +1883,25 @@ void main() {
     expect(frameRect.left, lessThan(24));
     expect(frameRect.width, greaterThanOrEqualTo(348));
     expect(frameRect.height, greaterThan(440));
-    expect(frameRect.height, lessThanOrEqualTo(600));
-    expect(
-      tester.getRect(find.byKey(const ValueKey('host-save-button'))).bottom,
-      lessThanOrEqualTo(844),
-    );
+    expect(frameRect.height, greaterThan(600));
+    expect(find.byType(CupertinoNavigationBar), findsOneWidget);
+    expect(find.byType(CupertinoTextField), findsWidgets);
+    final save = find.byKey(const ValueKey('host-save-button'));
+    final cancel = find.text('Cancel');
+    expect(tester.getRect(save).bottom, lessThan(frameRect.top));
+    expect(tester.getRect(save).center.dy, tester.getRect(cancel).center.dy);
+    expect(tester.getRect(save).height, greaterThanOrEqualTo(44));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    final password = find.byKey(const ValueKey('host-password-field'));
+    await tester.ensureVisible(password);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(password).bottom, lessThanOrEqualTo(544));
+    expect(tester.getRect(save).bottom, lessThan(100));
+    expect(tester.takeException(), isNull);
+    await tester.tap(cancel);
+    await tester.pumpAndSettle();
   });
 
   testWidgets('iOS list header actions live in the mobile title bar', (
@@ -1724,8 +1925,8 @@ void main() {
     final addHostRect = tester.getRect(
       find.byKey(const ValueKey('add-host-button')),
     );
-    expect(addHostRect.width, 38);
-    expect(addHostRect.height, 38);
+    expect(addHostRect.width, 44);
+    expect(addHostRect.height, 44);
     final headerTitleRow = find.byKey(
       const ValueKey('mobile-header-title-row'),
     );
@@ -1743,8 +1944,8 @@ void main() {
     );
     expect(newSessionButton, findsOneWidget);
     final newSessionRect = tester.getRect(newSessionButton);
-    expect(newSessionRect.width, 38);
-    expect(newSessionRect.height, 38);
+    expect(newSessionRect.width, 44);
+    expect(newSessionRect.height, 44);
 
     await tester.tap(find.text('Snippets'));
     await tester.pumpAndSettle();
@@ -1834,8 +2035,8 @@ void main() {
       final iconRect = tester.getRect(
         find.byKey(ValueKey('mobile-host-$keyPrefix-icon')),
       );
-      expect(buttonRect.width, 34);
-      expect(buttonRect.height, 34);
+      expect(buttonRect.width, 44);
+      expect(buttonRect.height, 44);
       expect(
         (buttonRect.center.dx - iconRect.center.dx).abs(),
         lessThanOrEqualTo(0.5),

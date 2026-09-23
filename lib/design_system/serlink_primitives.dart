@@ -1,10 +1,96 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 
 import 'serlink_context.dart';
 import 'serlink_dimensions.dart';
 import 'serlink_effects.dart';
+import 'serlink_forui.dart';
 import 'serlink_tokens.dart';
+
+/// Shared page state. Short windows and enlarged text can scroll to the action
+/// while ordinary viewports keep the content centered with a readable measure.
+class SerlinkEmptyState extends StatelessWidget {
+  const SerlinkEmptyState({
+    super.key,
+    required this.title,
+    required this.body,
+    this.icon,
+    this.loading = false,
+    this.loadingLabel,
+    this.action,
+  });
+
+  final String title;
+  final String body;
+  final IconData? icon;
+  final bool loading;
+  final String? loadingLabel;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: constraints.hasBoundedHeight ? constraints.maxHeight : 0,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(SerlinkSpacing.xl),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (loading) ...[
+                      SerlinkLoadingIndicator(semanticsLabel: loadingLabel),
+                      const SizedBox(height: SerlinkSpacing.lg),
+                    ] else if (icon != null) ...[
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: t.surfaceRaised,
+                          borderRadius: SerlinkRadii.workspace,
+                        ),
+                        child: Icon(icon, size: 26, color: t.textMuted),
+                      ),
+                      const SizedBox(height: SerlinkSpacing.lg),
+                    ],
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: t.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: SerlinkSpacing.sm),
+                    Text(
+                      body,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: t.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                    if (action != null) ...[
+                      const SizedBox(height: SerlinkSpacing.lg),
+                      action!,
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// A rounded surface separated by its fill and, for floating content, an
 /// optional soft shadow. Nested panels stay flat and omit decorative borders.
@@ -148,6 +234,7 @@ class SerlinkPressable extends StatefulWidget {
 class _SerlinkPressableState extends State<SerlinkPressable> {
   bool _hovered = false;
   bool _pressed = false;
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
@@ -161,36 +248,63 @@ class _SerlinkPressableState extends State<SerlinkPressable> {
         ? widget.hoverColor ?? t.accentPrimary.withValues(alpha: 0.06)
         : Colors.transparent;
 
-    return MouseRegion(
-      cursor: interactive ? SystemMouseCursors.click : MouseCursor.defer,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() {
-        _hovered = false;
-        _pressed = false;
-      }),
-      child: GestureDetector(
-        behavior: widget.behavior,
-        onTap: widget.onTap,
-        onTapDown: interactive ? (_) => setState(() => _pressed = true) : null,
-        onTapUp: interactive ? (_) => setState(() => _pressed = false) : null,
-        onTapCancel: interactive
-            ? () => setState(() => _pressed = false)
-            : null,
-        child: ClipRRect(
-          borderRadius: widget.borderRadius,
-          child: Stack(
-            children: [
-              Padding(padding: widget.padding, child: widget.child),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    curve: Curves.easeOut,
-                    color: overlay,
+    return Semantics(
+      button: interactive ? true : null,
+      child: FocusableActionDetector(
+        enabled: interactive,
+        onShowFocusHighlight: (focused) => setState(() => _focused = focused),
+        actions: {
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              widget.onTap?.call();
+              return null;
+            },
+          ),
+        },
+        child: MouseRegion(
+          cursor: interactive ? SystemMouseCursors.click : MouseCursor.defer,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() {
+            _hovered = false;
+            _pressed = false;
+          }),
+          child: GestureDetector(
+            behavior: widget.behavior,
+            onTap: widget.onTap,
+            onTapDown: interactive
+                ? (_) => setState(() => _pressed = true)
+                : null,
+            onTapUp: interactive
+                ? (_) => setState(() => _pressed = false)
+                : null,
+            onTapCancel: interactive
+                ? () => setState(() => _pressed = false)
+                : null,
+            child: ClipRRect(
+              borderRadius: widget.borderRadius,
+              child: Stack(
+                children: [
+                  Padding(padding: widget.padding, child: widget.child),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: AnimatedContainer(
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 120),
+                        curve: Curves.easeOut,
+                        decoration: BoxDecoration(
+                          color: overlay,
+                          borderRadius: widget.borderRadius,
+                          border: _focused && interactive
+                              ? Border.all(color: t.accentPrimary, width: 2)
+                              : null,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -308,7 +422,7 @@ class SerlinkTag extends StatelessWidget {
   }
 }
 
-class SerlinkChoiceChip extends StatefulWidget {
+class SerlinkChoiceChip extends StatelessWidget {
   const SerlinkChoiceChip({
     super.key,
     required this.label,
@@ -323,80 +437,36 @@ class SerlinkChoiceChip extends StatefulWidget {
   final bool enabled;
 
   @override
-  State<SerlinkChoiceChip> createState() => _SerlinkChoiceChipState();
-}
-
-class _SerlinkChoiceChipState extends State<SerlinkChoiceChip> {
-  bool _hovered = false;
-  bool _pressed = false;
-
-  @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final interactive = widget.enabled && widget.onSelected != null;
-    final foreground = widget.selected
-        ? t.accentPrimary
-        : _hovered && interactive
-        ? t.textPrimary
-        : t.textSecondary;
-    final background = widget.selected
-        ? t.accentPrimary.withValues(
-            alpha: _pressed ? 0.22 : (_hovered ? 0.18 : 0.14),
-          )
-        : Color.alphaBlend(
-            t.accentPrimary.withValues(
-              alpha: _pressed ? 0.12 : (_hovered ? 0.07 : 0),
-            ),
-            t.surfaceSunken,
-          );
-    final border = widget.selected
-        ? t.accentPrimary.withValues(alpha: 0.56)
-        : _hovered && interactive
-        ? t.accentPrimary.withValues(alpha: 0.34)
-        : t.borderSubtle;
-
-    return Opacity(
-      opacity: interactive ? 1 : 0.52,
-      child: MouseRegion(
-        cursor: interactive ? SystemMouseCursors.click : MouseCursor.defer,
-        onEnter: (_) {
-          if (interactive) setState(() => _hovered = true);
-        },
-        onExit: (_) {
-          if (interactive) {
-            setState(() {
-              _hovered = false;
-              _pressed = false;
-            });
-          }
-        },
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: interactive
-              ? () => widget.onSelected!(!widget.selected)
-              : null,
-          onTapDown: interactive
-              ? (_) => setState(() => _pressed = true)
-              : null,
-          onTapUp: interactive ? (_) => setState(() => _pressed = false) : null,
-          onTapCancel: interactive
-              ? () => setState(() => _pressed = false)
-              : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
-            curve: Curves.easeOut,
+    final interactive = enabled && onSelected != null;
+    return Semantics(
+      selected: selected,
+      enabled: interactive,
+      child: Opacity(
+        opacity: interactive ? 1 : 0.52,
+        child: SerlinkPressable(
+          onTap: interactive ? () => onSelected!(!selected) : null,
+          borderRadius: SerlinkRadii.pill,
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: background,
+              color: selected
+                  ? t.accentPrimary.withValues(alpha: 0.14)
+                  : t.surfaceSunken,
               borderRadius: SerlinkRadii.pill,
-              border: Border.all(color: border),
+              border: Border.all(
+                color: selected
+                    ? t.accentPrimary.withValues(alpha: 0.56)
+                    : t.borderSubtle,
+              ),
             ),
             child: Text(
-              widget.label,
+              label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: foreground,
+                color: selected ? t.accentPrimary : t.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -407,7 +477,7 @@ class _SerlinkChoiceChipState extends State<SerlinkChoiceChip> {
   }
 }
 
-class SerlinkSegment<T> {
+class SerlinkSegment<T extends Object> {
   const SerlinkSegment({
     required this.value,
     required this.label,
@@ -419,7 +489,7 @@ class SerlinkSegment<T> {
   final IconData icon;
 }
 
-class SerlinkSegmentedControl<T> extends StatelessWidget {
+class SerlinkSegmentedControl<T extends Object> extends StatelessWidget {
   const SerlinkSegmentedControl({
     super.key,
     required this.value,
@@ -439,6 +509,35 @@ class SerlinkSegmentedControl<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final interactive = enabled && onChanged != null;
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: CupertinoSlidingSegmentedControl<T>(
+          groupValue: value,
+          backgroundColor: t.surfaceSunken,
+          thumbColor: t.surfaceRaised,
+          onValueChanged: (next) {
+            if (interactive && next != null) onChanged!(next);
+          },
+          children: {
+            for (final segment in segments)
+              segment.value: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                child: Text(
+                  segment.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: interactive ? t.textPrimary : t.textMuted,
+                    fontWeight: segment.value == value
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                  ),
+                ),
+              ),
+          },
+        ),
+      );
+    }
     return ClipRRect(
       borderRadius: SerlinkRadii.control,
       child: DecoratedBox(
@@ -469,7 +568,7 @@ class SerlinkSegmentedControl<T> extends StatelessWidget {
   }
 }
 
-class _SerlinkSegmentButton<T> extends StatelessWidget {
+class _SerlinkSegmentButton<T extends Object> extends StatelessWidget {
   const _SerlinkSegmentButton({
     required this.segment,
     required this.selected,
@@ -488,43 +587,47 @@ class _SerlinkSegmentButton<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final foreground = selected ? t.accentPrimary : t.textSecondary;
-    return SerlinkPressable(
-      onTap: enabled ? () => onSelected?.call(segment.value) : null,
-      borderRadius: SerlinkRadii.control,
-      hoverColor: selected
-          ? t.accentPrimary.withValues(alpha: 0.12)
-          : t.accentPrimary.withValues(alpha: 0.06),
-      pressedColor: selected
-          ? t.accentPrimary.withValues(alpha: 0.18)
-          : t.accentPrimary.withValues(alpha: 0.1),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        height: compact ? 26 : 28,
-        padding: EdgeInsets.symmetric(horizontal: compact ? 9 : 12),
-        decoration: BoxDecoration(
-          color: selected ? t.surfaceRaised : Colors.transparent,
-          borderRadius: SerlinkRadii.control,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(segment.icon, size: compact ? 15 : 16, color: foreground),
-            SizedBox(width: compact ? 5 : 7),
-            Text(
-              segment.label,
-              style:
-                  (compact
-                          ? Theme.of(context).textTheme.labelSmall
-                          : Theme.of(context).textTheme.labelMedium)
-                      ?.copyWith(
-                        color: foreground,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
-                      ),
-            ),
-          ],
+    return Semantics(
+      selected: selected,
+      enabled: enabled,
+      child: SerlinkPressable(
+        onTap: enabled ? () => onSelected?.call(segment.value) : null,
+        borderRadius: SerlinkRadii.control,
+        hoverColor: selected
+            ? t.accentPrimary.withValues(alpha: 0.12)
+            : t.accentPrimary.withValues(alpha: 0.06),
+        pressedColor: selected
+            ? t.accentPrimary.withValues(alpha: 0.18)
+            : t.accentPrimary.withValues(alpha: 0.1),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          height: compact ? 26 : 28,
+          padding: EdgeInsets.symmetric(horizontal: compact ? 9 : 12),
+          decoration: BoxDecoration(
+            color: selected ? t.surfaceRaised : Colors.transparent,
+            borderRadius: SerlinkRadii.control,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(segment.icon, size: compact ? 15 : 16, color: foreground),
+              SizedBox(width: compact ? 5 : 7),
+              Text(
+                segment.label,
+                style:
+                    (compact
+                            ? Theme.of(context).textTheme.labelSmall
+                            : Theme.of(context).textTheme.labelMedium)
+                        ?.copyWith(
+                          color: foreground,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w600,
+                        ),
+              ),
+            ],
+          ),
         ),
       ),
     );

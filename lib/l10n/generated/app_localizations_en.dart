@@ -1196,6 +1196,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostGroupNewHint => 'Group name';
 
   @override
+  String get hostGroupCreateTitle => 'New Group';
+
+  @override
+  String get hostGroupNameRequired => 'Enter a valid group name.';
+
+  @override
+  String get hostGroupNameExists => 'A group with this name already exists.';
+
+  @override
+  String get hostGroupSaveFailed => 'Group could not be created.';
+
+  @override
+  String get hostGroupLoadFailed => 'Groups could not be loaded.';
+
+  @override
+  String get hostGroupMoveFailed => 'Host could not be moved to the group.';
+
+  @override
   String get hostsUngroupedGroup => 'Ungrouped';
 
   @override

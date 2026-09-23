@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:forui/forui.dart';
@@ -12,6 +13,41 @@ import 'serlink_effects.dart';
 enum SerlinkButtonVariant { primary, secondary, outline, ghost, danger }
 
 enum SerlinkButtonSize { xs, sm, md, lg }
+
+/// Editing is a full-screen modal task on iPhone, with navigation actions
+/// above the keyboard. Desktop keeps the existing dialog presentation.
+Future<T?> showSerlinkFormDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool barrierDismissible = false,
+}) {
+  if (Theme.of(context).platform != TargetPlatform.iOS) {
+    return showSerlinkDialog<T>(
+      context: context,
+      builder: builder,
+      barrierDismissible: barrierDismissible,
+    );
+  }
+  return Navigator.of(context).push<T>(
+    CupertinoPageRoute<T>(
+      fullscreenDialog: true,
+      builder: (context) => _SerlinkFormScope(child: builder(context)),
+    ),
+  );
+}
+
+class _SerlinkFormScope extends InheritedWidget {
+  const _SerlinkFormScope({required super.child, this.actions = false});
+
+  final bool actions;
+
+  static _SerlinkFormScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_SerlinkFormScope>();
+
+  @override
+  bool updateShouldNotify(_SerlinkFormScope oldWidget) =>
+      actions != oldWidget.actions;
+}
 
 Future<T?> showSerlinkDialog<T>({
   required BuildContext context,
@@ -58,6 +94,39 @@ class SerlinkDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    if (_SerlinkFormScope.maybeOf(context) != null) {
+      return CupertinoPageScaffold(
+        backgroundColor: t.surfaceBase,
+        navigationBar: CupertinoNavigationBar(
+          backgroundColor: t.surfaceBase,
+          automaticBackgroundVisibility: false,
+          automaticallyImplyLeading: false,
+          transitionBetweenRoutes: false,
+          middle: title,
+          leading: actions.isEmpty
+              ? null
+              : _SerlinkFormScope(actions: true, child: actions.first),
+          trailing: actions.length < 2
+              ? null
+              : _SerlinkFormScope(actions: true, child: actions.last),
+        ),
+        child: SafeArea(
+          child: DefaultTextStyle(
+            style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+              color: t.textPrimary,
+              fontSize: 17,
+              height: 1.3,
+            ),
+            child: SizedBox.expand(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                child: content ?? const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return FDialog(
       style: style,
       clipBehavior: Clip.antiAlias,
@@ -820,6 +889,75 @@ class SerlinkTextField extends StatelessWidget {
         scrollController: scrollController,
       );
     }
+    if (_SerlinkFormScope.maybeOf(context) != null) {
+      final t = context.tokens;
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (inputDecoration.labelText != null) ...[
+            Text(
+              inputDecoration.labelText!,
+              style: TextStyle(color: t.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+          ],
+          CupertinoTextField(
+            controller: controller,
+            focusNode: focusNode,
+            placeholder: inputDecoration.hintText,
+            placeholderStyle: TextStyle(color: t.textMuted, fontSize: 17),
+            style: style ?? TextStyle(color: t.textPrimary, fontSize: 17),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: t.surfaceSunken,
+              borderRadius: SerlinkRadii.control,
+              border: Border.all(
+                color: inputDecoration.errorText == null
+                    ? t.borderSubtle
+                    : t.statusDanger,
+                width: 0.5,
+              ),
+            ),
+            prefix: inputDecoration.prefixIcon,
+            suffix: inputDecoration.suffixIcon,
+            keyboardType: keyboardType,
+            textInputAction: textInputAction,
+            textCapitalization: textCapitalization,
+            textAlign: textAlign,
+            autofocus: autofocus,
+            obscureText: obscureText,
+            autocorrect: autocorrect,
+            enableSuggestions: enableSuggestions,
+            minLines: minLines,
+            maxLines: maxLines,
+            maxLength: maxLength,
+            expands: expands,
+            readOnly: readOnly,
+            enabled: enabled,
+            inputFormatters: inputFormatters,
+            onChanged: onChanged,
+            onSubmitted: onSubmitted,
+            onEditingComplete: onEditingComplete,
+            onTap: onTap,
+            scrollController: scrollController,
+          ),
+          if (inputDecoration.errorText != null ||
+              inputDecoration.helperText != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              inputDecoration.errorText ?? inputDecoration.helperText!,
+              style: TextStyle(
+                color: inputDecoration.errorText == null
+                    ? t.textSecondary
+                    : t.statusDanger,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ],
+      );
+    }
     return FTextField(
       control: FTextFieldControl.managed(
         controller: controller,
@@ -1141,6 +1279,19 @@ class SerlinkSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return Semantics(
+        label: semanticsLabel,
+        child: SizedBox(
+          height: 44,
+          child: CupertinoSwitch(
+            value: value,
+            onChanged: onChanged,
+            activeTrackColor: context.tokens.accentStrong,
+          ),
+        ),
+      );
+    }
     return _SerlinkSwitchFrame(
       value: value,
       onChanged: onChanged,
@@ -1340,6 +1491,25 @@ class _SerlinkButtonCore extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_SerlinkFormScope.maybeOf(context)?.actions == true) {
+      return CupertinoButton(
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(44, 44),
+        child: DefaultTextStyle.merge(
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: variant == SerlinkButtonVariant.primary
+                ? FontWeight.w600
+                : FontWeight.w400,
+            color: onPressed == null
+                ? context.tokens.textMuted
+                : context.tokens.accentPrimary,
+          ),
+          child: child,
+        ),
+      );
+    }
     return FButton(
       onPress: onPressed,
       variant: _foruiButtonVariant(variant),

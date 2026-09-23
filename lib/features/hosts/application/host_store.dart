@@ -5,7 +5,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/app_dependencies.dart';
 import '../../vault/application/vault_service.dart';
 import 'host_repository.dart';
+import 'host_group_repository.dart';
 import '../domain/host.dart';
+
+final hostGroupNamesProvider = FutureProvider.autoDispose
+    .family<List<String>, int>((ref, unlockGeneration) async {
+      final vault = await ref.watch(vaultSessionControllerProvider.future);
+      if (vault.vaultState != VaultState.unlocked ||
+          vault.unlockGeneration != unlockGeneration) {
+        return Completer<List<String>>().future;
+      }
+      ref.watch(
+        vaultRecordChangesByTypeProvider(
+          EncryptedHostGroupRepository.recordType,
+        ),
+      );
+      final groups = await ref.watch(hostGroupRepositoryProvider).list();
+      ref.keepAlive();
+      return groups;
+    });
 
 final hostSummariesProvider = FutureProvider.autoDispose
     .family<List<HostSummary>, int>((ref, unlockGeneration) async {

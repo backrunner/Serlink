@@ -26,6 +26,7 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
     required this.statusSuccess,
     required this.statusWarning,
     required this.statusDanger,
+    this.statusDangerFill = const Color(0xFFCF222E),
     required this.statusInfo,
     required this.shadowColor,
     required this.backdropTop,
@@ -75,6 +76,9 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
   final Color statusSuccess;
   final Color statusWarning;
   final Color statusDanger;
+
+  /// Solid destructive controls use a deeper red behind [onAccent].
+  final Color statusDangerFill;
   final Color statusInfo;
 
   /// Base color for soft drop shadows (alpha applied by the shadow helper).
@@ -153,6 +157,7 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
     Color? statusSuccess,
     Color? statusWarning,
     Color? statusDanger,
+    Color? statusDangerFill,
     Color? statusInfo,
     Color? shadowColor,
     Color? backdropTop,
@@ -176,6 +181,7 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
       statusSuccess: statusSuccess ?? this.statusSuccess,
       statusWarning: statusWarning ?? this.statusWarning,
       statusDanger: statusDanger ?? this.statusDanger,
+      statusDangerFill: statusDangerFill ?? this.statusDangerFill,
       statusInfo: statusInfo ?? this.statusInfo,
       shadowColor: shadowColor ?? this.shadowColor,
       backdropTop: backdropTop ?? this.backdropTop,
@@ -206,6 +212,11 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
       statusSuccess: Color.lerp(statusSuccess, other.statusSuccess, t)!,
       statusWarning: Color.lerp(statusWarning, other.statusWarning, t)!,
       statusDanger: Color.lerp(statusDanger, other.statusDanger, t)!,
+      statusDangerFill: Color.lerp(
+        statusDangerFill,
+        other.statusDangerFill,
+        t,
+      )!,
       statusInfo: Color.lerp(statusInfo, other.statusInfo, t)!,
       shadowColor: Color.lerp(shadowColor, other.shadowColor, t)!,
       backdropTop: Color.lerp(backdropTop, other.backdropTop, t)!,

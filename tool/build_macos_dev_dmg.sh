@@ -45,7 +45,7 @@ case "$ARCHS" in
   *) ARCH_SUFFIX=universal ;;
 esac
 
-ARCHIVE_PATH="$ROOT_DIR/build/dev/serlink-dev.xcarchive"
+BUILD_PATH="$ROOT_DIR/build/dev/xcode"
 WORK_DIR="$ROOT_DIR/build/dev/dmg-staging"
 BUNDLE_NAME="$DISPLAY_NAME.app"
 STAGED_APP="$WORK_DIR/$BUNDLE_NAME"
@@ -57,37 +57,41 @@ flutter build macos \
   --dart-define=SERLINK_DISTRIBUTION=direct \
   --config-only
 
-echo "== xcodebuild archive (ARCHS=$ARCHS) =="
-rm -rf "$ARCHIVE_PATH"
-xcodebuild archive \
+echo "== xcodebuild build for this Mac (ARCHS=$ARCHS) =="
+rm -rf "$BUILD_PATH"
+# Use the build action with a concrete destination: archive can reuse a
+# development profile that excludes this Mac, even with a destination set.
+xcodebuild build \
   -workspace macos/Runner.xcworkspace \
   -scheme Runner \
   -configuration Release \
-  -archivePath "$ARCHIVE_PATH" \
+  -destination "platform=macOS,arch=$(uname -m)" \
+  -derivedDataPath "$BUILD_PATH" \
   SERLINK_MACOS_ENTITLEMENTS=Runner/Direct.entitlements \
   SERLINK_APP_DISPLAY_NAME="$DISPLAY_NAME" \
   SERLINK_DMG_INSTALLER_ENABLED=YES \
   ARCHS="$ARCHS" \
-  -allowProvisioningUpdates
+  -allowProvisioningUpdates \
+  -allowProvisioningDeviceRegistration
 
-ARCHIVED_APP="$ARCHIVE_PATH/Products/Applications/serlink.app"
-if [[ ! -d "$ARCHIVED_APP" ]]; then
-  echo "error: archived app not found at $ARCHIVED_APP" >&2
+BUILT_APP="$BUILD_PATH/Build/Products/Release/serlink.app"
+if [[ ! -d "$BUILT_APP" ]]; then
+  echo "error: built app not found at $BUILT_APP" >&2
   exit 1
 fi
 
 # Reuse the entitlements Xcode actually signed with: they match the embedded
 # development provisioning profile (aps-environment=development etc.).
-ENTITLEMENTS_PLIST="$WORK_DIR/archived-entitlements.plist"
+ENTITLEMENTS_PLIST="$WORK_DIR/built-entitlements.plist"
 rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR"
-codesign -d --entitlements "$ENTITLEMENTS_PLIST.raw" --xml "$ARCHIVED_APP"
+codesign -d --entitlements "$ENTITLEMENTS_PLIST.raw" --xml "$BUILT_APP"
 # codesign prepends an "Executable=..." line; keep only the XML plist.
 sed -n '/<?xml/,$p' "$ENTITLEMENTS_PLIST.raw" > "$ENTITLEMENTS_PLIST"
 rm "$ENTITLEMENTS_PLIST.raw"
 
 echo "== stage $BUNDLE_NAME (keeping embedded provisioning profile) =="
-cp -R "$ARCHIVED_APP" "$STAGED_APP"
+cp -R "$BUILT_APP" "$STAGED_APP"
 
 echo "== compile and sign serlink-mcp helper =="
 dart compile exe "$ROOT_DIR/cli/serlink_mcp.dart" \
@@ -131,7 +135,7 @@ if [[ "$INSTALL_APP" == 1 ]]; then
 fi
 
 echo "== remove intermediate .app copies =="
-rm -rf "$WORK_DIR" "$ARCHIVE_PATH"
+rm -rf "$WORK_DIR" "$BUILD_PATH"
 
 echo "done: $DMG_PATH"
 if [[ "$INSTALL_APP" == 1 ]]; then

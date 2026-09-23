@@ -5,7 +5,7 @@ Future<void> _showWebDavSyncDialog(
   WidgetRef ref,
   WebDavSyncSettings? settings,
 ) {
-  return showSerlinkDialog<void>(
+  return showSerlinkFormDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (context) => _WebDavSyncDialog(initialSettings: settings),

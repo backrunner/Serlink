@@ -1117,6 +1117,24 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostGroupNewHint => 'グループ名';
 
   @override
+  String get hostGroupCreateTitle => '新しいグループ';
+
+  @override
+  String get hostGroupNameRequired => '有効なグループ名を入力してください。';
+
+  @override
+  String get hostGroupNameExists => '同じ名前のグループが既に存在します。';
+
+  @override
+  String get hostGroupSaveFailed => 'グループを作成できませんでした。';
+
+  @override
+  String get hostGroupLoadFailed => 'グループを読み込めませんでした。';
+
+  @override
+  String get hostGroupMoveFailed => 'ホストをグループに移動できませんでした。';
+
+  @override
   String get hostsUngroupedGroup => '未分類';
 
   @override

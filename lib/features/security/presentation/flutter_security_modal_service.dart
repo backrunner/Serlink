@@ -145,39 +145,41 @@ class _WebDavCertificateDialog extends StatelessWidget {
             ? l10n.securityWebDavCertificateChangedTitle
             : l10n.securityTrustWebDavCertificateTitle,
       ),
-      content: SizedBox(
-        width: _certificateDialogContentWidth,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(certificate.endpoint.toString()),
-            const SizedBox(height: 12),
-            Text(l10n.securityAlgorithmLabel(certificate.algorithm)),
-            const SizedBox(height: 8),
-            SelectableText(certificate.fingerprint),
-            if (certificate.expectedFingerprint != null) ...[
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: _certificateDialogContentWidth,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(certificate.endpoint.toString()),
               const SizedBox(height: 12),
+              Text(l10n.securityAlgorithmLabel(certificate.algorithm)),
+              const SizedBox(height: 8),
+              SelectableText(certificate.fingerprint),
+              if (certificate.expectedFingerprint != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  l10n.securityPreviousLabel(certificate.expectedFingerprint!),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Text(l10n.securitySubjectLabel(certificate.subject)),
+              const SizedBox(height: 8),
+              Text(l10n.securityIssuerLabel(certificate.issuer)),
+              const SizedBox(height: 8),
               Text(
-                l10n.securityPreviousLabel(certificate.expectedFingerprint!),
+                l10n.securityValidRangeLabel(
+                  _shortUtc(certificate.validFrom),
+                  _shortUtc(certificate.validUntil),
+                ),
               ),
+              if (certificate.requiresClockReview) ...[
+                const SizedBox(height: 12),
+                Text(l10n.securityCertificateClockWarning),
+              ],
             ],
-            const SizedBox(height: 12),
-            Text(l10n.securitySubjectLabel(certificate.subject)),
-            const SizedBox(height: 8),
-            Text(l10n.securityIssuerLabel(certificate.issuer)),
-            const SizedBox(height: 8),
-            Text(
-              l10n.securityValidRangeLabel(
-                _shortUtc(certificate.validFrom),
-                _shortUtc(certificate.validUntil),
-              ),
-            ),
-            if (certificate.requiresClockReview) ...[
-              const SizedBox(height: 12),
-              Text(l10n.securityCertificateClockWarning),
-            ],
-          ],
+          ),
         ),
       ),
       actions: [
@@ -212,22 +214,24 @@ class _HostKeyDialog extends StatelessWidget {
             ? l10n.securityHostKeyChangedTitle
             : l10n.securityConfirmFingerprintTitle,
       ),
-      content: SizedBox(
-        width: _hostKeyDialogContentWidth,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${prompt.hostname}:${prompt.port}'),
-            const SizedBox(height: 12),
-            Text(l10n.securityAlgorithmLabel(prompt.algorithm)),
-            const SizedBox(height: 8),
-            SelectableText(prompt.fingerprint),
-            if (prompt.previousFingerprint != null) ...[
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: _hostKeyDialogContentWidth,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${prompt.hostname}:${prompt.port}'),
               const SizedBox(height: 12),
-              Text(l10n.securityPreviousLabel(prompt.previousFingerprint!)),
+              Text(l10n.securityAlgorithmLabel(prompt.algorithm)),
+              const SizedBox(height: 8),
+              SelectableText(prompt.fingerprint),
+              if (prompt.previousFingerprint != null) ...[
+                const SizedBox(height: 12),
+                Text(l10n.securityPreviousLabel(prompt.previousFingerprint!)),
+              ],
             ],
-          ],
+          ),
         ),
       ),
       actions: [
@@ -263,26 +267,28 @@ class _ExportDialog extends StatelessWidget {
     final l10n = context.l10n;
     return SerlinkDialog(
       title: Text(preview.title),
-      content: SizedBox(
-        width: 520,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              preview.encrypted
-                  ? l10n.securityEncryptedExport
-                  : l10n.securityUnencryptedExport,
-            ),
-            if (preview.sensitiveFields.isNotEmpty) ...[
-              const SizedBox(height: 12),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                l10n.securitySensitiveFields(
-                  preview.sensitiveFields.join(', '),
-                ),
+                preview.encrypted
+                    ? l10n.securityEncryptedExport
+                    : l10n.securityUnencryptedExport,
               ),
+              if (preview.sensitiveFields.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  l10n.securitySensitiveFields(
+                    preview.sensitiveFields.join(', '),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
       actions: [
@@ -316,7 +322,7 @@ class _DestructiveActionDialog extends StatelessWidget {
               Navigator.of(context).pop(DestructiveDecision.cancel),
           child: Text(l10n.cancelAction),
         ),
-        SerlinkFilledButton(
+        SerlinkFilledButton.danger(
           onPressed: () =>
               Navigator.of(context).pop(DestructiveDecision.confirm),
           child: Text(l10n.confirmAction),
@@ -337,24 +343,26 @@ class _MultilinePasteDialog extends StatelessWidget {
     final lineCount = preview.split('\n').length;
     return SerlinkDialog(
       title: Text(l10n.securityPasteMultipleLinesTitle),
-      content: SizedBox(
-        width: 560,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l10n.securityPasteMultipleLinesBody(lineCount)),
-            const SizedBox(height: 12),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240),
-              child: SingleChildScrollView(
-                child: SelectableText(
-                  preview,
-                  style: const TextStyle(fontFamily: 'monospace'),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: 560,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.securityPasteMultipleLinesBody(lineCount)),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    preview,
+                    style: const TextStyle(fontFamily: 'monospace'),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       actions: [
@@ -382,23 +390,25 @@ class _AgentAccessDialog extends StatelessWidget {
     return SerlinkDialog(
       maxWidth: _hostKeyDialogMaxWidth,
       title: Text(l10n.securityAgentAccessTitle),
-      content: SizedBox(
-        width: _hostKeyDialogContentWidth,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.securityAgentAccessBody(
-                prompt.clientName,
-                prompt.hostDisplayName,
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: _hostKeyDialogContentWidth,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.securityAgentAccessBody(
+                  prompt.clientName,
+                  prompt.hostDisplayName,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(l10n.securityAgentAccessHostIdLabel(prompt.hostId)),
-            const SizedBox(height: 12),
-            Text(l10n.securityAgentAccessWarning),
-          ],
+              const SizedBox(height: 8),
+              Text(l10n.securityAgentAccessHostIdLabel(prompt.hostId)),
+              const SizedBox(height: 12),
+              Text(l10n.securityAgentAccessWarning),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -426,31 +436,33 @@ class _AgentCommandDialog extends StatelessWidget {
     return SerlinkDialog(
       maxWidth: _hostKeyDialogMaxWidth,
       title: Text(l10n.securityAgentCommandTitle),
-      content: SizedBox(
-        width: _hostKeyDialogContentWidth,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.securityAgentCommandBody(
-                prompt.clientName,
-                prompt.hostDisplayName,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(l10n.securityAgentCommandRuleLabel(prompt.ruleDescription)),
-            const SizedBox(height: 12),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240),
-              child: SingleChildScrollView(
-                child: SelectableText(
-                  prompt.command,
-                  style: const TextStyle(fontFamily: 'monospace'),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: _hostKeyDialogContentWidth,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.securityAgentCommandBody(
+                  prompt.clientName,
+                  prompt.hostDisplayName,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(l10n.securityAgentCommandRuleLabel(prompt.ruleDescription)),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    prompt.command,
+                    style: const TextStyle(fontFamily: 'monospace'),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [

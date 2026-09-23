@@ -203,7 +203,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       content: _DialogScrollFrame(
         key: const ValueKey('host-form-scroll-frame'),
         width: layout.contentWidth,
-        height: layout.contentHeight,
+        height: capabilities.isIOS ? double.infinity : layout.contentHeight,
         controller: _scrollController,
         fillHeight: true,
         padding: layout.scrollPadding,
@@ -212,6 +212,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
           children: [
             _HostFormSection(
               title: l10n.hostSectionConnection,
+              icon: Icons.dns_outlined,
               padding: layout.sectionPadding,
               child: Column(
                 children: [
@@ -283,6 +284,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             SizedBox(height: layout.sectionGap),
             _HostFormSection(
               title: l10n.hostSectionAuthentication,
+              icon: Icons.lock_outline_rounded,
               padding: layout.sectionPadding,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -404,6 +406,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
               SizedBox(height: layout.sectionGap),
               _HostFormSection(
                 title: l10n.hostSectionRouting,
+                icon: Icons.alt_route_rounded,
                 padding: layout.sectionPadding,
                 child: _JumpHostSelectionSection(
                   hosts: _jumpHostOptions,
@@ -710,6 +713,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       final capabilities = ref.read(platformCapabilitiesProvider);
       final identities = await ref.read(identityRepositoryProvider).list();
       final hostConfigs = await ref.read(hostRepositoryProvider).list();
+      final savedGroups = await ref.read(hostGroupRepositoryProvider).list();
       final sourceHostId = widget.host?.id;
       final excludedJumpHostId = widget.mode == _HostFormMode.edit
           ? sourceHostId
@@ -743,12 +747,10 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
         );
         _jumpHostOptions = List<HostSummary>.unmodifiable(jumpHosts);
         _groupOptions = List<String>.unmodifiable(
-          hostConfigs
-              .map((host) => host.groupId)
-              .whereType<String>()
-              .where((groupId) => groupId != _kNewGroupSentinel)
-              .toSet()
-              .toList()
+          {
+              ...savedGroups,
+              ...hostConfigs.map((host) => host.groupId).whereType<String>(),
+            }.where((groupId) => groupId != _kNewGroupSentinel).toSet().toList()
             ..sort(
               (left, right) =>
                   left.toLowerCase().compareTo(right.toLowerCase()),
@@ -1001,7 +1003,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   }
 
   Future<void> _addIdentity() async {
-    final created = await showSerlinkDialog<Object?>(
+    final created = await showSerlinkFormDialog<Object?>(
       context: context,
       barrierDismissible: false,
       builder: (context) => const _IdentityEditDialog(),
@@ -1019,7 +1021,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   }
 
   Future<void> _editIdentity(IdentityConfig identity) async {
-    final updated = await showSerlinkDialog<bool>(
+    final updated = await showSerlinkFormDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _IdentityEditDialog(identity: identity),
@@ -1160,9 +1162,11 @@ class _HostFormDialogLayout {
       scrollPadding: compact
           ? const EdgeInsets.fromLTRB(0, 4, 4, 0)
           : const EdgeInsets.fromLTRB(2, 8, 10, 2),
-      sectionPadding: EdgeInsets.all(compact ? 10 : 14),
-      sectionGap: compact ? 12 : 16,
-      fieldGap: compact ? 10 : 14,
+      sectionPadding: EdgeInsets.all(
+        capabilities.isIOS ? 16 : (compact ? 12 : 16),
+      ),
+      sectionGap: capabilities.isIOS ? 24 : (compact ? 12 : 16),
+      fieldGap: capabilities.isIOS ? 16 : (compact ? 10 : 14),
       inlineGap: compact ? 8 : 12,
       buttonSize: compact ? SerlinkButtonSize.md : SerlinkButtonSize.lg,
     );

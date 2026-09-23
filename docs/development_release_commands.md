@@ -234,7 +234,8 @@ For local development DMGs, use the dedicated script instead:
 
 It builds the direct channel with `SERLINK_APP_DISPLAY_NAME="Serlink (Dev)"`,
 keeps the Xcode development provisioning profile (required for the app to
-launch), embeds and signs the `serlink-mcp` helper, creates
+launch), targets the current Mac so automatic signing can register it and
+refresh the profile, embeds and signs the `serlink-mcp` helper, creates
 `build/Serlink-<version>+<build>-<arch>-dev.dmg`, installs the branded app into
 `/Applications`, and deletes intermediate `.app` copies so LaunchServices does
 not index duplicate Serlink apps. It signs with `Apple Development` by default

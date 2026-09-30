@@ -12,6 +12,34 @@ import 'package:serlink/features/transfers/domain/transfer_task.dart';
 
 void main() {
   test(
+    'synchronous start failure frees the queue and supports retry',
+    () async {
+      final queue = TransferQueueController(maxConcurrentTransfers: 1);
+      addTearDown(queue.dispose);
+      final broken = _ThrowingSftpConnection();
+      final healthy = _FakeSftpConnection();
+      final failed = queue.enqueueUpload(
+        connection: broken,
+        localPath: '/a',
+        remotePath: '/b',
+      );
+      final next = queue.enqueueDownload(
+        connection: healthy,
+        remotePath: '/b',
+        localPath: '/c',
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(queue.state.byId(failed)!.state, TransferState.failed);
+      expect(queue.state.byId(next)!.state, TransferState.running);
+      expect(queue.canRetry(failed), isTrue);
+      await queue.cancel(next);
+      broken.throwOnStart = false;
+      await queue.retry(failed);
+      expect(queue.state.byId(failed)!.state, TransferState.running);
+    },
+  );
+
+  test(
     'throttles continuous progress and checkpoints but saves completion',
     () {
       fakeAsync((async) {
@@ -640,4 +668,24 @@ class _FakeSftpConnection implements SftpConnection {
 
   @override
   Future<void> writeTextFile(String path, String contents) async {}
+}
+
+class _ThrowingSftpConnection extends _FakeSftpConnection {
+  bool throwOnStart = true;
+
+  @override
+  Stream<TransferProgress> upload({
+    required TransferTaskId taskId,
+    required TransferItemKind itemKind,
+    required String localPath,
+    required String remotePath,
+  }) {
+    if (throwOnStart) throw StateError('Connection closed');
+    return super.upload(
+      taskId: taskId,
+      itemKind: itemKind,
+      localPath: localPath,
+      remotePath: remotePath,
+    );
+  }
 }

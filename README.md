@@ -29,7 +29,7 @@ move between servers often and want their connection data to stay private.
 | Terminal workspace | SSH tabs, local terminal tabs, split panes, reconnect-in-place, buffer search, paste guard, startup commands, ZMODEM, and local/remote/SOCKS port forwarding. |
 | SFTP and transfers | Remote directory browsing, file actions, bounded text preview/edit, upload/download queues, progress details, pause/resume/retry, and conflict handling. |
 | Hosts and credentials | Host profiles, password identities, private keys, OpenSSH certificates, known-host verification, jump hosts, tags, and OpenSSH config import/export. |
-| Private vault | Encrypted Drift/SQLite storage, recovery keys, encrypted backups, secure-storage secrets, Face ID unlock where available, and background privacy controls. |
+| Private vault | Encrypted Drift/SQLite storage, recovery keys, encrypted backups, secure-storage secrets, biometric unlock where available, and background privacy controls. |
 | Encrypted sync | WebDAV sync, private CloudKit sync on Apple platforms, device records, conflict review, tombstones, remote repair, TLS diagnostics, and certificate pinning. |
 | Daily workflow | Command snippets, transfer history, redacted diagnostics, and app localization for English, Simplified Chinese, and Japanese. |
 
@@ -47,7 +47,7 @@ move between servers often and want their connection data to stay private.
 
 Requirements:
 
-- Flutter SDK compatible with Dart `^3.12.0`
+- Flutter SDK compatible with Dart `^3.13.0` (Flutter 3.47.5 or later)
 - Desktop Flutter toolchain for the target OS
 - Xcode command line tools for Apple platforms
 - Visual Studio C++ desktop workload for Windows
@@ -79,6 +79,8 @@ Release helpers and platform runbooks live in `docs/`:
 - [Development release commands](docs/development_release_commands.md)
 - [iOS release](docs/ios_release.md)
 - [macOS release](docs/macos_release.md)
+- [macOS submission materials](docs/release/macos/README.md)
+- [Dependency and application review](docs/release/review-2026-09-30.md)
 - [CloudKit production release](docs/cloudkit_production_release.md)
 - [macOS distribution](docs/macos_distribution.md)
 

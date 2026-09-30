@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Serlink Privacy Policy · 隐私政策 · プライバシーポリシー</title>
+<style>
+:root{color-scheme:light dark}body{font:16px/1.65 system-ui,sans-serif;max-width:820px;margin:auto;padding:32px 24px}a{color:#008a80}h1,h2{line-height:1.25}article{padding:20px 0 36px;border-bottom:1px solid #8884}nav{display:flex;gap:24px;flex-wrap:wrap}.date{opacity:.7}
+</style>
+<nav aria-label="Language"><a href="#en">English</a><a href="#zh">简体中文</a><a href="#ja">日本語</a><a href="support.html">Support / 支持</a></nav>
+<article id="en" lang="en">
+<h1>Serlink Privacy Policy</h1><p class="date">Effective date: 30 September 2026</p>
+<p>Serlink is an SSH terminal and SFTP workspace. The app does not require a Serlink account. This policy describes the app's current data handling.</p>
+<h2>Your local workspace</h2>
+<p>Host profiles, credential material, snippets and workspace records are stored in an encrypted local vault. Device-local secrets use the operating system's secure storage. Optional biometric unlock protects a random device key; the vault passphrase is not saved by that feature. Serlink does not receive biometric templates.</p>
+<p>Terminal data is used to display your remote session. Downloaded files and exported plaintext metadata are stored where you select them; those files are not covered by vault encryption. Protect your exported files separately. Locking the vault prevents new credential access but does not disconnect already-established SSH/SFTP sessions or transfers.</p>
+<h2>Servers and optional sync</h2>
+<p>When you connect, authentication data, commands and files are sent to your chosen SSH/SFTP server. The server operator can process that data under its own policies. The app does not relay those connections through a Serlink-operated service.</p>
+<p>iCloud sync uses Apple's CloudKit private database. WebDAV sync uses an endpoint you configure. Sync uploads encrypted vault snapshots and operational object metadata; the app's vault keys are not uploaded by the sync service. Apple or your WebDAV operator may process service and connection metadata under their policies. Disabling sync stops future app sync; it does not erase existing remote copies.</p>
+<h2>Diagnostics and external agents</h2>
+<p>Serlink has no advertising or analytics SDK and does not automatically upload diagnostic logs to its developer. Diagnostic exports are local, redact sensitive connection information and omit terminal output. If you send an export to support, review the files and remove anything private first.</p>
+<p>The optional MCP endpoint permits an external agent to use explicitly authorized sessions. Serlink does not include an AI model or automatically send session data to an AI provider. An agent you authorize may transmit data according to that agent's configuration and provider policies.</p>
+<h2>Control, retention and deletion</h2>
+<p>You control host records, credentials, snippets, backups, exported files, sync destinations and agent authorizations. Local records remain until you delete or reset them. Remote data and backups have separate lifetimes: use the remote-data controls or your provider to delete them, and remove exports and backups separately. Keep recovery keys safe; the developer cannot recover an unknown vault passphrase without your recovery key.</p>
+<h2>Contact and updates</h2>
+<p>For privacy questions, use the contact published on the <a href="support.html">support page</a>. This policy will be updated if the app's data handling changes.</p>
+</article>
+<article id="zh" lang="zh-Hans">
+<h1>Serlink 隐私政策</h1><p class="date">生效日期：2026 年 9 月 30 日</p>
+<p>Serlink 是 SSH 终端与 SFTP 工作区，无需 Serlink 账号。本政策说明当前应用的数据处理方式。</p>
+<h2>本地工作区</h2>
+<p>主机、凭据、片段及工作区记录保存在本地加密保险库。设备密钥使用系统安全存储。可选的生物识别解锁保护一个随机设备密钥，不保存保险库密码；Serlink 不接收生物识别模板。</p>
+<p>终端数据用于显示远程会话。下载文件和导出的明文资料保存在你选择的位置，不受保险库加密保护，请自行保护这些文件。锁定保险库会阻止新的凭据访问，但不会中断已建立的 SSH/SFTP 会话或传输。</p>
+<h2>服务器与可选同步</h2>
+<p>连接时，认证资料、命令和文件发送到你选择的 SSH/SFTP 服务器，服务器运营方可按其政策处理数据。连接不经过 Serlink 运营的中转服务。</p>
+<p>iCloud 同步使用 Apple CloudKit 私有数据库；WebDAV 使用你配置的端点。同步上传加密保险库快照与必要的对象元数据，同步服务不上传保险库密钥。Apple 或 WebDAV 运营方可能按其政策处理服务及连接元数据。关闭同步会停止后续同步，不会自动删除已有远程副本。</p>
+<h2>诊断与外部代理</h2>
+<p>Serlink 无广告或分析 SDK，不会自动向开发者上传诊断日志。诊断导出保存在本地，排除终端输出并脱敏敏感连接信息。向支持人员发送前，请检查导出文件并移除私人内容。</p>
+<p>可选 MCP 端点允许外部代理使用你明确授权的会话。Serlink 不内置 AI 模型，也不会自动把会话数据发送到 AI 提供商。被你授权的代理可能按其配置及服务政策发送数据。</p>
+<h2>控制、保留和删除</h2>
+<p>你可以管理主机、凭据、片段、备份、导出文件、同步服务和代理授权。本地记录保留至删除或重置。远程数据、备份和导出文件各自保留，需要通过应用的远程数据控制或服务商删除远程副本，并单独删除备份及导出。请妥善保管恢复密钥；开发者无法在没有恢复密钥的情况下找回遗失的保险库密码。</p>
+<h2>联系与更新</h2>
+<p>隐私问题请使用<a href="support.html">支持页面</a>公布的联系方式。应用的数据处理方式变化时，本政策会更新。</p>
+</article>
+<article id="ja" lang="ja">
+<h1>Serlink プライバシーポリシー</h1><p class="date">発効日：2026 年 9 月 30 日</p>
+<p>Serlink は SSH ターミナルと SFTP のワークスペースです。Serlink アカウントは不要です。本ポリシーは現在のアプリのデータ処理を説明します。</p>
+<h2>ローカルのワークスペース</h2>
+<p>ホスト、認証情報、スニペットとワークスペースのレコードはローカルの暗号化ボールトに保存します。デバイスの秘密情報は OS の安全なストレージを使用します。任意の生体認証解除はランダムなデバイスキーを保護し、ボールトのパスフレーズを保存しません。生体認証のテンプレートを Serlink が受け取ることはありません。</p>
+<p>ターミナルデータはセッションの表示に使用します。ダウンロードしたファイルと平文で書き出した情報は選択した場所に保存され、ボールトの暗号化の対象ではありません。別途保護してください。ボールトのロックは新しい認証情報へのアクセスを防ぎますが、接続済みの SSH/SFTP セッションや転送を終了しません。</p>
+<h2>サーバーと任意の同期</h2>
+<p>認証情報、コマンドとファイルは選択した SSH/SFTP サーバーに送信されます。サーバーの運営者は独自のポリシーに基づき処理できます。Serlink が運営する中継サービスは使用しません。</p>
+<p>iCloud 同期は Apple の CloudKit プライベートデータベース、WebDAV 同期は設定したエンドポイントを使用します。暗号化されたスナップショットと必要なオブジェクトのメタデータを送信し、同期サービスはボールトの鍵を送信しません。Apple や WebDAV 運営者はサービスと接続のメタデータを独自のポリシーで処理する場合があります。同期を無効にしても既存のリモートコピーは削除されません。</p>
+<h2>診断と外部エージェント</h2>
+<p>広告・分析 SDK は含まず、診断ログを開発者へ自動送信しません。診断の書き出しはローカルで行い、接続の機密情報を伏せ、ターミナル出力を含めません。サポートへ送る前に内容を確認し、個人情報を取り除いてください。</p>
+<p>任意の MCP エンドポイントは明示的に許可したセッションを外部エージェントに提供します。AI モデルを内蔵せず、AI 提供者にセッションデータを自動送信しません。許可したエージェントが自身の設定と提供者のポリシーに従ってデータを送信する場合があります。</p>
+<h2>管理、保存と削除</h2>
+<p>ホスト、認証情報、スニペット、バックアップ、書き出し、同期先とエージェントの許可は利用者が管理します。ローカルレコードは削除・リセットまで残ります。リモートデータ、バックアップと書き出したファイルは別途削除してください。復旧キーを安全に保管してください。復旧キーなしで失ったパスフレーズを開発者が復元することはできません。</p>
+<h2>連絡と更新</h2>
+<p>プライバシーに関する質問は<a href="support.html">サポートページ</a>の連絡先をご利用ください。データ処理が変わる場合は本ポリシーを更新します。</p>
+</article>
+</html>

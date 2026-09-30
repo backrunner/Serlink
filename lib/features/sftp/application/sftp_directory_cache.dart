@@ -14,6 +14,28 @@ class SftpDirectoryCache {
   final int maxEntries;
   final DateTime Function() _now;
   final _entries = <String, ({DateTime savedAt, List<SftpEntry> entries})>{};
+  final _pendingLoads = <String, Object>{};
+
+  /// Invalidated or superseded requests can finish, but cannot refill the cache.
+  Future<List<SftpEntry>> load(
+    String path,
+    Future<List<SftpEntry>> Function() fetch, {
+    bool bypassCache = false,
+  }) async {
+    if (!bypassCache) {
+      final cached = read(path);
+      if (cached != null) return cached;
+    }
+    final token = Object();
+    _pendingLoads[path] = token;
+    try {
+      final entries = await fetch();
+      if (identical(_pendingLoads[path], token)) store(path, entries);
+      return entries;
+    } finally {
+      if (identical(_pendingLoads[path], token)) _pendingLoads.remove(path);
+    }
+  }
 
   List<SftpEntry>? read(String path) {
     _expire();
@@ -42,8 +64,10 @@ class SftpDirectoryCache {
   void invalidate([String? path]) {
     if (path == null) {
       _entries.clear();
+      _pendingLoads.clear();
     } else {
       _entries.remove(path);
+      _pendingLoads.remove(path);
     }
   }
 

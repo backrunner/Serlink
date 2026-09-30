@@ -690,7 +690,7 @@ class SyncRunService {
       () async {
         for (var attempt = 0; attempt < 2; attempt += 1) {
           try {
-            return switch (resolution) {
+            return await switch (resolution) {
               SyncConflictResolution.keepLocal => _keepLocalThenPush(
                 provider,
                 acceptedConflicts: acceptedConflicts,
@@ -1607,7 +1607,7 @@ class SyncRunService {
       final plaintext = await _vault.decryptRecord(envelope);
       final decoded = jsonDecode(utf8.decode(plaintext));
       if (decoded is! Map<String, Object?>) {
-        return _relatedRecordModifiedAt(
+        return await _relatedRecordModifiedAt(
           envelope,
           source: source,
           provider: provider,
@@ -1701,12 +1701,12 @@ class SyncRunService {
     SyncConflictFieldSet? fieldSet;
     String? title;
     try {
-      final localJson =
-          jsonDecode(utf8.decode(await _vault.decryptRecord(localEnvelope)))
-              as Map<String, Object?>;
-      final remoteJson =
-          jsonDecode(utf8.decode(await _vault.decryptRecord(remoteEnvelope)))
-              as Map<String, Object?>;
+      final localJson = jsonDecode(
+        utf8.decode(await _vault.decryptRecord(localEnvelope)),
+      ) as Map<String, Object?>;
+      final remoteJson = jsonDecode(
+        utf8.decode(await _vault.decryptRecord(remoteEnvelope)),
+      ) as Map<String, Object?>;
       fieldSet = _fieldMerge.inspect(
         recordType: remoteEnvelope.type,
         recordId: remoteEnvelope.id,

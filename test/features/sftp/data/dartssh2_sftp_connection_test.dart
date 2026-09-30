@@ -4,6 +4,30 @@ import 'package:serlink/features/sftp/data/dartssh2_sftp_connection.dart';
 import 'package:serlink/features/sftp/domain/sftp_entry.dart';
 
 void main() {
+  for (final filename in [
+    '',
+    '.',
+    '..',
+    '../outside',
+    '/absolute',
+    'a/b',
+    'a\u0000b',
+  ]) {
+    test('rejects unsafe directory entry ${filename.codeUnits}', () {
+      expect(
+        () => DartSsh2SftpConnection.mapName(
+          path: '/workspace',
+          name: ssh.SftpName(
+            filename: filename,
+            longname: '',
+            attr: ssh.SftpFileAttrs(),
+          ),
+        ),
+        throwsFormatException,
+      );
+    });
+  }
+
   test('maps dartssh2 directory entries to Serlink SFTP entries', () {
     final entry = DartSsh2SftpConnection.mapName(
       path: '/var/www',

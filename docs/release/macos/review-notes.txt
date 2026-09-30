@@ -1,0 +1,41 @@
+Serlink 1.0.0 — Mac App Store review notes
+
+Serlink is an SSH terminal and SFTP client. It does not require a Serlink
+account or subscription. SSH authentication is to a server chosen by the user.
+
+Getting started:
+1. Launch Serlink and create a local vault using a passphrase chosen by you.
+2. Save the recovery key when prompted. Biometric unlock is optional and depends
+   on the Mac's hardware. Do not use production credentials for review.
+3. In Settings > Credentials, add a password or private-key identity for a
+   reachable SSH server. Add a host from the Hosts page and select that identity.
+4. Connect from the host row. On the first connection, verify the SHA256 host-key
+   fingerprint against the server's fingerprint before trusting it.
+5. Open an SSH session, run harmless commands such as pwd, uptime and ls, search
+   the terminal buffer, and reconnect or close the session from its tab.
+6. Open SFTP for the same host. Browse directories and transfer a disposable file
+   between the server and a destination selected in the native file picker.
+7. Add a command snippet and inspect the Transfers page for progress/history.
+8. WebDAV sync is optional and uses an endpoint selected by the user. iCloud sync
+   requires an iCloud account and the deployed CloudKit Production schema.
+   Core SSH/SFTP use does not require either sync service.
+
+App Store build behavior:
+- Uses App Sandbox. Remote SSH/SFTP, selected-file import/export, encrypted vault
+  storage and encrypted sync are available.
+- Local shell tabs, OS SSH-agent authentication, automatic ~/.ssh/config access,
+  direct local-file launching and the standalone MCP stdio helper are disabled.
+- The optional MCP HTTP endpoint is authenticated, listens on loopback only, and
+  requires explicit session authorization for an external agent. Serlink does
+  not include an AI model or send data to an AI provider by itself.
+- Locking the vault prevents new credential resolution. Already-established
+  connections and transfers continue; close them explicitly to disconnect.
+- Diagnostics stay local unless the user exports and shares them. Diagnostic
+  exports exclude terminal output and redact sensitive connection information.
+
+Before pasting these notes into App Store Connect:
+Add the dedicated review SSH server details, if needed, in the private review
+fields or an attachment. Include hostname, port, username, auth method, temporary
+credential, expected host-key fingerprint, and allowed test directory. Confirm
+that Apple can reach it throughout the review period. Do not use or publish real
+production credentials. Reviewer contact fields are intentionally not supplied.

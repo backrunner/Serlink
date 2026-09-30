@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -241,26 +242,25 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsRecoverResetAction => '復旧 / リセット';
 
   @override
-  String get settingsLocalUnlockTitle => 'Face ID 解除';
+  String get settingsLocalUnlockTitle => '生体認証解除';
 
   @override
-  String get settingsLocalUnlockSemantics => 'Face ID 解除を有効にする';
+  String get settingsLocalUnlockSemantics => '生体認証解除を有効にする';
 
   @override
-  String get settingsLocalUnlockNeedsVault =>
-      'Face ID 解除を有効にする前にボールトを作成してください。';
+  String get settingsLocalUnlockNeedsVault => '生体認証解除を有効にする前にボールトを作成してください。';
 
   @override
   String get settingsLocalUnlockNeedsVaultMobile => '先に作成';
 
   @override
-  String get settingsLocalUnlockEnabled => '有効です。ボールトをロックすると Face ID で解除できます。';
+  String get settingsLocalUnlockEnabled => '有効です。ボールトをロックすると生体認証で解除できます。';
 
   @override
-  String get settingsLocalUnlockEnabledMobile => 'Face ID 可';
+  String get settingsLocalUnlockEnabledMobile => '生体認証可';
 
   @override
-  String get settingsLocalUnlockUnavailable => 'このデバイスでは Face ID を利用できません。';
+  String get settingsLocalUnlockUnavailable => 'このデバイスでは生体認証を利用できません。';
 
   @override
   String get settingsLocalUnlockUnavailableMobile => '利用不可';
@@ -272,7 +272,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsLocalUnlockDisabledMobile => 'パスフレーズ必須';
 
   @override
-  String get settingsUnlockWithDeviceAction => 'Face ID を使用';
+  String get settingsUnlockWithDeviceAction => '生体認証を使用';
 
   @override
   String get settingsBackgroundPrivacyTitle => 'バックグラウンドのプライバシー';
@@ -520,25 +520,25 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAppVersionUnavailable => 'バージョン情報を取得できません';
 
   @override
-  String get settingsEnableLocalUnlockTitle => 'Face ID 解除を有効にしますか？';
+  String get settingsEnableLocalUnlockTitle => '生体認証解除を有効にしますか？';
 
   @override
-  String get settingsDisableLocalUnlockTitle => 'Face ID 解除を無効にしますか？';
+  String get settingsDisableLocalUnlockTitle => '生体認証解除を無効にしますか？';
 
   @override
   String get settingsEnableLocalUnlockBody =>
-      'Serlink は Face ID で保護されたランダムなデバイスキーを保存します。ボールトのパスフレーズは保存されません。';
+      'Serlink は生体認証で保護されたランダムなデバイスキーを保存します。ボールトのパスフレーズは保存されません。';
 
   @override
   String get settingsDisableLocalUnlockBody =>
-      'Face ID で保護されたデバイスキーを削除します。既存の接続は動作を続けます。';
+      '生体認証で保護されたデバイスキーを削除します。既存の接続は動作を続けます。';
 
   @override
-  String get vaultEnableFaceIdUnlockTitle => 'Face ID での解除を有効にしますか？';
+  String get vaultEnableFaceIdUnlockTitle => '生体認証での解除を有効にしますか？';
 
   @override
   String get vaultEnableFaceIdUnlockBody =>
-      'このデバイスで Face ID を使ってボールトを解除できます。Serlink は Face ID で保護されたランダムなデバイスキーのみを保存し、ボールトのパスフレーズは保存しません。';
+      'このデバイスで生体認証を使ってボールトを解除できます。Serlink は生体認証で保護されたランダムなデバイスキーのみを保存し、ボールトのパスフレーズは保存しません。';
 
   @override
   String get settingsEnableAction => '有効にする';
@@ -548,20 +548,20 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsLocalUnlockEnabledSnack =>
-      'Face ID 解除を有効にしました。ボールトをロックすると Face ID を使用できます。';
+      '生体認証解除を有効にしました。ボールトをロックすると生体認証を使用できます。';
 
   @override
-  String get settingsLocalUnlockVerifyFailedSnack => 'Face ID 解除を確認できませんでした。';
+  String get settingsLocalUnlockVerifyFailedSnack => '生体認証解除を確認できませんでした。';
 
   @override
-  String get settingsLocalUnlockDisabledSnack => 'Face ID 解除を無効にしました。';
+  String get settingsLocalUnlockDisabledSnack => '生体認証解除を無効にしました。';
 
   @override
   String get settingsLocalUnlockStillAvailableSnack =>
-      'このデバイスでは Face ID 解除がまだ利用できます。';
+      'このデバイスでは生体認証解除がまだ利用できます。';
 
   @override
-  String get settingsLocalUnlockUpdateFailed => 'Face ID 解除を更新できませんでした。';
+  String get settingsLocalUnlockUpdateFailed => '生体認証解除を更新できませんでした。';
 
   @override
   String get copyAction => 'コピー';
@@ -2051,7 +2051,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultUnlockAction => '解除';
 
   @override
-  String get vaultUnlockWithDeviceAction => 'Face ID を使用';
+  String get vaultUnlockWithDeviceAction => '生体認証を使用';
 
   @override
   String get vaultUseRecoveryCodeAction => '復旧コードを使用';
@@ -2090,15 +2090,14 @@ class AppLocalizationsJa extends AppLocalizations {
   String get vaultInvalidRecoveryKeyFormatError => 'この復旧キー形式はサポートされていません。';
 
   @override
-  String get vaultLocalUnlockNotEnabledError =>
-      'このデバイスでは Face ID 解除が有効ではありません。';
+  String get vaultLocalUnlockNotEnabledError => 'このデバイスでは生体認証解除が有効ではありません。';
 
   @override
   String get vaultLocalUnlockFailedError =>
-      'Face ID 解除に失敗しました。ボールトのパスフレーズを使用してください。';
+      '生体認証解除に失敗しました。ボールトのパスフレーズを使用してください。';
 
   @override
-  String get vaultLocalUnlockUnavailableError => 'このデバイスでは Face ID を利用できません。';
+  String get vaultLocalUnlockUnavailableError => 'このデバイスでは生体認証を利用できません。';
 
   @override
   String get vaultEmptyPassphraseError => 'ボールトのパスフレーズは空にできません。';

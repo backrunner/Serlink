@@ -351,27 +351,32 @@ class TransferQueueController {
     operation.task = task;
     _replaceTask(task);
 
-    final stream = switch (task.direction) {
-      TransferDirection.upload => operation.connection.upload(
-        taskId: task.id,
-        itemKind: task.itemKind,
-        localPath: task.localPath,
-        remotePath: task.remotePath,
-      ),
-      TransferDirection.download => operation.connection.download(
-        taskId: task.id,
-        itemKind: task.itemKind,
-        remotePath: task.remotePath,
-        localPath: task.localPath,
-      ),
-    };
+    try {
+      final stream = switch (task.direction) {
+        TransferDirection.upload => operation.connection.upload(
+          taskId: task.id,
+          itemKind: task.itemKind,
+          localPath: task.localPath,
+          remotePath: task.remotePath,
+        ),
+        TransferDirection.download => operation.connection.download(
+          taskId: task.id,
+          itemKind: task.itemKind,
+          remotePath: task.remotePath,
+          localPath: task.localPath,
+        ),
+      };
 
-    _subscriptions[task.id] = stream.listen(
-      (progress) => _handleProgress(task.id, progress),
-      onError: (Object error) => _handleError(task.id, error),
-      onDone: () => _handleDone(task.id),
-      cancelOnError: true,
-    );
+      _subscriptions[task.id] = stream.listen(
+        (progress) => _handleProgress(task.id, progress),
+        onError: (Object error) => _handleError(task.id, error),
+        onDone: () => _handleDone(task.id),
+        cancelOnError: true,
+      );
+    } on Object catch (error) {
+      // Defer pumping until the current queue iteration has finished.
+      scheduleMicrotask(() => _handleError(task.id, error));
+    }
   }
 
   void _handleProgress(TransferTaskId taskId, TransferProgress progress) {

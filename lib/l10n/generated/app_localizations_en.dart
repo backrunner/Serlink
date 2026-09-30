@@ -1,5 +1,6 @@
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -266,28 +267,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsRecoverResetAction => 'Recover / Reset';
 
   @override
-  String get settingsLocalUnlockTitle => 'Face ID unlock';
+  String get settingsLocalUnlockTitle => 'Biometric unlock';
 
   @override
-  String get settingsLocalUnlockSemantics => 'Enable Face ID unlock';
+  String get settingsLocalUnlockSemantics => 'Enable biometric unlock';
 
   @override
   String get settingsLocalUnlockNeedsVault =>
-      'Create the vault before enabling Face ID unlock.';
+      'Create the vault before enabling biometric unlock.';
 
   @override
   String get settingsLocalUnlockNeedsVaultMobile => 'Create vault first';
 
   @override
   String get settingsLocalUnlockEnabled =>
-      'Enabled. Lock the vault to unlock with Face ID.';
+      'Enabled. Lock the vault to unlock with biometrics.';
 
   @override
-  String get settingsLocalUnlockEnabledMobile => 'Face ID ready';
+  String get settingsLocalUnlockEnabledMobile => 'Biometrics ready';
 
   @override
   String get settingsLocalUnlockUnavailable =>
-      'Face ID is not available on this device.';
+      'Biometric authentication is not available on this device.';
 
   @override
   String get settingsLocalUnlockUnavailableMobile => 'Not available';
@@ -300,7 +301,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLocalUnlockDisabledMobile => 'Passphrase required';
 
   @override
-  String get settingsUnlockWithDeviceAction => 'Use Face ID';
+  String get settingsUnlockWithDeviceAction => 'Use biometrics';
 
   @override
   String get settingsBackgroundPrivacyTitle => 'Background privacy';
@@ -561,25 +562,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAppVersionUnavailable => 'Version unavailable';
 
   @override
-  String get settingsEnableLocalUnlockTitle => 'Enable Face ID unlock?';
+  String get settingsEnableLocalUnlockTitle => 'Enable biometric unlock?';
 
   @override
-  String get settingsDisableLocalUnlockTitle => 'Disable Face ID unlock?';
+  String get settingsDisableLocalUnlockTitle => 'Disable biometric unlock?';
 
   @override
   String get settingsEnableLocalUnlockBody =>
-      'Serlink will store a random device key protected by Face ID. Your vault passphrase is not stored.';
+      'Serlink will store a random device key protected by biometrics. Your vault passphrase is not stored.';
 
   @override
   String get settingsDisableLocalUnlockBody =>
-      'This removes this device key from Face ID protection. Existing connections keep running.';
+      'This removes this device key from biometrics protection. Existing connections keep running.';
 
   @override
-  String get vaultEnableFaceIdUnlockTitle => 'Enable Face ID unlock?';
+  String get vaultEnableFaceIdUnlockTitle => 'Enable biometric unlock?';
 
   @override
   String get vaultEnableFaceIdUnlockBody =>
-      'Use Face ID to unlock this vault on this device. Serlink stores a random device key protected by Face ID, not your vault passphrase.';
+      'Use biometrics to unlock this vault on this device. Serlink stores a random device key protected by biometrics, not your vault passphrase.';
 
   @override
   String get settingsEnableAction => 'Enable';
@@ -589,22 +590,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsLocalUnlockEnabledSnack =>
-      'Face ID unlock enabled. Lock the vault to use Face ID.';
+      'Biometric unlock enabled. Lock the vault to use biometrics.';
 
   @override
   String get settingsLocalUnlockVerifyFailedSnack =>
-      'Face ID unlock could not be verified.';
+      'Biometric unlock could not be verified.';
 
   @override
-  String get settingsLocalUnlockDisabledSnack => 'Face ID unlock disabled.';
+  String get settingsLocalUnlockDisabledSnack => 'Biometric unlock disabled.';
 
   @override
   String get settingsLocalUnlockStillAvailableSnack =>
-      'Face ID unlock is still available on this device.';
+      'Biometric unlock is still available on this device.';
 
   @override
   String get settingsLocalUnlockUpdateFailed =>
-      'Face ID unlock could not be updated.';
+      'Biometric unlock could not be updated.';
 
   @override
   String get copyAction => 'Copy';
@@ -1735,8 +1736,7 @@ class AppLocalizationsEn extends AppLocalizations {
       locale: localeName,
       other:
           '$count active terminal panes are still running. Closing this window will disconnect them.',
-      one:
-          '1 active terminal pane is still running. Closing this window will disconnect it.',
+      one: '1 active terminal pane is still running. Closing this window will disconnect it.',
     );
     return '$_temp0';
   }
@@ -2182,7 +2182,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultUnlockAction => 'Unlock';
 
   @override
-  String get vaultUnlockWithDeviceAction => 'Use Face ID';
+  String get vaultUnlockWithDeviceAction => 'Use biometrics';
 
   @override
   String get vaultUseRecoveryCodeAction => 'Use recovery code';
@@ -2226,15 +2226,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vaultLocalUnlockNotEnabledError =>
-      'Face ID vault unlock is not enabled on this device.';
+      'Biometric vault unlock is not enabled on this device.';
 
   @override
   String get vaultLocalUnlockFailedError =>
-      'Face ID unlock failed. Use the vault passphrase.';
+      'Biometric unlock failed. Use the vault passphrase.';
 
   @override
   String get vaultLocalUnlockUnavailableError =>
-      'Face ID is not available on this device.';
+      'Biometric authentication is not available on this device.';
 
   @override
   String get vaultEmptyPassphraseError => 'Vault passphrase cannot be empty.';
@@ -2288,10 +2288,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other:
-          '# encrypted records could not be read. Quarantine them to keep using the rest of the vault.',
-      one:
-          '# encrypted record could not be read. Quarantine it to keep using the rest of the vault.',
+      other: '# encrypted records could not be read. Quarantine them to keep using the rest of the vault.',
+      one: '# encrypted record could not be read. Quarantine it to keep using the rest of the vault.',
     );
     return '$_temp0';
   }

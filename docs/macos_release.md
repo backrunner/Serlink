@@ -7,6 +7,9 @@ This runbook covers both macOS release channels:
 
 Related docs:
 
+- [Prepared submission materials](release/macos/README.md)
+- [2026-09-30 dependency and application review](release/review-2026-09-30.md)
+
 - `docs/development_release_commands.md` for the short command reference
 - `docs/macos_testflight_signing.md` for App Store Connect signing
 - `docs/macos_distribution.md` for the App Store versus direct channel split

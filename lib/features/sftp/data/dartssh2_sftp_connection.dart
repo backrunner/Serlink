@@ -530,9 +530,8 @@ class DartSsh2SftpConnection implements SftpConnection {
       if (relativePath == '.') {
         continue;
       }
-      await Directory(
-        p.joinAll([localPath, ...p.posix.split(relativePath)]),
-      ).create(recursive: true);
+      await Directory(p.joinAll([localPath, ...p.posix.split(relativePath)]))
+          .create(recursive: true);
     }
     var transferredBytes = 0;
     for (final file in tree.files) {
@@ -750,6 +749,17 @@ class DartSsh2SftpConnection implements SftpConnection {
   }
 
   static SftpEntry mapName({required String path, required ssh.SftpName name}) {
+    // READDIR returns a single child name. Never let a server-provided path
+    // escape the directory during recursive download or deletion.
+    if (name.filename.isEmpty ||
+        name.filename == '.' ||
+        name.filename == '..' ||
+        name.filename.contains('/') ||
+        name.filename.contains('\u0000') ||
+        (Platform.isWindows &&
+            (name.filename.contains('\\') || name.filename.contains(':')))) {
+      throw const FormatException('Invalid SFTP directory entry name.');
+    }
     final attrs = name.attr;
     final entryPath = _joinRemotePath(path, name.filename);
     return SftpEntry(

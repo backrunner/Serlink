@@ -236,6 +236,15 @@ plist_requires_development_environment "macos/Runner/DebugProfile.entitlements" 
 plist_requires_aps_environment "macos/Runner/DebugProfile.entitlements" "com.apple.developer.aps-environment" "development" "macOS Debug/Profile entitlements"
 check_script_contains "macos/Runner/Info.plist" "SERLINK_MACOS_BUILD_NUMBER" "macOS Info.plist"
 check_script_contains "macos/Runner/Configs/AppInfo.xcconfig" "SERLINK_MACOS_BUILD_NUMBER" "macOS build number config"
+plutil -lint "macos/Runner/PrivacyInfo.xcprivacy" >/dev/null
+plist_requires_bool "macos/Runner/PrivacyInfo.xcprivacy" "NSPrivacyTracking" "false" "macOS privacy manifest"
+plist_requires_value \
+  "macos/Runner/PrivacyInfo.xcprivacy" \
+  "NSPrivacyAccessedAPITypes:0:NSPrivacyAccessedAPIType" \
+  "NSPrivacyAccessedAPICategoryFileTimestamp" \
+  "macos/Runner/PrivacyInfo.xcprivacy"
+check_script_contains "macos/Runner.xcodeproj/project.pbxproj" "PrivacyInfo.xcprivacy in Resources" "macOS Xcode project"
+ok "macOS privacy manifest is bundled"
 
 if [[ "$DISTRIBUTION" == "app_store" || "$DISTRIBUTION" == "all" ]]; then
   check_cloudkit_entitlements "macos/Runner/Release.entitlements" "macOS App Store entitlements"

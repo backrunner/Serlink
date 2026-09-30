@@ -50,6 +50,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
 
   @override
   void dispose() {
+    _invalidateListCache();
     _pathFocusNode.removeListener(_handlePathFocusChanged);
     _pathFocusNode.dispose();
     _pathController.dispose();
@@ -408,9 +409,8 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
 
   Widget _buildPathContent(BuildContext context, {required bool enabled}) {
     final t = context.tokens;
-    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      color: enabled ? t.textPrimary : t.textMuted,
-    );
+    final style = Theme.of(context).textTheme.bodyMedium
+        ?.copyWith(color: enabled ? t.textPrimary : t.textMuted);
     if (_editingPath) {
       return SerlinkTextField(
         key: const ValueKey('sftp-path-field'),
@@ -552,13 +552,11 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     bool bypassCache = false,
   }) async {
     final normalizedPath = _joinRemotePath(path);
-    if (!bypassCache) {
-      final cached = _listCache.read(normalizedPath);
-      if (cached != null) return cached;
-    }
-    final entries = await connection.list(normalizedPath);
-    _listCache.store(normalizedPath, entries);
-    return entries;
+    return _listCache.load(
+      normalizedPath,
+      () => connection.list(normalizedPath),
+      bypassCache: bypassCache,
+    );
   }
 
   void _invalidateListCache([String? path]) {

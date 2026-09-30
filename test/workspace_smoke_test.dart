@@ -129,7 +129,7 @@ void main() {
     expect(tester.getRect(toggle).height, greaterThanOrEqualTo(44));
     expect(find.byType(CupertinoSwitch), findsWidgets);
     final titleLeft = tester.getRect(find.text('Language')).left;
-    for (final label in ['Vault', 'Face ID unlock', 'Background privacy']) {
+    for (final label in ['Vault', 'Biometric unlock', 'Background privacy']) {
       expect(tester.getRect(find.text(label)).left, titleLeft);
     }
     // Group headings sit outside the rows, without another column of icons.
@@ -1003,7 +1003,7 @@ void main() {
     expect(find.text('Generated key'), findsOneWidget);
   });
 
-  testWidgets('iOS offers Face ID unlock after vault creation', (tester) async {
+  testWidgets('iOS offers Biometric unlock after vault creation', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
     addTearDown(tester.view.resetPhysicalSize);
@@ -1043,13 +1043,13 @@ void main() {
     expect(tester.takeException(), isNull);
 
     expect(find.text('Recovery Key'), findsOneWidget);
-    expect(find.text('Enable Face ID unlock?'), findsNothing);
+    expect(find.text('Enable biometric unlock?'), findsNothing);
 
     await tester.tap(find.text('I have saved it'));
-    await _pumpUntilFound(tester, find.text('Enable Face ID unlock?'));
+    await _pumpUntilFound(tester, find.text('Enable biometric unlock?'));
     expect(tester.takeException(), isNull);
 
-    expect(find.text('Enable Face ID unlock?'), findsOneWidget);
+    expect(find.text('Enable biometric unlock?'), findsOneWidget);
     final container = ProviderScope.containerOf(
       tester.element(find.byType(SerlinkApp)),
     );
@@ -1067,7 +1067,7 @@ void main() {
     expect(tester.takeException(), isNull);
 
     expect(
-      find.text('Face ID unlock enabled. Lock the vault to use Face ID.'),
+      find.text('Biometric unlock enabled. Lock the vault to use biometrics.'),
       findsOneWidget,
     );
     final session = container.read(vaultSessionControllerProvider).value;
@@ -1306,7 +1306,7 @@ void main() {
     expect(find.text('Reset Vault Permanently'), findsOneWidget);
   });
 
-  testWidgets('settings shows Face ID unlock controls after enabling', (
+  testWidgets('settings shows Biometric unlock controls after enabling', (
     tester,
   ) async {
     await _pumpLockedVaultApp(
@@ -1338,12 +1338,12 @@ void main() {
       find.byKey(const ValueKey('settings-local-unlock-switch')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Enable Face ID unlock?'), findsOneWidget);
+    expect(find.text('Enable biometric unlock?'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Enable'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Face ID unlock enabled. Lock the vault to use Face ID.'),
+      find.text('Biometric unlock enabled. Lock the vault to use biometrics.'),
       findsOneWidget,
     );
     await tester.pump(const Duration(seconds: 4));
@@ -1359,7 +1359,7 @@ void main() {
       find.byKey(const ValueKey('settings-local-unlock-button')),
       findsOneWidget,
     );
-    expect(find.text('Use Face ID'), findsOneWidget);
+    expect(find.text('Use biometrics'), findsOneWidget);
   });
 
   testWidgets('mobile settings controls stay compact and readable', (
@@ -1445,7 +1445,7 @@ void main() {
     final switchRect = tester.getRect(localUnlockSwitch);
     expect(switchRect.width, lessThanOrEqualTo(38));
     expect(switchRect.height, lessThanOrEqualTo(26));
-    final localUnlockTitleRect = tester.getRect(find.text('Face ID unlock'));
+    final localUnlockTitleRect = tester.getRect(find.text('Biometric unlock'));
     expect(
       (switchRect.center.dy - localUnlockTitleRect.center.dy).abs(),
       lessThanOrEqualTo(16),

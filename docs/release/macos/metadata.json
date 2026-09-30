@@ -1,0 +1,52 @@
+{
+  "preparedAt": "2026-09-30",
+  "platform": "MAC_OS",
+  "version": "1.0.0",
+  "bundleId": "com.alkinum.serlink",
+  "minimumOSVersion": "12.0",
+  "primaryCategory": "DEVELOPER_TOOLS",
+  "secondaryCategory": null,
+  "appAccountRequired": false,
+  "inAppPurchases": false,
+  "subscriptions": false,
+  "tracking": false,
+  "proposedPrivacyLabel": "DATA_NOT_COLLECTED",
+  "supportURL": null,
+  "privacyPolicyURL": null,
+  "marketingURL": null,
+  "price": null,
+  "territories": null,
+  "releaseMethod": null,
+  "localizations": {
+    "en-US": {
+      "name": "Serlink - SSH & SFTP",
+      "subtitle": "Your private server workspace",
+      "promotionalText": "Connect to your servers, work in SSH tabs, browse files with SFTP, and keep host profiles and credentials together in an encrypted vault.",
+      "keywords": "ssh,sftp,terminal,server,remote,files,transfer,developer,keys,vault,snippets,webdav",
+      "description": "Serlink brings remote terminals, file transfers and connection data into a focused Mac workspace.\n\nCONNECT AND WORK\nOrganize hosts and credentials, verify SSH host keys, connect through jump hosts, and work in terminal tabs or split panes. Search your terminal buffer, reconnect in place, and keep frequently used commands as snippets.\n\nMANAGE REMOTE FILES\nBrowse SFTP directories, upload and download files, manage permissions, and preview or edit supported text files. Track transfers in a queue with progress, pause, resume, cancellation and retry for supported tasks.\n\nKEEP YOUR WORKSPACE PRIVATE\nStore host profiles and credentials in an encrypted local vault. Save a recovery key, create encrypted backups, and use biometric unlock where supported. Sync encrypted workspace records through iCloud or a WebDAV endpoint you choose.\n\nMADE FOR MAC\nA compact workspace with keyboard controls, light and dark appearances, and English, Simplified Chinese and Japanese interfaces. No Serlink account is required. You provide access to your own SSH/SFTP servers.\n\nThe Mac App Store edition uses App Sandbox. Local shell tabs, system SSH-agent authentication, automatic SSH-config access and the standalone MCP stdio helper are available only in the direct edition. Optional authenticated MCP access in the App Store edition uses a local HTTP endpoint and explicit session authorization. Serlink does not include an AI model.\n\nLocking the vault prevents new credential access; existing sessions and transfers continue until you close them. iCloud sync requires an iCloud account. WebDAV sync requires your own endpoint.",
+      "whatsNew": "The first Serlink release for Mac: SSH tabs and split panes, SFTP file management, encrypted host and credential storage, command snippets, transfer history, encrypted backups, and optional iCloud or WebDAV sync.",
+      "betaDescription": "Test Serlink's Mac App Store edition: SSH terminals, SFTP file management, an encrypted vault, snippets, transfers and optional encrypted sync. Use disposable servers and files, and save the vault recovery key. No Serlink account is required.",
+      "betaWhatToTest": "Create and unlock a vault; add a test host and identity; verify its host key; connect and reconnect SSH; browse SFTP and transfer disposable files; test pause, resume and cancellation; use snippets and terminal search; check light/dark appearance and keyboard controls. If available, test iCloud between two devices or sync through your WebDAV server. Include app/build, macOS version and steps in feedback. Remove credentials, private keys, server addresses and terminal output from attachments."
+    },
+    "zh-Hans": {
+      "name": "Serlink - SSH 与 SFTP",
+      "subtitle": "私密的服务器工作区",
+      "promotionalText": "在一个紧凑工作区中连接服务器、使用 SSH 终端、浏览 SFTP 文件，并通过加密保险库管理主机与凭据。",
+      "keywords": "SSH,SFTP,终端,服务器,远程,文件传输,开发者,密钥,保险库,代码片段,WebDAV",
+      "description": "Serlink 将远程终端、文件传输和连接资料整合到专注的 Mac 工作区。\n\n连接与工作\n管理主机和凭据，核验 SSH 主机密钥，使用跳板机，在终端标签页和分屏中工作。搜索终端缓冲区、原地重连，并将常用命令保存为片段。\n\n管理远程文件\n浏览 SFTP 目录、上传和下载文件、管理权限，预览或编辑支持的文本文件。通过传输队列查看进度，暂停、继续、取消或重试支持的任务。\n\n保护工作区资料\n主机和凭据保存在本地加密保险库。保存恢复密钥、创建加密备份，并在受支持的设备上使用生物识别解锁。可选择 iCloud 或自己的 WebDAV 服务同步加密工作区记录。\n\n适合 Mac 的日常操作\n紧凑布局、键盘操作、深浅外观，以及中文、英文和日文界面。无需 Serlink 账号；SSH/SFTP 服务器及其访问凭据由你提供。\n\nMac App Store 版本使用 App Sandbox。本地 shell、系统 SSH agent 认证、自动读取 SSH 配置和独立 MCP stdio 助手仅在直接分发版本提供。商店版本的可选 MCP 访问使用经过认证的本地 HTTP 端点，需要明确授权会话。Serlink 本身不内置 AI 模型。\n\n锁定保险库会阻止新的凭据访问；已建立的会话与传输会继续运行，直至你关闭它们。iCloud 同步需要 iCloud 账号，WebDAV 同步需要你自己的服务端点。",
+      "whatsNew": "Serlink 的首个 Mac 版本：SSH 标签页与分屏、SFTP 文件管理、加密主机与凭据存储、命令片段、传输历史、加密备份，以及可选的 iCloud 和 WebDAV 同步。",
+      "betaDescription": "测试 Serlink 的 Mac App Store 版本：SSH 终端、SFTP 文件管理、加密保险库、片段、传输及可选加密同步。请使用测试服务器和可丢弃文件，并保存保险库恢复密钥。无需 Serlink 账号。",
+      "betaWhatToTest": "创建和解锁保险库；添加测试主机与凭据并核验主机密钥；连接和重连 SSH；浏览 SFTP 并传输测试文件；测试暂停、继续和取消；使用命令片段和终端搜索；检查深浅外观及键盘操作。如条件允许，测试两台设备的 iCloud 同步或自己的 WebDAV 服务。反馈请包含版本、macOS 版本和复现步骤，附件中请移除凭据、私钥、服务器地址和终端输出。"
+    },
+    "ja": {
+      "name": "Serlink - SSH・SFTP",
+      "subtitle": "プライベートなサーバーワークスペース",
+      "promotionalText": "SSH ターミナルと SFTP をひとつのワークスペースに。ホストと認証情報を暗号化ボールトでまとめて管理できます。",
+      "keywords": "ssh,sftp,ターミナル,サーバー,リモート,ファイル転送,開発,鍵,ボールト,スニペット,webdav",
+      "description": "Serlink はリモートターミナル、ファイル転送、接続情報をひとつの Mac ワークスペースにまとめます。\n\n接続して作業\nホストと認証情報を整理し、SSH ホスト鍵を確認して接続します。踏み台ホスト、ターミナルのタブと分割表示、バッファ検索、同じタブでの再接続に対応。よく使うコマンドはスニペットに保存できます。\n\nリモートファイルを管理\nSFTP のディレクトリを閲覧し、ファイルをアップロード・ダウンロード。権限の変更や、対応するテキストファイルのプレビュー・編集もできます。転送キューで進捗を確認し、対応するタスクを一時停止、再開、キャンセル、再試行できます。\n\nワークスペースを保護\nホストと認証情報はローカルの暗号化ボールトに保存します。復旧キー、暗号化バックアップ、対応デバイスでの生体認証解除を利用できます。暗号化されたレコードを iCloud または自分の WebDAV サーバーで同期できます。\n\nMac の日常作業に\nコンパクトな画面、キーボード操作、ライト・ダーク表示、日本語・英語・簡体字中国語のインターフェイス。Serlink アカウントは不要です。SSH/SFTP サーバーへのアクセスはご自身で用意してください。\n\nMac App Store 版は App Sandbox を使用します。ローカルシェル、システムの SSH agent 認証、自動 SSH 設定アクセス、独立した MCP stdio ヘルパーは直接配布版の機能です。ストア版の任意の MCP アクセスは認証付きローカル HTTP エンドポイントを使い、セッションへの明示的な許可が必要です。Serlink に AI モデルは含まれていません。\n\nボールトをロックすると新しい認証情報へのアクセスを防ぎます。接続済みセッションと転送は閉じるまで続きます。iCloud 同期には iCloud アカウント、WebDAV 同期にはご自身のエンドポイントが必要です。",
+      "whatsNew": "Serlink 初の Mac 版です。SSH タブと分割表示、SFTP ファイル管理、暗号化されたホストと認証情報、コマンドスニペット、転送履歴、暗号化バックアップ、任意の iCloud・WebDAV 同期に対応します。",
+      "betaDescription": "Serlink の Mac App Store 版をテストできます。SSH、SFTP、暗号化ボールト、スニペット、転送と任意の暗号化同期を確認してください。テスト用サーバーと不要なファイルを使い、復旧キーを保存してください。Serlink アカウントは不要です。",
+      "betaWhatToTest": "ボールトの作成と解除、ホストと認証情報の追加、ホスト鍵の確認、SSH 接続と再接続、SFTP 閲覧とテストファイルの転送、一時停止・再開・キャンセル、スニペットと検索、ライト・ダーク表示、キーボード操作を確認してください。可能なら 2 台で iCloud 同期、または自分の WebDAV サーバーをテストしてください。フィードバックにはアプリと macOS のバージョン、再現手順を記載し、認証情報、秘密鍵、サーバーのアドレス、ターミナル出力を添付から除いてください。"
+    }
+  }
+}

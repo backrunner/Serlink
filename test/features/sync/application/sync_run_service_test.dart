@@ -37,6 +37,32 @@ void main() {
     }
   });
 
+  for (final resolution in SyncConflictResolution.values) {
+    test(
+      'conflict resolution retries an asynchronous manifest race ($resolution)',
+      () async {
+        final provider = _ManifestConflictProvider(
+          LocalDirectorySyncProvider(tempDir),
+        );
+        await service.pushEncryptedSnapshot(provider.inner);
+        await records.upsert(
+          await vault.encryptRecord(
+            id: VaultRecordId('host:new'),
+            type: 'host',
+            plaintext: utf8.encode('{"hostname":"new.example.test"}'),
+          ),
+        );
+        provider.conflictsRemaining = 1;
+        await service.resolveConflicts(provider, resolution);
+        expect(provider.manifestWriteAttempts, 2);
+        expect(
+          await _manifestRecordIds(vault: vault, provider: provider.inner),
+          contains('host:new'),
+        );
+      },
+    );
+  }
+
   test(
     'sync uploads only changed objects and bounds concurrent reads',
     () async {
@@ -3014,6 +3040,8 @@ class _ManifestConflictProvider implements SyncProvider {
   final LocalDirectorySyncProvider inner;
   Future<void> Function()? onFirstManifestConflict;
   var alwaysConflict = false;
+  var conflictsRemaining = 0;
+  var manifestWriteAttempts = 0;
   var _conflicted = false;
 
   @override
@@ -3036,7 +3064,8 @@ class _ManifestConflictProvider implements SyncProvider {
     RemoteManifest manifest,
     RemoteManifest? expectedCurrent,
   ) async {
-    if (alwaysConflict) {
+    manifestWriteAttempts += 1;
+    if (alwaysConflict || conflictsRemaining-- > 0) {
       throw const SyncProviderException(
         'sync.provider.conflict',
         'Remote sync data changed while syncing.',

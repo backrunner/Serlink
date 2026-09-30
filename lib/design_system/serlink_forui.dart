@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:forui/forui.dart';
+import 'package:material_ui/material_ui.dart' as mui;
 
 import 'serlink_context.dart';
 import 'serlink_dimensions.dart';
@@ -112,11 +113,8 @@ class SerlinkDialog extends StatelessWidget {
         ),
         child: SafeArea(
           child: DefaultTextStyle(
-            style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-              color: t.textPrimary,
-              fontSize: 17,
-              height: 1.3,
-            ),
+            style: Theme.of(context).textTheme.bodyLarge!
+                .copyWith(color: t.textPrimary, fontSize: 17, height: 1.3),
             child: SizedBox.expand(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -1610,7 +1608,7 @@ FTextFieldStyleDelta _textFieldStyleDelta({
         ? null
         : EdgeInsetsGeometryDelta.value(contentPadding ?? EdgeInsets.zero),
     color: borderless ? _textFieldColorDelta(Colors.transparent) : null,
-    border: borderless ? _textFieldBorderDelta(InputBorder.none) : null,
+    border: borderless ? _textFieldBorderDelta(mui.InputBorder.none) : null,
     contentTextStyle: textStyle == null
         ? null
         : _textFieldTextStyleDelta(textStyle),
@@ -1633,9 +1631,9 @@ _textFieldColorDelta(Color color) {
 FVariantsValueDelta<
   FTextFieldVariantConstraint,
   FTextFieldVariant,
-  InputBorder,
+  mui.InputBorder,
   Delta
 >
-_textFieldBorderDelta(InputBorder border) {
+_textFieldBorderDelta(mui.InputBorder border) {
   return FVariantsValueDelta.delta([FVariantValueDeltaOperation.all(border)]);
 }

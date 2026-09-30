@@ -2154,7 +2154,16 @@ class $$VaultHeadersTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$VaultHeadersTable, VaultHeaderRow>(table),
+                  BaseReferences<
+                    _$SerlinkDatabase,
+                    $VaultHeadersTable,
+                    VaultHeaderRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -2442,7 +2451,18 @@ class $$EncryptedRecordsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$EncryptedRecordsTable, EncryptedRecordRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$SerlinkDatabase,
+                    $EncryptedRecordsTable,
+                    EncryptedRecordRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -2716,7 +2736,18 @@ class $$VaultBackupEntriesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$VaultBackupEntriesTable, VaultBackupEntryRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$SerlinkDatabase,
+                    $VaultBackupEntriesTable,
+                    VaultBackupEntryRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -3032,7 +3063,18 @@ class $$QuarantinedRecordsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$QuarantinedRecordsTable, QuarantinedRecordRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$SerlinkDatabase,
+                    $QuarantinedRecordsTable,
+                    QuarantinedRecordRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),

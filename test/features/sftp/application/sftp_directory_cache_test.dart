@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/features/sftp/application/sftp_directory_cache.dart';
 import 'package:serlink/features/sftp/domain/sftp_entry.dart';
@@ -8,6 +10,31 @@ void main() {
     path: '/file',
     type: SftpEntryType.file,
   );
+
+  for (final all in [false, true]) {
+    test(
+      'invalidated in-flight loads cannot refill the cache (all=$all)',
+      () async {
+        final cache = SftpDirectoryCache();
+        final pending = Completer<List<SftpEntry>>();
+        final load = cache.load('/a', () => pending.future);
+        cache.invalidate(all ? null : '/a');
+        pending.complete([entry]);
+        expect(await load, [entry]);
+        expect(cache.read('/a'), isNull);
+      },
+    );
+  }
+
+  test('older response cannot overwrite a newer refresh', () async {
+    final cache = SftpDirectoryCache();
+    final pending = Completer<List<SftpEntry>>();
+    final old = cache.load('/a', () => pending.future);
+    await cache.load('/a', () async => [], bypassCache: true);
+    pending.complete([entry]);
+    await old;
+    expect(cache.read('/a'), isEmpty);
+  });
 
   test('evicts the least recently read directory and expires entries', () {
     var now = DateTime.utc(2026);

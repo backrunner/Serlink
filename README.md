@@ -43,6 +43,13 @@ move between servers often and want their connection data to stay private.
 | Linux | Desktop Flutter project and shared desktop core are present; packaging and distro QA are still pending. |
 | Android | Not an active release target right now. |
 
+## Website and support
+
+The official site targets `serlink.alkinum.com`; its custom svedocs source,
+usage documentation and deployment instructions are in [website/](website/README.md).
+Support uses **support@serlink.alkinum.com**. The site is prepared locally;
+public hosting and mailbox delivery are separate deployment checks.
+
 ## Development
 
 Requirements:
@@ -98,6 +105,7 @@ lib/
 test/           unit, widget, smoke, platform, sync, and release-gate tests
 docs/           release, signing, CloudKit, distribution, and schema notes
 third_party/    vendored dependencies with local patches
+website/        custom svedocs product site and multilingual usage guides
 ```
 
 ## Security Notes

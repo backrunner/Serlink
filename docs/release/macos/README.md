@@ -8,8 +8,7 @@ submission materials; no upload, notarization, or review submission is implied.
 - `metadata.json`: English, Simplified Chinese, and Japanese App Store fields,
   TestFlight descriptions, and technical app information.
 - `review-notes.txt`: copyable English App Review instructions and channel limits.
-- `privacy.html`: multilingual privacy-policy page, ready to host after inserting
-  the operator's support contact.
+- `privacy.html`: multilingual privacy-policy page, paired with the website privacy policy.
 - `support.html`: multilingual troubleshooting and support page.
 - `encryption.md`: implementation inventory for the export questionnaire.
 - `screenshots/{en,zh,ja}/`: five 2560 × 1600 JPEGs per locale, in display order.
@@ -40,9 +39,11 @@ See [Apple's screenshot specifications](https://developer.apple.com/help/app-sto
 ## App Store Connect values
 
 Use the developer-tools category, bundle ID `com.alkinum.serlink`, macOS minimum
-version 12.0, and the processed build that matches the final app. Marketing URL
-is optional. Supply publicly reachable HTTPS URLs for `privacy.html` and
-`support.html`; a local file is not a valid App Store URL.
+version 12.0, and the processed build that matches the final app.
+The website source is in `website/`. Metadata points to
+`https://serlink.alkinum.com/privacy/` and `https://serlink.alkinum.com/support/`.
+Deploy and verify their public HTTPS reachability before submitting those values;
+a local build or HTML file is not a valid public App Store URL.
 
 The code currently has no developer-operated account, analytics SDK, advertising,
 tracking, in-app purchases, or subscriptions. The proposed privacy label is
@@ -64,7 +65,7 @@ questionnaire; the resulting rating is determined by App Store Connect.
 | Item | State |
 | --- | --- |
 | Developer/legal entity, copyright confirmation, review contact, bank/tax and trader information | Intentionally left to the account holder. |
-| Support contact and hosting domain | Pages are prepared locally; insert the operator's public contact and host them, then verify the saved URLs. |
+| Support contact and hosting domain | Contact is support@serlink.alkinum.com. Website URLs are configured; deploy and verify them before App Store submission. |
 | Price, territories, release method and date | Business choices are unset. No price or availability changes have been made. |
 | Encryption declaration and any jurisdiction-specific documents | Technical inventory is prepared in `encryption.md`; complete the current questionnaire and required declarations. |
 | Distribution rights and EULA | Confirm rights for the AGPL project and bundled dependencies before accepting App Store agreements. No rights declaration has been submitted. |
@@ -81,5 +82,5 @@ the gate.
 
 材料包含中、英、日商店文案、TestFlight 文案、审核操作说明、隐私和支持页面、
 加密实现清单、三套截图及现有图标。所有内容保存在仓库中，尚未发布到网站或
-App Store Connect。价格、地区、公开联系方式、审核服务器和加密申报等尚待
+App Store Connect。价格、地区、网站部署、审核服务器和加密申报等尚待
 账号持有人完成；这些也不能用构建通过来代替。主体、税务、银行及法律承诺信息未填。

@@ -202,6 +202,7 @@ class TerminalPainter {
       }
 
       final style = _textStyle.toTextStyle(
+        codePoint: charCode,
         color: color,
         bold: cellFlags & CellFlags.bold != 0,
         italic: cellFlags & CellFlags.italic != 0,

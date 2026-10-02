@@ -6,6 +6,7 @@ import 'package:xterm/xterm.dart';
 import '../../../core/ids/entity_id.dart';
 import '../../vault/application/vault_record_repository.dart';
 import '../../vault/application/vault_service.dart';
+import '../domain/nerd_font_glyphs.dart';
 import 'terminal_font_discovery.dart';
 
 enum SerlinkTerminalThemeId { serlinkDark, serlinkLight, highContrast }
@@ -101,6 +102,7 @@ class TerminalDisplaySettings {
       fontSize: fontSize,
       height: lineHeight,
       glyphOverhangReserve: _glyphOverhangReserveFor(fontFamily, fontSize),
+      fallbackNerdFontIcons: !terminalFontFamilyIsNerdFont(fontFamily),
     );
   }
 
@@ -123,12 +125,15 @@ class _SerlinkTerminalStyle extends TerminalStyle {
     required super.fontSize,
     required super.height,
     required this.glyphOverhangReserve,
+    required this.fallbackNerdFontIcons,
   });
 
   final double glyphOverhangReserve;
+  final bool fallbackNerdFontIcons;
 
   @override
   TextStyle toTextStyle({
+    int? codePoint,
     Color? color,
     Color? backgroundColor,
     bool bold = false,
@@ -143,7 +148,17 @@ class _SerlinkTerminalStyle extends TerminalStyle {
           italic: italic,
           underline: underline,
         )
-        .copyWith(letterSpacing: glyphOverhangReserve);
+        .copyWith(
+          letterSpacing: glyphOverhangReserve,
+          // Ordinary fonts may occupy these private-use slots with unrelated
+          // characters. Missing-glyph fallback alone cannot resolve that.
+          fontFamily:
+              fallbackNerdFontIcons &&
+                  codePoint != null &&
+                  isNerdFontIconCodePoint(codePoint)
+              ? bundledTerminalFontFamily
+              : fontFamily,
+        );
   }
 }
 

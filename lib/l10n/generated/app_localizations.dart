@@ -3511,7 +3511,7 @@ abstract class AppLocalizations {
   /// No description provided for @terminalCustomFamilyHelper.
   ///
   /// In en, this message translates to:
-  /// **'Type an installed font family, then apply. The built-in Nerd Font fills in missing icons.'**
+  /// **'Type an installed font family, then apply. Nerd Font icons use the built-in font with ordinary fonts.'**
   String get terminalCustomFamilyHelper;
 
   /// No description provided for @terminalCustomFamilyHint.

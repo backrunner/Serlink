@@ -6,6 +6,8 @@ Upstream: https://github.com/ryanoasis/nerd-fonts/tree/v3.4.0/patched-fonts/JetB
 
 The four original TTF files are redistributed without modification. The Mono variant keeps terminal icons within a single character cell. Flutter registers this family on every platform through `pubspec.yaml`; no system installation or runtime download is needed.
 
+`lib/features/terminal/domain/nerd_font_glyphs.dart` records the private-use glyph coverage from the regular face's Unicode cmap. When upgrading these fonts, regenerate that range table and check the same coverage in all four faces. The terminal uses this map to select the bundled icon font for non-Nerd primary fonts, including fonts with conflicting private-use characters.
+
 `OFL.txt` preserves the JetBrains license and `NERD_FONTS_LICENSE.txt` preserves the Nerd Fonts license. Both notices are bundled as assets and registered in Flutter's license registry.
 
 ## SHA-256

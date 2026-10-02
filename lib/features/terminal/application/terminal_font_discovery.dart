@@ -249,10 +249,17 @@ String normalizeTerminalFontFamily(String value) {
 
 bool terminalFontFamilyHasEnhancedGlyphs(String family) {
   final normalized = normalizeTerminalFontFamily(family);
-  return normalized.contains('nerdfont') ||
-      normalized.contains('powerline') ||
-      normalized.startsWith('meslolgsnf');
+  return _normalizedFamilyIsNerdFont(normalized) ||
+      normalized.contains('powerline');
 }
+
+bool terminalFontFamilyIsNerdFont(String family) {
+  final normalized = normalizeTerminalFontFamily(family);
+  return _normalizedFamilyIsNerdFont(normalized);
+}
+
+bool _normalizedFamilyIsNerdFont(String normalized) =>
+    normalized.contains('nerdfont') || RegExp(r'nf[mp]?$').hasMatch(normalized);
 
 List<TerminalFontCandidate> _dedupeFonts(List<TerminalFontCandidate> fonts) {
   final seen = <String>{};

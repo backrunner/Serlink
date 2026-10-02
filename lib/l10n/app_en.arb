@@ -984,7 +984,7 @@
   "terminalSearchFontsHint": "Search fonts",
   "terminalSelectFontHint": "Select a font",
   "terminalCustomFamilyLabel": "Custom family",
-  "terminalCustomFamilyHelper": "Type an installed font family, then apply. The built-in Nerd Font fills in missing icons.",
+  "terminalCustomFamilyHelper": "Type an installed font family, then apply. Nerd Font icons use the built-in font with ordinary fonts.",
   "terminalCustomFamilyHint": "e.g. JetBrains Mono",
   "terminalApplyCustomFontTooltip": "Apply custom font",
   "terminalScanningFonts": "Scanning fonts",

@@ -14,7 +14,7 @@ Search the terminal buffer to locate previous output. Reconnect an interrupted s
 
 Serlink includes **JetBrainsMono Nerd Font Mono** and uses it by default for new terminal settings on every platform. Nerd Font and Powerline icons work without installing a font separately.
 
-In **Settings → Terminal → Font**, choose the built-in font or another installed Nerd Font. You can also enter an installed font family in the custom font field. Existing font choices are preserved; the built-in font fills in missing icons. Per-host terminal profiles can use a different font from the global setting.
+In **Settings → Terminal → Font**, choose the built-in font or another installed Nerd Font. You can also enter an installed font family in the custom font field. Existing font choices are preserved. With an ordinary font selected, Nerd Font icons automatically use the built-in font while regular text keeps your selected font. Per-host terminal profiles can use a different font from the global setting.
 
 ## Reuse commands
 

@@ -3,6 +3,11 @@ terminal compatibility patches.
 
 Current patches:
 
+- Pass each cell's code point to `TerminalStyle.toTextStyle` so Serlink can use
+  the bundled Nerd Font for icons while measuring and painting ordinary text
+  in the user's selected font. This also handles non-Nerd fonts with conflicting
+  private-use glyphs, where ordinary missing-glyph fallback would not activate.
+
 - Release highlight anchors on disposal and support batched selection/highlight
   changes, including linear-time removal of a group of search highlights.
 

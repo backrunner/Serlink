@@ -1983,7 +1983,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get terminalCustomFamilyHelper =>
-      'Type an installed font family, then apply. The built-in Nerd Font fills in missing icons.';
+      'Type an installed font family, then apply. Nerd Font icons use the built-in font with ordinary fonts.';
 
   @override
   String get terminalCustomFamilyHint => 'e.g. JetBrains Mono';

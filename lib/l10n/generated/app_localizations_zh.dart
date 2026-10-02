@@ -1844,7 +1844,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get terminalCustomFamilyHelper =>
-      '输入已安装的字体族，然后应用。缺失图标由内置 Nerd Font 补全。';
+      '输入已安装的字体族，然后应用。普通字体的 Nerd Font 图标自动使用内置字体。';
 
   @override
   String get terminalCustomFamilyHint => '例如 JetBrains Mono';

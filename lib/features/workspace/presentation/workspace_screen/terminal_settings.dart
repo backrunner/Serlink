@@ -710,6 +710,7 @@ class _TerminalFontPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = settings.terminalThemeFor(Theme.of(context).brightness);
+    final textStyle = settings.textStyle;
     final t = context.tokens;
     return ClipRRect(
       borderRadius: SerlinkRadii.control,
@@ -722,10 +723,21 @@ class _TerminalFontPreview extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Text(
-              _sample,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  for (final codePoint in _sample.runes)
+                    TextSpan(
+                      text: String.fromCharCode(codePoint),
+                      style: textStyle.toTextStyle(
+                        codePoint: codePoint,
+                        color: theme.foreground,
+                      ),
+                    ),
+                ],
+              ),
               maxLines: 1,
-              style: settings.textStyle.toTextStyle(color: theme.foreground),
+              style: textStyle.toTextStyle(color: theme.foreground),
             ),
           ),
         ),

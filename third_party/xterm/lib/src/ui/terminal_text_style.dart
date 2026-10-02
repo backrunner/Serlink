@@ -51,7 +51,10 @@ class TerminalStyle {
 
   final List<String> fontFamilyFallback;
 
+  /// [codePoint] identifies a terminal cell. Subclasses may select a glyph font
+  /// for that cell while keeping the primary font for cell size measurement.
   TextStyle toTextStyle({
+    int? codePoint,
     Color? color,
     Color? backgroundColor,
     bool bold = false,

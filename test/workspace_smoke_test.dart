@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/cupertino.dart';
@@ -34,6 +35,7 @@ import 'package:serlink/features/sync/application/sync_device_service.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
 import 'package:serlink/features/sync/domain/sync_provider.dart';
 import 'package:serlink/features/terminal/application/local_terminal_service.dart';
+import 'package:serlink/features/terminal/application/terminal_font_discovery.dart';
 import 'package:serlink/features/terminal/application/terminal_modifier_latch.dart';
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
 import 'package:serlink/features/vault/application/in_memory_vault_service.dart';
@@ -50,9 +52,11 @@ import 'package:xterm/xterm.dart';
 
 part 'workspace_smoke_test_fakes.dart';
 part 'workspace_smoke_test_host_groups.dart';
+part 'workspace_smoke_test_terminal_fonts.dart';
 
 void main() {
   _hostGroupTests();
+  _terminalFontTests();
   testWidgets(
     'iOS snippet and credential editors use modal navigation actions',
     (tester) async {
@@ -3178,6 +3182,8 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   IdentityRepository? identityRepository,
   List<SyncDeviceMetadata>? syncDevices,
   bool protectBackground = false,
+  AppLanguageSettingsRepository? languageRepository,
+  TerminalFontDiscovery? fontDiscovery,
 }) async {
   final database = SerlinkDatabase(NativeDatabase.memory());
   final transferQueue = TransferQueueController();
@@ -3213,6 +3219,12 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
     ProviderScope(
       overrides: [
         platformCapabilitiesProvider.overrideWithValue(resolvedCapabilities),
+        if (languageRepository != null)
+          appLanguageSettingsRepositoryProvider.overrideWithValue(
+            languageRepository,
+          ),
+        if (fontDiscovery != null)
+          terminalFontDiscoveryProvider.overrideWithValue(fontDiscovery),
         if (resolvedCapabilities.cloudKitSync) ...[
           cloudKitAvailabilityCheckProvider.overrideWithValue(
             () async => false,

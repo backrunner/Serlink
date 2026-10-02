@@ -3484,6 +3484,12 @@ abstract class AppLocalizations {
   /// **'Font'**
   String get terminalFontLabel;
 
+  /// No description provided for @terminalBundledFont.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in'**
+  String get terminalBundledFont;
+
   /// No description provided for @terminalSearchFontsHint.
   ///
   /// In en, this message translates to:
@@ -3505,7 +3511,7 @@ abstract class AppLocalizations {
   /// No description provided for @terminalCustomFamilyHelper.
   ///
   /// In en, this message translates to:
-  /// **'Type an installed font family, then apply.'**
+  /// **'Type an installed font family, then apply. The built-in Nerd Font fills in missing icons.'**
   String get terminalCustomFamilyHelper;
 
   /// No description provided for @terminalCustomFamilyHint.

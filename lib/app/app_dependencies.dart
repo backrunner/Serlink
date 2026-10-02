@@ -1798,12 +1798,7 @@ class TerminalDisplaySettingsController
       // A locked or unavailable vault should not block terminal startup.
     }
 
-    try {
-      final catalog = await ref.watch(terminalFontCatalogProvider.future);
-      return TerminalDisplaySettings(fontFamily: catalog.preferredFontFamily);
-    } on Object {
-      return const TerminalDisplaySettings();
-    }
+    return const TerminalDisplaySettings();
   }
 
   void setTheme(SerlinkTerminalThemeId themeId) {

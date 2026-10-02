@@ -101,6 +101,20 @@ flutter:
 
   assets:
     - assets/brands/
+    - assets/fonts/jetbrains_mono_nerd/OFL.txt
+    - assets/fonts/jetbrains_mono_nerd/NERD_FONTS_LICENSE.txt
+
+  fonts:
+    - family: JetBrainsMono Nerd Font Mono
+      fonts:
+        - asset: assets/fonts/jetbrains_mono_nerd/JetBrainsMonoNerdFontMono-Regular.ttf
+        - asset: assets/fonts/jetbrains_mono_nerd/JetBrainsMonoNerdFontMono-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/jetbrains_mono_nerd/JetBrainsMonoNerdFontMono-Italic.ttf
+          style: italic
+        - asset: assets/fonts/jetbrains_mono_nerd/JetBrainsMonoNerdFontMono-BoldItalic.ttf
+          weight: 700
+          style: italic
 
   # To add assets to your application, add an assets section, like this:
   # assets:

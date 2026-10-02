@@ -2,6 +2,10 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../domain/terminal_font_family.dart';
+
+export '../domain/terminal_font_family.dart';
+
 class TerminalFontCandidate {
   const TerminalFontCandidate({
     required this.family,
@@ -25,7 +29,7 @@ class TerminalFontCandidate {
 
   bool get isTerminalOptimized {
     final normalized = normalizeTerminalFontFamily(family);
-    return normalized == defaultTerminalFontFamily ||
+    return normalized == systemTerminalFontFamily ||
         normalized.contains('mono') ||
         normalized.contains('code') ||
         normalized.contains('hack') ||
@@ -62,6 +66,11 @@ class TerminalFontCatalog {
 
   TerminalFontCandidate get preferredFont {
     for (final font in fonts) {
+      if (font.isBuiltIn && font.isNerdFont && !font.isSymbolOnly) {
+        return font;
+      }
+    }
+    for (final font in fonts) {
       if (font.isNerdFont && !font.isSymbolOnly && font.isTerminalOptimized) {
         return font;
       }
@@ -82,7 +91,7 @@ class TerminalFontCatalog {
       }
     }
     return fonts.firstWhere(
-      (font) => font.family == defaultTerminalFontFamily,
+      (font) => font.family == systemTerminalFontFamily,
       orElse: () => _fallbackFontCandidates.first,
     );
   }
@@ -133,7 +142,13 @@ class TerminalFontDiscovery {
     }
 
     final catalog = TerminalFontCatalog(
-      fonts: _dedupeFonts([...detected, ..._fallbackFontCandidates]),
+      // Keep the bundled family first so a system installation with the same
+      // name cannot hide its built-in status or change the default.
+      fonts: _dedupeFonts([
+        _fallbackFontCandidates.first,
+        ...detected,
+        ..._fallbackFontCandidates,
+      ]),
     );
     if (fontDirectories == null) {
       _cachedCatalog = catalog;
@@ -142,10 +157,13 @@ class TerminalFontDiscovery {
   }
 }
 
-const defaultTerminalFontFamily = 'monospace';
-
 const _fallbackFontCandidates = [
-  TerminalFontCandidate(family: defaultTerminalFontFamily, isBuiltIn: true),
+  TerminalFontCandidate(
+    family: bundledTerminalFontFamily,
+    isNerdFont: true,
+    isBuiltIn: true,
+  ),
+  TerminalFontCandidate(family: systemTerminalFontFamily, isBuiltIn: true),
   TerminalFontCandidate(family: 'SF Mono'),
   TerminalFontCandidate(family: 'Menlo'),
   TerminalFontCandidate(family: 'Monaco'),
@@ -187,6 +205,7 @@ const _knownTerminalFonts = [
 List<String> terminalFontFallbackFamilies(String primaryFamily) {
   final seen = {normalizeTerminalFontFamily(primaryFamily)};
   final candidates = [
+    bundledTerminalFontFamily,
     'MesloLGS NF',
     'JetBrainsMono Nerd Font',
     'JetBrainsMono Nerd Font Mono',
@@ -215,7 +234,7 @@ List<String> terminalFontFallbackFamilies(String primaryFamily) {
     'Consolas',
     'Liberation Mono',
     'Courier New',
-    defaultTerminalFontFamily,
+    systemTerminalFontFamily,
     'sans-serif',
   ];
   return [

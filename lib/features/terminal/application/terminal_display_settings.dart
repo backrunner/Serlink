@@ -150,7 +150,7 @@ class _SerlinkTerminalStyle extends TerminalStyle {
 double _glyphOverhangReserveFor(String fontFamily, double fontSize) {
   final enhancedGlyphFont =
       terminalFontFamilyHasEnhancedGlyphs(fontFamily) ||
-      normalizeTerminalFontFamily(fontFamily) == defaultTerminalFontFamily;
+      normalizeTerminalFontFamily(fontFamily) == systemTerminalFontFamily;
   if (!enhancedGlyphFont) {
     return 0;
   }

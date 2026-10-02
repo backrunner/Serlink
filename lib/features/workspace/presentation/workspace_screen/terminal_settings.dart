@@ -256,9 +256,8 @@ class _TerminalSettingsDialogState
         child: Scrollbar(
           controller: _scrollController,
           child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(
-              context,
-            ).copyWith(scrollbars: false),
+            behavior: ScrollConfiguration.of(context)
+                .copyWith(scrollbars: false),
             child: SingleChildScrollView(
               controller: _scrollController,
               physics: const ClampingScrollPhysics(),
@@ -277,6 +276,7 @@ class _TerminalSettingsDialogState
 
     final hostAction = widget.hostId != null && hostSettings == null
         ? SerlinkTextButton(
+            size: SerlinkButtonSize.sm,
             onPressed: () =>
                 workspaceController.saveTerminalDisplaySettingsForHost(
                   widget.tabId,
@@ -287,6 +287,7 @@ class _TerminalSettingsDialogState
           )
         : widget.hostId != null && hostSettings != null
         ? SerlinkTextButton(
+            size: SerlinkButtonSize.sm,
             onPressed: () =>
                 workspaceController.resetTerminalDisplaySettingsForHost(
                   widget.tabId,
@@ -331,27 +332,36 @@ class _TerminalSettingsDialogState
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: Text(
-                            l10n.terminalSettingsTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: t.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                l10n.terminalSettingsTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: t.textPrimary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            SerlinkFilledButton(
+                              size: SerlinkButtonSize.sm,
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: Text(l10n.doneAction),
+                            ),
+                          ],
+                        ),
+                        if (hostAction != null)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: hostAction,
                           ),
-                        ),
-                        ?hostAction,
-                        if (hostAction != null) const SizedBox(width: 6),
-                        SerlinkFilledButton(
-                          size: SerlinkButtonSize.sm,
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: Text(l10n.doneAction),
-                        ),
                       ],
                     ),
                   ),
@@ -591,7 +601,9 @@ class _TerminalFontPickerState extends State<_TerminalFontPicker> {
               for (final font in fonts)
                 SerlinkSelectItem(
                   value: font.family,
-                  label: font.label,
+                  label: font.isBuiltIn && font.isNerdFont
+                      ? '${l10n.terminalBundledFont}  ·  ${font.family}'
+                      : font.label,
                   icon: _terminalFontIcon(font),
                 ),
             ],
@@ -656,24 +668,33 @@ class _TerminalFontStatus extends StatelessWidget {
         ? l10n.terminalNerdFontReady
         : l10n.terminalNoNerdFont;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          hasNerdFont ? Icons.check_circle : Icons.circle_outlined,
-          size: 13,
-          color: color,
-        ),
-        const SizedBox(width: 5),
-        Text(
-          text,
-          style: TextStyle(
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: math.min(180, MediaQuery.sizeOf(context).width * 0.45),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            hasNerdFont ? Icons.check_circle : Icons.circle_outlined,
+            size: 13,
             color: color,
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
           ),
-        ),
-      ],
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: color,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -681,7 +702,8 @@ class _TerminalFontStatus extends StatelessWidget {
 class _TerminalFontPreview extends StatelessWidget {
   const _TerminalFontPreview({required this.settings});
 
-  static const _sample = 'serlink    ~/vault    main  ❯  echo ready';
+  static const _sample =
+      'serlink  \u{f120}    \u{f07b} ~/vault    \u{e0a0} main  ❯  echo ready';
 
   final TerminalDisplaySettings settings;
 

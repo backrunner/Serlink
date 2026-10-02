@@ -1831,6 +1831,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get terminalFontLabel => '字体';
 
   @override
+  String get terminalBundledFont => '内置';
+
+  @override
   String get terminalSearchFontsHint => '搜索字体';
 
   @override
@@ -1840,7 +1843,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get terminalCustomFamilyLabel => '自定义字体族';
 
   @override
-  String get terminalCustomFamilyHelper => '输入已安装的字体族，然后应用。';
+  String get terminalCustomFamilyHelper =>
+      '输入已安装的字体族，然后应用。缺失图标由内置 Nerd Font 补全。';
 
   @override
   String get terminalCustomFamilyHint => '例如 JetBrains Mono';

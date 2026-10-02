@@ -114,7 +114,8 @@ void _terminalFontTests() {
                 widget.decoration?.hintText == l10n.terminalCustomFamilyHint,
           );
           await tester.ensureVisible(custom);
-          await tester.enterText(custom, '  Hack Nerd Font Mono  ');
+          final customFamily = mobile ? 'Menlo' : 'Hack Nerd Font Mono';
+          await tester.enterText(custom, '  $customFamily  ');
           if (mobile) {
             tester.view.viewInsets = const FakeViewPadding(bottom: 300);
             await tester.pumpAndSettle();
@@ -127,8 +128,25 @@ void _terminalFontTests() {
           await tester.pumpAndSettle();
           expect(
             container.read(terminalDisplaySettingsProvider).value!.fontFamily,
-            'Hack Nerd Font Mono',
+            customFamily,
           );
+          final preview = tester.widget<Text>(
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is Text &&
+                  (widget.textSpan?.toPlainText().startsWith('serlink') ??
+                      false),
+            ),
+          );
+          final spans = (preview.textSpan! as TextSpan).children!
+              .cast<TextSpan>();
+          for (final icon in spans.where((span) => span.text == '\u{e0b0}')) {
+            expect(
+              icon.style!.fontFamily,
+              mobile ? bundledTerminalFontFamily : customFamily,
+            );
+          }
+          expect(spans.first.style!.fontFamily, customFamily);
           await tester.tap(find.text(l10n.doneAction));
           await tester.pumpAndSettle();
           expect(
@@ -136,20 +154,25 @@ void _terminalFontTests() {
                 .widget<TerminalView>(find.byType(TerminalView).first)
                 .textStyle
                 .fontFamily,
-            'Hack Nerd Font Mono',
+            customFamily,
           );
 
           // Reopen, create a host override, then change it without changing global settings.
           await openSettings();
-          expect(pickerFor('Hack Nerd Font Mono'), findsOneWidget);
+          expect(pickerFor(customFamily), findsOneWidget);
           await tester.tap(find.text(l10n.terminalSaveForHostAction));
           await tester.pumpAndSettle();
-          final hostPicker = pickerFor(
-            'Hack Nerd Font Mono',
-            hostProfile: true,
-          );
+          final hostPicker = pickerFor(customFamily, hostProfile: true);
           await tester.ensureVisible(hostPicker);
+          await tester.pumpAndSettle();
           await tester.tap(hostPicker);
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find
+                .descendant(of: hostPicker, matching: find.byType(EditableText))
+                .last,
+            'JetBrainsMono Nerd Font Mono',
+          );
           await tester.pumpAndSettle();
           await tester.tap(find.text(bundledLabel).last);
           await tester.pumpAndSettle();
@@ -161,11 +184,11 @@ void _terminalFontTests() {
           );
           expect(
             container.read(terminalDisplaySettingsProvider).value!.fontFamily,
-            'Hack Nerd Font Mono',
+            customFamily,
           );
           await tester.tap(find.text(l10n.terminalUseGlobalAction));
           await tester.pumpAndSettle();
-          expect(pickerFor('Hack Nerd Font Mono'), findsOneWidget);
+          expect(pickerFor(customFamily), findsOneWidget);
           await tester.tap(find.text(l10n.doneAction));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);

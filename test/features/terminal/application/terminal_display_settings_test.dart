@@ -71,6 +71,42 @@ void main() {
     expect(settings.textStyle.toTextStyle().letterSpacing, 0);
   });
 
+  test('Nerd Font icons use the bundle while ordinary text keeps the selected font', () {
+    for (final family in ['Menlo', 'monospace', 'Example for Powerline']) {
+      final style = TerminalDisplaySettings(fontFamily: family).textStyle;
+      for (final codePoint in [0xe0b0, 0xf120, 0xf0318]) {
+        expect(
+          style.toTextStyle(codePoint: codePoint).fontFamily,
+          bundledTerminalFontFamily,
+        );
+      }
+      // Latin, CJK, emoji and private-use slots outside the bundled icon map.
+      for (final codePoint in [
+        0x41,
+        0x4e2d,
+        0x1f600,
+        0xe00b,
+        0xf1af1,
+        0x100000,
+      ]) {
+        expect(style.toTextStyle(codePoint: codePoint).fontFamily, family);
+      }
+      expect(style.toTextStyle().fontFamily, family);
+    }
+  });
+
+  test('selected Nerd Font remains primary for icon glyphs', () {
+    for (final family in [
+      'Hack Nerd Font Mono',
+      'MesloLGS NF',
+      'Iosevka NFM',
+      'BlexMono NF',
+    ]) {
+      final style = TerminalDisplaySettings(fontFamily: family).textStyle;
+      expect(style.toTextStyle(codePoint: 0xe0b0).fontFamily, family);
+    }
+  });
+
   test('full Nerd Font fallbacks are preferred before symbol-only fonts', () {
     final fallbacks = terminalFontFallbackFamilies('JetBrains Mono');
 
@@ -81,9 +117,8 @@ void main() {
   });
 
   test('bundled font is ready without any system font installation', () async {
-    final catalog = await const TerminalFontDiscovery(
-      fontDirectories: [],
-    ).discover();
+    final catalog = await const TerminalFontDiscovery(fontDirectories: [])
+        .discover();
 
     expect(catalog.hasNerdFont, isTrue);
     expect(catalog.preferredFontFamily, bundledTerminalFontFamily);
@@ -155,9 +190,8 @@ void main() {
         await directory.delete(recursive: true);
       }
     });
-    await File(
-      p.join(directory.path, 'JetBrainsMonoNerdFont-Regular.ttf'),
-    ).create();
+    await File(p.join(directory.path, 'JetBrainsMonoNerdFont-Regular.ttf'))
+        .create();
 
     final catalog = await TerminalFontDiscovery(
       fontDirectories: [directory.path],
@@ -201,9 +235,8 @@ void main() {
   test('system duplicate retains the bundled font metadata', () async {
     final directory = await Directory.systemTemp.createTemp('serlink_fonts_');
     addTearDown(() => directory.delete(recursive: true));
-    await File(
-      p.join(directory.path, 'JetBrainsMonoNerdFontMono-Regular.ttf'),
-    ).create();
+    await File(p.join(directory.path, 'JetBrainsMonoNerdFontMono-Regular.ttf'))
+        .create();
     final catalog = await TerminalFontDiscovery(
       fontDirectories: [directory.path],
     ).discover();

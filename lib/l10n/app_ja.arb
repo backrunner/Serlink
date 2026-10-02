@@ -568,7 +568,7 @@
   "terminalSearchFontsHint": "フォントを検索",
   "terminalSelectFontHint": "フォントを選択",
   "terminalCustomFamilyLabel": "カスタムファミリー",
-  "terminalCustomFamilyHelper": "インストール済みフォントファミリーを入力して適用します。不足するアイコンは内蔵 Nerd Font で補完します。",
+  "terminalCustomFamilyHelper": "インストール済みフォントファミリーを入力して適用します。通常フォントの Nerd Font アイコンは内蔵フォントで表示します。",
   "terminalCustomFamilyHint": "例: JetBrains Mono",
   "terminalApplyCustomFontTooltip": "カスタムフォントを適用",
   "terminalScanningFonts": "フォントをスキャン中",

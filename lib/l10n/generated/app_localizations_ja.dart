@@ -1865,7 +1865,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get terminalCustomFamilyHelper =>
-      'インストール済みフォントファミリーを入力して適用します。不足するアイコンは内蔵 Nerd Font で補完します。';
+      'インストール済みフォントファミリーを入力して適用します。通常フォントの Nerd Font アイコンは内蔵フォントで表示します。';
 
   @override
   String get terminalCustomFamilyHint => '例: JetBrains Mono';

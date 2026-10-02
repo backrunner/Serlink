@@ -37,6 +37,10 @@ void main() {
     );
 
     expect(
+      settings.textStyle.fontFamilyFallback.first,
+      bundledTerminalFontFamily,
+    );
+    expect(
       settings.textStyle.fontFamilyFallback,
       contains('Symbols Nerd Font Mono'),
     );
@@ -73,6 +77,30 @@ void main() {
     expect(
       fallbacks.indexOf('JetBrainsMono Nerd Font'),
       lessThan(fallbacks.indexOf('Symbols Nerd Font Mono')),
+    );
+  });
+
+  test('bundled font is ready without any system font installation', () async {
+    final catalog = await const TerminalFontDiscovery(
+      fontDirectories: [],
+    ).discover();
+
+    expect(catalog.hasNerdFont, isTrue);
+    expect(catalog.preferredFontFamily, bundledTerminalFontFamily);
+    expect(catalog.preferredFont.isBuiltIn, isTrue);
+    expect(
+      TerminalFontCatalog.fallback().preferredFontFamily,
+      bundledTerminalFontFamily,
+    );
+    const settings = TerminalDisplaySettings();
+    expect(settings.fontFamily, bundledTerminalFontFamily);
+    expect(
+      settings.textStyle.fontFamilyFallback,
+      isNot(contains(bundledTerminalFontFamily)),
+    );
+    expect(
+      TerminalDisplaySettings.fromJson({}).fontFamily,
+      bundledTerminalFontFamily,
     );
   });
 
@@ -136,10 +164,11 @@ void main() {
     ).discover();
 
     expect(catalog.hasNerdFont, isTrue);
-    expect(catalog.preferredFontFamily, 'JetBrainsMono Nerd Font');
+    expect(catalog.containsFamily('JetBrainsMono Nerd Font'), isTrue);
+    expect(catalog.preferredFontFamily, bundledTerminalFontFamily);
   });
 
-  test('global terminal settings default to discovered Nerd Font', () async {
+  test('global terminal settings default to bundled Nerd Font', () async {
     final directory = await Directory.systemTemp.createTemp(
       'serlink_terminal_fonts_',
     );
@@ -166,7 +195,51 @@ void main() {
       terminalDisplaySettingsProvider.future,
     );
 
-    expect(settings.fontFamily, 'Hack Nerd Font');
+    expect(settings.fontFamily, bundledTerminalFontFamily);
+  });
+
+  test('system duplicate retains the bundled font metadata', () async {
+    final directory = await Directory.systemTemp.createTemp('serlink_fonts_');
+    addTearDown(() => directory.delete(recursive: true));
+    await File(
+      p.join(directory.path, 'JetBrainsMonoNerdFontMono-Regular.ttf'),
+    ).create();
+    final catalog = await TerminalFontDiscovery(
+      fontDirectories: [directory.path],
+    ).discover();
+    final matches = catalog.fonts.where(
+      (font) => font.family == bundledTerminalFontFamily,
+    );
+    expect(matches, hasLength(1));
+    expect(matches.single.isBuiltIn, isTrue);
+  });
+
+  test('saved ordinary and custom Nerd Font choices are preserved', () async {
+    for (final family in ['monospace', 'Menlo', 'Hack Nerd Font Mono']) {
+      final repository = _FakeTerminalDisplaySettingsRepository()
+        ..settings = TerminalDisplaySettings(fontFamily: family);
+      final container = ProviderContainer(
+        overrides: [
+          terminalDisplaySettingsRepositoryProvider.overrideWithValue(
+            repository,
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final settings = await container.read(
+        terminalDisplaySettingsProvider.future,
+      );
+      expect(settings.fontFamily, family);
+      expect(
+        settings.textStyle.fontFamilyFallback.first,
+        bundledTerminalFontFamily,
+      );
+      container
+          .read(terminalDisplaySettingsProvider.notifier)
+          .setFontFamily(bundledTerminalFontFamily);
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.settings!.fontFamily, bundledTerminalFontFamily);
+    }
   });
 
   test('terminal display settings round trip through json', () {

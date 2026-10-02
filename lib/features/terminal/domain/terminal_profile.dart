@@ -1,3 +1,5 @@
+import 'terminal_font_family.dart';
+
 class TerminalProfile {
   const TerminalProfile({
     required this.id,
@@ -16,7 +18,7 @@ class TerminalProfile {
   static const defaultProfile = TerminalProfile(
     id: 'serlink-dark',
     name: 'Serlink Dark',
-    fontFamily: 'monospace',
+    fontFamily: defaultTerminalFontFamily,
     fontSize: 13,
     scrollbackLines: 10000,
   );

@@ -1852,6 +1852,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get terminalFontLabel => 'フォント';
 
   @override
+  String get terminalBundledFont => '内蔵';
+
+  @override
   String get terminalSearchFontsHint => 'フォントを検索';
 
   @override
@@ -1861,7 +1864,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String get terminalCustomFamilyLabel => 'カスタムファミリー';
 
   @override
-  String get terminalCustomFamilyHelper => 'インストール済みフォントファミリーを入力して適用します。';
+  String get terminalCustomFamilyHelper =>
+      'インストール済みフォントファミリーを入力して適用します。不足するアイコンは内蔵 Nerd Font で補完します。';
 
   @override
   String get terminalCustomFamilyHint => '例: JetBrains Mono';

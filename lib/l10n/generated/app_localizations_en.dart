@@ -1970,6 +1970,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get terminalFontLabel => 'Font';
 
   @override
+  String get terminalBundledFont => 'Built-in';
+
+  @override
   String get terminalSearchFontsHint => 'Search fonts';
 
   @override
@@ -1980,7 +1983,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get terminalCustomFamilyHelper =>
-      'Type an installed font family, then apply.';
+      'Type an installed font family, then apply. The built-in Nerd Font fills in missing icons.';
 
   @override
   String get terminalCustomFamilyHint => 'e.g. JetBrains Mono';

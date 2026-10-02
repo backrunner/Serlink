@@ -32,16 +32,18 @@ class SerlinkLabeledField extends StatelessWidget {
           padding: const EdgeInsets.only(left: 2, bottom: 7),
           child: Row(
             children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: t.textSecondary,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.2,
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: t.textSecondary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                  ),
                 ),
               ),
-              if (trailing != null) ...[const Spacer(), trailing!],
+              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
             ],
           ),
         ),

@@ -1,5 +1,5 @@
 ---
-title: "Serlink を入手"
+title: "ダウンロード"
 description: "公開状況、配布方式、ソースからの実行。"
 ---
 

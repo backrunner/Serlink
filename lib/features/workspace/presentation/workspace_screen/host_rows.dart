@@ -141,9 +141,22 @@ class _HostRow extends StatelessWidget {
       ),
     );
     if (mobile) {
-      return _SwipeHostActionsRow(
-        onEdit: onEdit,
-        onDelete: onDelete,
+      return _SwipeActionsRow(
+        actions: [
+          _SwipeRowAction(
+            keyPrefix: 'mobile-host-edit',
+            label: l10n.hostEditMenu,
+            icon: Icons.edit_outlined,
+            onPressed: onEdit,
+          ),
+          _SwipeRowAction(
+            keyPrefix: 'mobile-host-delete',
+            label: l10n.hostsDeleteAction,
+            icon: Icons.delete_outline,
+            onPressed: onDelete,
+            danger: true,
+          ),
+        ],
         child: row,
       );
     }
@@ -167,167 +180,6 @@ class _HostRow extends StatelessWidget {
         ),
       ],
       child: row,
-    );
-  }
-}
-
-class _SwipeHostActionsRow extends StatefulWidget {
-  const _SwipeHostActionsRow({
-    required this.child,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  static const double _actionGap = SerlinkSpacing.sm;
-  static const double revealWidth = _SwipeHostAction.side * 2 + _actionGap * 2;
-
-  final Widget child;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  State<_SwipeHostActionsRow> createState() => _SwipeHostActionsRowState();
-}
-
-class _SwipeHostActionsRowState extends State<_SwipeHostActionsRow> {
-  double _dragOffset = 0;
-
-  void _handleDragUpdate(DragUpdateDetails details) {
-    final next = (_dragOffset + details.delta.dx).clamp(
-      -_SwipeHostActionsRow.revealWidth,
-      0.0,
-    );
-    if (next == _dragOffset) {
-      return;
-    }
-    setState(() => _dragOffset = next);
-  }
-
-  void _handleDragEnd(DragEndDetails details) {
-    final velocity = details.velocity.pixelsPerSecond.dx;
-    final open =
-        velocity < -220 ||
-        (_dragOffset < -_SwipeHostActionsRow.revealWidth * 0.45 &&
-            velocity < 220);
-    setState(() => _dragOffset = open ? -_SwipeHostActionsRow.revealWidth : 0);
-  }
-
-  void _handleEdit() {
-    setState(() => _dragOffset = 0);
-    widget.onEdit();
-  }
-
-  void _handleDelete() {
-    setState(() => _dragOffset = 0);
-    widget.onDelete();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: SerlinkRadii.dialog,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _SwipeHostAction(
-                      buttonKey: const ValueKey('mobile-host-edit-button'),
-                      onPressed: _handleEdit,
-                      icon: Icons.edit_outlined,
-                      iconKey: const ValueKey('mobile-host-edit-icon'),
-                      semanticsLabel: context.l10n.hostEditMenu,
-                    ),
-                    const SizedBox(width: _SwipeHostActionsRow._actionGap),
-                    _SwipeHostAction(
-                      buttonKey: const ValueKey('mobile-host-delete-button'),
-                      onPressed: _handleDelete,
-                      icon: Icons.delete_outline,
-                      iconKey: const ValueKey('mobile-host-delete-icon'),
-                      semanticsLabel: context.l10n.hostsDeleteAction,
-                      danger: true,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Transform.translate(
-            offset: Offset(_dragOffset, 0),
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onHorizontalDragUpdate: _handleDragUpdate,
-              onHorizontalDragEnd: _handleDragEnd,
-              child: widget.child,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SwipeHostAction extends StatelessWidget {
-  const _SwipeHostAction({
-    required this.buttonKey,
-    required this.onPressed,
-    required this.icon,
-    required this.iconKey,
-    required this.semanticsLabel,
-    this.danger = false,
-  });
-
-  static const double side = 44;
-
-  final Key buttonKey;
-  final VoidCallback onPressed;
-  final IconData icon;
-  final Key iconKey;
-  final String semanticsLabel;
-  final bool danger;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final background = danger ? t.statusDangerFill : t.surfaceRaised;
-    final foreground = danger ? t.onAccent : t.textPrimary;
-    final borderColor = danger
-        ? t.statusDanger.withValues(alpha: 0.7)
-        : t.borderStrong;
-    return Align(
-      alignment: Alignment.center,
-      child: Semantics(
-        button: true,
-        label: semanticsLabel,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: SerlinkRadii.dialog,
-            border: Border.all(color: borderColor),
-            boxShadow: serlinkShadow(t, elevation: 6, opacity: 0.45),
-          ),
-          child: SerlinkPressable(
-            key: buttonKey,
-            onTap: onPressed,
-            borderRadius: SerlinkRadii.dialog,
-            hoverColor: danger
-                ? Colors.white.withValues(alpha: 0.08)
-                : t.accentPrimary.withValues(alpha: 0.08),
-            pressedColor: danger
-                ? Colors.black.withValues(alpha: 0.14)
-                : t.accentPrimary.withValues(alpha: 0.14),
-            child: SizedBox.square(
-              dimension: side,
-              child: Icon(icon, key: iconKey, size: 20, color: foreground),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../../core/ids/entity_id.dart';
 import '../domain/sftp_entry.dart';
 
@@ -14,11 +16,50 @@ class SftpFilePreview {
     required this.text,
     required this.bytesRead,
     required this.truncated,
+    this.isText = true,
   });
+
+  factory SftpFilePreview.fromBytes(
+    List<int> bytes, {
+    required bool truncated,
+  }) {
+    final buffer = StringBuffer();
+    final isPdf =
+        bytes.length >= 5 &&
+        ascii.decode(bytes.take(5).toList(), allowInvalid: true) == '%PDF-';
+    var isText =
+        !isPdf &&
+        !bytes.any(
+          (byte) =>
+              (byte < 32 && byte != 9 && byte != 10 && byte != 13) ||
+              byte == 127,
+        );
+    if (isText) {
+      try {
+        final decoder = utf8.decoder.startChunkedConversion(
+          StringConversionSink.fromStringSink(buffer),
+        );
+        decoder.add(bytes);
+        // A bounded preview may end halfway through a UTF-8 character. Keep
+        // the incomplete tail buffered instead of turning it into replacement
+        // characters, while still rejecting malformed bytes elsewhere.
+        if (!truncated) decoder.close();
+      } on FormatException {
+        isText = false;
+      }
+    }
+    return SftpFilePreview(
+      text: isText ? buffer.toString() : '',
+      bytesRead: bytes.length,
+      truncated: truncated,
+      isText: isText,
+    );
+  }
 
   final String text;
   final int bytesRead;
   final bool truncated;
+  final bool isText;
 }
 
 class TransferProgress {

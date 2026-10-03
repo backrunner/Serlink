@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
@@ -47,16 +48,23 @@ import 'package:serlink/features/workspace/presentation/workspace_screen.dart';
 import 'package:serlink/features/settings/application/app_language_settings.dart';
 import 'package:serlink/l10n/l10n.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
+import 'package:serlink/platform/document_gateway.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 import 'package:xterm/xterm.dart';
 
 part 'workspace_smoke_test_fakes.dart';
 part 'workspace_smoke_test_host_groups.dart';
 part 'workspace_smoke_test_terminal_fonts.dart';
+part 'workspace_smoke_test_sftp_mobile.dart';
+part 'workspace_smoke_test_transfer_swipe.dart';
+part 'workspace_smoke_test_transfer_menu.dart';
 
 void main() {
   _hostGroupTests();
   _terminalFontTests();
+  _sftpMobileTests();
+  _mobileTransferSwipeTests();
+  _desktopTransferMenuTests();
   testWidgets(
     'iOS snippet and credential editors use modal navigation actions',
     (tester) async {
@@ -1007,7 +1015,9 @@ void main() {
     expect(find.text('Generated key'), findsOneWidget);
   });
 
-  testWidgets('iOS offers Biometric unlock after vault creation', (tester) async {
+  testWidgets('iOS offers Biometric unlock after vault creation', (
+    tester,
+  ) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
     addTearDown(tester.view.resetPhysicalSize);
@@ -2133,6 +2143,10 @@ void main() {
   ) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(390, 844);
+    tester.view.padding = const FakeViewPadding(top: 59, bottom: 34);
+    tester.view.viewPadding = const FakeViewPadding(top: 59, bottom: 34);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
@@ -2177,6 +2191,13 @@ void main() {
     );
     expect(find.text('app.env'), findsOneWidget);
     expect(find.text('rw-r-----'), findsOneWidget);
+    final listRect = tester.getRect(
+      find.byKey(const ValueKey('sftp-entry-list')),
+    );
+    expect(
+      tester.getTopLeft(find.text('app.env')).dy - listRect.top,
+      lessThan(20),
+    );
 
     for (final finder in [
       find.byKey(const ValueKey('sftp-path-display')),
@@ -3184,6 +3205,7 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   bool protectBackground = false,
   AppLanguageSettingsRepository? languageRepository,
   TerminalFontDiscovery? fontDiscovery,
+  DocumentGateway? documentGateway,
 }) async {
   final database = SerlinkDatabase(NativeDatabase.memory());
   final transferQueue = TransferQueueController();
@@ -3219,6 +3241,8 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
     ProviderScope(
       overrides: [
         platformCapabilitiesProvider.overrideWithValue(resolvedCapabilities),
+        if (documentGateway != null)
+          documentGatewayProvider.overrideWithValue(documentGateway),
         if (languageRepository != null)
           appLanguageSettingsRepositoryProvider.overrideWithValue(
             languageRepository,
@@ -3232,8 +3256,8 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
           cloudKitSyncProviderFactoryProvider.overrideWithValue(
             () => _EmptySyncProvider(),
           ),
-          cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
         ],
+        cloudKitSyncChangesProvider.overrideWith((_) => const Stream.empty()),
         serlinkDatabaseProvider.overrideWithValue(database),
         vaultCryptoConfigProvider.overrideWithValue(
           const VaultCryptoConfig.testing(),

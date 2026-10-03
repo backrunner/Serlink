@@ -459,19 +459,15 @@ class _DialogStateView extends StatelessWidget {
             Text(
               state.title,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: t.textPrimary,
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(context).textTheme.titleSmall
+                  ?.copyWith(color: t.textPrimary, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
             Text(
               state.body,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: t.textSecondary,
-                height: 1.4,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: t.textSecondary, height: 1.4),
             ),
           ],
         ),
@@ -503,7 +499,7 @@ const double _mobileBottomNavigationSafeAreaFraction = 2 / 3;
 
 _OverlayToastHandle? _activeToast;
 
-void _showSnackBar(BuildContext context, String message) {
+void _showSnackBar(BuildContext context, String message, {Duration? duration}) {
   final t = context.tokens;
   final l10n = context.l10n;
   final bottomMargin = _snackBarMargin + _snackBarBottomReservedHeight(context);
@@ -533,6 +529,7 @@ void _showSnackBar(BuildContext context, String message) {
       child: _OverlayToast(
         message: message,
         messageStyle: messageStyle,
+        duration: duration ?? _snackBarDisplayDuration,
         closeTooltip: l10n.closeAction,
         onDismissed: () {
           handle.dismissImmediately();
@@ -567,12 +564,14 @@ class _OverlayToast extends StatefulWidget {
   const _OverlayToast({
     required this.message,
     required this.messageStyle,
+    required this.duration,
     required this.closeTooltip,
     required this.onDismissed,
   });
 
   final String message;
   final TextStyle messageStyle;
+  final Duration duration;
   final String closeTooltip;
   final VoidCallback onDismissed;
 
@@ -594,7 +593,7 @@ class _OverlayToastState extends State<_OverlayToast>
   void initState() {
     super.initState();
     unawaited(_controller.forward());
-    _autoDismissTimer = Timer(_snackBarDisplayDuration, _dismiss);
+    _autoDismissTimer = Timer(widget.duration, _dismiss);
   }
 
   @override
@@ -751,9 +750,8 @@ class _DynamicStatusText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final style = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: t.textSecondary);
+    final style = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: t.textSecondary);
     return Wrap(
       key: const ValueKey('dynamic-status-text'),
       alignment: WrapAlignment.start,

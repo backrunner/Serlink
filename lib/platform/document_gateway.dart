@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -20,6 +20,28 @@ class DocumentGateway {
   const DocumentGateway({required this.capabilities});
 
   final PlatformCapabilities capabilities;
+
+  /// Presents the system's file actions on iOS, or opens the desktop handler.
+  /// A successful result means the system UI was presented, not that the user
+  /// selected an application. Dismissing that UI is not an error.
+  Future<bool> openLocalFile(String path) async {
+    if (!capabilities.openLocalFile) {
+      return false;
+    }
+    if (capabilities.isIOS) {
+      return await const MethodChannel('serlink/platform')
+              .invokeMethod<bool>('openLocalFile', {'path': path}) ??
+          false;
+    }
+    final (command, arguments) = switch (capabilities.operatingSystem) {
+      'macos' => ('open', [path]),
+      'windows' => ('explorer', [path]),
+      'linux' => ('xdg-open', [path]),
+      _ => throw UnsupportedError('Opening files is not supported.'),
+    };
+    await Process.start(command, arguments, mode: ProcessStartMode.detached);
+    return true;
+  }
 
   Future<PickedLocalDocument?> pickUploadFile({
     List<XTypeGroup> acceptedTypeGroups = const <XTypeGroup>[],

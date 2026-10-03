@@ -1,10 +1,17 @@
 part of '../workspace_screen.dart';
 
+typedef _RemoteFileResult = ({String? text, bool openExternally});
+
 class _RemoteFileDialog extends StatefulWidget {
-  const _RemoteFileDialog({required this.entry, required this.preview});
+  const _RemoteFileDialog({
+    required this.entry,
+    required this.preview,
+    this.canOpenExternally = false,
+  });
 
   final SftpEntry entry;
   final SftpFilePreview preview;
+  final bool canOpenExternally;
 
   @override
   State<_RemoteFileDialog> createState() => _RemoteFileDialogState();
@@ -72,17 +79,42 @@ class _RemoteFileDialogState extends State<_RemoteFileDialog> {
         ),
       ),
       actions: [
+        if (widget.canOpenExternally)
+          SerlinkTextButton(
+            onPressed: _openExternally,
+            child: Text(l10n.openExternalAction),
+          ),
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(preview.truncated ? l10n.closeAction : l10n.cancelAction),
         ),
         if (!preview.truncated)
           SerlinkFilledButton(
-            onPressed: () => Navigator.of(context).pop(_controller.text),
+            onPressed: () => Navigator.of(context).pop<_RemoteFileResult>((
+              text: _controller.text,
+              openExternally: false,
+            )),
             child: Text(l10n.saveAction),
           ),
       ],
     );
+  }
+
+  Future<void> _openExternally() async {
+    if (_controller.text != widget.preview.text) {
+      final l10n = context.l10n;
+      final discard = await _confirmDialog(
+        context,
+        title: l10n.remoteFileDiscardTitle,
+        body: l10n.remoteFileDiscardBody,
+        confirmLabel: l10n.remoteFileDiscardAndOpenAction,
+      );
+      if (!mounted || !discard) return;
+    }
+    if (mounted) {
+      Navigator.of(context)
+          .pop<_RemoteFileResult>((text: null, openExternally: true));
+    }
   }
 }
 
@@ -265,10 +297,7 @@ class _SftpEntryRow extends StatelessWidget {
               _SftpEntryActionButton(
                 tooltip: l10n.sftpChangePermissionsTitle,
                 onPressed: onChmod,
-                icon: const Icon(
-                  Icons.admin_panel_settings_outlined,
-                  size: 16,
-                ),
+                icon: const Icon(Icons.admin_panel_settings_outlined, size: 16),
               ),
               _SftpEntryActionButton(
                 tooltip: l10n.deleteAction,
@@ -352,9 +381,8 @@ class _CompactSftpEntryRow extends StatelessWidget {
                   children: [
                     Text(
                       typeLabel,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: t.textSecondary),
                     ),
                     if (permissionsLabel.isNotEmpty)
                       Text(
@@ -369,9 +397,8 @@ class _CompactSftpEntryRow extends StatelessWidget {
                         part,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: t.textSecondary),
                       ),
                   ],
                 ),

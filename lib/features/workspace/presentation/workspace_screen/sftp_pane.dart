@@ -31,6 +31,8 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   final TextEditingController _pathController = TextEditingController();
   final FocusNode _pathFocusNode = FocusNode();
   final _listCache = SftpDirectoryCache();
+  final _pendingExternalOpens = <TransferTaskId>{};
+  bool _previewOpening = false;
   Future<List<SftpEntry>>? _entriesFuture;
   String _filterText = '';
   String? _promptedDefaultDirectoryForPath;
@@ -78,6 +80,23 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(transferQueueStateProvider, (_, next) {
+      final state = next.value;
+      if (state == null) return;
+      for (final id in _pendingExternalOpens.toList()) {
+        final task = state.byId(id);
+        if (task != null && !_transferIsActive(task)) {
+          _pendingExternalOpens.remove(id);
+          if (task.state == TransferState.completed &&
+              WidgetsBinding.instance.lifecycleState ==
+                  AppLifecycleState.resumed) {
+            unawaited(_openCompletedTransfer(context, ref, task));
+          } else if (task.state == TransferState.failed) {
+            _showSnackBar(context, context.l10n.sftpDownloadFailedSnack);
+          }
+        }
+      }
+    });
     final l10n = context.l10n;
     final capabilities = ref.watch(platformCapabilitiesProvider);
     final compact = capabilities.prefersMobileWorkspaceShell;
@@ -354,6 +373,9 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
           );
         }
         return ListView.separated(
+          key: const ValueKey('sftp-entry-list'),
+          // The workspace shell already handles the device safe areas.
+          padding: EdgeInsets.zero,
           itemCount: _showParentEntry ? entries.length + 1 : entries.length,
           separatorBuilder: (context, index) =>
               const SizedBox(height: SerlinkSpacing.xs),
@@ -833,35 +855,44 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
     };
   }
 
-  Future<void> _enqueueDownload(SftpEntry entry) async {
+  Future<void> _enqueueDownload(
+    SftpEntry entry, {
+    bool openWhenComplete = false,
+  }) async {
     final l10n = context.l10n;
     final itemKind = entry.type == SftpEntryType.directory
         ? TransferItemKind.directory
         : TransferItemKind.file;
-    final localPath = switch (itemKind) {
-      TransferItemKind.file => await _pickFileDownloadPath(entry),
-      TransferItemKind.directory => await _pickDirectoryDownloadPath(entry),
-    };
-    if (localPath == null) {
-      return;
-    }
-    ref
-        .read(transferQueueControllerProvider)
-        .enqueueDownload(
-          connection: _connection(),
-          itemKind: itemKind,
-          sourceHostId: widget.hostId,
-          sourceMachineName: widget.sourceMachineName,
-          remotePath: entry.path,
-          localPath: localPath,
-        );
-    if (mounted) {
+    try {
+      final localPath = switch (itemKind) {
+        TransferItemKind.file => await _pickFileDownloadPath(entry),
+        TransferItemKind.directory => await _pickDirectoryDownloadPath(entry),
+      };
+      if (!mounted || localPath == null) {
+        return;
+      }
+      final taskId = ref
+          .read(transferQueueControllerProvider)
+          .enqueueDownload(
+            connection: _connection(),
+            itemKind: itemKind,
+            sourceHostId: widget.hostId,
+            sourceMachineName: widget.sourceMachineName,
+            remotePath: entry.path,
+            localPath: localPath,
+          );
+      if (openWhenComplete) _pendingExternalOpens.add(taskId);
       _showSnackBar(
         context,
         itemKind == TransferItemKind.directory
             ? l10n.sftpFolderDownloadQueuedSnack
             : l10n.sftpDownloadQueuedSnack,
+        duration: ref.read(platformCapabilitiesProvider).prefersTouchUi
+            ? const Duration(seconds: 2)
+            : null,
       );
+    } on Object {
+      if (mounted) _showSnackBar(context, l10n.sftpDownloadFailedSnack);
     }
   }
 
@@ -1076,16 +1107,33 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
   }
 
   Future<void> _previewFile(SftpEntry entry) async {
+    if (_previewOpening) return;
+    _previewOpening = true;
     final l10n = context.l10n;
+    final canOpenExternally = ref.read(platformCapabilitiesProvider).isIOS;
     try {
       final preview = await _connection().readTextPreview(entry.path);
       if (!mounted) {
         return;
       }
-      final updatedText = await showSerlinkDialog<String>(
+      if (!preview.isText) {
+        await _offerExternalOpen(entry, canOpenExternally: canOpenExternally);
+        return;
+      }
+      final result = await showSerlinkDialog<_RemoteFileResult>(
         context: context,
-        builder: (context) => _RemoteFileDialog(entry: entry, preview: preview),
+        builder: (context) => _RemoteFileDialog(
+          entry: entry,
+          preview: preview,
+          canOpenExternally: canOpenExternally,
+        ),
       );
+      if (!mounted || result == null) return;
+      if (result.openExternally) {
+        await _enqueueDownload(entry, openWhenComplete: true);
+        return;
+      }
+      final updatedText = result.text;
       if (updatedText == null || updatedText == preview.text) {
         return;
       }
@@ -1095,8 +1143,35 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
       );
     } on Object catch (error) {
       if (mounted) {
-        _showSnackBar(context, sftpFailureMessage(error));
+        await _offerExternalOpen(
+          entry,
+          canOpenExternally: canOpenExternally,
+          failureMessage: sftpFailureMessage(error),
+        );
       }
+    } finally {
+      _previewOpening = false;
+    }
+  }
+
+  Future<void> _offerExternalOpen(
+    SftpEntry entry, {
+    required bool canOpenExternally,
+    String? failureMessage,
+  }) async {
+    final l10n = context.l10n;
+    if (!canOpenExternally) {
+      _showSnackBar(context, failureMessage ?? l10n.sftpPreviewUnavailable);
+      return;
+    }
+    final open = await _confirmDialog(
+      context,
+      title: l10n.sftpPreviewUnavailable,
+      body: failureMessage ?? l10n.sftpExternalOpenBody,
+      confirmLabel: l10n.sftpDownloadAndOpenAction,
+    );
+    if (mounted && open) {
+      await _enqueueDownload(entry, openWhenComplete: true);
     }
   }
 

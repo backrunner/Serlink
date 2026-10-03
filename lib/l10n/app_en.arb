@@ -1253,6 +1253,11 @@
   "sftpUploadQueuedSnack": "Upload queued.",
   "sftpFolderUploadQueuedSnack": "Folder upload queued.",
   "sftpFolderDownloadQueuedSnack": "Folder download queued.",
+  "openExternalAction": "Open in…",
+  "sftpPreviewUnavailable": "Preview unavailable",
+  "sftpExternalOpenBody": "Download this file to open it with another app.",
+  "sftpDownloadAndOpenAction": "Download and open",
+  "sftpDownloadFailedSnack": "Download failed. Try again.",
   "sftpDownloadQueuedSnack": "Download queued.",
   "sftpMergeRemoteFolderTitle": "Merge remote folder?",
   "sftpReplaceRemoteFileTitle": "Replace remote file?",
@@ -1311,6 +1316,9 @@
   "sftpDeleteFileBody": "This deletes the remote file.",
   "sftpEntryDeletedSnack": "Entry deleted.",
   "sftpFileSavedSnack": "File saved.",
+  "remoteFileDiscardTitle": "Discard changes?",
+  "remoteFileDiscardBody": "Your edits have not been saved. Discard them and download the remote file to open with another app?",
+  "remoteFileDiscardAndOpenAction": "Discard and open",
   "remoteFilePreviewLimited": "Preview limited to {bytes}.",
   "@remoteFilePreviewLimited": {
     "placeholders": {

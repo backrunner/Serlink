@@ -2357,10 +2357,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sftpFolderUploadQueuedSnack => '文件夹上传已加入队列。';
 
   @override
-  String get sftpFolderDownloadQueuedSnack => '文件夹下载已加入队列。';
+  String get sftpFolderDownloadQueuedSnack => '文件夹已加入下载';
 
   @override
-  String get sftpDownloadQueuedSnack => '下载已加入队列。';
+  String get openExternalAction => '外部打开';
+
+  @override
+  String get sftpPreviewUnavailable => '无法内置预览';
+
+  @override
+  String get sftpExternalOpenBody => '下载此文件后，可使用其他应用打开。';
+
+  @override
+  String get sftpDownloadAndOpenAction => '下载并打开';
+
+  @override
+  String get sftpDownloadFailedSnack => '下载失败，请重试';
+
+  @override
+  String get sftpDownloadQueuedSnack => '已加入下载';
 
   @override
   String get sftpMergeRemoteFolderTitle => '合并远程文件夹？';
@@ -2437,6 +2452,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sftpFileSavedSnack => '文件已保存。';
+
+  @override
+  String get remoteFileDiscardTitle => '放弃修改？';
+
+  @override
+  String get remoteFileDiscardBody => '当前修改尚未保存。要放弃修改，下载远程文件并使用其他应用打开吗？';
+
+  @override
+  String get remoteFileDiscardAndOpenAction => '放弃并打开';
 
   @override
   String remoteFilePreviewLimited(String bytes) {

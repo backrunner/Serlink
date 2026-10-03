@@ -168,10 +168,49 @@ class _TransferTaskRow extends ConsumerWidget {
         task.state == TransferState.paused;
     final canOpen =
         task.state == TransferState.completed &&
-        (capabilities.openLocalFile || capabilities.documentExport);
+        ((capabilities.openLocalFile &&
+                (task.itemKind == TransferItemKind.file ||
+                    capabilities.isDesktop)) ||
+            (task.itemKind == TransferItemKind.file &&
+                capabilities.documentExport));
 
-    return SerlinkContextMenu(
+    final row = SerlinkContextMenu(
       actions: [
+        if (canOpen)
+          SerlinkMenuAction(
+            label: capabilities.isIOS
+                ? l10n.openExternalAction
+                : capabilities.openLocalFile
+                ? l10n.settingsOpenAction
+                : l10n.settingsExportAction,
+            icon: Icons.open_in_new,
+            onPressed: () =>
+                unawaited(_openCompletedTransfer(context, ref, task)),
+          ),
+        if (task.state == TransferState.running)
+          SerlinkMenuAction(
+            label: l10n.pauseAction,
+            icon: Icons.pause,
+            onPressed: () => unawaited(queue.pause(task.id)),
+          ),
+        if (task.state == TransferState.paused)
+          SerlinkMenuAction(
+            label: l10n.resumeAction,
+            icon: Icons.play_arrow,
+            onPressed: () => unawaited(queue.resume(task.id)),
+          ),
+        if (queue.canRetry(task.id))
+          SerlinkMenuAction(
+            label: l10n.retryAction,
+            icon: Icons.refresh,
+            onPressed: () => unawaited(queue.retry(task.id)),
+          ),
+        if (_transferIsActive(task))
+          SerlinkMenuAction(
+            label: l10n.cancelAction,
+            icon: Icons.close,
+            onPressed: () => unawaited(queue.cancel(task.id)),
+          ),
         SerlinkMenuAction(
           label: l10n.transferDeleteMenu,
           icon: Icons.delete_outline,
@@ -182,7 +221,10 @@ class _TransferTaskRow extends ConsumerWidget {
         cursor: canOpen ? SystemMouseCursors.click : MouseCursor.defer,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onDoubleTap: canOpen
+          onTap: canOpen && capabilities.prefersTouchUi
+              ? () => unawaited(_openCompletedTransfer(context, ref, task))
+              : null,
+          onDoubleTap: canOpen && !capabilities.prefersTouchUi
               ? () => unawaited(_openCompletedTransfer(context, ref, task))
               : null,
           child: ListRow(
@@ -237,9 +279,8 @@ class _TransferTaskRow extends ConsumerWidget {
                             ? '${task.localPath} -> ${task.remotePath}'
                             : '${task.remotePath} -> ${task.localPath}',
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: t.textSecondary),
                       ),
                     ),
                   ],
@@ -258,18 +299,16 @@ class _TransferTaskRow extends ConsumerWidget {
                   const SizedBox(height: 6),
                   Text(
                     _transferProgressLabel(l10n, task),
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: t.textSecondary),
                   ),
                   if (task.bytesPerSecond != null) ...[
                     const SizedBox(height: 2),
                     Text(
                       '${_formatBytes(task.bytesPerSecond!.round())}/s'
                       '${task.eta == null ? '' : ' · ${l10n.transferEtaLeft(_formatDuration(task.eta!))}'}',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: t.textMuted),
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: t.textMuted),
                     ),
                   ],
                 ],
@@ -279,9 +318,20 @@ class _TransferTaskRow extends ConsumerWidget {
                   Text(
                     task.failure!.message,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: t.statusDanger),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: t.statusDanger),
+                  ),
+                ],
+                if (canOpen && capabilities.isIOS) ...[
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SerlinkTextButton.icon(
+                      onPressed: () =>
+                          unawaited(_openCompletedTransfer(context, ref, task)),
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: Text(l10n.openExternalAction),
+                    ),
                   ),
                 ],
                 if (_transferHasInlineActions(task, queue)) ...[
@@ -320,6 +370,21 @@ class _TransferTaskRow extends ConsumerWidget {
         ),
       ),
     );
+    if (capabilities.prefersMobileWorkspaceShell) {
+      return _SwipeActionsRow(
+        actions: [
+          _SwipeRowAction(
+            keyPrefix: 'mobile-transfer-${task.id.value}-delete',
+            label: l10n.transferDeleteMenu,
+            icon: Icons.delete_outline,
+            onPressed: () => unawaited(_deleteTransfer(context, ref, task)),
+            danger: true,
+          ),
+        ],
+        child: row,
+      );
+    }
+    return row;
   }
 }
 
@@ -415,19 +480,21 @@ Future<void> _openCompletedTransfer(
   try {
     final capabilities = ref.read(platformCapabilitiesProvider);
     if (capabilities.openLocalFile) {
-      await _openLocalPath(task.localPath);
+      final opened = await ref
+          .read(documentGatewayProvider)
+          .openLocalFile(task.localPath);
+      if (!opened && context.mounted) {
+        _showSnackBar(context, context.l10n.transferOpenFailedSnack);
+      }
       return;
     }
     if (localType == FileSystemEntityType.file && capabilities.documentExport) {
-      final exported = await ref
+      await ref
           .read(documentGatewayProvider)
           .exportLocalFile(
             task.localPath,
             suggestedName: _fileName(task.localPath),
           );
-      if (!exported && context.mounted) {
-        _showSnackBar(context, context.l10n.transferOpenFailedSnack);
-      }
       return;
     }
     throw UnsupportedError('Opening files is not supported.');
@@ -467,9 +534,9 @@ Future<_TransferDeleteChoice?> _showTransferDeleteDialog(
             child: Text(l10n.transferRemoveOnlyAction),
           ),
           SerlinkFilledButton.danger(
-            onPressed: () => Navigator.of(
-              context,
-            ).pop(_TransferDeleteChoice.transferAndLocalFile),
+            onPressed: () =>
+                Navigator.of(context)
+                    .pop(_TransferDeleteChoice.transferAndLocalFile),
             child: Text(l10n.transferDeleteLocalTooAction(localKind)),
           ),
         ],
@@ -484,16 +551,6 @@ Future<void> _deleteLocalPath(String path, FileSystemEntityType localType) {
     FileSystemEntityType.link => Link(path).delete(),
     _ => File(path).delete(),
   };
-}
-
-Future<void> _openLocalPath(String path) async {
-  final (command, arguments) = switch (Platform.operatingSystem) {
-    'macos' => ('open', [path]),
-    'windows' => ('explorer', [path]),
-    'linux' => ('xdg-open', [path]),
-    _ => throw UnsupportedError('Opening files is not supported.'),
-  };
-  await Process.start(command, arguments, mode: ProcessStartMode.detached);
 }
 
 bool _transferHasInlineActions(

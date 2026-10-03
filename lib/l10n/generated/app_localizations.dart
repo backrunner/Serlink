@@ -4504,6 +4504,36 @@ abstract class AppLocalizations {
   /// **'Folder download queued.'**
   String get sftpFolderDownloadQueuedSnack;
 
+  /// No description provided for @openExternalAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in…'**
+  String get openExternalAction;
+
+  /// No description provided for @sftpPreviewUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview unavailable'**
+  String get sftpPreviewUnavailable;
+
+  /// No description provided for @sftpExternalOpenBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Download this file to open it with another app.'**
+  String get sftpExternalOpenBody;
+
+  /// No description provided for @sftpDownloadAndOpenAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Download and open'**
+  String get sftpDownloadAndOpenAction;
+
+  /// No description provided for @sftpDownloadFailedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed. Try again.'**
+  String get sftpDownloadFailedSnack;
+
   /// No description provided for @sftpDownloadQueuedSnack.
   ///
   /// In en, this message translates to:
@@ -4641,6 +4671,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'File saved.'**
   String get sftpFileSavedSnack;
+
+  /// No description provided for @remoteFileDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard changes?'**
+  String get remoteFileDiscardTitle;
+
+  /// No description provided for @remoteFileDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your edits have not been saved. Discard them and download the remote file to open with another app?'**
+  String get remoteFileDiscardBody;
+
+  /// No description provided for @remoteFileDiscardAndOpenAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard and open'**
+  String get remoteFileDiscardAndOpenAction;
 
   /// No description provided for @remoteFilePreviewLimited.
   ///

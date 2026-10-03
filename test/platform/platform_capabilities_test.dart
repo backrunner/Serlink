@@ -17,7 +17,7 @@ void main() {
     expect(capabilities.terminalSplit, isFalse);
     expect(capabilities.terminalZmodemTransfers, isFalse);
     expect(capabilities.localDirectoryTransfer, isFalse);
-    expect(capabilities.openLocalFile, isFalse);
+    expect(capabilities.openLocalFile, isTrue);
     expect(capabilities.sshAgentAuth, isFalse);
     expect(capabilities.hardwareKeyAuth, isFalse);
     expect(capabilities.mcpServer, isFalse);

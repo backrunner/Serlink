@@ -2389,10 +2389,25 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sftpFolderUploadQueuedSnack => 'フォルダアップロードをキューに追加しました。';
 
   @override
-  String get sftpFolderDownloadQueuedSnack => 'フォルダダウンロードをキューに追加しました。';
+  String get sftpFolderDownloadQueuedSnack => 'フォルダのダウンロード待ち';
 
   @override
-  String get sftpDownloadQueuedSnack => 'ダウンロードをキューに追加しました。';
+  String get openExternalAction => 'ほかのアプリで開く';
+
+  @override
+  String get sftpPreviewUnavailable => 'プレビューできません';
+
+  @override
+  String get sftpExternalOpenBody => 'ファイルをダウンロードして、ほかのアプリで開けます。';
+
+  @override
+  String get sftpDownloadAndOpenAction => 'ダウンロードして開く';
+
+  @override
+  String get sftpDownloadFailedSnack => 'ダウンロード失敗。再試行してください。';
+
+  @override
+  String get sftpDownloadQueuedSnack => 'ダウンロード待ち';
 
   @override
   String get sftpMergeRemoteFolderTitle => 'リモートフォルダをマージしますか？';
@@ -2470,6 +2485,16 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get sftpFileSavedSnack => 'ファイルを保存しました。';
+
+  @override
+  String get remoteFileDiscardTitle => '変更を破棄しますか？';
+
+  @override
+  String get remoteFileDiscardBody =>
+      '変更は保存されていません。変更を破棄し、リモートファイルをダウンロードしてほかのアプリで開きますか？';
+
+  @override
+  String get remoteFileDiscardAndOpenAction => '破棄して開く';
 
   @override
   String remoteFilePreviewLimited(String bytes) {

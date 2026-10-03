@@ -69,6 +69,14 @@ framework SEO, canonical/hreflang metadata, real Markdown rendering, local searc
 Fonts use the system stack. There is no analytics integration or contact form;
 the support page provides email and public issue links.
 
+## Copy and visual style
+
+Name features directly and describe concrete actions in every language. Keep
+selection and focus styles tied to real interaction state. Avoid decorative
+status dots, numbered section labels, badge strips, all-caps overlines and
+repeated slogans. Use normal punctuation in Chinese instead of dot-separated
+phrases. Apply the same wording to page metadata and the social card.
+
 ## Deployment
 
 `wrangler.jsonc` describes a Cloudflare Workers static-assets deployment using

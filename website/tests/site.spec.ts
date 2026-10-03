@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 const locales = [
-  { code: 'en', prefix: '', headline: 'Your servers. One workspace.', vault: 'Vault & recovery', search: 'vault', lang: 'en' },
-  { code: 'zh', prefix: '/zh', headline: '你的服务器。 一个工作空间。', vault: '保险库与恢复', search: '保险库', lang: 'zh-CN' },
-  { code: 'ja', prefix: '/ja', headline: 'あなたのサーバー。 ひとつのワークスペース。', vault: 'ボールトと復旧', search: 'ボールト', lang: 'ja' },
+  { code: 'en', prefix: '', vault: 'Vault & recovery', search: 'vault', lang: 'en' },
+  { code: 'zh', prefix: '/zh', vault: '保险库与恢复', search: '保险库', lang: 'zh-CN' },
+  { code: 'ja', prefix: '/ja', vault: 'ボールトと復旧', search: 'ボールト', lang: 'ja' },
 ];
 for (const locale of locales) {
   test(`${locale.code}: homepage, gallery, navigation and contact`, async ({ page }, info) => {
@@ -109,7 +109,7 @@ test('404 remains usable and static discovery files use the official domain', as
   const missing = await page.goto('/ja/missing-page/');
   expect(missing?.status()).toBe(404);
   await expect(page.locator('main')).toHaveCount(1);
-  await expect(page.locator('h1')).toHaveText('この先にはページがありません。');
+  await expect(page.locator('h1')).toHaveText('ページが見つかりません');
   await expect(page.locator('main a').first()).toHaveAttribute('href', '/ja');
   const sitemap = await request.get('/sitemap.xml');
   const urls = [...(await sitemap.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => new URL(match[1]).pathname);
@@ -131,6 +131,27 @@ test('narrow viewports do not hide header actions or overflow', async ({ page })
       await expect(page.locator('.sd-search-trigger')).toBeVisible();
       await expect(page.locator('.sd-scope-trigger')).toBeVisible();
       await expect(page.getByTestId('theme-toggle')).toBeVisible();
+    }
+  }
+});
+
+test('MCP content uses the full mobile width with its guide underneath', async ({ page }) => {
+  for (const width of [320, 390, 560, 561, 678, 768, 850]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const locale of locales) {
+      await page.goto(`${locale.prefix}/`);
+      const section = page.locator('.sl-agent-row');
+      const bounds = await section.evaluate((element) => {
+        const rect = (selector: string) => {
+          const { x, y, width, height } = element.querySelector(selector)!.getBoundingClientRect();
+          return { x, y, width, height };
+        };
+        return { section: element.getBoundingClientRect().width, copy: rect(':scope > div'), paragraph: rect('p'), link: rect(':scope > a') };
+      });
+      expect(bounds.copy.width, `${locale.code} ${width}: copy width`).toBeCloseTo(bounds.section, 0);
+      expect(bounds.paragraph.width, `${locale.code} ${width}: paragraph width`).toBeGreaterThanOrEqual(Math.min(660, bounds.section) - 1);
+      expect(bounds.link.y, `${locale.code} ${width}: guide follows copy`).toBeGreaterThanOrEqual(bounds.copy.y + bounds.copy.height);
+      expect(bounds.link.x + bounds.link.width).toBeLessThanOrEqual(bounds.copy.x + bounds.copy.width + 1);
     }
   }
 });

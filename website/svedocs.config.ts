@@ -1,7 +1,7 @@
 import { defineConfig } from 'svedocs/config';
 import { en, zh, ja } from './src/lib/messages.ts';
 export default defineConfig({
-  site: { name: 'Serlink', title: 'Serlink', description: 'A private SSH terminal and SFTP workspace for your remote machines.', url: 'https://serlink.alkinum.com' },
+  site: { name: 'Serlink', title: 'Serlink', description: 'SSH terminals, SFTP file transfers and encrypted credentials.', url: 'https://serlink.alkinum.com' },
   build: { mode: 'static' },
   theme: {
     defaultMode: 'system', readingStyle: 'plain',
@@ -13,7 +13,7 @@ export default defineConfig({
       { label: 'Documentation', labelKey: 'site.docs', href: '/docs' },
       { label: 'Support', labelKey: 'site.support', href: '/support' }
     ],
-    footer: { text: 'Serlink · A workspace of your own.', links: [
+    footer: { text: 'Serlink', links: [
       { label: 'Privacy', labelKey: 'site.privacy', href: '/privacy' },
       { label: 'License', labelKey: 'site.licenses', href: '/licenses' },
       { label: 'Support', labelKey: 'site.support', href: '/support' },

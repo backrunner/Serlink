@@ -1,5 +1,5 @@
 ---
-title: "获取 Serlink"
+title: "发行与下载"
 description: "发行状态、渠道差异与源码构建。"
 ---
 

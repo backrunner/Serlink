@@ -1,5 +1,5 @@
 ---
-title: "Serlink — サーバーを、ひとつの場所に。"
-description: "プライベートな SSH ターミナルと SFTP ワークスペース。接続、ファイル、認証情報をひとつに。"
+title: "Serlink — SSH と SFTP クライアント"
+description: "SSH ターミナル、SFTP ファイル転送、認証情報の暗号化。iCloud または WebDAV で任意の同期に対応。"
 layout: home
 ---

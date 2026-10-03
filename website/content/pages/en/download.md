@@ -1,5 +1,5 @@
 ---
-title: "Get Serlink"
+title: "Downloads"
 description: "Availability, distribution channels and source builds."
 ---
 

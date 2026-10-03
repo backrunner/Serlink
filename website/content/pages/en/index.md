@@ -1,5 +1,5 @@
 ---
-title: "Serlink — Your servers. One workspace."
-description: "A private SSH terminal and SFTP workspace. Keep connections, files and credentials close at hand."
+title: "Serlink — SSH and SFTP client"
+description: "SSH terminals, SFTP file transfers and encrypted credentials. Optional sync through iCloud or WebDAV."
 layout: home
 ---

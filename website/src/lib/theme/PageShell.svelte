@@ -14,8 +14,10 @@
   export let actions: NonNullable<SvedocsPageShellProps['actions']> = [];
   export let context: SvedocsPageShellProps['context'] = undefined;
   $: t = context?.t ?? fallbackTranslate;
+  $: pageKicker = kicker && kicker !== t('article.kind.page') ? kicker : '';
 </script>
 <main lang={context?.languageTag} id="content" class="sl-page" class:sl-error={variant === 'error'}>
-  <header><p class="sl-eyebrow">{variant === 'error' ? `${status ?? 404} / SERLINK` : kicker || 'SERLINK'}</p><h1>{title || page?.title || ''}</h1><p class="sl-lede">{description || page?.description || ''}</p>{#if variant === 'error' && path}<code>{path}</code>{/if}</header>
+  <header><!-- Show a useful status or an explicit custom label, without a generic page badge. -->
+    {#if variant === 'error'}<p class="sl-label">{status ?? 404}</p>{:else if pageKicker}<p class="sl-label">{pageKicker}</p>{/if}<h1>{title || page?.title || ''}</h1><p class="sl-lede">{description || page?.description || ''}</p>{#if variant === 'error' && path}<code>{path}</code>{/if}</header>
   {#if variant === 'error'}<div class="sl-actions">{#each actions as action}<a class="sl-button" class:sl-primary={action.primary} href={action.href}>{action.label}</a>{/each}</div>{:else}<article class="sd-prose" use:codeCopy={t}>{#if content}<svelte:component this={content} />{:else}{@html html || page?.html || ''}{/if}</article>{/if}
 </main>

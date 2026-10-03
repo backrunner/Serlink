@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#102e2b"/><path d="M860 0v630M1030 0v630M0 480h1200" stroke="#25493f" fill="none"/><g fill="none" stroke="#69d8ba" stroke-width="5"><rect x="850" y="174" width="235" height="175" rx="15"/><path d="m880 210 35 35-35 35m55 0h56"/></g><text x="78" y="94" fill="#c7e8db" font-family="sans-serif" font-size="28" font-weight="600">Serlink.</text><text x="78" y="240" fill="#eef7f2" font-family="sans-serif" font-size="76" font-weight="600" letter-spacing="-3">Your servers.</text><text x="78" y="325" fill="#69d8ba" font-family="sans-serif" font-size="76" font-weight="600" letter-spacing="-3">One workspace.</text><text x="82" y="401" fill="#a6c5b8" font-family="sans-serif" font-size="22">SSH · SFTP · Encrypted vault</text><text x="82" y="552" fill="#a6c5b8" font-family="monospace" font-size="17">serlink.alkinum.com</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#101b1a"/>
+  <text x="78" y="100" fill="#e8f0ec" font-family="sans-serif" font-size="32" font-weight="600">Serlink</text>
+  <g fill="none" stroke="#5bd8bc" stroke-width="4">
+    <rect x="870" y="213" width="220" height="164" rx="8"/>
+    <path d="m900 252 30 30-30 30m55 0h55"/>
+  </g>
+  <text x="78" y="262" fill="#e8f0ec" font-family="sans-serif" font-size="72" font-weight="600">SSH and SFTP</text>
+  <text x="78" y="350" fill="#e8f0ec" font-family="sans-serif" font-size="72" font-weight="600">for your servers</text>
+  <text x="82" y="421" fill="#a1b4ac" font-family="sans-serif" font-size="23">Terminals, file transfers and encrypted credentials</text>
+  <text x="82" y="548" fill="#a1b4ac" font-family="sans-serif" font-size="20">serlink.alkinum.com</text>
+</svg>

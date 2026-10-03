@@ -2549,6 +2549,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sftpFolderDownloadQueuedSnack => 'Folder download queued.';
 
   @override
+  String get openExternalAction => 'Open in…';
+
+  @override
+  String get sftpPreviewUnavailable => 'Preview unavailable';
+
+  @override
+  String get sftpExternalOpenBody =>
+      'Download this file to open it with another app.';
+
+  @override
+  String get sftpDownloadAndOpenAction => 'Download and open';
+
+  @override
+  String get sftpDownloadFailedSnack => 'Download failed. Try again.';
+
+  @override
   String get sftpDownloadQueuedSnack => 'Download queued.';
 
   @override
@@ -2628,6 +2644,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sftpFileSavedSnack => 'File saved.';
+
+  @override
+  String get remoteFileDiscardTitle => 'Discard changes?';
+
+  @override
+  String get remoteFileDiscardBody =>
+      'Your edits have not been saved. Discard them and download the remote file to open with another app?';
+
+  @override
+  String get remoteFileDiscardAndOpenAction => 'Discard and open';
 
   @override
   String remoteFilePreviewLimited(String bytes) {

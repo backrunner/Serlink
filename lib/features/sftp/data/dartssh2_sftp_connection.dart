@@ -97,11 +97,7 @@ class DartSsh2SftpConnection implements SftpConnection {
         final visibleBytes = truncated
             ? Uint8List.sublistView(bytes, 0, maxBytes)
             : bytes;
-        return SftpFilePreview(
-          text: utf8.decode(visibleBytes, allowMalformed: true),
-          bytesRead: visibleBytes.length,
-          truncated: truncated,
-        );
+        return SftpFilePreview.fromBytes(visibleBytes, truncated: truncated);
       } finally {
         await remoteFile?.close();
       }

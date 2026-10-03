@@ -83,7 +83,7 @@ class PlatformCapabilities {
 
   bool get localDirectoryTransfer => !isIOS;
 
-  bool get openLocalFile => isDesktop && !isAppStoreDistribution;
+  bool get openLocalFile => isIOS || (isDesktop && !isAppStoreDistribution);
 
   bool get documentExport => true;
 

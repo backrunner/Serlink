@@ -1,12 +1,14 @@
 import 'dart:io';
 
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/platform/document_gateway.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const platformChannel = MethodChannel('serlink/platform');
   late FileSelectorPlatform originalPlatform;
   late _FakeFileSelectorPlatform fakePlatform;
   late Directory tempDirectory;
@@ -21,10 +23,54 @@ void main() {
   });
 
   tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(platformChannel, null);
     FileSelectorPlatform.instance = originalPlatform;
     if (await tempDirectory.exists()) {
       await tempDirectory.delete(recursive: true);
     }
+  });
+
+  test(
+    'presents iOS file actions using a path without copying file bytes',
+    () async {
+      MethodCall? received;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(platformChannel, (call) async {
+            received = call;
+            return true;
+          });
+      const gateway = DocumentGateway(
+        capabilities: PlatformCapabilities(
+          operatingSystem: 'ios',
+          targetPlatform: TargetPlatform.iOS,
+        ),
+      );
+      expect(
+        await gateway.openLocalFile('/Documents/Downloads/report.pdf'),
+        isTrue,
+      );
+      expect(received?.method, 'openLocalFile');
+      expect(received?.arguments, {'path': '/Documents/Downloads/report.pdf'});
+      expect(fakePlatform.suggestedName, isNull);
+    },
+  );
+
+  test('propagates native presentation failures', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(platformChannel, (_) async {
+          throw PlatformException(code: 'file_unavailable');
+        });
+    const gateway = DocumentGateway(
+      capabilities: PlatformCapabilities(
+        operatingSystem: 'ios',
+        targetPlatform: TargetPlatform.iOS,
+      ),
+    );
+    await expectLater(
+      gateway.openLocalFile('/missing.pdf'),
+      throwsA(isA<PlatformException>()),
+    );
   });
 
   test(

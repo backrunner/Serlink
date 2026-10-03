@@ -88,6 +88,7 @@ part 'workspace_screen/identity_edit_dialog.dart';
 part 'workspace_screen/vault_access.dart';
 part 'workspace_screen/vault_recovery_dialogs.dart';
 part 'workspace_screen/host_rows.dart';
+part 'workspace_screen/swipe_actions.dart';
 part 'workspace_screen/snippets.dart';
 part 'workspace_screen/sessions_tabs.dart';
 part 'workspace_screen/terminal_pane.dart';

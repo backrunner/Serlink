@@ -251,6 +251,11 @@ class _FakeShellSession implements SshShellSession {
 }
 
 class _MutableFakeSftpConnection implements SftpConnection {
+  SftpFilePreview? previewOverride;
+  Object? previewError;
+  Completer<void>? downloadGate;
+  bool writeDownloads = false;
+  Object? downloadError;
   final Set<String> deniedListPaths = {};
   final Map<String, int> listCounts = {};
   final Map<String, SftpEntry> _entries = {
@@ -335,14 +340,15 @@ class _MutableFakeSftpConnection implements SftpConnection {
     required TransferItemKind itemKind,
     required String remotePath,
     required String localPath,
-  }) {
-    return Stream<TransferProgress>.value(
-      TransferProgress(
-        taskId: taskId,
-        state: TransferState.completed,
-        transferredBytes: _entries[remotePath]?.size ?? 1,
-        totalBytes: _entries[remotePath]?.size ?? 1,
-      ),
+  }) async* {
+    await downloadGate?.future;
+    if (downloadError case final error?) throw error;
+    if (writeDownloads) await File(localPath).writeAsString('downloaded file');
+    yield TransferProgress(
+      taskId: taskId,
+      state: TransferState.completed,
+      transferredBytes: _entries[remotePath]?.size ?? 1,
+      totalBytes: _entries[remotePath]?.size ?? 1,
     );
   }
 
@@ -378,6 +384,8 @@ class _MutableFakeSftpConnection implements SftpConnection {
     String path, {
     int maxBytes = defaultSftpPreviewBytes,
   }) async {
+    if (previewError case final error?) throw error;
+    if (previewOverride case final preview?) return preview;
     final text = _fileContents[path] ?? '';
     final bytes = text.codeUnits.length;
     if (bytes <= maxBytes) {

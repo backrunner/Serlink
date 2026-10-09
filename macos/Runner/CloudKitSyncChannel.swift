@@ -278,16 +278,16 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
 
     func appendPath(_ path: String) {
       lock.lock()
+      defer { lock.unlock() }
       paths.append(path)
-      lock.unlock()
     }
 
     func setRecordError(_ error: Error) {
       lock.lock()
+      defer { lock.unlock() }
       if recordError == nil {
         recordError = error
       }
-      lock.unlock()
     }
 
     func snapshot() -> (paths: [String], error: Error?) {
@@ -298,12 +298,11 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
 
     func completeOnce(_ value: Any?) {
       lock.lock()
+      defer { lock.unlock() }
       if completed {
-        lock.unlock()
         return
       }
       completed = true
-      lock.unlock()
       Self.complete(result, value)
     }
 

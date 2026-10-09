@@ -1,6 +1,7 @@
 import CloudKit
 import Flutter
 import Foundation
+import Security
 import UIKit
 
 /// Bridges the `serlink/cloudkit` method channel to the user's private CloudKit
@@ -127,6 +128,10 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func isAvailable(result: @escaping FlutterResult) {
+    guard Self.hasCloudKitEntitlements else {
+      result(false)
+      return
+    }
     container.accountStatus { status, error in
       if let error = error {
         Self.complete(result, Self.flutterError(error))
@@ -137,6 +142,10 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func readObject(path: String, result: @escaping FlutterResult) {
+    guard Self.hasCloudKitEntitlements else {
+      result(Self.unavailableError())
+      return
+    }
     database.fetch(withRecordID: recordID(for: path)) { record, error in
       if let error = error as? CKError, error.code == .unknownItem {
         Self.complete(result, nil)
@@ -155,6 +164,10 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func writeObject(path: String, data: Data, result: @escaping FlutterResult) {
+    guard Self.hasCloudKitEntitlements else {
+      result(Self.unavailableError())
+      return
+    }
     let record = CKRecord(recordType: Self.recordType, recordID: recordID(for: path))
     saveObject(path: path, data: data, record: record, savePolicy: .allKeys, result: result)
   }
@@ -165,6 +178,10 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
     expectedData: Data?,
     result: @escaping FlutterResult
   ) {
+    guard Self.hasCloudKitEntitlements else {
+      result(Self.unavailableError())
+      return
+    }
     let recordID = recordID(for: path)
     database.fetch(withRecordID: recordID) { [weak self] record, error in
       guard let self else {
@@ -230,6 +247,10 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func deleteObject(path: String, result: @escaping FlutterResult) {
+    guard Self.hasCloudKitEntitlements else {
+      result(Self.unavailableError())
+      return
+    }
     database.delete(withRecordID: recordID(for: path)) { _, error in
       if let error = error as? CKError, error.code == .unknownItem {
         Self.complete(result, nil)
@@ -244,6 +265,10 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func listObjects(prefix: String?, result: @escaping FlutterResult) {
+    guard Self.hasCloudKitEntitlements else {
+      result(Self.unavailableError())
+      return
+    }
     let query = CKQuery(recordType: Self.recordType, predicate: NSPredicate(value: true))
     var paths: [String] = []
     var recordError: Error?
@@ -252,16 +277,16 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
 
     func appendPath(_ path: String) {
       lock.lock()
+      defer { lock.unlock() }
       paths.append(path)
-      lock.unlock()
     }
 
     func setRecordError(_ error: Error) {
       lock.lock()
+      defer { lock.unlock() }
       if recordError == nil {
         recordError = error
       }
-      lock.unlock()
     }
 
     func snapshot() -> (paths: [String], error: Error?) {
@@ -272,12 +297,11 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
 
     func completeOnce(_ value: Any?) {
       lock.lock()
+      defer { lock.unlock() }
       if completed {
-        lock.unlock()
         return
       }
       completed = true
-      lock.unlock()
       Self.complete(result, value)
     }
 
@@ -320,6 +344,9 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func ensureRemoteChangeSubscription() {
+    guard Self.hasCloudKitEntitlements else {
+      return
+    }
     if subscriptionRequested {
       return
     }
@@ -401,6 +428,27 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
     return url
   }
 
+  private static var hasCloudKitEntitlements: Bool {
+    entitlementValues("com.apple.developer.icloud-services").contains("CloudKit")
+      && entitlementValues("com.apple.developer.icloud-container-identifiers")
+        .contains(containerIdentifier)
+  }
+
+  private static func entitlementValues(_ name: String) -> [String] {
+    guard let task = SecTaskCreateFromSelf(nil),
+      let value = SecTaskCopyValueForEntitlement(task, name as CFString, nil)
+    else {
+      return []
+    }
+    if let values = value as? [String] {
+      return values
+    }
+    if let value = value as? String {
+      return [value]
+    }
+    return []
+  }
+
   private static func argumentError(_ name: String) -> FlutterError {
     FlutterError(
       code: "sync.cloudkit.invalid_arguments",
@@ -420,7 +468,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   private static func unavailableError() -> FlutterError {
     FlutterError(
       code: "sync.cloudkit.unavailable",
-      message: "iCloud sync is unavailable.",
+      message: "iCloud sync requires a signed app with CloudKit entitlements.",
       details: nil
     )
   }

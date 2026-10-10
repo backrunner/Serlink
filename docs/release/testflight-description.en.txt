@@ -1,0 +1,5 @@
+Serlink is an SSH terminal and SFTP client for iPhone, iPad and Mac. Organize hosts, keys and command snippets, transfer files, and keep workspace records in an encrypted vault. Optional iCloud sync shares encrypted workspace records across Apple devices signed in to the same iCloud account.
+
+Please test SSH connections to your own server, SFTP uploads and downloads, file opening and sharing on iOS, and iCloud synchronization between iOS and macOS. Check vault lock/unlock, record edits and deletions, conflict handling, and retry after reconnecting to the network.
+
+Serlink does not require a Serlink account. SSH/SFTP features require a server you control or are authorized to access. iOS and Mac App Store builds do not provide a local shell or system SSH agent integration.

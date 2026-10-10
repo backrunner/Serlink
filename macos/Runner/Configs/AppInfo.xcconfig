@@ -19,7 +19,7 @@ SERLINK_DMG_INSTALLER_ENABLED = NO
 PRODUCT_BUNDLE_IDENTIFIER = com.alkinum.serlink
 
 // macOS App Store Connect build number. Keep this independent from iOS.
-SERLINK_MACOS_BUILD_NUMBER = 15
+SERLINK_MACOS_BUILD_NUMBER = 16
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 BackRunner. All rights reserved.

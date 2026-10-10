@@ -1,7 +1,6 @@
 import CloudKit
 import Flutter
 import Foundation
-import Security
 import UIKit
 
 /// Bridges the `serlink/cloudkit` method channel to the user's private CloudKit
@@ -128,7 +127,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func isAvailable(result: @escaping FlutterResult) {
-    guard Self.hasCloudKitEntitlements else {
+    guard Self.supportsCloudKitRuntime else {
       result(false)
       return
     }
@@ -142,7 +141,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func readObject(path: String, result: @escaping FlutterResult) {
-    guard Self.hasCloudKitEntitlements else {
+    guard Self.supportsCloudKitRuntime else {
       result(Self.unavailableError())
       return
     }
@@ -164,7 +163,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func writeObject(path: String, data: Data, result: @escaping FlutterResult) {
-    guard Self.hasCloudKitEntitlements else {
+    guard Self.supportsCloudKitRuntime else {
       result(Self.unavailableError())
       return
     }
@@ -178,7 +177,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
     expectedData: Data?,
     result: @escaping FlutterResult
   ) {
-    guard Self.hasCloudKitEntitlements else {
+    guard Self.supportsCloudKitRuntime else {
       result(Self.unavailableError())
       return
     }
@@ -247,7 +246,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func deleteObject(path: String, result: @escaping FlutterResult) {
-    guard Self.hasCloudKitEntitlements else {
+    guard Self.supportsCloudKitRuntime else {
       result(Self.unavailableError())
       return
     }
@@ -265,7 +264,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func listObjects(prefix: String?, result: @escaping FlutterResult) {
-    guard Self.hasCloudKitEntitlements else {
+    guard Self.supportsCloudKitRuntime else {
       result(Self.unavailableError())
       return
     }
@@ -344,7 +343,7 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
   }
 
   private func ensureRemoteChangeSubscription() {
-    guard Self.hasCloudKitEntitlements else {
+    guard Self.supportsCloudKitRuntime else {
       return
     }
     if subscriptionRequested {
@@ -428,25 +427,15 @@ class CloudKitSyncChannel: NSObject, FlutterStreamHandler {
     return url
   }
 
-  private static var hasCloudKitEntitlements: Bool {
-    entitlementValues("com.apple.developer.icloud-services").contains("CloudKit")
-      && entitlementValues("com.apple.developer.icloud-container-identifiers")
-        .contains(containerIdentifier)
-  }
-
-  private static func entitlementValues(_ name: String) -> [String] {
-    guard let task = SecTaskCreateFromSelf(nil),
-      let value = SecTaskCopyValueForEntitlement(task, name as CFString, nil)
-    else {
-      return []
-    }
-    if let values = value as? [String] {
-      return values
-    }
-    if let value = value as? String {
-      return [value]
-    }
-    return []
+  // SecTask entitlement APIs are macOS-only public APIs. iOS device signing
+  // validates the release entitlements; CloudKit reports account/service errors.
+  // Keep unsigned simulator runs from instantiating CKContainer.
+  private static var supportsCloudKitRuntime: Bool {
+    #if targetEnvironment(simulator)
+      return false
+    #else
+      return true
+    #endif
   }
 
   private static func argumentError(_ name: String) -> FlutterError {

@@ -19,3 +19,9 @@ order: 6
 关闭同步会停止后续同步，不会删除已经上传的远程副本。请通过应用远程数据控制或服务提供方删除副本，并单独管理备份。
 
 连接、TLS 或权限问题请参考[排查指南](/docs/troubleshooting)。
+
+## Apple 版本与可用性
+
+iCloud 同步需要正确签名的 Apple 版本与 iCloud 账号。未签名的 iOS 模拟器版本会显示 iCloud 不可用。TestFlight 与 App Store 使用 Production，开发版本使用 Development，两个环境的记录相互独立。macOS 与 iOS 共用 Production 容器。
+
+应用支持远端变化通知，但设备挂起或网络变化后仍可能需要重连或重新打开。请检查编辑与删除是否同步到第二台设备；schema 已部署并不代表实际同步已验证。

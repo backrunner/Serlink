@@ -14,7 +14,7 @@ Serlink 正在积极开发，目前尚无可在此提供的公开安装包或 Ap
 | 平台 | 当前状态 |
 | --- | --- |
 | macOS 12 及以上 | 主力桌面平台，准备 App Store、TestFlight 与直接发行。 |
-| iOS | 移动端开发与设备验证进行中。 |
+| iOS | 准备 App Store 与 TestFlight 发布；支持 iOS/iPadOS 15 起的 iPhone 与 iPad。 |
 | Windows | 已有桌面项目，安装包与实机验收待完成。 |
 | Linux | 已有桌面项目，打包与发行版验证待完成。 |
 

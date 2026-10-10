@@ -14,7 +14,7 @@ Follow [GitHub releases](https://github.com/backrunner/Serlink/releases) for pub
 | Platform | Current status |
 | --- | --- |
 | macOS 12 or later | Primary desktop target; App Store, TestFlight and direct release preparation. |
-| iOS | Mobile development and device validation in progress. |
+| iOS | App Store and TestFlight release preparation; iPhone and iPad supported from iOS/iPadOS 15. |
 | Windows | Desktop project present; installer and real-device acceptance pending. |
 | Linux | Desktop project present; packaging and distribution testing pending. |
 

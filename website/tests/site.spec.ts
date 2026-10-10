@@ -110,7 +110,7 @@ test('404 remains usable and static discovery files use the official domain', as
   expect(missing?.status()).toBe(404);
   await expect(page.locator('main')).toHaveCount(1);
   await expect(page.locator('h1')).toHaveText('ページが見つかりません');
-  await expect(page.locator('main a').first()).toHaveAttribute('href', '/ja');
+  await expect(page.locator('main a').first()).toHaveAttribute('href', '/ja/');
   const sitemap = await request.get('/sitemap.xml');
   const urls = [...(await sitemap.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => new URL(match[1]).pathname);
   expect(urls).toHaveLength(39);

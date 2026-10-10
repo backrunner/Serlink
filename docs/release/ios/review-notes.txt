@@ -1,0 +1,15 @@
+Serlink 1.0.0 — iPhone and iPad review notes
+Bundle ID: com.alkinum.serlink. Minimum system: iOS/iPadOS 15.
+
+No Serlink account, in-app purchase or subscription is required. SSH access uses a server supplied by the user.
+1. Create a local vault and save its recovery key.
+2. Add a password or key identity in Settings > Credentials and a host referencing it.
+3. Verify the SSH host-key fingerprint before connecting. Run harmless commands, search the output, reconnect, and try snippets.
+4. Open SFTP, browse folders and preview/edit a disposable text file.
+5. Upload a selected file with the document picker. Download and open a file using the system share sheet; on iPad the share sheet is anchored to the view.
+6. Inspect transfer progress and swipe left to remove its record. A local file can be retained or deleted separately. External edits are not automatically uploaded.
+7. iCloud and WebDAV sync are optional. Use the same iCloud account on two Apple devices to test encrypted records. Core SSH/SFTP works without sync.
+
+Local shell, system SSH-agent authentication and desktop splits are not iOS features. Keep the app foregrounded for transfers. Vault locking prevents new credential access; existing sessions continue until closed. Downloaded files are outside vault encryption. Diagnostics stay local unless explicitly exported.
+
+For SSH/SFTP testing, add an SSH server available to the reviewer and its own credentials, then verify the server host key. Serlink does not operate an account service or bundled demo server.

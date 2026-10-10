@@ -19,3 +19,9 @@ If local and remote changes conflict, inspect the records in the sync review int
 Disabling sync stops future app sync. It does not erase copies already stored remotely. Use the app’s remote-data controls or your service provider to remove those copies, and manage backups separately.
 
 For connection, TLS or permission errors, read [troubleshooting](/docs/troubleshooting).
+
+## Apple builds and availability
+
+iCloud sync requires a signed Apple build and an iCloud account. Unsigned iOS simulator builds report iCloud as unavailable. TestFlight and App Store builds use Production; development builds use Development, so records are separate. Both macOS and iOS share the same Production container.
+
+The app can receive remote-change notifications, but reconnecting or reopening may still be needed after suspension or a network change. Check that edits and deletions reach the second device; a deployed schema alone does not establish a successful sync.

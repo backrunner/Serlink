@@ -1,0 +1,71 @@
+{
+  "preparedAt": "2026-10-11",
+  "platform": "IOS",
+  "version": "1.0.0",
+  "bundleId": "com.alkinum.serlink",
+  "minimumOSVersion": "15.0",
+  "primaryCategory": "DEVELOPER_TOOLS",
+  "secondaryCategory": null,
+  "appAccountRequired": false,
+  "inAppPurchases": false,
+  "subscriptions": false,
+  "tracking": false,
+  "proposedPrivacyLabel": "DATA_NOT_COLLECTED",
+  "supportURL": "https://serlink.alkinum.com/support/",
+  "privacyPolicyURL": "https://serlink.alkinum.com/privacy/",
+  "marketingURL": "https://serlink.alkinum.com/",
+  "price": {
+    "currency": "USD",
+    "amount": 1.99,
+    "baseTerritory": "USA"
+  },
+  "territories": {
+    "selection": "ALL_EXCEPT",
+    "excluded": [
+      "FRA"
+    ]
+  },
+  "releaseMethod": "AFTER_APPROVAL",
+  "localizations": {
+    "en-US": {
+      "name": "Serlink: SSH & SFTP Terminal",
+      "subtitle": "Server files & encrypted vault",
+      "promotionalText": "SSH and SFTP in one private workspace. Bundled Nerd Font icons, encrypted credentials, snippets, file transfers, and optional iCloud or WebDAV sync.",
+      "keywords": "remote,client,transfer,console,linux,unix,devops,keys,snippets,webdav,icloud,jump,host",
+      "description": "Serlink is an SSH terminal and SFTP client for iPhone and iPad. Connect to your own servers, manage remote files, and keep connection credentials in an encrypted local vault.\n\nREMOTE TERMINALS\nOrganize hosts and identities, verify SSH host-key fingerprints, connect through jump hosts, switch between session tabs, search terminal output and reconnect interrupted sessions. The bundled JetBrainsMono Nerd Font Mono displays terminal and Powerline icons without extra font installation. Save frequently used commands as snippets and review them before sending.\n\nFILES AND TRANSFERS\nBrowse SFTP folders and preview or edit supported text files. Upload through the system document picker. Download files, open them with compatible apps or save a copy using the iOS share sheet. View transfer progress, retry supported tasks and swipe to remove transfer records. Editing a file in another app does not automatically upload it to the server. Keep Serlink open during transfers; background completion is not guaranteed.\n\nYOUR PRIVATE WORKSPACE\nStore hosts and credentials in an encrypted vault. Save the recovery key, create encrypted backups and use biometric unlock on supported devices. Optionally sync encrypted workspace records through iCloud or your own WebDAV endpoint. Downloaded files are outside vault encryption.\n\nNo Serlink account, advertising, in-app purchases or subscription is required. SSH/SFTP access uses servers and credentials you provide. English, Simplified Chinese and Japanese interfaces, with light and dark appearances.\n\nLocal shell tabs, system SSH-agent authentication and desktop split panes are not iOS features. Locking the vault prevents new credential access; existing connections and transfers continue until you close them. iCloud requires an iCloud account. WebDAV requires your own endpoint.",
+      "whatsNew": "The first Serlink release for iPhone and iPad: SSH sessions, SFTP files, encrypted credentials, command snippets, bundled Nerd Font icons and optional iCloud or WebDAV sync.",
+      "betaDescription": "The first Serlink release for iPhone and iPad: SSH sessions, SFTP files, encrypted credentials, command snippets, bundled Nerd Font icons and optional iCloud or WebDAV sync.",
+      "betaWhatToTest": "Create and unlock a vault; add a test host and identity; verify its host key; connect and reconnect SSH; browse SFTP and transfer disposable files; test pause, resume and cancellation; use snippets and terminal search; check light/dark appearance and system share sheet and rotation. If available, test iCloud between two devices or sync through your WebDAV server. Include app/build, iOS/iPadOS version and steps in feedback. Remove credentials, private keys, server addresses and terminal output from attachments.",
+      "supportURL": "https://serlink.alkinum.com/support/",
+      "privacyPolicyURL": "https://serlink.alkinum.com/privacy/",
+      "marketingURL": "https://serlink.alkinum.com/"
+    },
+    "zh-Hans": {
+      "name": "Serlink: SSH终端与SFTP文件",
+      "subtitle": "远程服务器管理与安全文件传输",
+      "promotionalText": "SSH 终端与 SFTP 文件管理整合到私密工作区，内置 Nerd Font 图标字体，提供加密凭据、命令片段、文件传输，以及可选的 iCloud 或 WebDAV 同步。",
+      "keywords": "客户端,Linux,运维,密钥,跳板机,片段,WebDAV,iCloud,保险库,加密,同步",
+      "description": "Serlink 是适用于 iPhone 和 iPad 的 SSH 终端与 SFTP 客户端。连接自己的服务器、管理远程文件，并将连接凭据保存在本地加密保险库中。\n\n远程终端\n管理主机与凭据、核验 SSH 主机指纹、通过跳板机连接，在会话标签页之间切换、搜索输出和重新连接。内置 JetBrainsMono Nerd Font Mono，无需额外安装字体即可显示终端和 Powerline 图标。将常用命令保存为片段，发送前检查内容。\n\n文件与传输\n浏览 SFTP 目录，预览或编辑支持的文本文件。通过系统文档选择器上传；下载后可通过 iOS 系统分享菜单选择兼容应用或保存副本。查看传输进度、重试支持的任务，并左滑移除传输记录。在其他应用中修改文件不会自动上传。传输时保持 Serlink 打开，不保证应用挂起后的后台完成。\n\n私密工作区\n主机与凭据保存在加密保险库，支持恢复密钥、加密备份和受支持设备上的生物识别解锁。可选择 iCloud 或自己的 WebDAV 服务同步加密记录。下载文件不属于保险库加密范围。\n\n无需 Serlink 账号，没有广告、内购或订阅。SSH/SFTP 服务器及访问凭据由你提供。支持中文、英文、日文以及深浅外观。\n\niOS 不提供本地 shell、系统 SSH agent 认证或桌面分屏。锁定保险库会阻止新的凭据访问；现有会话和传输会继续，需单独关闭。iCloud 需要 iCloud 账号，WebDAV 需要自己的服务端点。",
+      "whatsNew": "Serlink 的首个 iPhone 与 iPad 版本：SSH 会话、SFTP 文件、加密凭据、命令片段、内置 Nerd Font 图标，以及可选的 iCloud 或 WebDAV 同步。",
+      "betaDescription": "Serlink 的首个 iPhone 与 iPad 版本：SSH 会话、SFTP 文件、加密凭据、命令片段、内置 Nerd Font 图标，以及可选的 iCloud 或 WebDAV 同步。",
+      "betaWhatToTest": "创建和解锁保险库；添加测试主机与凭据并核验主机密钥；连接和重连 SSH；浏览 SFTP 并传输测试文件；测试暂停、继续和取消；使用命令片段和终端搜索；检查深浅外观及系统分享菜单与旋转。如条件允许，测试两台设备的 iCloud 同步或自己的 WebDAV 服务。反馈请包含版本、iOS/iPadOS 版本和复现步骤，附件中请移除凭据、私钥、服务器地址和终端输出。",
+      "supportURL": "https://serlink.alkinum.com/zh/support/",
+      "privacyPolicyURL": "https://serlink.alkinum.com/zh/privacy/",
+      "marketingURL": "https://serlink.alkinum.com/zh/"
+    },
+    "ja": {
+      "name": "Serlink - SSH接続とSFTP転送",
+      "subtitle": "サーバー管理・ファイル転送・暗号化",
+      "promotionalText": "SSH ターミナルと SFTP をひとつに。Nerd Font を内蔵し、認証情報の暗号化、スニペット、ファイル転送、任意の iCloud・WebDAV 同期に対応。",
+      "keywords": "ターミナル,リモート,Linux,鍵,踏み台,スニペット,WebDAV,iCloud,同期",
+      "description": "Serlink は iPhone と iPad 向けの SSH ターミナル・SFTP クライアントです。自分のサーバーに接続し、リモートファイルを管理し、認証情報をローカルの暗号化ボールトに保存できます。\n\nリモートターミナル\nホストと認証情報の整理、SSH ホスト鍵の確認、踏み台ホスト、セッションタブ、出力検索、再接続に対応。JetBrainsMono Nerd Font Mono を内蔵し、追加インストールなしでターミナルや Powerline のアイコンを表示します。よく使うコマンドはスニペットに保存し、送信前に確認できます。\n\nファイルと転送\nSFTP フォルダを閲覧し、対応するテキストをプレビュー・編集します。システムの書類ピッカーでアップロードし、ダウンロード後は共有シートから対応アプリで開くかコピーを保存できます。進捗確認、対応タスクの再試行、スワイプでの転送記録削除ができます。他のアプリでの編集は自動アップロードされません。転送中はアプリを開いてください。バックグラウンド完了は保証しません。\n\nプライベートなワークスペース\nホストと認証情報を暗号化ボールトで保護します。復旧キー、暗号化バックアップ、対応デバイスの生体認証解除に対応。iCloud または自分の WebDAV エンドポイントで暗号化レコードを同期できます。ダウンロードファイルはボールト暗号化の対象外です。\n\nSerlink アカウント、広告、アプリ内課金、サブスクリプションは不要です。SSH/SFTP サーバーと認証情報はご自身で用意してください。日本語・英語・簡体字中国語、ライト・ダーク表示に対応。\n\niOS にはローカルシェル、システム SSH agent、デスクトップ分割表示はありません。ボールトのロック後も既存の接続と転送は続きます。切断するには個別に閉じてください。iCloud には iCloud アカウント、WebDAV にはご自身のサービスが必要です。",
+      "whatsNew": "Serlink 初の iPhone・iPad 版。SSH、SFTP、暗号化された認証情報、スニペット、内蔵 Nerd Font、任意の iCloud・WebDAV 同期に対応します。",
+      "betaDescription": "Serlink 初の iPhone・iPad 版。SSH、SFTP、暗号化された認証情報、スニペット、内蔵 Nerd Font、任意の iCloud・WebDAV 同期に対応します。",
+      "betaWhatToTest": "ボールトの作成と解除、ホストと認証情報の追加、ホスト鍵の確認、SSH 接続と再接続、SFTP 閲覧とテストファイルの転送、一時停止・再開・キャンセル、スニペットと検索、ライト・ダーク表示、共有シートと画面回転を確認してください。可能なら 2 台で iCloud 同期、または自分の WebDAV サーバーをテストしてください。フィードバックにはアプリと iOS/iPadOS のバージョン、再現手順を記載し、認証情報、秘密鍵、サーバーのアドレス、ターミナル出力を添付から除いてください。",
+      "supportURL": "https://serlink.alkinum.com/ja/support/",
+      "privacyPolicyURL": "https://serlink.alkinum.com/ja/privacy/",
+      "marketingURL": "https://serlink.alkinum.com/ja/"
+    }
+  },
+  "buildNumber": "12"
+}

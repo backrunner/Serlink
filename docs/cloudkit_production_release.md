@@ -45,6 +45,25 @@ SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED=1 \
 The confirmation variable is intentionally explicit because deploying the schema
 to Production is an Apple Developer portal action, not a local repository change.
 
+## Verification on 2026-10-11
+
+Apple `cktool export-schema` successfully exported Development and Production
+for team `PB8H83VL3Z`. The exports match byte-for-byte. Production includes
+`SerlinkSyncObject`, `path STRING QUERYABLE`, `data ASSET`, a queryable record ID,
+and creator-only read/write permissions. Snapshots are in
+`docs/release/cloudkit/`. No promotion is needed for the current contract.
+
+```sh
+xcrun cktool export-schema --team-id PB8H83VL3Z \
+  --container-id iCloud.com.alkinum.serlink --environment production \
+  --output-file /tmp/serlink-production.ckdb
+```
+
+This confirms the deployed schema, not successful reads/writes or push delivery
+from the final distribution builds. Repeat the physical two-device smoke plan
+below after upload and TestFlight processing. Neither an environment variable
+nor a local entitlement check substitutes for that smoke test.
+
 ## Build gates
 
 For a full preflight without the production confirmation gate:

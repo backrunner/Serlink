@@ -1,7 +1,7 @@
 # macOS submission materials
 
-Prepared on 2026-09-30 for Serlink 1.0.0, macOS build 15. These are local
-submission materials; no upload, notarization, or review submission is implied.
+Prepared on 2026-10-11 for Serlink 1.0.0, macOS build 16. App Store Connect
+name/subtitle/category updates are saved. Three-language version metadata, screenshots and the privately supplied App Review contact are saved. See the dated report for upload state.
 
 ## Files
 
@@ -14,20 +14,19 @@ submission materials; no upload, notarization, or review submission is implied.
 - `screenshots/{en,zh,ja}/`: five 2560 × 1600 JPEGs per locale, in display order.
 - `licenses/`: repository, resolved-package and native CocoaPods license texts.
 - `icon-1024.png`: the existing opaque macOS app icon.
-- `../review-2026-09-30.md`: dependency changes, findings, and verification.
+- `../review-2026-10-11.md`: dependency changes, findings, and verification.
 
 The screenshot set renders the production Flutter widgets with the App Store
-platform capabilities, locally installed macOS fonts, and fictional in-memory fixture data.
+platform capabilities, native macOS Flutter engine and system fonts, and fictional in-memory fixture data.
 Terminal text and remote directory contents are examples, not live server results.
 Screenshots do not verify a distribution-signed app, CloudKit Production, native
 file pickers, or VoiceOver. Review all assets against the final distribution build
 before upload. No user vault, real credentials, or private host data are used.
 
-Regenerate on macOS with the selected Flutter 3.47.5 SDK and Python `fonttools`
-installed in a virtual environment (font files are not redistributed):
+Regenerate on macOS with the selected Flutter 3.47.5 SDK (the capture temporarily adds and restores the integration-test dependency):
 
 ```sh
-python3 tool/render_store_screenshots.py /path/to/flutter
+python3 tool/capture_native_macos_store_screenshots.py --flutter /path/to/flutter
 python3 tool/check_store_materials.py
 ```
 
@@ -64,14 +63,14 @@ questionnaire; the resulting rating is determined by App Store Connect.
 
 | Item | State |
 | --- | --- |
-| Developer/legal entity, copyright confirmation, review contact, bank/tax and trader information | Intentionally left to the account holder. |
-| Support contact and hosting domain | Contact is support@serlink.alkinum.com. Website URLs are configured; deploy and verify them before App Store submission. |
-| Price, territories, release method and date | Business choices are unset. No price or availability changes have been made. |
-| Encryption declaration and any jurisdiction-specific documents | Technical inventory is prepared in `encryption.md`; complete the current questionnaire and required declarations. |
+| Content rights and account agreements | Content-rights confirmation remains with the account holder; existing trader and Standard Apple EULA settings were retained. |
+| Support contact and hosting domain | Contact is support@serlink.alkinum.com. Website is deployed and privacy/support URLs return HTTPS 200; mailbox delivery remains unverified. |
+| Price, territories, release method and date | US$1.99 with US base territory, worldwide except France (174 current territories), automatic release after approval; saved in App Store Connect. |
+| Encryption declaration and any jurisdiction-specific documents | The current build questionnaire was answered with standard application-level algorithms and no France distribution; missing-compliance status cleared. Implementation inventory is in `encryption.md`. |
 | Distribution rights and EULA | Confirm rights for the AGPL project and bundled dependencies before accepting App Store agreements. No rights declaration has been submitted. |
-| App Review SSH demonstration | Supply a dedicated disposable review server, reachability and non-production credentials in the private review fields if required. The app itself needs no Serlink account. Never commit these credentials. |
-| CloudKit schema | Local contract gate passes; Production deployment and two-device sync still require live verification. |
-| Final archive/export/upload | Release compilation is verified; App Store distribution export and upload are not performed. Build 15 was not checked against previously uploaded build numbers; increment before the next upload. |
+| App Review SSH demonstration | No bundled demo server will be supplied by owner choice. Review notes explain reviewer-owned SSH access. The app itself needs no Serlink account. |
+| CloudKit schema | Live Production and Development schemas are identical and satisfy the contract; the exported app has Production CloudKit and push entitlements. Two-device Production sync remains unverified. |
+| Final archive/export/upload | Build 16 archive and distribution export pass, including strict signature verification. Upload state is recorded in the dated report. |
 | Direct macOS release | Use the separate Developer ID/DMG scripts; notarization, stapling and a quarantined clean-Mac check remain required. |
 
 Use `docs/macos_release.md` for the build, export, upload and direct-distribution
@@ -80,7 +79,8 @@ the gate.
 
 ## 中文说明
 
-材料包含中、英、日商店文案、TestFlight 文案、审核操作说明、隐私和支持页面、
-加密实现清单、三套截图及现有图标。所有内容保存在仓库中，尚未发布到网站或
-App Store Connect。价格、地区、网站部署、审核服务器和加密申报等尚待
-账号持有人完成；这些也不能用构建通过来代替。主体、税务、银行及法律承诺信息未填。
+已更新中、英、日搜索名称、副标题、关键词和审核说明，网站升级到 svedocs 0.2.3
+并部署。macOS 构建 16 的归档、发行导出、签名与 Production 权限均已验证。
+完整测试通过不代替真机跨设备 CloudKit 同步。截图已在原生 macOS 引擎上使用真实生产组件和虚构数据重新捕获，
+不代表真实服务器或 CloudKit 运行结果。价格 US$1.99、全球排除法国、获批后自动发布和审核联系人已保存；按所有者要求不提供专用测试服务器，
+最终发布与加密申报状态以本次审核报告为准。

@@ -23,3 +23,7 @@ Diagnostic exports are available in **Settings → Diagnostic logs**. Review the
 [Connection troubleshooting](/docs/troubleshooting), [vault recovery](/docs/vault) and [sync guidance](/docs/sync) cover common issues. Check [release availability](/download) if you cannot find an installer.
 
 Email opens your own mail application. This website does not upload diagnostics or submit a support request for you. See [privacy](/privacy) for handling of messages you choose to send.
+
+## iPhone and iPad transfers
+
+Use the document picker to upload and the share sheet to open or save downloaded files. External edits do not automatically upload. Keep Serlink open during transfers; background completion is not guaranteed. Local shells, OS SSH-agent authentication and desktop split panes are not iOS features.

@@ -1,6 +1,6 @@
 # Serlink official website
 
-A custom product website and usage guide built with **svedocs 0.2.2** and Svelte 5.
+A custom product website and usage guide built with **svedocs 0.2.3** and Svelte 5.
 The canonical domain is **https://serlink.alkinum.com**. Support uses
 **support@serlink.alkinum.com**. The domain and email address are configuration;
 a local build does not establish live hosting or mailbox delivery.
@@ -14,7 +14,7 @@ for hosts, terminals, SFTP, vault recovery, sync and macOS MCP access.
 
 Use Node 24 LTS or newer and the package manager pinned in `package.json`.
 TypeScript is constrained to 6.x. Package versions were verified against the
-registry on 2026-09-30; use the checked-in lockfile for reproducible installs.
+registry on 2026-10-11; use the checked-in lockfile for reproducible installs.
 
 ```sh
 cd website

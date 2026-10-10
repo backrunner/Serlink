@@ -24,7 +24,7 @@ App Store build behavior:
 - Uses App Sandbox. Remote SSH/SFTP, selected-file import/export, encrypted vault
   storage and encrypted sync are available.
 - Local shell tabs, OS SSH-agent authentication, automatic ~/.ssh/config access,
-  direct local-file launching and the standalone MCP stdio helper are disabled.
+  and the standalone MCP stdio helper are disabled.
 - The optional MCP HTTP endpoint is authenticated, listens on loopback only, and
   requires explicit session authorization for an external agent. Serlink does
   not include an AI model or send data to an AI provider by itself.
@@ -33,9 +33,4 @@ App Store build behavior:
 - Diagnostics stay local unless the user exports and shares them. Diagnostic
   exports exclude terminal output and redact sensitive connection information.
 
-Before pasting these notes into App Store Connect:
-Add the dedicated review SSH server details, if needed, in the private review
-fields or an attachment. Include hostname, port, username, auth method, temporary
-credential, expected host-key fingerprint, and allowed test directory. Confirm
-that Apple can reach it throughout the review period. Do not use or publish real
-production credentials. Reviewer contact fields are intentionally not supplied.
+For SSH/SFTP testing, add an SSH server available to the reviewer and its own credentials, then verify the server host key. Serlink does not operate an account service or bundled demo server.

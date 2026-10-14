@@ -80,7 +80,7 @@ class QuarantinedRecords extends Table {
 class SerlinkDatabase extends _$SerlinkDatabase {
   SerlinkDatabase([QueryExecutor? executor]) : super(executor ?? _open());
 
-  static const currentSchemaVersion = 7;
+  static const currentSchemaVersion = 8;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -91,6 +91,7 @@ class SerlinkDatabase extends _$SerlinkDatabase {
       await migrator.createAll();
       await _createSyncAuxiliaryTables();
       await _createRecordTypeIndex();
+      await _createLocalTransferTasksTable();
     },
     onUpgrade: (migrator, from, to) async {
       var current = from;
@@ -121,6 +122,10 @@ class SerlinkDatabase extends _$SerlinkDatabase {
         await _createRecordTypeIndex();
         current = 7;
       }
+      if (current == 7 && to >= 8) {
+        await _createLocalTransferTasksTable();
+        current = 8;
+      }
       if (current == to) {
         return;
       }
@@ -139,6 +144,15 @@ class SerlinkDatabase extends _$SerlinkDatabase {
     'CREATE INDEX IF NOT EXISTS encrypted_records_type_id '
     'ON encrypted_records(type, id)',
   );
+
+  Future<void> _createLocalTransferTasksTable() => customStatement('''
+CREATE TABLE IF NOT EXISTS local_transfer_tasks (
+  vault_id TEXT NOT NULL,
+  id TEXT NOT NULL,
+  envelope_json TEXT NOT NULL,
+  PRIMARY KEY (vault_id, id)
+)
+''');
 
   Future<void> _createSyncAuxiliaryTables() async {
     await transaction(() async {
@@ -273,9 +287,8 @@ LazyDatabase _open() {
         databaseFile: paths.databaseFile,
         automaticBackupDirectory: paths.automaticBackupDirectory,
       ).run(targetSchemaVersion: SerlinkDatabase.currentSchemaVersion);
-      return NativeDatabase.createInBackground(
-        paths.databaseFile,
-      ).interceptWith(_CloseCallbackQueryInterceptor(profileLock.release));
+      return NativeDatabase.createInBackground(paths.databaseFile)
+          .interceptWith(_CloseCallbackQueryInterceptor(profileLock.release));
     } on Object {
       await profileLock.release();
       rethrow;

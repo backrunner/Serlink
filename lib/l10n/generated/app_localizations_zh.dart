@@ -73,10 +73,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostsDeleteAction => '删除';
 
   @override
-  String get hostsDeletedSnack => '主机已删除。';
+  String get hostsDeletedSnack => '主机已删除';
 
   @override
-  String get hostsDeleteFailedSnack => '无法删除主机。';
+  String get hostsDeleteFailedSnack => '无法删除主机';
 
   @override
   String get hostsAddTooltip => '添加主机';
@@ -191,10 +191,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLanguageJapanese => '日本語';
 
   @override
-  String get settingsLanguageSaved => '语言已更新。';
+  String get settingsLanguageSaved => '语言已更新';
 
   @override
-  String get settingsLanguageSaveFailed => '语言无法更新。';
+  String get settingsLanguageSaveFailed => '语言无法更新';
 
   @override
   String get settingsSecuritySection => '安全';
@@ -287,10 +287,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsBackgroundPrivacyDisabled => '已关闭。切到后台时保留当前界面。';
 
   @override
-  String get settingsBackgroundPrivacySaved => '后台隐私保护已更新。';
+  String get settingsBackgroundPrivacySaved => '后台隐私保护已更新';
 
   @override
-  String get settingsBackgroundPrivacySaveFailed => '无法更新后台隐私保护。';
+  String get settingsBackgroundPrivacySaveFailed => '无法更新后台隐私保护';
 
   @override
   String get settingsSshConfigAutoImportTitle => '自动导入 SSH 配置';
@@ -306,10 +306,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSshConfigAutoImportDisabled => '已关闭。导入新主机前会先询问。';
 
   @override
-  String get settingsSshConfigAutoImportSaved => 'SSH 配置自动导入设置已更新。';
+  String get settingsSshConfigAutoImportSaved => 'SSH 配置自动导入设置已更新';
 
   @override
-  String get settingsSshConfigAutoImportSaveFailed => '无法更新 SSH 配置自动导入设置。';
+  String get settingsSshConfigAutoImportSaveFailed => '无法更新 SSH 配置自动导入设置';
 
   @override
   String get sshConfigNewHostsTitle => '发现新的 SSH 配置主机';
@@ -397,7 +397,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String settingsMcpInstallSuccess(String agent) {
-    return '已将 Serlink MCP 配置写入 $agent。';
+    return '已将 Serlink MCP 配置写入 $agent';
   }
 
   @override
@@ -418,7 +418,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsMcpTokenCopyTooltip => '复制令牌';
 
   @override
-  String get settingsMcpTokenCopied => '令牌已复制到剪贴板。';
+  String get settingsMcpTokenCopied => '令牌已复制到剪贴板';
 
   @override
   String get settingsMcpCopyHttpConfigAction => '复制 HTTP MCP 配置 (JSON)';
@@ -427,7 +427,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsMcpCopyStdioConfigAction => '复制 stdio 助手配置 (JSON)';
 
   @override
-  String get settingsMcpConfigCopied => 'MCP 客户端配置已复制到剪贴板。';
+  String get settingsMcpConfigCopied => 'MCP 客户端配置已复制到剪贴板';
 
   @override
   String get settingsMcpStdioPathHint => '仅在调用工具时按需启动 Serlink。请保持应用路径不变。';
@@ -496,7 +496,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAboutSection => '关于';
 
   @override
-  String get settingsRepositoryOpenFailed => '无法打开仓库链接。';
+  String get settingsRepositoryOpenFailed => '无法打开仓库链接';
 
   @override
   String settingsAppVersionOnly(String version) {
@@ -541,16 +541,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDisableAction => '停用';
 
   @override
-  String get settingsLocalUnlockEnabledSnack => '生物识别解锁已启用。锁定保险库后即可使用生物识别。';
+  String get settingsLocalUnlockEnabledSnack => '生物识别解锁已启用。锁定保险库后即可使用生物识别';
 
   @override
-  String get settingsLocalUnlockVerifyFailedSnack => '无法验证生物识别解锁。';
+  String get settingsLocalUnlockVerifyFailedSnack => '无法验证生物识别解锁';
 
   @override
-  String get settingsLocalUnlockDisabledSnack => '生物识别解锁已停用。';
+  String get settingsLocalUnlockDisabledSnack => '生物识别解锁已停用';
 
   @override
-  String get settingsLocalUnlockStillAvailableSnack => '此设备上仍可使用生物识别解锁。';
+  String get settingsLocalUnlockStillAvailableSnack => '此设备上仍可使用生物识别解锁';
 
   @override
   String get settingsLocalUnlockUpdateFailed => '无法更新生物识别解锁。';
@@ -642,10 +642,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '本地保险库数据需要先恢复，才能重建远程同步。Serlink 可以从当前远程同步集恢复本地加密记录。';
 
   @override
-  String get syncRemoteRepaired => '远程同步已修复。';
+  String get syncRemoteRepaired => '远程同步已修复';
 
   @override
-  String get syncWebDavCertificateTrustSaved => 'WebDAV 证书信任已保存。';
+  String get syncWebDavCertificateTrustSaved => 'WebDAV 证书信任已保存';
 
   @override
   String get syncErrorVaultDataMissing => '同步所需的保险库数据在本机缺失。';
@@ -703,21 +703,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get syncErrorStagedProviderInvalid => '暂存的同步提供方无效。';
 
   @override
-  String get syncICloudEnabledSnack => 'iCloud 同步已启用。';
+  String get syncICloudEnabledSnack => 'iCloud 同步已启用';
 
   @override
-  String get syncICloudPausedSnack => 'iCloud 同步已暂停。';
+  String get syncICloudPausedSnack => 'iCloud 同步已暂停';
 
   @override
   String get syncICloudRemoteVaultAdoptedSnack =>
-      'iCloud 中已有 Serlink 保险库。请使用那个保险库的密码短语继续同步。';
+      'iCloud 中已有 Serlink 保险库。请使用那个保险库的密码短语继续同步';
 
   @override
   String get syncICloudRemoteVaultAdoptedAfterInitializeSnack =>
-      '已改用 iCloud 中已有的保险库，本次设置的密码未生效。请使用 iCloud 保险库的密码解锁。';
+      '已改用 iCloud 中已有的保险库，本次设置的密码未生效。请使用 iCloud 保险库的密码解锁';
 
   @override
-  String get syncWebDavRemoteVaultAdoptedSnack => '已切换为远程保险库。请使用远程保险库的密码解锁。';
+  String get syncWebDavRemoteVaultAdoptedSnack => '已切换为远程保险库。请使用远程保险库的密码解锁';
 
   @override
   String get syncICloudUnavailableError => 'iCloud 同步不可用。';
@@ -730,8 +730,8 @@ class AppLocalizationsZh extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '同步冲突已解决。已同步 $count 条加密记录。',
-      one: '同步冲突已解决。已同步 1 条加密记录。',
+      other: '同步冲突已解决。已同步 $count 条加密记录',
+      one: '同步冲突已解决。已同步 1 条加密记录',
     );
     return '$_temp0';
   }
@@ -1118,7 +1118,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostGroupLoadFailed => '无法加载分组。';
 
   @override
-  String get hostGroupMoveFailed => '无法将主机移入分组。';
+  String get hostGroupMoveFailed => '无法将主机移入分组';
 
   @override
   String get hostsUngroupedGroup => '未分组';
@@ -1326,19 +1326,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get snippetErrorNotFound => '该片段已不存在。';
 
   @override
-  String get snippetSentSnack => '片段已发送到终端。';
+  String get snippetSentSnack => '片段已发送到终端';
 
   @override
-  String get snippetInsertedSnack => '片段已插入终端。';
+  String get snippetInsertedSnack => '片段已插入终端';
 
   @override
-  String get snippetNoTerminalSnack => '请先打开已连接的终端标签。';
+  String get snippetNoTerminalSnack => '请先打开已连接的终端标签';
 
   @override
-  String get snippetDeletedSnack => '片段已删除。';
+  String get snippetDeletedSnack => '片段已删除';
 
   @override
-  String get snippetDeleteFailedSnack => '无法删除片段。';
+  String get snippetDeleteFailedSnack => '无法删除片段';
 
   @override
   String get syncDevicesDialogTitle => '同步设备';
@@ -1352,10 +1352,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get syncDeviceRemoveBody => '这会从此保险库中移除加密同步设备记录。';
 
   @override
-  String get syncDeviceRemovedSnack => '同步设备已移除。';
+  String get syncDeviceRemovedSnack => '同步设备已移除';
 
   @override
-  String get syncDeviceRemoveFailedSnack => '无法移除同步设备。';
+  String get syncDeviceRemoveFailedSnack => '无法移除同步设备';
 
   @override
   String get syncDeviceResetTitle => '重置同步设备？';
@@ -1365,10 +1365,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '这会从加密同步中移除当前设备注册，并创建新的本地设备身份。其他设备会看到旧设备已被移除。';
 
   @override
-  String get syncDeviceResetSnack => '同步设备已重置。下次同步时会创建新的注册。';
+  String get syncDeviceResetSnack => '同步设备已重置。下次同步时会创建新的注册';
 
   @override
-  String get syncDeviceResetFailedSnack => '无法重置同步设备。';
+  String get syncDeviceResetFailedSnack => '无法重置同步设备';
 
   @override
   String get syncDevicesEmptyTitle => '还没有同步设备';
@@ -1450,7 +1450,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get webDavAllowHttpAction => '允许 HTTP';
 
   @override
-  String get webDavSavedSnack => 'WebDAV 同步设置已保存。';
+  String get webDavSavedSnack => 'WebDAV 同步设置已保存';
 
   @override
   String get webDavRemoveTitle => '移除 WebDAV 同步？';
@@ -1459,7 +1459,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get webDavRemoveBody => '这会移除本地 WebDAV 配置和保存的密码。';
 
   @override
-  String get webDavRemovedSnack => 'WebDAV 同步设置已移除。';
+  String get webDavRemovedSnack => 'WebDAV 同步设置已移除';
 
   @override
   String get webDavRemoteVaultMismatchTitle => '远程已有另一个 Serlink 保险库';
@@ -1504,7 +1504,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get credentialsDeleteTooltip => '删除凭据';
 
   @override
-  String get credentialUpdatedSnack => '凭据已更新。';
+  String get credentialUpdatedSnack => '凭据已更新';
 
   @override
   String get credentialDeleteTitle => '删除凭据？';
@@ -1518,13 +1518,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get credentialDeletedSnack => '凭据已删除。';
+  String get credentialDeletedSnack => '凭据已删除';
 
   @override
-  String get credentialDeleteFailedSnack => '无法删除凭据。';
+  String get credentialDeleteFailedSnack => '无法删除凭据';
 
   @override
-  String get credentialAddedSnack => '凭据已添加。';
+  String get credentialAddedSnack => '凭据已添加';
 
   @override
   String get credentialGenerateKeyAction => '生成密钥对';
@@ -1540,7 +1540,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get credentialCopyPublicKeyTooltip => '复制公钥';
 
   @override
-  String get credentialPublicKeyCopiedSnack => '已复制公钥。';
+  String get credentialPublicKeyCopiedSnack => '已复制公钥';
 
   @override
   String get credentialKeyGenerationFailed => '密钥生成失败。';
@@ -1566,10 +1566,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get knownHostDeletedSnack => '已知主机已删除。';
+  String get knownHostDeletedSnack => '已知主机已删除';
 
   @override
-  String get knownHostDeleteFailedSnack => '无法删除已知主机。';
+  String get knownHostDeleteFailedSnack => '无法删除已知主机';
 
   @override
   String get startAction => '开始';
@@ -1952,40 +1952,40 @@ class AppLocalizationsZh extends AppLocalizations {
   String get forwardingDynamicValidationError => '绑定主机和端口必须有效。';
 
   @override
-  String get forwardingLocalStartedSnack => '本地端口转发已启动。';
+  String get forwardingLocalStartedSnack => '本地端口转发已启动';
 
   @override
-  String get forwardingLocalStartFailedSnack => '无法启动本地端口转发。';
+  String get forwardingLocalStartFailedSnack => '无法启动本地端口转发';
 
   @override
-  String get forwardingLocalStoppedSnack => '本地端口转发已停止。';
+  String get forwardingLocalStoppedSnack => '本地端口转发已停止';
 
   @override
-  String get forwardingLocalStopFailedSnack => '无法停止本地端口转发。';
+  String get forwardingLocalStopFailedSnack => '无法停止本地端口转发';
 
   @override
-  String get forwardingRemoteStartedSnack => '远程端口转发已启动。';
+  String get forwardingRemoteStartedSnack => '远程端口转发已启动';
 
   @override
-  String get forwardingRemoteStartFailedSnack => '无法启动远程端口转发。';
+  String get forwardingRemoteStartFailedSnack => '无法启动远程端口转发';
 
   @override
-  String get forwardingRemoteStoppedSnack => '远程端口转发已停止。';
+  String get forwardingRemoteStoppedSnack => '远程端口转发已停止';
 
   @override
-  String get forwardingRemoteStopFailedSnack => '无法停止远程端口转发。';
+  String get forwardingRemoteStopFailedSnack => '无法停止远程端口转发';
 
   @override
-  String get forwardingSocksStartedSnack => 'SOCKS 代理已启动。';
+  String get forwardingSocksStartedSnack => 'SOCKS 代理已启动';
 
   @override
-  String get forwardingSocksStartFailedSnack => '无法启动 SOCKS 代理。';
+  String get forwardingSocksStartFailedSnack => '无法启动 SOCKS 代理';
 
   @override
-  String get forwardingSocksStoppedSnack => 'SOCKS 代理已停止。';
+  String get forwardingSocksStoppedSnack => 'SOCKS 代理已停止';
 
   @override
-  String get forwardingSocksStopFailedSnack => '无法停止 SOCKS 代理。';
+  String get forwardingSocksStopFailedSnack => '无法停止 SOCKS 代理';
 
   @override
   String get vaultCreateTitle => '创建保险库';
@@ -2140,7 +2140,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vaultQuarantineRecordsAction => '隔离损坏记录';
 
   @override
-  String get vaultCorruptRecordsQuarantinedSnack => '损坏记录已隔离。';
+  String get vaultCorruptRecordsQuarantinedSnack => '损坏记录已隔离';
 
   @override
   String get vaultResetTitle => '重置保险库';
@@ -2262,8 +2262,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get syncConflictRemoteLabel => '远程';
 
   @override
-  String get syncConflictUnsupportedBody =>
-      '此记录类型当前需要整条记录解决。请对该冲突使用已有的本地或远程操作。';
+  String get syncConflictUnsupportedBody => '此记录类型当前需要整条记录解决。请对该冲突使用已有的本地或远程操作';
 
   @override
   String syncConflictFieldCount(num count) {
@@ -2345,16 +2344,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sftpFolderNameLabel => '文件夹名称';
 
   @override
-  String get sftpFolderCreatedSnack => '文件夹已创建。';
+  String get sftpFolderCreatedSnack => '文件夹已创建';
 
   @override
-  String get sftpSelectedFileNoPathSnack => '所选文件没有本地路径。';
+  String get sftpSelectedFileNoPathSnack => '所选文件没有本地路径';
 
   @override
-  String get sftpUploadQueuedSnack => '上传已加入队列。';
+  String get sftpUploadQueuedSnack => '上传已加入队列';
 
   @override
-  String get sftpFolderUploadQueuedSnack => '文件夹上传已加入队列。';
+  String get sftpFolderUploadQueuedSnack => '文件夹上传已加入队列';
 
   @override
   String get sftpFolderDownloadQueuedSnack => '文件夹已加入下载';
@@ -2416,13 +2415,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sftpTargetPathLabel => '目标路径';
 
   @override
-  String get sftpTargetExistsSnack => '目标路径已存在。';
+  String get sftpTargetExistsSnack => '目标路径已存在';
 
   @override
-  String get sftpEntryRenamedSnack => '条目已重命名。';
+  String get sftpEntryRenamedSnack => '条目已重命名';
 
   @override
-  String get sftpEntryMovedSnack => '条目已移动。';
+  String get sftpEntryMovedSnack => '条目已移动';
 
   @override
   String get sftpChangePermissionsTitle => '更改权限';
@@ -2431,10 +2430,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sftpOctalPermissionsLabel => '权限（八进制或符号）';
 
   @override
-  String get sftpPermissionsOctalError => '权限必须是八进制（如 0644）或符号格式（如 rw-r--r--）。';
+  String get sftpPermissionsOctalError => '权限必须是八进制（如 0644）或符号格式（如 rw-r--r--）';
 
   @override
-  String get sftpPermissionsUpdatedSnack => '权限已更新。';
+  String get sftpPermissionsUpdatedSnack => '权限已更新';
 
   @override
   String sftpDeleteEntryTitle(String name) {
@@ -2448,10 +2447,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sftpDeleteFileBody => '这会删除远程文件。';
 
   @override
-  String get sftpEntryDeletedSnack => '条目已删除。';
+  String get sftpEntryDeletedSnack => '条目已删除';
 
   @override
-  String get sftpFileSavedSnack => '文件已保存。';
+  String get sftpFileSavedSnack => '文件已保存';
 
   @override
   String get remoteFileDiscardTitle => '放弃修改？';
@@ -2512,22 +2511,22 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get transferClearedSnack => '传输已清除。';
+  String get transferClearedSnack => '传输已清除';
 
   @override
-  String get transferRemoveLocalFailedSnack => '传输已移除，但无法删除本地文件。';
+  String get transferRemoveLocalFailedSnack => '传输已移除，但无法删除本地文件';
 
   @override
-  String get transferAndLocalDeletedSnack => '传输和本地文件已删除。';
+  String get transferAndLocalDeletedSnack => '传输和本地文件已删除';
 
   @override
-  String get transferDeletedSnack => '传输已删除。';
+  String get transferDeletedSnack => '传输已删除';
 
   @override
-  String get transferCompletedMissingSnack => '已完成项目在本地不再可用。';
+  String get transferCompletedMissingSnack => '已完成项目在本地不再可用';
 
   @override
-  String get transferOpenFailedSnack => '无法打开已完成项目。';
+  String get transferOpenFailedSnack => '无法打开已完成项目';
 
   @override
   String get transferDeleteTitle => '删除传输？';
@@ -2666,10 +2665,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get exportVaultBackupBody => '备份包含加密的保险库数据。请妥善保管。';
 
   @override
-  String get backupExportedSnack => '加密备份已导出。';
+  String get backupExportedSnack => '加密备份已导出';
 
   @override
-  String get noHostsAvailableExportSnack => '没有可导出的主机。';
+  String get noHostsAvailableExportSnack => '没有可导出的主机';
 
   @override
   String get exportHostMetadataTitle => '导出主机元数据？';
@@ -2679,10 +2678,10 @@ class AppLocalizationsZh extends AppLocalizations {
       '导出主机名称、地址、用户名、标签、跳板主机关联和连接选项。不包含凭据和私钥材料。';
 
   @override
-  String get hostMetadataExportedSnack => '主机元数据已导出。';
+  String get hostMetadataExportedSnack => '主机元数据已导出';
 
   @override
-  String get hostMetadataExportFailedSnack => '无法导出主机元数据。';
+  String get hostMetadataExportFailedSnack => '无法导出主机元数据';
 
   @override
   String get exportOpenSshConfigTitle => '导出 OpenSSH 配置？';
@@ -2692,13 +2691,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '将所选主机和所需跳板主机导出为 OpenSSH 配置。不包含凭据和私钥材料。';
 
   @override
-  String get openSshConfigExportedSnack => 'OpenSSH 配置已导出。';
+  String get openSshConfigExportedSnack => 'OpenSSH 配置已导出';
 
   @override
   String get exportIdentityMetadataTitle => '导出身份元数据？';
 
   @override
-  String get identityMetadataExportedSnack => '身份元数据已导出。';
+  String get identityMetadataExportedSnack => '身份元数据已导出';
 
   @override
   String get exportDiagnosticBundleTitle => '导出诊断日志？';
@@ -2708,7 +2707,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '诊断日志会被脱敏，并排除终端输出、命令、主机、用户名、路径、凭据和私钥。';
 
   @override
-  String get diagnosticBundleExportedSnack => '诊断日志已导出。';
+  String get diagnosticBundleExportedSnack => '诊断日志已导出';
 
   @override
   String get backupOperationFailed => '备份操作失败。';
@@ -2732,18 +2731,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importEncryptedBackupBody => '这会替换本机的保险库数据，并合并所选备份中的加密记录。';
 
   @override
-  String get backupImportedSnack => '加密备份已导入。';
+  String get backupImportedSnack => '加密备份已导入';
 
   @override
-  String get noImportableOpenSshHostsSnack => '没有找到可导入的 OpenSSH 主机。';
+  String get noImportableOpenSshHostsSnack => '没有找到可导入的 OpenSSH 主机';
 
   @override
   String openSshHostsImportedSnack(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '已导入 $count 台主机。',
-      one: '已导入 1 台主机。',
+      other: '已导入 $count 台主机',
+      one: '已导入 1 台主机',
     );
     return '$_temp0';
   }
@@ -2753,8 +2752,8 @@ class AppLocalizationsZh extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '已导入 $count 台主机，跳过 $skipped 台。',
-      one: '已导入 1 台主机，跳过 $skipped 台。',
+      other: '已导入 $count 台主机，跳过 $skipped 台',
+      one: '已导入 1 台主机，跳过 $skipped 台',
     );
     return '$_temp0';
   }
@@ -2771,8 +2770,8 @@ class AppLocalizationsZh extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '已导入 $count 个指纹。',
-      one: '已导入 1 个指纹。',
+      other: '已导入 $count 个指纹',
+      one: '已导入 1 个指纹',
     );
     return '$_temp0';
   }
@@ -2782,15 +2781,15 @@ class AppLocalizationsZh extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '已导入 $count 个指纹，$unmatched 个未匹配。',
-      one: '已导入 1 个指纹，$unmatched 个未匹配。',
+      other: '已导入 $count 个指纹，$unmatched 个未匹配',
+      one: '已导入 1 个指纹，$unmatched 个未匹配',
     );
     return '$_temp0';
   }
 
   @override
   String identityImportedSnack(String name) {
-    return '已导入 $name。';
+    return '已导入 $name';
   }
 
   @override
@@ -2884,4 +2883,59 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchAction => '搜索';
+
+  @override
+  String get settingsMcpGuardTitle => '命令防护';
+
+  @override
+  String get settingsMcpGuardLocal => '本机规则';
+
+  @override
+  String settingsMcpGuardEnabled(String model) {
+    return '本机规则 + $model';
+  }
+
+  @override
+  String get settingsMcpGuardLoading => '正在读取防护设置…';
+
+  @override
+  String get settingsMcpGuardUnavailable => '无法读取防护设置';
+
+  @override
+  String get settingsMcpGuardConfigure => '配置';
+
+  @override
+  String get settingsMcpGuardDialogTitle => '模型命令防护';
+
+  @override
+  String get settingsMcpGuardDescription =>
+      '启用后，代理命令会发送给 TypeSafe 判断风险。危险、判断不明确或检查失败时都会拦截。API key 仅保存在本机。';
+
+  @override
+  String get settingsMcpGuardInputHint =>
+      '代理须提交完整命令。分段输入、历史控制和单独回车将被拦截，仍可使用 Ctrl-C 中断。';
+
+  @override
+  String get settingsMcpGuardEnable => '启用模型防护';
+
+  @override
+  String get settingsMcpGuardModel => '模型';
+
+  @override
+  String get settingsMcpGuardApiKey => 'TypeSafe API key';
+
+  @override
+  String get settingsMcpGuardKeySaved => '已保存密钥，留空则保留';
+
+  @override
+  String get settingsMcpGuardKeyHint => '输入 TypeSafe API key';
+
+  @override
+  String get settingsMcpGuardRemoveKey => '移除密钥并关闭模型防护';
+
+  @override
+  String get settingsMcpGuardInvalid => '启用防护前，请填写有效的模型名称和 API key。';
+
+  @override
+  String get settingsMcpGuardSaveFailed => '无法保存防护设置，请重试。';
 }

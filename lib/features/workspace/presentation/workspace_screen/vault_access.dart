@@ -118,7 +118,7 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
     });
 
     return Center(
-      child: SingleChildScrollView(
+      child: SerlinkScrollView(
         padding: const EdgeInsets.all(32),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -413,7 +413,7 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
     final detail = session.failureMessage;
 
     return Center(
-      child: SingleChildScrollView(
+      child: SerlinkScrollView(
         padding: const EdgeInsets.all(32),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),

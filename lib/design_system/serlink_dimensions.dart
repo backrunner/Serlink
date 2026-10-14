@@ -54,7 +54,12 @@ abstract final class SerlinkSizes {
   static const double compactControlHeight = 28;
 
   /// Consistent inset for primary desktop lists below their toolbars.
-  static const EdgeInsets listPadding = EdgeInsets.all(SerlinkSpacing.md);
+  static const EdgeInsets listPadding = EdgeInsets.fromLTRB(
+    SerlinkSpacing.md,
+    SerlinkSpacing.xs,
+    SerlinkSpacing.md,
+    SerlinkSpacing.md,
+  );
 
   /// Indent applied to in-section dividers so they align past the leading icon.
   static const double dividerIndent = 48;

@@ -248,35 +248,23 @@ class _TerminalSettingsDialogState
             mediaQuery.size.height * _settingsDialogHeightFactor,
           );
 
-    final scrollFrame = SizedBox(
+    final scrollFrame = _DialogScrollFrame(
       key: const ValueKey('terminal-settings-scroll-frame'),
       width: sheet ? double.infinity : _dialogWidthSmall,
       height: viewportHeight,
-      child: ClipRect(
-        child: Scrollbar(
-          controller: _scrollController,
-          child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(context)
-                .copyWith(scrollbars: false),
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              physics: const ClampingScrollPhysics(),
-              child: _TerminalSettingsContent(
-                settings: settings,
-                fontCatalog: fontCatalog,
-                catalogLoading: fontCatalogAsync.isLoading,
-                editingHostProfile: editingHostProfile,
-                onChanged: updateSettings,
-              ),
-            ),
-          ),
-        ),
+      controller: _scrollController,
+      child: _TerminalSettingsContent(
+        settings: settings,
+        fontCatalog: fontCatalog,
+        catalogLoading: fontCatalogAsync.isLoading,
+        editingHostProfile: editingHostProfile,
+        onChanged: updateSettings,
       ),
     );
 
     final hostAction = widget.hostId != null && hostSettings == null
-        ? SerlinkTextButton(
-            size: SerlinkButtonSize.sm,
+        ? SerlinkOutlinedButton(
+            size: sheet ? SerlinkButtonSize.sm : SerlinkButtonSize.md,
             onPressed: () =>
                 workspaceController.saveTerminalDisplaySettingsForHost(
                   widget.tabId,
@@ -286,8 +274,8 @@ class _TerminalSettingsDialogState
             child: Text(l10n.terminalSaveForHostAction),
           )
         : widget.hostId != null && hostSettings != null
-        ? SerlinkTextButton(
-            size: SerlinkButtonSize.sm,
+        ? SerlinkOutlinedButton(
+            size: sheet ? SerlinkButtonSize.sm : SerlinkButtonSize.md,
             onPressed: () =>
                 workspaceController.resetTerminalDisplaySettingsForHost(
                   widget.tabId,
@@ -357,17 +345,19 @@ class _TerminalSettingsDialogState
                             ),
                           ],
                         ),
-                        if (hostAction != null)
+                        if (hostAction != null) ...[
+                          const SizedBox(height: 6),
                           Align(
                             alignment: Alignment.centerRight,
                             child: hostAction,
                           ),
+                        ],
                       ],
                     ),
                   ),
                   Divider(height: 1, color: t.borderSubtle),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                     child: scrollFrame,
                   ),
                 ],
@@ -384,10 +374,21 @@ class _TerminalSettingsDialogState
       title: Text(l10n.terminalSettingsTitle),
       content: scrollFrame,
       actions: [
-        ?hostAction,
-        SerlinkFilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.doneAction),
+        Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: hostAction ?? const SizedBox.shrink(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            SerlinkFilledButton(
+              size: SerlinkButtonSize.md,
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(l10n.doneAction),
+            ),
+          ],
         ),
       ],
     );
@@ -412,114 +413,133 @@ class _TerminalSettingsContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Padding(
-      padding: const EdgeInsets.only(right: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SurfaceSection(
-            title: l10n.terminalAppearanceSection,
-            showDividers: false,
-            contentPadding: const EdgeInsets.all(16),
-            children: [
-              SerlinkLabeledField(
-                label: l10n.terminalDarkThemeLabel,
-                child: SerlinkSelect<SerlinkTerminalThemeId>(
-                  key: ValueKey(
-                    'terminal-theme-${settings.themeId.name}-$editingHostProfile',
-                  ),
-                  value: settings.themeId,
-                  items: [
-                    for (final themeId in SerlinkTerminalThemeId.values)
-                      SerlinkSelectItem(
-                        value: themeId,
-                        label: themeId.label,
-                        icon: Icons.palette_outlined,
-                      ),
-                  ],
-                  onChanged: (themeId) {
-                    onChanged(settings.copyWith(themeId: themeId));
-                  },
-                ),
-              ),
-              const SizedBox(height: 16),
-              SerlinkLabeledField(
-                label: l10n.terminalLightThemeLabel,
-                child: SerlinkSelect<SerlinkTerminalThemeId>(
-                  key: ValueKey(
-                    'terminal-light-theme-${settings.lightThemeId.name}-$editingHostProfile',
-                  ),
-                  value: settings.lightThemeId,
-                  items: [
-                    for (final themeId in SerlinkTerminalThemeId.values)
-                      SerlinkSelectItem(
-                        value: themeId,
-                        label: themeId.label,
-                        icon: Icons.palette_outlined,
-                      ),
-                  ],
-                  onChanged: (themeId) {
-                    onChanged(settings.copyWith(lightThemeId: themeId));
-                  },
-                ),
-              ),
-              const SizedBox(height: 16),
-              _TerminalFontPicker(
-                settings: settings,
-                catalog: fontCatalog,
-                catalogLoading: catalogLoading,
-                editingHostProfile: editingHostProfile,
-                onFontFamilyChanged: (fontFamily) {
-                  onChanged(settings.copyWith(fontFamily: fontFamily));
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          SurfaceSection(
-            title: l10n.terminalLayoutSection,
-            showDividers: false,
-            contentPadding: const EdgeInsets.all(16),
-            children: [
-              _SettingsSlider(
-                label: l10n.terminalFontSizeLabel,
-                value: settings.fontSize,
-                min: 10,
-                max: 24,
-                divisions: 14,
-                displayValue: '${settings.fontSize.toStringAsFixed(0)} px',
-                onChanged: (value) {
-                  onChanged(settings.copyWith(fontSize: value));
-                },
-              ),
-              const SizedBox(height: 10),
-              _SettingsSlider(
-                label: l10n.terminalLineHeightLabel,
-                value: settings.lineHeight,
-                min: 1,
-                max: 1.5,
-                divisions: 10,
-                displayValue: settings.lineHeight.toStringAsFixed(2),
-                onChanged: (value) {
-                  onChanged(settings.copyWith(lineHeight: value));
-                },
-              ),
-              const SizedBox(height: 10),
-              _SettingsSlider(
-                label: l10n.terminalScrollbackLabel,
-                value: settings.scrollbackLines.toDouble(),
-                min: 1000,
-                max: 100000,
-                divisions: 99,
-                displayValue: _formatScrollbackLines(settings.scrollbackLines),
-                onChanged: (value) {
-                  onChanged(settings.copyWith(scrollbackLines: value.round()));
-                },
-              ),
-            ],
-          ),
+    final darkTheme = SerlinkLabeledField(
+      label: l10n.terminalDarkThemeLabel,
+      child: SerlinkSelect<SerlinkTerminalThemeId>(
+        key: ValueKey(
+          'terminal-theme-${settings.themeId.name}-$editingHostProfile',
+        ),
+        value: settings.themeId,
+        items: [
+          for (final themeId in SerlinkTerminalThemeId.values)
+            SerlinkSelectItem(
+              value: themeId,
+              label: themeId.label,
+              icon: Icons.palette_outlined,
+            ),
         ],
+        onChanged: (themeId) {
+          onChanged(settings.copyWith(themeId: themeId));
+        },
       ),
+    );
+    final lightTheme = SerlinkLabeledField(
+      label: l10n.terminalLightThemeLabel,
+      child: SerlinkSelect<SerlinkTerminalThemeId>(
+        key: ValueKey(
+          'terminal-light-theme-${settings.lightThemeId.name}-$editingHostProfile',
+        ),
+        value: settings.lightThemeId,
+        items: [
+          for (final themeId in SerlinkTerminalThemeId.values)
+            SerlinkSelectItem(
+              value: themeId,
+              label: themeId.label,
+              icon: Icons.palette_outlined,
+            ),
+        ],
+        onChanged: (themeId) {
+          onChanged(settings.copyWith(lightThemeId: themeId));
+        },
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DialogSection(
+          title: l10n.terminalAppearanceSection,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth >= 440 &&
+                    MediaQuery.textScalerOf(context).scale(13) <= 16) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: darkTheme),
+                      const SizedBox(width: 16),
+                      Expanded(child: lightTheme),
+                    ],
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [darkTheme, const SizedBox(height: 16), lightTheme],
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _DialogSection(
+          title: l10n.terminalFontLabel,
+          action: _TerminalFontStatus(
+            catalog: fontCatalog,
+            loading: catalogLoading,
+          ),
+          children: [
+            _TerminalFontPicker(
+              settings: settings,
+              catalog: fontCatalog,
+              editingHostProfile: editingHostProfile,
+              onFontFamilyChanged: (fontFamily) {
+                onChanged(settings.copyWith(fontFamily: fontFamily));
+              },
+            ),
+            const SizedBox(height: 16),
+            _SettingsSlider(
+              label: l10n.terminalFontSizeLabel,
+              value: settings.fontSize,
+              min: 10,
+              max: 24,
+              divisions: 14,
+              displayValue: '${settings.fontSize.toStringAsFixed(0)} px',
+              onChanged: (value) {
+                onChanged(settings.copyWith(fontSize: value));
+              },
+            ),
+            const SizedBox(height: 10),
+            _SettingsSlider(
+              label: l10n.terminalLineHeightLabel,
+              value: settings.lineHeight,
+              min: 1,
+              max: 1.5,
+              divisions: 10,
+              displayValue: settings.lineHeight.toStringAsFixed(2),
+              onChanged: (value) {
+                onChanged(settings.copyWith(lineHeight: value));
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _DialogSection(
+          title: l10n.terminalLayoutSection,
+          children: [
+            _SettingsSlider(
+              label: l10n.terminalScrollbackLabel,
+              value: settings.scrollbackLines.toDouble(),
+              min: 1000,
+              max: 100000,
+              divisions: 99,
+              displayValue: _formatScrollbackLines(settings.scrollbackLines),
+              onChanged: (value) {
+                onChanged(settings.copyWith(scrollbackLines: value.round()));
+              },
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -528,14 +548,12 @@ class _TerminalFontPicker extends StatefulWidget {
   const _TerminalFontPicker({
     required this.settings,
     required this.catalog,
-    required this.catalogLoading,
     required this.editingHostProfile,
     required this.onFontFamilyChanged,
   });
 
   final TerminalDisplaySettings settings;
   final TerminalFontCatalog catalog;
-  final bool catalogLoading;
   final bool editingHostProfile;
   final ValueChanged<String> onFontFamilyChanged;
 
@@ -583,35 +601,28 @@ class _TerminalFontPickerState extends State<_TerminalFontPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SerlinkLabeledField(
-          label: l10n.terminalFontLabel,
-          trailing: _TerminalFontStatus(
-            catalog: widget.catalog,
-            loading: widget.catalogLoading,
+        SerlinkSelect<String>(
+          key: ValueKey(
+            'terminal-font-family-${widget.settings.fontFamily}-${widget.editingHostProfile}',
           ),
-          child: SerlinkSelect<String>(
-            key: ValueKey(
-              'terminal-font-family-${widget.settings.fontFamily}-${widget.editingHostProfile}',
-            ),
-            value: widget.settings.fontFamily,
-            searchable: true,
-            searchHint: l10n.terminalSearchFontsHint,
-            hintText: l10n.terminalSelectFontHint,
-            items: [
-              for (final font in fonts)
-                SerlinkSelectItem(
-                  value: font.family,
-                  label: font.isBuiltIn && font.isNerdFont
-                      ? '${l10n.terminalBundledFont}  ·  ${font.family}'
-                      : font.label,
-                  icon: _terminalFontIcon(font),
-                ),
-            ],
-            onChanged: (fontFamily) {
-              _customFontController.text = fontFamily;
-              widget.onFontFamilyChanged(fontFamily);
-            },
-          ),
+          value: widget.settings.fontFamily,
+          searchable: true,
+          searchHint: l10n.terminalSearchFontsHint,
+          hintText: l10n.terminalSelectFontHint,
+          items: [
+            for (final font in fonts)
+              SerlinkSelectItem(
+                value: font.family,
+                label: font.isBuiltIn && font.isNerdFont
+                    ? '${l10n.terminalBundledFont}  ·  ${font.family}'
+                    : font.label,
+                icon: _terminalFontIcon(font),
+              ),
+          ],
+          onChanged: (fontFamily) {
+            _customFontController.text = fontFamily;
+            widget.onFontFamilyChanged(fontFamily);
+          },
         ),
         const SizedBox(height: 16),
         SerlinkLabeledField(
@@ -719,7 +730,7 @@ class _TerminalFontPreview extends StatelessWidget {
           color: theme.background,
           border: Border.all(color: t.borderSubtle),
         ),
-        child: SingleChildScrollView(
+        child: SerlinkScrollView(
           scrollDirection: Axis.horizontal,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

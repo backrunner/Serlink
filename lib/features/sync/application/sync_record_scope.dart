@@ -10,6 +10,12 @@ final cloudKitSyncSettingsRecordId = VaultRecordId(
 final webDavSyncSettingsRecordId = VaultRecordId(webDavSyncSettingsRecordValue);
 
 bool isLocalOnlySyncRecord({required VaultRecordId id, required String type}) {
-  return type == syncSettingsRecordType &&
-      (id == cloudKitSyncSettingsRecordId || id == webDavSyncSettingsRecordId);
+  // Older apps stored transfer history in the shared vault. Ignore those
+  // records and their tombstones in both directions, including stale snapshots.
+  return type == 'transfer_task' ||
+      id.value.startsWith('transfer_task:') ||
+      id.value.startsWith('sync:tombstone:transfer_task%3A') ||
+      (type == syncSettingsRecordType &&
+          (id == cloudKitSyncSettingsRecordId ||
+              id == webDavSyncSettingsRecordId));
 }

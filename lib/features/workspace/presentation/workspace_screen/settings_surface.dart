@@ -8,7 +8,7 @@ const EdgeInsets _settingsDesktopSurfacePadding = EdgeInsets.fromLTRB(
   SerlinkSpacing.xl,
   36,
 );
-const double _settingsHeaderGap = 24;
+const double _settingsHeaderGap = SerlinkSpacing.md;
 const double _settingsSectionGap = 20;
 
 class _SettingsSurface extends ConsumerWidget {
@@ -219,86 +219,88 @@ class _SettingsSurface extends ConsumerWidget {
       ],
     );
 
-    return ListView(
-      key: const PageStorageKey('settings-scroll'),
-      padding: showInPageTitle
-          ? _settingsDesktopSurfacePadding
-          : const EdgeInsets.fromLTRB(
-              SerlinkSpacing.lg,
-              _mobileSurfaceTopGap,
-              SerlinkSpacing.lg,
-              SerlinkSpacing.lg,
-            ),
-      children: [
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1120),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (showInPageTitle) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.settingsTitle,
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: t.textPrimary,
-                              ),
+    return SerlinkScrollFade(
+      child: ListView(
+        key: const PageStorageKey('settings-scroll'),
+        padding: showInPageTitle
+            ? _settingsDesktopSurfacePadding
+            : const EdgeInsets.fromLTRB(
+                SerlinkSpacing.lg,
+                _mobileSurfaceTopGap,
+                SerlinkSpacing.lg,
+                SerlinkSpacing.lg,
+              ),
+        children: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (showInPageTitle) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.settingsTitle,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: t.textPrimary,
+                                ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      StatusPill(
-                        label: _vaultStatusPillLabel(l10n, vaultState),
-                        color: vaultState == VaultState.unlocked
-                            ? t.accentPrimary
-                            : t.textMuted,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: _settingsHeaderGap),
-                ],
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final preferences = [generalSection, securitySection];
-                    final services = [
-                      _SyncSettingsSection(vaultState: vaultState),
-                      if (capabilities.mcpServer) const _McpSettingsSection(),
-                      dataSection,
-                    ];
-                    if (!mobile &&
-                        constraints.maxWidth >= 900 &&
-                        MediaQuery.textScalerOf(context).scale(14) <= 18) {
-                      return Row(
-                        key: const ValueKey('settings-columns'),
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: _SettingsSectionColumn(
-                              children: preferences,
+                        const SizedBox(width: 16),
+                        StatusPill(
+                          label: _vaultStatusPillLabel(l10n, vaultState),
+                          color: vaultState == VaultState.unlocked
+                              ? t.accentPrimary
+                              : t.textMuted,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: _settingsHeaderGap),
+                  ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final preferences = [generalSection, securitySection];
+                      final services = [
+                        _SyncSettingsSection(vaultState: vaultState),
+                        if (capabilities.mcpServer) const _McpSettingsSection(),
+                        dataSection,
+                      ];
+                      if (!mobile &&
+                          constraints.maxWidth >= 900 &&
+                          MediaQuery.textScalerOf(context).scale(14) <= 18) {
+                        return Row(
+                          key: const ValueKey('settings-columns'),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: _SettingsSectionColumn(
+                                children: preferences,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: _SettingsSectionColumn(children: services),
-                          ),
-                        ],
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: _SettingsSectionColumn(children: services),
+                            ),
+                          ],
+                        );
+                      }
+                      return _SettingsSectionColumn(
+                        children: [...preferences, ...services],
                       );
-                    }
-                    return _SettingsSectionColumn(
-                      children: [...preferences, ...services],
-                    );
-                  },
-                ),
-                const SizedBox(height: _settingsSectionGap),
-                _SettingsAboutFooter(packageInfo: appPackageInfo),
-              ],
+                    },
+                  ),
+                  const SizedBox(height: _settingsSectionGap),
+                  _SettingsAboutFooter(packageInfo: appPackageInfo),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -453,9 +455,8 @@ class _SettingsAboutFooter extends StatelessWidget {
                 Text(
                   _settingsAppVersionLabel(l10n, packageInfo),
                   key: const ValueKey('settings-about-version-label'),
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: t.textMuted),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: t.textMuted),
                 ),
               ],
             ),

@@ -253,38 +253,39 @@ Future<List<HostId>?> _showHostSelectionDialog(
               children: [
                 Text(
                   description,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.tokens.textSecondary,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: context.tokens.textSecondary),
                 ),
                 const SizedBox(height: 12),
                 ConstrainedBox(
                   constraints: const BoxConstraints(
                     maxHeight: _hostSelectionListMaxHeight,
                   ),
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      for (final host in hosts)
-                        SerlinkCheckboxListTile(
-                          dense: true,
-                          value: selected.contains(host.id),
-                          title: Text(host.displayName),
-                          subtitle: Text(
-                            '${host.username}@${host.hostname}:${host.port}',
-                            overflow: TextOverflow.ellipsis,
+                  child: SerlinkScrollFade(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final host in hosts)
+                          SerlinkCheckboxListTile(
+                            dense: true,
+                            value: selected.contains(host.id),
+                            title: Text(host.displayName),
+                            subtitle: Text(
+                              '${host.username}@${host.hostname}:${host.port}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                if (value ?? false) {
+                                  selected.add(host.id);
+                                } else {
+                                  selected.remove(host.id);
+                                }
+                              });
+                            },
                           ),
-                          onChanged: (value) {
-                            setState(() {
-                              if (value ?? false) {
-                                selected.add(host.id);
-                              } else {
-                                selected.remove(host.id);
-                              }
-                            });
-                          },
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -315,9 +316,9 @@ Future<List<HostId>?> _showHostSelectionDialog(
               SerlinkFilledButton(
                 onPressed: selected.isEmpty
                     ? null
-                    : () => Navigator.of(
-                        context,
-                      ).pop(selected.toList(growable: false)),
+                    : () =>
+                          Navigator.of(context)
+                              .pop(selected.toList(growable: false)),
                 child: Text(context.l10n.settingsExportAction),
               ),
             ],

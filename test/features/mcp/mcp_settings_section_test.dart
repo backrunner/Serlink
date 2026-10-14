@@ -24,10 +24,163 @@ import 'package:serlink/features/sync/domain/webdav_tls_certificate_details.dart
 import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
 import 'package:serlink/features/vault/application/vault_service.dart';
 import 'package:serlink/features/workspace/presentation/workspace_screen.dart';
+import 'package:serlink/l10n/l10n.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
 void main() {
+  for (final scenario in [
+    (size: const Size(1000, 760), scale: 1.0, dark: false),
+    (size: const Size(1000, 760), scale: 1.0, dark: true),
+    (size: const Size(600, 480), scale: 1.5, dark: true),
+    (size: const Size(800, 600), scale: 1.5, dark: false),
+  ]) {
+    testWidgets('MCP manager layout $scenario', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = scenario.size;
+      tester.platformDispatcher.textScaleFactorTestValue = scenario.scale;
+      tester.platformDispatcher.platformBrightnessTestValue = scenario.dark
+          ? Brightness.dark
+          : Brightness.light;
+      tester.platformDispatcher.localesTestValue = [const Locale('zh')];
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+      addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+      _stubMcpStdioHelperFileExists(installed: true);
+      await _pumpSerlinkApp(
+        tester,
+        serverController: _FakeMcpServerController(
+          initialState: const McpServerState(
+            running: true,
+            port: 7432,
+            token: '00000000-0000-4000-8000-000000000000',
+          ),
+        ),
+      );
+      await _openMcpManager(tester);
+      await tester.pumpAndSettle();
+
+      final dialog = find.byType(SerlinkDialog);
+      final l10n = tester.element(dialog).l10n;
+      final serverTitle = find.descendant(
+        of: dialog,
+        matching: find.text(l10n.settingsMcpServerTitle),
+      );
+      final tokenTitle = find.text(l10n.settingsMcpTokenTitle);
+      expect(
+        tester.getTopLeft(serverTitle).dx,
+        tester.getTopLeft(tokenTitle).dx,
+      );
+      final close = find.descendant(
+        of: dialog,
+        matching: find.widgetWithText(SerlinkTextButton, l10n.closeAction),
+      );
+      final closeBounds = tester.getRect(close);
+      expect(closeBounds.bottom, lessThanOrEqualTo(scenario.size.height));
+      expect(close.hitTestable(), findsOneWidget);
+
+      final tokenScroll = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byKey(const ValueKey('settings-mcp-token-scroll')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position;
+      expect(tokenScroll.axis, Axis.horizontal);
+      if (scenario.size.width == 600) {
+        expect(tokenScroll.maxScrollExtent, greaterThan(0));
+      }
+
+      final scroll = find
+          .descendant(
+            of: find.byKey(const ValueKey('settings-mcp-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final position = tester.state<ScrollableState>(scroll).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(
+        find.text(l10n.settingsMcpSessionsEmpty).hitTestable(),
+        findsOneWidget,
+      );
+      expect(tester.getRect(close), closeBounds);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('model protection settings save keys without exposing them', (
+    tester,
+  ) async {
+    tester.platformDispatcher.localesTestValue = [const Locale('en')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+    _useLargeSurface(tester);
+    final container = await _pumpSerlinkApp(
+      tester,
+      serverController: _FakeMcpServerController(),
+    );
+    await _openMcpManager(tester);
+    final bridge = container.read(agentSessionBridgeProvider);
+    await tester.tap(
+      find.byKey(const ValueKey('settings-mcp-guard-configure')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Model command protection'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('settings-mcp-guard-enable')));
+    await tester.tap(find.byKey(const ValueKey('settings-mcp-guard-save')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Enter a valid model name and API key before enabling protection.',
+      ),
+      findsOneWidget,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-mcp-guard-api-key')),
+      'fixture-api-key',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-mcp-guard-model')),
+      'jev-latest',
+    );
+    await tester.tap(find.byKey(const ValueKey('settings-mcp-guard-save')));
+    await tester.pumpAndSettle();
+    final guard = container.read(commandDecisionGuardProvider);
+    expect((await guard.readSettings()).enabled, isTrue);
+    expect(find.text('Local rules + jev-latest'), findsOneWidget);
+    expect(
+      identical(container.read(agentSessionBridgeProvider), bridge),
+      isTrue,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('settings-mcp-guard-configure')),
+    );
+    await tester.pumpAndSettle();
+    final keyField = tester.widget<SerlinkTextField>(
+      find.byKey(const ValueKey('settings-mcp-guard-api-key')),
+    );
+    expect(keyField.obscureText, isTrue);
+    expect(keyField.controller!.text, isEmpty);
+    expect(find.text('fixture-api-key'), findsNothing);
+    await tester.tap(
+      find.byKey(const ValueKey('settings-mcp-guard-remove-key')),
+    );
+    await tester.pumpAndSettle();
+    final removed = await guard.readSettings();
+    expect(removed.enabled, isFalse);
+    expect(removed.hasApiKey, isFalse);
+    expect(
+      identical(container.read(agentSessionBridgeProvider), bridge),
+      isTrue,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('MCP manager dialog renders status, toggle, and config', (
     tester,
   ) async {
@@ -58,9 +211,7 @@ void main() {
     expect(find.textContaining('"command"'), findsOneWidget);
     expect(_stdioCopyButton(tester).onPressed, isNotNull);
 
-    await tester.tap(
-      find.byKey(const ValueKey('settings-mcp-server-switch')),
-    );
+    await tester.tap(find.byKey(const ValueKey('settings-mcp-server-switch')));
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(server.startCallCount, 1);
@@ -126,9 +277,9 @@ void main() {
       ),
       agentSessionsStream: Stream.value([handle]),
     );
-    final bridge =
-        container.read(agentSessionBridgeProvider)
-            as _RecordingAgentSessionBridge;
+    final bridge = container.read(
+      agentSessionBridgeProvider,
+    ) as _RecordingAgentSessionBridge;
     await _openMcpManager(tester);
 
     await _pumpUntilFound(tester, find.text('codex'));
@@ -276,8 +427,15 @@ Future<void> _openMcpManager(WidgetTester tester) async {
     tester,
     find.byKey(const ValueKey('settings-mcp-manage-button')),
   );
+  await tester.ensureVisible(
+    find.byKey(const ValueKey('settings-mcp-manage-button')),
+  );
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('settings-mcp-manage-button')));
-  await _pumpUntilFound(tester, find.text('Client config'));
+  await _pumpUntilFound(
+    tester,
+    find.byKey(const ValueKey('settings-mcp-scroll')),
+  );
 }
 
 Future<ProviderContainer> _pumpSerlinkApp(
@@ -345,9 +503,11 @@ Future<ProviderContainer> _pumpSerlinkApp(
 }
 
 Future<void> _openSettings(WidgetTester tester) async {
-  await _pumpUntilFound(tester, find.text('Settings'));
-  await tester.tap(find.text('Settings'));
-  await _pumpUntilFound(tester, find.text('Security'));
+  await _pumpUntilFound(tester, find.byType(WorkspaceScreen));
+  final l10n = tester.element(find.byType(WorkspaceScreen)).l10n;
+  await _pumpUntilFound(tester, find.text(l10n.settingsTitle));
+  await tester.tap(find.text(l10n.settingsTitle));
+  await _pumpUntilFound(tester, find.text(l10n.settingsSecuritySection));
 }
 
 Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
@@ -361,11 +521,14 @@ Future<void> _pumpUntilFound(WidgetTester tester, Finder finder) async {
 }
 
 class _FakeMcpServerController extends McpServerController {
+  _FakeMcpServerController({this.initialState = const McpServerState()});
+
+  final McpServerState initialState;
   var startCallCount = 0;
   var stopCallCount = 0;
 
   @override
-  McpServerState build() => const McpServerState();
+  McpServerState build() => initialState;
 
   @override
   Future<void> start() async {

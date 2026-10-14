@@ -4,7 +4,7 @@ import { defineConfig } from 'vite';
 import { svedocs } from 'svedocs/vite';
 import config from './svedocs.config.ts';
 export default defineConfig({ plugins: [
-  svedocs({ config, theme: { components: {
+  svedocs({ config, components: { SupportForm: '$lib/SupportForm.svelte' }, theme: { components: {
     Navbar: '$lib/theme/Navbar.svelte', Footer: '$lib/theme/Footer.svelte',
     Article: '$lib/theme/Article.svelte', PageShell: '$lib/theme/PageShell.svelte',
     Sidebar: '$lib/theme/Sidebar.svelte', ThemeToggle: '$lib/theme/ThemeToggle.svelte'

@@ -3,11 +3,16 @@
 Prepared on 2026-10-11 for Serlink 1.0.0, macOS build 16. App Store Connect
 name/subtitle/category updates are saved. Three-language version metadata, screenshots and the privately supplied App Review contact are saved. See the dated report for upload state.
 
+On 2026-10-12, build 16 was resubmitted with incoming-network entitlement
+verification steps and an App Review reply. App Store Connect shows Waiting
+for Review. See [the entitlement follow-up](network-server-review-2026-10-12.md).
+
 ## Files
 
 - `metadata.json`: English, Simplified Chinese, and Japanese App Store fields,
   TestFlight descriptions, and technical app information.
 - `review-notes.txt`: copyable English App Review instructions and channel limits.
+- `network-server-review-reply.txt`: English reply explaining the incoming-network entitlement; send after saving the corresponding review notes in App Store Connect.
 - `privacy.html`: multilingual privacy-policy page, paired with the website privacy policy.
 - `support.html`: multilingual troubleshooting and support page.
 - `encryption.md`: implementation inventory for the export questionnaire.
@@ -64,7 +69,7 @@ questionnaire; the resulting rating is determined by App Store Connect.
 | Item | State |
 | --- | --- |
 | Content rights and account agreements | Content-rights confirmation remains with the account holder; existing trader and Standard Apple EULA settings were retained. |
-| Support contact and hosting domain | Contact is support@serlink.alkinum.com. Website is deployed and privacy/support URLs return HTTPS 200; mailbox delivery remains unverified. |
+| Support contact and hosting domain | Support uses the OnFire form. Website is deployed and privacy/support URLs return HTTPS 200; ticket reply delivery is verified separately. |
 | Price, territories, release method and date | US$1.99 with US base territory, worldwide except France (174 current territories), automatic release after approval; saved in App Store Connect. |
 | Encryption declaration and any jurisdiction-specific documents | The current build questionnaire was answered with standard application-level algorithms and no France distribution; missing-compliance status cleared. Implementation inventory is in `encryption.md`. |
 | Distribution rights and EULA | Confirm rights for the AGPL project and bundled dependencies before accepting App Store agreements. No rights declaration has been submitted. |

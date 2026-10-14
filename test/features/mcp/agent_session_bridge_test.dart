@@ -7,6 +7,9 @@ import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/hosts/application/host_store.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/mcp/application/agent_session_bridge.dart';
+import 'package:serlink/features/mcp/application/command_decision_guard.dart';
+import 'package:serlink/features/mcp/domain/command_decision.dart';
+import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
 import 'package:serlink/features/mcp/data/command_risk_policy.dart';
 import 'package:serlink/features/mcp/domain/agent_session.dart';
 import 'package:serlink/features/security/application/security_modal_service.dart';
@@ -22,6 +25,336 @@ import 'package:serlink/features/workspace/application/workspace_tab_controller.
 import 'package:serlink/features/workspace/domain/workspace_tab.dart';
 
 void main() {
+  group('model command protection', () {
+    test(
+      'blocks semantically dangerous commands missed by local rules',
+      () async {
+        final model = _DecisionModel()..decision = CommandDecision.dangerous;
+        final guard = await _enabledGuard(model);
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService();
+        final container = _container(
+          service: service,
+          modal: modal,
+          decisionGuard: guard,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        const command =
+            'python3 -c "import shutil; shutil.rmtree(\'/srv/data\')"';
+        await expectLater(
+          bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: command,
+          ),
+          throwsA(_bridgeException('command_blocked')),
+        );
+        expect(model.commands, [command]);
+        expect(service.shells.single.writes, isEmpty);
+        expect(modal.commandCallCount, 0);
+      },
+    );
+
+    for (final outcome in ['uncertain', 'unavailable']) {
+      test('$outcome model result sends no terminal bytes', () async {
+        final model = _DecisionModel();
+        if (outcome == 'uncertain') {
+          model.decision = CommandDecision.uncertain;
+        }
+        if (outcome == 'unavailable') {
+          model.failure = StateError('fixture-key secret failure');
+        }
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService();
+        final container = _container(
+          service: service,
+          modal: modal,
+          decisionGuard: await _enabledGuard(model),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        await expectLater(
+          bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'ls',
+          ),
+          throwsA(_bridgeException('command_blocked')),
+        );
+        expect(service.shells.single.writes, isEmpty);
+        expect(modal.commandCallCount, 0);
+      });
+    }
+
+    test(
+      'Ctrl-C interrupts immediately and cancels a pending safe result',
+      () async {
+        final model = _DecisionModel()..pending = Completer<CommandDecision>();
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: _FakeSecurityModalService(),
+          decisionGuard: await _enabledGuard(model),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        final command = bridge.exec(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          command: 'ls',
+        );
+        final rejection = expectLater(
+          command,
+          throwsA(_bridgeException('command_blocked')),
+        );
+        await model.started.future;
+        await bridge.sendInput(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          text: '\x03',
+        );
+        expect(service.shells.single.writes, ['\x03']);
+        model.pending!.complete(CommandDecision.safe);
+        await rejection;
+        expect(service.shells.single.writes, ['\x03']);
+      },
+    );
+
+    test('local hard blocks do not call the model', () async {
+      final model = _DecisionModel();
+      final service = _EchoSshSessionService();
+      final container = _container(
+        service: service,
+        modal: _FakeSecurityModalService(),
+        decisionGuard: await _enabledGuard(model),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final handle = await _openSession(bridge);
+      await expectLater(
+        bridge.exec(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          command: 'mkfs.ext4 /dev/sda',
+        ),
+        throwsA(_bridgeException('command_blocked')),
+      );
+      expect(model.commands, isEmpty);
+      expect(service.shells.single.writes, isEmpty);
+    });
+
+    test(
+      'session-wide rule approval cannot bypass a new model judgment',
+      () async {
+        final model = _DecisionModel();
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService()
+          ..commandDecision = AgentCommandDecision.allowSession;
+        final container = _container(
+          service: service,
+          modal: modal,
+          decisionGuard: await _enabledGuard(model),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        await bridge.exec(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          command: 'rm -rf /tmp/a',
+        );
+        model.decision = CommandDecision.dangerous;
+        await expectLater(
+          bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'rm -rf /srv/data',
+          ),
+          throwsA(_bridgeException('command_blocked')),
+        );
+        expect(model.commands, hasLength(2));
+        expect(modal.commandCallCount, 1);
+        expect(service.shells.single.writes, ['rm -rf /tmp/a\r']);
+      },
+    );
+
+    for (final failure in ['revoked', 'closed', 'changed']) {
+      test(
+        '$failure while the model is pending prevents every input byte',
+        () async {
+          final model = _DecisionModel()
+            ..pending = Completer<CommandDecision>();
+          final guard = await _enabledGuard(model);
+          final service = _EchoSshSessionService();
+          final container = _container(
+            service: service,
+            modal: _FakeSecurityModalService(),
+            decisionGuard: guard,
+          );
+          addTearDown(container.dispose);
+          final bridge = await _bridge(container);
+          final handle = await _openSession(bridge);
+          final result = bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'ls',
+          );
+          final expectation = expectLater(
+            result,
+            throwsA(
+              _bridgeException(
+                failure == 'revoked'
+                    ? 'authorization_required'
+                    : failure == 'closed'
+                    ? 'session_not_found'
+                    : 'command_blocked',
+              ),
+            ),
+          );
+          await model.started.future;
+          if (failure == 'revoked') {
+            bridge.revokeGrant(handle.grantId);
+          }
+          if (failure == 'closed') {
+            await bridge.closeSession(handle.sessionId);
+          }
+          if (failure == 'changed') {
+            await guard.saveSettings(enabled: false, model: 'jev-1.13.0');
+          }
+          model.pending!.complete(CommandDecision.safe);
+          await expectation;
+          expect(service.shells.single.writes, isEmpty);
+        },
+      );
+    }
+
+    test(
+      'fragmented input and history keys cannot bypass model checks',
+      () async {
+        final model = _DecisionModel();
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: _FakeSecurityModalService(),
+          decisionGuard: await _enabledGuard(model),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        for (final text in ['rm ', '-rf /', '\r', '\x1b[A\r']) {
+          await expectLater(
+            bridge.sendInput(
+              clientName: _clientName,
+              sessionId: handle.sessionId,
+              text: text,
+            ),
+            throwsA(_bridgeException('command_blocked')),
+          );
+        }
+        expect(service.shells.single.writes, isEmpty);
+        expect(model.commands, isEmpty);
+        await bridge.sendInput(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          text: '\x03',
+        );
+        await bridge.sendInput(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          text: 'ls\r',
+        );
+        expect(model.commands, ['ls\r']);
+        expect(service.shells.single.writes, ['\x03', 'ls\r']);
+      },
+    );
+
+    test(
+      'enabling protection requires clearing previously unsubmitted input',
+      () async {
+        final model = _DecisionModel();
+        final guard = CommandDecisionGuard(
+          secrets: InMemorySecretStore(),
+          model: model,
+        );
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: _FakeSecurityModalService(),
+          decisionGuard: guard,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        await bridge.sendInput(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          text: 'prefix ',
+        );
+        await guard.saveSettings(
+          enabled: true,
+          model: 'jev-1.13.0',
+          apiKey: 'fixture-key',
+        );
+        await expectLater(
+          bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'ls',
+          ),
+          throwsA(_bridgeException('command_blocked')),
+        );
+        expect(service.shells.single.writes, ['prefix ']);
+        await bridge.sendInput(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          text: '\x03',
+        );
+        await bridge.exec(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          command: 'ls',
+        );
+        expect(service.shells.single.writes, ['prefix ', '\x03', 'ls\r']);
+      },
+    );
+
+    test('commands in one session are serialized across model waits', () async {
+      final model = _DecisionModel()..pending = Completer<CommandDecision>();
+      final service = _EchoSshSessionService();
+      final container = _container(
+        service: service,
+        modal: _FakeSecurityModalService(),
+        decisionGuard: await _enabledGuard(model),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final handle = await _openSession(bridge);
+      final first = bridge.exec(
+        clientName: _clientName,
+        sessionId: handle.sessionId,
+        command: 'ls',
+      );
+      await model.started.future;
+      final second = bridge.exec(
+        clientName: _clientName,
+        sessionId: handle.sessionId,
+        command: 'pwd',
+      );
+      await _drainMicrotasks();
+      expect(model.commands, ['ls']);
+      final pending = model.pending!;
+      model.pending = null;
+      pending.complete(CommandDecision.safe);
+      await Future.wait([first, second]);
+      expect(model.commands, ['ls', 'pwd']);
+      expect(service.shells.single.writes, ['ls\r', 'pwd\r']);
+    });
+  });
+
   group('AgentSessionBridge', () {
     test('listHosts throws vault_locked when the vault is locked', () async {
       final container = _container(
@@ -33,10 +366,7 @@ void main() {
       await container.read(vaultSessionControllerProvider.future);
       final bridge = await _bridge(container);
 
-      expect(
-        bridge.listHosts,
-        throwsA(_bridgeException('vault_locked')),
-      );
+      expect(bridge.listHosts, throwsA(_bridgeException('vault_locked')));
     });
 
     test('openSession throws vault_locked when the vault is locked', () async {
@@ -69,20 +399,23 @@ void main() {
       );
     });
 
-    test('openSession throws authorization_denied when the user denies', () async {
-      final modal = _FakeSecurityModalService()
-        ..accessDecision = AgentAccessDecision.deny;
-      final service = _EchoSshSessionService();
-      final container = _container(service: service, modal: modal);
-      addTearDown(container.dispose);
-      final bridge = await _bridge(container);
+    test(
+      'openSession throws authorization_denied when the user denies',
+      () async {
+        final modal = _FakeSecurityModalService()
+          ..accessDecision = AgentAccessDecision.deny;
+        final service = _EchoSshSessionService();
+        final container = _container(service: service, modal: modal);
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
 
-      await expectLater(
-        bridge.openSession(clientName: _clientName, hostId: _host.id),
-        throwsA(_bridgeException('authorization_denied')),
-      );
-      expect(service.openShellCount, 0);
-    });
+        await expectLater(
+          bridge.openSession(clientName: _clientName, hostId: _host.id),
+          throwsA(_bridgeException('authorization_denied')),
+        );
+        expect(service.openShellCount, 0);
+      },
+    );
 
     test('openSession opens a workspace tab and attaches', () async {
       final service = _EchoSshSessionService();
@@ -243,41 +576,43 @@ void main() {
       expect(modal.commandCallCount, 2);
     });
 
-    test('revokeGrant makes further calls fail with authorization_required',
-        () async {
-      final service = _EchoSshSessionService();
-      final container = _container(
-        service: service,
-        modal: _FakeSecurityModalService(),
-      );
-      addTearDown(container.dispose);
-      final bridge = await _bridge(container);
-      final handle = await _openSession(bridge);
+    test(
+      'revokeGrant makes further calls fail with authorization_required',
+      () async {
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: _FakeSecurityModalService(),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
 
-      await bridge.exec(
-        clientName: _clientName,
-        sessionId: handle.sessionId,
-        command: 'ls',
-      );
-      bridge.revokeGrant(handle.grantId);
-
-      await expectLater(
-        bridge.exec(
+        await bridge.exec(
           clientName: _clientName,
           sessionId: handle.sessionId,
           command: 'ls',
-        ),
-        throwsA(_bridgeException('authorization_required')),
-      );
-      // The tab stays open; only agent access is cut.
-      expect(
-        container
-            .read(workspaceRuntimeRegistryProvider)
-            .hasAttachedTerminal(handle.sessionId),
-        isTrue,
-      );
-      expect(service.shells.single.writes, hasLength(1));
-    });
+        );
+        bridge.revokeGrant(handle.grantId);
+
+        await expectLater(
+          bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'ls',
+          ),
+          throwsA(_bridgeException('authorization_required')),
+        );
+        // The tab stays open; only agent access is cut.
+        expect(
+          container
+              .read(workspaceRuntimeRegistryProvider)
+              .hasAttachedTerminal(handle.sessionId),
+          isTrue,
+        );
+        expect(service.shells.single.writes, hasLength(1));
+      },
+    );
 
     test('sendInput sends raw text and policies newline input', () async {
       final service = _EchoSshSessionService();
@@ -318,15 +653,9 @@ void main() {
       await bridge.closeSession(handle.sessionId);
 
       expect(bridge.sessions, isEmpty);
-      expect(
-        container.read(workspaceTabControllerProvider).tabs,
-        isEmpty,
-      );
+      expect(container.read(workspaceTabControllerProvider).tabs, isEmpty);
       await expectLater(
-        bridge.readScreen(
-          clientName: _clientName,
-          sessionId: handle.sessionId,
-        ),
+        bridge.readScreen(clientName: _clientName, sessionId: handle.sessionId),
         throwsA(_bridgeException('session_not_found')),
       );
     });
@@ -371,72 +700,77 @@ void main() {
       expect(service.openShellCount, 0);
     });
 
-    test('openSession reuses a failed terminal tab for the same host', () async {
-      final service = _EchoSshSessionService()
-        ..shellFailures.add(StateError('boom'));
-      final container = _container(
-        service: service,
-        modal: _FakeSecurityModalService(),
-      );
-      addTearDown(container.dispose);
-      final bridge = await _bridge(container);
+    test(
+      'openSession reuses a failed terminal tab for the same host',
+      () async {
+        final service = _EchoSshSessionService()
+          ..shellFailures.add(StateError('boom'));
+        final container = _container(
+          service: service,
+          modal: _FakeSecurityModalService(),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
 
-      await expectLater(
-        bridge.openSession(clientName: _clientName, hostId: _host.id),
-        throwsA(_bridgeException('connect_failed')),
-      );
-      final failedTab = container
-          .read(workspaceTabControllerProvider)
-          .tabs
-          .single;
-      expect(failedTab.lifecycle, SessionLifecycleState.failed);
+        await expectLater(
+          bridge.openSession(clientName: _clientName, hostId: _host.id),
+          throwsA(_bridgeException('connect_failed')),
+        );
+        final failedTab = container
+            .read(workspaceTabControllerProvider)
+            .tabs
+            .single;
+        expect(failedTab.lifecycle, SessionLifecycleState.failed);
 
-      final handle = await bridge.openSession(
-        clientName: _clientName,
-        hostId: _host.id,
-      );
-
-      expect(handle.state, AgentSessionState.connected);
-      final tabs = container.read(workspaceTabControllerProvider).tabs;
-      expect(tabs, hasLength(1));
-      expect(tabs.single.id, failedTab.id);
-      expect(service.openShellCount, 2);
-    });
-
-    test('exec and sendInput throw session_not_attached after a disconnect',
-        () async {
-      final service = _EchoSshSessionService();
-      final container = _container(
-        service: service,
-        modal: _FakeSecurityModalService(),
-      );
-      addTearDown(container.dispose);
-      final bridge = await _bridge(container);
-      final handle = await _openSession(bridge);
-
-      await service.shells.single.close();
-      await _drainMicrotasks();
-
-      await expectLater(
-        bridge.exec(
+        final handle = await bridge.openSession(
           clientName: _clientName,
-          sessionId: handle.sessionId,
-          command: 'ls',
-        ),
-        throwsA(_bridgeException('session_not_attached')),
-      );
-      await expectLater(
-        bridge.sendInput(
-          clientName: _clientName,
-          sessionId: handle.sessionId,
-          text: 'y',
-        ),
-        throwsA(_bridgeException('session_not_attached')),
-      );
-      expect(service.shells.single.writes, isEmpty);
-      // The handle is kept: the user may reconnect the pane.
-      expect(bridge.sessions, [handle]);
-    });
+          hostId: _host.id,
+        );
+
+        expect(handle.state, AgentSessionState.connected);
+        final tabs = container.read(workspaceTabControllerProvider).tabs;
+        expect(tabs, hasLength(1));
+        expect(tabs.single.id, failedTab.id);
+        expect(service.openShellCount, 2);
+      },
+    );
+
+    test(
+      'exec and sendInput throw session_not_attached after a disconnect',
+      () async {
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: _FakeSecurityModalService(),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+
+        await service.shells.single.close();
+        await _drainMicrotasks();
+
+        await expectLater(
+          bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'ls',
+          ),
+          throwsA(_bridgeException('session_not_attached')),
+        );
+        await expectLater(
+          bridge.sendInput(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            text: 'y',
+          ),
+          throwsA(_bridgeException('session_not_attached')),
+        );
+        expect(service.shells.single.writes, isEmpty);
+        // The handle is kept: the user may reconnect the pane.
+        expect(bridge.sessions, [handle]);
+      },
+    );
 
     test('manually closing the tab forgets the session', () async {
       final container = _container(
@@ -456,10 +790,7 @@ void main() {
 
       expect(bridge.sessions, isEmpty);
       await expectLater(
-        bridge.readScreen(
-          clientName: _clientName,
-          sessionId: handle.sessionId,
-        ),
+        bridge.readScreen(clientName: _clientName, sessionId: handle.sessionId),
         throwsA(_bridgeException('session_not_found')),
       );
       await expectLater(
@@ -528,8 +859,7 @@ void main() {
       expect(bridge.sessions, isEmpty);
       final tabs = container.read(workspaceTabControllerProvider).tabs;
       expect(tabs, hasLength(1));
-      final panes =
-          (tabs.single.content as TerminalTabContent).panes;
+      final panes = (tabs.single.content as TerminalTabContent).panes;
       expect(panes, hasLength(1));
       expect(panes.single.sessionId, isNot(handle.sessionId));
     });
@@ -577,6 +907,7 @@ ProviderContainer _container({
   required _EchoSshSessionService service,
   required _FakeSecurityModalService modal,
   bool unlocked = true,
+  CommandDecisionGuard? decisionGuard,
   WorkspaceTabController Function()? workspaceTabControllerFactory,
 }) {
   return ProviderContainer(
@@ -613,6 +944,7 @@ ProviderContainer _container({
           ref: ref,
           authorization: ref.watch(mcpAuthorizationServiceProvider),
           riskPolicy: CommandRiskPolicy(),
+          decisionGuard: decisionGuard,
           securityModalService: modal,
           attachTimeout: const Duration(seconds: 5),
           attachPollInterval: const Duration(milliseconds: 10),
@@ -858,4 +1190,37 @@ class _FakeTerminalDisplaySettingsRepository
 
   @override
   Future<void> save(TerminalDisplaySettings settings) async {}
+}
+
+Future<CommandDecisionGuard> _enabledGuard(_DecisionModel model) async {
+  final guard = CommandDecisionGuard(
+    secrets: InMemorySecretStore(),
+    model: model,
+  );
+  await guard.saveSettings(
+    enabled: true,
+    model: 'jev-1.13.0',
+    apiKey: 'fixture-key',
+  );
+  return guard;
+}
+
+class _DecisionModel implements CommandDecisionModel {
+  Object? failure;
+  CommandDecision decision = CommandDecision.safe;
+  Completer<CommandDecision>? pending;
+  final started = Completer<void>();
+  final List<String> commands = [];
+  @override
+  Future<CommandDecision> assess({
+    required String command,
+    required String model,
+    required String apiKey,
+  }) async {
+    commands.add(command);
+    if (failure != null) throw failure!;
+    if (!started.isCompleted) started.complete();
+    if (pending != null) return pending!.future;
+    return decision;
+  }
 }

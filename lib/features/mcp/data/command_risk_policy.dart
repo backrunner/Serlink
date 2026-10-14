@@ -9,14 +9,14 @@ import '../domain/command_risk.dart';
 /// treated as a safety net layered on top of user confirmation, not as a
 /// sandbox.
 ///
-/// Rule order: [additionalSafePatterns] (session allowlist) first, then
-/// blocked rules, then needsConfirm rules. Anything unmatched is safe.
+/// Rule order: blocked rules first, then [additionalSafePatterns] (session
+/// allowlist), then needsConfirm rules. Anything unmatched is safe.
 class CommandRiskPolicy {
   CommandRiskPolicy({List<RegExp> additionalSafePatterns = const []})
     : additionalSafePatterns = List.unmodifiable(additionalSafePatterns);
 
   /// Per-session allowlist: commands matching any of these are assessed
-  /// [CommandRiskLevel.safe] before any other rule is considered.
+  /// [CommandRiskLevel.safe] only after hard blocking rules are checked.
   final List<RegExp> additionalSafePatterns;
 
   CommandRiskAssessment assess(String command) {
@@ -26,6 +26,17 @@ class CommandRiskPolicy {
         level: CommandRiskLevel.safe,
         command: command,
       );
+    }
+    for (final rule in _rules.where(
+      (rule) => rule.level == CommandRiskLevel.blocked,
+    )) {
+      if (rule.matches(normalized)) {
+        return CommandRiskAssessment(
+          level: rule.level,
+          matchedRule: rule.id,
+          command: command,
+        );
+      }
     }
     for (final pattern in additionalSafePatterns) {
       if (pattern.hasMatch(normalized)) {
@@ -44,7 +55,10 @@ class CommandRiskPolicy {
         );
       }
     }
-    return CommandRiskAssessment(level: CommandRiskLevel.safe, command: command);
+    return CommandRiskAssessment(
+      level: CommandRiskLevel.safe,
+      command: command,
+    );
   }
 }
 
@@ -77,11 +91,7 @@ final List<_Rule> _rules = [
     CommandRiskLevel.blocked,
     r'>\s*/dev/(rdisk|sd|nvme|disk|hd|mmcblk)',
   ),
-  _Rule.regex(
-    'mkfs',
-    CommandRiskLevel.blocked,
-    r'\bmkfs(\.\w+)?\b',
-  ),
+  _Rule.regex('mkfs', CommandRiskLevel.blocked, r'\bmkfs(\.\w+)?\b'),
   _Rule.regex(
     'fork_bomb',
     CommandRiskLevel.blocked,
@@ -89,7 +99,11 @@ final List<_Rule> _rules = [
   ),
 
   // --- Needs confirmation. ---
-  _Rule('rm_recursive_force', CommandRiskLevel.needsConfirm, _isRmRecursiveForce),
+  _Rule(
+    'rm_recursive_force',
+    CommandRiskLevel.needsConfirm,
+    _isRmRecursiveForce,
+  ),
   _Rule.regex(
     'system_power',
     CommandRiskLevel.needsConfirm,
@@ -110,11 +124,7 @@ final List<_Rule> _rules = [
     CommandRiskLevel.needsConfirm,
     r'\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(sh|bash|zsh|dash|ksh|fish|python\d*|perl|ruby)\b',
   ),
-  _Rule.regex(
-    'dd_general',
-    CommandRiskLevel.needsConfirm,
-    r'\bdd\b',
-  ),
+  _Rule.regex('dd_general', CommandRiskLevel.needsConfirm, r'\bdd\b'),
   _Rule.regex(
     'eval_remote_content',
     CommandRiskLevel.needsConfirm,

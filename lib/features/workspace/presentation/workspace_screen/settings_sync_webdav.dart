@@ -70,7 +70,7 @@ class _WebDavSyncDialogState extends ConsumerState<_WebDavSyncDialog> {
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(context).height * 0.72,
           ),
-          child: SingleChildScrollView(
+          child: SerlinkScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [

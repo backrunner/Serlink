@@ -14,7 +14,6 @@ import 'package:serlink/features/hosts/application/host_repository.dart';
 import 'package:serlink/features/hosts/application/host_store.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
-import 'package:serlink/features/sync/application/auto_sync_controller.dart';
 import 'package:serlink/features/sync/application/sync_run_service.dart';
 import 'package:serlink/features/sync/data/local_sync_provider.dart';
 import 'package:serlink/features/sync/domain/sync_provider.dart';
@@ -84,12 +83,11 @@ void main() {
     final subscription = container.listen(hostSummariesProvider(1), (_, _) {});
     addTearDown(subscription.close);
     await container.read(hostSummariesProvider(1).future);
+    final transferDatabase = SerlinkDatabase(NativeDatabase.memory());
+    addTearDown(transferDatabase.close);
     final transfers = EncryptedTransferTaskRepository(
       vault: vault,
-      records: NotifyingVaultRecordRepository(
-        inner: records,
-        changes: container.read(vaultRecordChangeBusProvider),
-      ),
+      database: transferDatabase,
     );
     final initialCalls = hosts.listCalls;
     final watch = Stopwatch()..start();

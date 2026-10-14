@@ -401,6 +401,7 @@ class _ForwardingDialogState extends State<_ForwardingDialog> {
       ),
       actions: [
         SerlinkTextButton(
+          size: SerlinkButtonSize.md,
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l10n.closeAction),
         ),
@@ -491,36 +492,21 @@ class _ForwardSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-                ],
-              ),
+    return _DialogSection(
+      title: title,
+      subtitle: subtitle,
+      action: destructive
+          ? SerlinkFilledButton.danger(
+              size: SerlinkButtonSize.md,
+              onPressed: onPressed,
+              child: Text(actionLabel),
+            )
+          : SerlinkOutlinedButton(
+              size: SerlinkButtonSize.md,
+              onPressed: onPressed,
+              child: Text(actionLabel),
             ),
-            if (destructive)
-              SerlinkFilledButton.danger(
-                onPressed: onPressed,
-                child: Text(actionLabel),
-              )
-            else
-              SerlinkFilledButton.tonal(
-                onPressed: onPressed,
-                child: Text(actionLabel),
-              ),
-          ],
-        ),
-        if (child != null) ...[const SizedBox(height: 12), child!],
-      ],
+      children: [?child],
     );
   }
 }

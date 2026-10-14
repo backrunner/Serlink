@@ -18,7 +18,7 @@
 <p>iCloud sync uses Apple's CloudKit private database. WebDAV sync uses an endpoint you configure. Sync uploads encrypted vault snapshots and operational object metadata; the app's vault keys are not uploaded by the sync service. Apple or your WebDAV operator may process service and connection metadata under their policies. Disabling sync stops future app sync; it does not erase existing remote copies.</p>
 <h2>Diagnostics and external agents</h2>
 <p>Serlink has no advertising or analytics SDK and does not automatically upload diagnostic logs to its developer. Diagnostic exports are local, redact sensitive connection information and omit terminal output. If you send an export to support, review the files and remove anything private first.</p>
-<p>The optional MCP endpoint permits an external agent to use explicitly authorized sessions. Serlink does not include an AI model or automatically send session data to an AI provider. An agent you authorize may transmit data according to that agent's configuration and provider policies.</p>
+<p>The optional MCP endpoint permits an external agent to use explicitly authorized sessions. Model command protection is off by default. If you configure your own TypeSafe API key and enable it, Serlink sends the commands submitted by agents to TypeSafe for risk assessment; it does not include host records, SSH credentials, terminal screens or command output in these requests. The API key and protection settings stay in device-local secure storage and are not included in vault sync or backups. TypeSafe processes these requests under its own service and privacy policies. An agent you authorize may separately transmit data according to that agent's configuration and provider policies.</p>
 <h2>Control, retention and deletion</h2>
 <p>You control host records, credentials, snippets, backups, exported files, sync destinations and agent authorizations. Local records remain until you delete or reset them. Remote data and backups have separate lifetimes: use the remote-data controls or your provider to delete them, and remove exports and backups separately. Keep recovery keys safe; the developer cannot recover an unknown vault passphrase without your recovery key.</p>
 <h2>Contact and updates</h2>
@@ -35,7 +35,7 @@
 <p>iCloud 同步使用 Apple CloudKit 私有数据库；WebDAV 使用你配置的端点。同步上传加密保险库快照与必要的对象元数据，同步服务不上传保险库密钥。Apple 或 WebDAV 运营方可能按其政策处理服务及连接元数据。关闭同步会停止后续同步，不会自动删除已有远程副本。</p>
 <h2>诊断与外部代理</h2>
 <p>Serlink 无广告或分析 SDK，不会自动向开发者上传诊断日志。诊断导出保存在本地，排除终端输出并脱敏敏感连接信息。向支持人员发送前，请检查导出文件并移除私人内容。</p>
-<p>可选 MCP 端点允许外部代理使用你明确授权的会话。Serlink 不内置 AI 模型，也不会自动把会话数据发送到 AI 提供商。被你授权的代理可能按其配置及服务政策发送数据。</p>
+<p>可选 MCP 端点允许外部代理使用你明确授权的会话。模型命令防护默认关闭。配置自己的 TypeSafe API key 并启用后，Serlink 会将代理提交的命令发送给 TypeSafe 判断风险；请求不会附带主机记录、SSH 凭据、终端画面或命令输出。API key 和防护设置仅保存在本机安全存储中，不参与保险库同步或备份。TypeSafe 按其服务及隐私政策处理请求。被你授权的代理还可能按其配置及服务政策发送数据。</p>
 <h2>控制、保留和删除</h2>
 <p>你可以管理主机、凭据、片段、备份、导出文件、同步服务和代理授权。本地记录保留至删除或重置。远程数据、备份和导出文件各自保留，需要通过应用的远程数据控制或服务商删除远程副本，并单独删除备份及导出。请妥善保管恢复密钥；开发者无法在没有恢复密钥的情况下找回遗失的保险库密码。</p>
 <h2>联系与更新</h2>
@@ -52,7 +52,7 @@
 <p>iCloud 同期は Apple の CloudKit プライベートデータベース、WebDAV 同期は設定したエンドポイントを使用します。暗号化されたスナップショットと必要なオブジェクトのメタデータを送信し、同期サービスはボールトの鍵を送信しません。Apple や WebDAV 運営者はサービスと接続のメタデータを独自のポリシーで処理する場合があります。同期を無効にしても既存のリモートコピーは削除されません。</p>
 <h2>診断と外部エージェント</h2>
 <p>広告・分析 SDK は含まず、診断ログを開発者へ自動送信しません。診断の書き出しはローカルで行い、接続の機密情報を伏せ、ターミナル出力を含めません。サポートへ送る前に内容を確認し、個人情報を取り除いてください。</p>
-<p>任意の MCP エンドポイントは明示的に許可したセッションを外部エージェントに提供します。AI モデルを内蔵せず、AI 提供者にセッションデータを自動送信しません。許可したエージェントが自身の設定と提供者のポリシーに従ってデータを送信する場合があります。</p>
+<p>任意の MCP エンドポイントは明示的に許可したセッションを外部エージェントに提供します。モデルによるコマンド保護は初期状態で無効です。自身の TypeSafe API キーを設定して有効にすると、エージェントが送信したコマンドを TypeSafe に送ってリスクを判定します。リクエストにホスト記録、SSH 認証情報、端末画面、コマンド出力は含めません。API キーと保護設定はデバイスの安全なストレージにのみ保存し、保管庫の同期やバックアップには含めません。TypeSafe は自身のサービスとプライバシーポリシーに基づいて処理します。許可したエージェントが自身の設定と提供者のポリシーに従って別途データを送信する場合があります。</p>
 <h2>管理、保存と削除</h2>
 <p>ホスト、認証情報、スニペット、バックアップ、書き出し、同期先とエージェントの許可は利用者が管理します。ローカルレコードは削除・リセットまで残ります。リモートデータ、バックアップと書き出したファイルは別途削除してください。復旧キーを安全に保管してください。復旧キーなしで失ったパスフレーズを開発者が復元することはできません。</p>
 <h2>連絡と更新</h2>

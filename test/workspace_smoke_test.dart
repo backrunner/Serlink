@@ -2877,40 +2877,77 @@ void main() {
     expect(localTerminal.shells, hasLength(1));
   });
 
-  testWidgets('hosts entrance animation plays once per unlock', (tester) async {
-    final now = DateTime.utc(2026);
-    final hosts = _DelayedHostRepository([
-      _hostConfig(
-        id: 'animated-host',
-        displayName: 'Animated Bastion',
-        hostname: 'animated.internal',
-        createdAt: now,
-      ),
-      _hostConfig(
-        id: 'animated-db',
-        displayName: 'Animated Database',
-        hostname: 'db.internal',
-        createdAt: now.subtract(const Duration(days: 1)),
-      ),
-    ])..completeList();
+  for (final grouped in [false, true]) {
+    testWidgets(
+      'hosts entrance animation plays once per unlock (grouped: $grouped)',
+      (tester) async {
+        final now = DateTime.utc(2026);
+        final hosts = _DelayedHostRepository([
+          _hostConfig(
+            id: 'animated-host',
+            groupId: grouped ? 'Production' : null,
+            displayName: 'Animated Bastion',
+            hostname: 'animated.internal',
+            createdAt: now,
+          ),
+          _hostConfig(
+            id: 'animated-db',
+            displayName: 'Animated Database',
+            hostname: 'db.internal',
+            createdAt: now.subtract(const Duration(days: 1)),
+          ),
+        ])..completeList();
 
-    await _pumpLockedVaultApp(tester, hostRepository: hosts);
-    await _submitVaultPassphrase(tester, 'correct horse battery staple');
-    await _pumpUntilFound(tester, find.text('Animated Bastion'));
+        await _pumpLockedVaultApp(tester, hostRepository: hosts);
+        await _submitVaultPassphrase(tester, 'correct horse battery staple');
+        await _pumpUntilFound(tester, find.text('Animated Bastion'));
 
-    expect(find.byType(EntranceFade), findsNWidgets(2));
+        expect(find.byType(EntranceFade), findsNWidgets(grouped ? 4 : 2));
+        if (grouped) {
+          final header = find.ancestor(
+            of: find.byKey(const ValueKey('host-group-Production')),
+            matching: find.byType(EntranceFade),
+          );
+          final row = find.ancestor(
+            of: find.text('Animated Bastion'),
+            matching: find.byType(EntranceFade),
+          );
+          final ungrouped = find.ancestor(
+            of: find.byKey(const ValueKey('host-group-')),
+            matching: find.byType(EntranceFade),
+          );
+          expect(header, findsOneWidget);
+          expect(ungrouped, findsOneWidget);
+          await tester.pump(const Duration(milliseconds: 40));
+          await tester.pump(const Duration(milliseconds: 80));
+          double opacity(Finder entrance) => tester
+              .widget<Opacity>(
+                find
+                    .descendant(of: entrance, matching: find.byType(Opacity))
+                    .first,
+              )
+              .opacity;
+          expect(opacity(header), allOf(greaterThan(0), lessThan(1)));
+          expect(
+            opacity(row),
+            allOf(greaterThan(0), lessThan(opacity(header))),
+          );
+          expect(opacity(ungrouped), lessThan(opacity(row)));
+        }
 
-    await tester.tap(find.text('Sessions'));
-    await tester.pumpAndSettle();
-    expect(find.byType(EntranceFade), findsNothing);
+        await tester.tap(find.text('Sessions'));
+        await tester.pumpAndSettle();
+        expect(find.byType(EntranceFade), findsNothing);
 
-    await tester.tap(find.text('Hosts'));
-    await tester.pump();
+        await tester.tap(find.text('Hosts'));
+        await tester.pump();
 
-    expect(find.text('Animated Bastion'), findsOneWidget);
-    expect(find.text('Animated Database'), findsOneWidget);
-    expect(find.byType(EntranceFade), findsNothing);
-  });
+        expect(find.text('Animated Bastion'), findsOneWidget);
+        expect(find.text('Animated Database'), findsOneWidget);
+        expect(find.byType(EntranceFade), findsNothing);
+      },
+    );
+  }
 
   testWidgets('synced hosts animate into the existing list', (tester) async {
     final now = DateTime.utc(2026);
@@ -3434,6 +3471,7 @@ HostConfig _hostConfig({
   required String hostname,
   required DateTime createdAt,
   DateTime? lastConnectedAt,
+  String? groupId,
   bool writeBackToSshConfig = false,
 }) {
   return HostConfig(
@@ -3451,6 +3489,7 @@ HostConfig _hostConfig({
     createdAt: createdAt,
     updatedAt: createdAt,
     lastConnectedAt: lastConnectedAt,
+    groupId: groupId,
     writeBackToSshConfig: writeBackToSshConfig,
   );
 }

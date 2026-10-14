@@ -2926,4 +2926,59 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get searchAction => '検索';
+
+  @override
+  String get settingsMcpGuardTitle => 'コマンド保護';
+
+  @override
+  String get settingsMcpGuardLocal => 'ローカルルール';
+
+  @override
+  String settingsMcpGuardEnabled(String model) {
+    return 'ローカルルール + $model';
+  }
+
+  @override
+  String get settingsMcpGuardLoading => '保護設定を読み込み中…';
+
+  @override
+  String get settingsMcpGuardUnavailable => '保護設定を読み込めません';
+
+  @override
+  String get settingsMcpGuardConfigure => '設定';
+
+  @override
+  String get settingsMcpGuardDialogTitle => 'モデルによるコマンド保護';
+
+  @override
+  String get settingsMcpGuardDescription =>
+      '有効にすると、エージェントのコマンドを TypeSafe に送信してリスクを判定します。危険、不確実、確認失敗の場合は実行をブロックします。API キーはこのデバイスにのみ保存されます。';
+
+  @override
+  String get settingsMcpGuardInputHint =>
+      'エージェントは完全なコマンドを送信する必要があります。分割入力、履歴操作、Enter のみの入力はブロックされます。Ctrl-C での中断は引き続き利用できます。';
+
+  @override
+  String get settingsMcpGuardEnable => 'モデル保護を有効にする';
+
+  @override
+  String get settingsMcpGuardModel => 'モデル';
+
+  @override
+  String get settingsMcpGuardApiKey => 'TypeSafe API キー';
+
+  @override
+  String get settingsMcpGuardKeySaved => '保存済み。空欄で現在のキーを保持';
+
+  @override
+  String get settingsMcpGuardKeyHint => 'TypeSafe API キーを入力';
+
+  @override
+  String get settingsMcpGuardRemoveKey => 'キーを削除してモデル保護を無効にする';
+
+  @override
+  String get settingsMcpGuardInvalid => '保護を有効にする前に、有効なモデル名と API キーを入力してください。';
+
+  @override
+  String get settingsMcpGuardSaveFailed => '保護設定を保存できませんでした。再試行してください。';
 }

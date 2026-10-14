@@ -2,8 +2,8 @@
 
 A custom product website and usage guide built with **svedocs 0.2.3** and Svelte 5.
 The canonical domain is **https://serlink.alkinum.com**. Support uses
-**support@serlink.alkinum.com**. The domain and email address are configuration;
-a local build does not establish live hosting or mailbox delivery.
+the OnFire support form. The domain and support integration are configuration;
+a local build does not establish live hosting, ticket creation or reply delivery.
 
 The site has English, Simplified Chinese and Japanese translations, a responsive
 product screenshot gallery, local browser search, and light/dark/system themes.
@@ -22,6 +22,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 pnpm check
 pnpm check:docs
+pnpm test:support
 pnpm build
 pnpm exec playwright install chromium
 pnpm test
@@ -66,8 +67,9 @@ structure, and supplies its own component layout and style tokens. It preserves
 framework SEO, canonical/hreflang metadata, real Markdown rendering, local search,
 `/sitemap.xml`, `/robots.txt`, `/llms.txt`, `/llms-full.txt` and each page's
 `index.md` twin. Search has no hosted API, AI binding, user token or remote model.
-Fonts use the system stack. There is no analytics integration or contact form;
-the support page provides email and public issue links.
+Fonts use the system stack. There is no analytics integration. The support form
+uses Cloudflare Turnstile and sends submissions through the same-origin Worker
+to OnFire; credentials and customer tokens stay on the server.
 
 ## Copy and visual style
 
@@ -81,8 +83,10 @@ phrases. Apply the same wording to page metadata and the social card.
 
 `wrangler.jsonc` describes a Cloudflare Workers static-assets deployment using
 the `serlink.alkinum.com` custom domain, HTTPS, trailing-slash HTML handling and a
-static 404 page. The production site has no runtime bindings. The dry run is a
-configuration/bundle check and does not publish the website or configure DNS.
+static 404 page. Only `/api/support` runs server code. It requires the
+`ONFIRE_API_KEY` Worker secret, server-owned product/ticket-type mappings and
+the `SUPPORT_RATE_LIMIT` binding configured in `wrangler.jsonc`. The dry run is
+a configuration/bundle check and does not publish the website or configure DNS.
 
 When publishing is requested, use the account authorized for `alkinum.com`:
 
@@ -94,8 +98,9 @@ The deploy script checks types and content, rebuilds static output, and invokes
 `wrangler deploy --no-autoconfig`. After deploying, verify live HTTPS, all three
 languages, search, privacy/support links, robots/sitemap and the 404 response.
 The App Store material pack points to `/support/` and `/privacy/`; establish their
-public reachability before submitting those fields. Mailbox provisioning and
-email-delivery verification remain independent from website deployment.
+public reachability before submitting those fields. Real ticket creation,
+Turnstile verification and reply delivery remain independent from website
+deployment.
 
 Do not add an App Store badge or installer URL until the corresponding public
 release exists. Change the availability copy and platform status together across
@@ -105,6 +110,6 @@ all three translations when release gates have actually been completed.
 
 官网使用独立定制的首页与文档主题，包含中、英、日三语、真实应用截图切换、
 本地搜索、深浅主题、支持、隐私、许可及功能指南。域名配置为
-`serlink.alkinum.com`，支持邮箱为 `support@serlink.alkinum.com`。
-构建与部署预演通过不代表网站已上线，也不代表邮箱已经开通。
+`serlink.alkinum.com`，支持入口为 OnFire 表单 `https://serlink.alkinum.com/zh/support/`。
+构建与部署预演通过不代表网站、真实工单创建及回复送达已经验证。
 公开安装包或商店页面出现后，再同步修改三种语言的发行状态。

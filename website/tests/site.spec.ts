@@ -35,7 +35,7 @@ for (const locale of locales) {
     await expect(page.locator('main')).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
     await page.goto(`${locale.prefix}/support/`);
-    await expect(page.locator('a[href^="mailto:support@serlink.alkinum.com"]')).toHaveCount(1);
+    await expect(page.locator('main form')).toBeVisible();
     expect(errors).toEqual([]);
   });
   test(`${locale.code}: local scoped search and keyboard dismissal`, async ({ page }) => {

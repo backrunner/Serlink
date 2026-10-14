@@ -39,7 +39,7 @@ iCloud sync uses Apple's CloudKit private database. WebDAV sync uses an endpoint
 Serlink has no advertising or analytics SDK and does not automatically upload diagnostic logs to its developer. Diagnostic exports are local, redact sensitive connection information and omit terminal output. If you send an export to support, review the files and remove anything private first.
 
 
-The optional MCP endpoint permits an external agent to use explicitly authorized sessions. Serlink does not include an AI model or automatically send session data to an AI provider. An agent you authorize may transmit data according to that agent's configuration and provider policies.
+The optional MCP endpoint permits an external agent to use explicitly authorized sessions. Model command protection is off by default. If you configure your own TypeSafe API key and enable it, Serlink sends the commands submitted by agents to TypeSafe for risk assessment; it does not include host records, SSH credentials, terminal screens or command output in these requests. The API key and protection settings stay in device-local secure storage and are not included in vault sync or backups. TypeSafe processes these requests under its own service and privacy policies. An agent you authorize may separately transmit data according to that agent's configuration and provider policies.
 
 
 
@@ -61,8 +61,8 @@ For privacy questions, use the contact published on the [support page](/support)
 
 ## This website and support
 
-This website at **serlink.alkinum.com** serves static pages and product images. Documentation search runs in your browser. It contains no analytics, advertising pixels, account system, remote font requests or support form. The host still receives requests for pages and assets and may process network metadata to deliver and secure the service. Your theme preference is saved in browser local storage; clearing site data removes it.
+This website at **serlink.alkinum.com** serves static pages and product images. Documentation search runs in your browser. It contains no analytics, advertising pixels, account system or remote font requests. The host still receives requests for pages and assets and may process network metadata to deliver and secure the service. Your theme preference is saved in browser local storage; clearing site data removes it.
 
-Emailing **support@serlink.alkinum.com** sends the address, message and attachments you choose to our support mailbox and its mail providers. We use them to answer your request. Keep credentials and recovery material out of support messages. To ask about or request deletion of support information, email the same address.
+The support form sends your email address, selected topic, subject, message, language and any optional app/device information to our OnFire support system hosted on Cloudflare. Authorized staff use them to handle your request. The form has no file upload and does not access diagnostics, terminal output or vault data automatically. Cloudflare Turnstile processes browser, device and network signals to prevent abuse; we also use IP addresses to limit attempts. Keep credentials and recovery material out of messages. Use the support form to request access or deletion of support records; we may need to verify your request. Records are kept as needed to resolve requests and meet legal obligations.
 
-GitHub links lead to an external service governed by its own policy. GitHub issues are public; use email for private security or privacy reports.
+GitHub links lead to an external service governed by its own policy. GitHub issues are public; use the support form for private security or privacy reports.

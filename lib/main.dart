@@ -33,7 +33,7 @@ Future<void> main() async {
           // restoring transfer history.
           vault: () =>
               ref.read(vaultSessionControllerProvider.notifier).service,
-          records: ref.watch(vaultRecordRepositoryProvider),
+          database: ref.watch(serlinkDatabaseProvider),
         );
       }),
     ],

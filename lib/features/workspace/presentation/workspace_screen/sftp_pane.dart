@@ -1334,7 +1334,7 @@ class _SftpToolbarContainer extends StatelessWidget {
     if (!scrollable) {
       return child;
     }
-    return SingleChildScrollView(
+    return SerlinkScrollView(
       scrollDirection: Axis.horizontal,
       child: child,
     );

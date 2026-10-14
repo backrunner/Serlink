@@ -28,6 +28,20 @@ Open **Settings → MCP / Agent access**. Copy the HTTP configuration displayed 
 
 Both macOS channels support HTTP access. The separate stdio helper is available only in the direct distribution. Use the helper configuration copied by the app rather than guessing its installation path.
 
+## Model command protection
+
+In **Settings → MCP / Agent access → Manage → Command protection → Configure**,
+enter your own TypeSafe API key and enable model protection. The default model is
+`jev-1.13.0`; no model requests are made before you enable the feature. Commands
+submitted by agents are sent to TypeSafe for risk assessment. The key and settings
+stay in device-local secure storage, outside vault sync and backups.
+
+Local hard blocks always apply. Dangerous or uncertain model judgments, unavailable
+providers and malformed responses block execution, even after a local rule was
+approved for the session. Use complete commands with `serlink_exec`; partial input,
+history controls and standalone Enter are blocked while model protection is enabled.
+Ctrl-C remains available. These checks are not a shell sandbox or a safety guarantee.
+
 ## Approve and revoke
 
 Unlock the vault before opening a host session. The first client/host request needs your approval. Risky commands can require further confirmation and some destructive patterns are blocked; these checks are not a complete safety guarantee.

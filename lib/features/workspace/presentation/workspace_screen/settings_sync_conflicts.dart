@@ -50,31 +50,36 @@ class _SyncConflictReviewDialogState
           maxWidth: 820,
           maxHeight: math.min(560, MediaQuery.sizeOf(context).height * 0.68),
         ),
-        child: ListView.separated(
-          shrinkWrap: true,
-          itemCount: widget.conflicts.length,
-          separatorBuilder: (_, _) => const SizedBox(height: SerlinkSpacing.md),
-          itemBuilder: (context, index) {
-            final conflict = widget.conflicts[index];
-            final fieldSet = conflict.fieldSet;
-            if (fieldSet == null) {
-              return _SyncConflictUnsupportedCard(conflict: conflict);
-            }
-            if (!fieldSet.supportsFieldMerge) {
-              return _SyncConflictUnsupportedCard(conflict: conflict);
-            }
-            return _SyncConflictFieldCard(
-              conflict: conflict,
-              fieldSet: fieldSet,
-              useRemoteByField: _choices[conflict.id.value] ?? const {},
-              onChanged: (fieldKey, useRemote) {
-                setState(() {
-                  _choices.putIfAbsent(conflict.id.value, () => {})[fieldKey] =
-                      useRemote;
-                });
-              },
-            );
-          },
+        child: SerlinkScrollFade(
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: widget.conflicts.length,
+            separatorBuilder: (_, _) =>
+                const SizedBox(height: SerlinkSpacing.md),
+            itemBuilder: (context, index) {
+              final conflict = widget.conflicts[index];
+              final fieldSet = conflict.fieldSet;
+              if (fieldSet == null) {
+                return _SyncConflictUnsupportedCard(conflict: conflict);
+              }
+              if (!fieldSet.supportsFieldMerge) {
+                return _SyncConflictUnsupportedCard(conflict: conflict);
+              }
+              return _SyncConflictFieldCard(
+                conflict: conflict,
+                fieldSet: fieldSet,
+                useRemoteByField: _choices[conflict.id.value] ?? const {},
+                onChanged: (fieldKey, useRemote) {
+                  setState(() {
+                    _choices.putIfAbsent(
+                      conflict.id.value,
+                      () => {},
+                    )[fieldKey] = useRemote;
+                  });
+                },
+              );
+            },
+          ),
         ),
       ),
       actions: [
@@ -169,10 +174,8 @@ class _SyncConflictFieldCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final t = context.tokens;
-    final titleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
-      color: t.textPrimary,
-      fontWeight: FontWeight.w700,
-    );
+    final titleStyle = Theme.of(context).textTheme.titleSmall
+        ?.copyWith(color: t.textPrimary, fontWeight: FontWeight.w700);
     return SurfacePanel(
       borderRadius: SerlinkRadii.dialog,
       child: Column(
@@ -283,10 +286,8 @@ class _ConflictColumnLabels extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
-      color: t.textMuted,
-      fontWeight: FontWeight.w600,
-    );
+    final style = Theme.of(context).textTheme.labelSmall
+        ?.copyWith(color: t.textMuted, fontWeight: FontWeight.w600);
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < _conflictNarrowBreakpoint) {
@@ -294,9 +295,7 @@ class _ConflictColumnLabels extends StatelessWidget {
         }
         return Row(
           children: [
-            const SizedBox(
-              width: _conflictFieldLabelWidth + SerlinkSpacing.md,
-            ),
+            const SizedBox(width: _conflictFieldLabelWidth + SerlinkSpacing.md),
             Expanded(child: Text(localLabel, style: style)),
             const SizedBox(width: SerlinkSpacing.sm),
             Expanded(child: Text(remoteLabel, style: style)),
@@ -331,10 +330,8 @@ class _ConflictFieldRow extends StatelessWidget {
       field.label,
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-        color: t.textSecondary,
-        fontWeight: FontWeight.w600,
-      ),
+      style: Theme.of(context).textTheme.labelMedium
+          ?.copyWith(color: t.textSecondary, fontWeight: FontWeight.w600),
     );
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -472,10 +469,8 @@ class _ConflictChoiceTile extends StatelessWidget {
               value,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: t.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: t.textPrimary, fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -497,9 +492,8 @@ class _SyncConflictUnsupportedCard extends StatelessWidget {
       message: conflict.subtitle,
       child: Text(
         context.l10n.syncConflictUnsupportedBody,
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: t.textSecondary),
       ),
     );
   }

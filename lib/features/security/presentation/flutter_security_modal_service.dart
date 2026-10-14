@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../design_system/design_system.dart';
 import '../../../l10n/l10n.dart';
+import '../../snippets/presentation/shell_code_controller.dart';
 import '../../ssh/application/ssh_session_service.dart';
 import '../../sync/domain/webdav_tls_certificate_details.dart';
 import '../application/security_modal_service.dart';
@@ -145,7 +146,7 @@ class _WebDavCertificateDialog extends StatelessWidget {
             ? l10n.securityWebDavCertificateChangedTitle
             : l10n.securityTrustWebDavCertificateTitle,
       ),
-      content: SingleChildScrollView(
+      content: SerlinkScrollView(
         child: SizedBox(
           width: _certificateDialogContentWidth,
           child: Column(
@@ -214,7 +215,7 @@ class _HostKeyDialog extends StatelessWidget {
             ? l10n.securityHostKeyChangedTitle
             : l10n.securityConfirmFingerprintTitle,
       ),
-      content: SingleChildScrollView(
+      content: SerlinkScrollView(
         child: SizedBox(
           width: _hostKeyDialogContentWidth,
           child: Column(
@@ -267,7 +268,7 @@ class _ExportDialog extends StatelessWidget {
     final l10n = context.l10n;
     return SerlinkDialog(
       title: Text(preview.title),
-      content: SingleChildScrollView(
+      content: SerlinkScrollView(
         child: SizedBox(
           width: 520,
           child: Column(
@@ -341,9 +342,21 @@ class _MultilinePasteDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final lineCount = preview.split('\n').length;
+    final codeController = ShellCodeController(text: preview);
+    final code = codeController.buildTextSpan(
+      context: context,
+      style: TextStyle(
+        fontFamily: 'monospace',
+        fontSize: 13,
+        height: 1.6,
+        color: context.tokens.textPrimary,
+      ),
+      withComposing: false,
+    );
+    codeController.dispose();
     return SerlinkDialog(
       title: Text(l10n.securityPasteMultipleLinesTitle),
-      content: SingleChildScrollView(
+      content: SerlinkScrollView(
         child: SizedBox(
           width: 560,
           child: Column(
@@ -352,12 +365,19 @@ class _MultilinePasteDialog extends StatelessWidget {
             children: [
               Text(l10n.securityPasteMultipleLinesBody(lineCount)),
               const SizedBox(height: 12),
-              ConstrainedBox(
+              Container(
+                width: double.infinity,
                 constraints: const BoxConstraints(maxHeight: 240),
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    preview,
-                    style: const TextStyle(fontFamily: 'monospace'),
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: context.tokens.surfaceSunken,
+                  borderRadius: SerlinkRadii.control,
+                ),
+                child: SerlinkScrollView(
+                  padding: const EdgeInsets.all(SerlinkSpacing.md),
+                  child: SelectableText.rich(
+                    code,
+                    textDirection: TextDirection.ltr,
                   ),
                 ),
               ),
@@ -390,7 +410,7 @@ class _AgentAccessDialog extends StatelessWidget {
     return SerlinkDialog(
       maxWidth: _hostKeyDialogMaxWidth,
       title: Text(l10n.securityAgentAccessTitle),
-      content: SingleChildScrollView(
+      content: SerlinkScrollView(
         child: SizedBox(
           width: _hostKeyDialogContentWidth,
           child: Column(
@@ -436,7 +456,7 @@ class _AgentCommandDialog extends StatelessWidget {
     return SerlinkDialog(
       maxWidth: _hostKeyDialogMaxWidth,
       title: Text(l10n.securityAgentCommandTitle),
-      content: SingleChildScrollView(
+      content: SerlinkScrollView(
         child: SizedBox(
           width: _hostKeyDialogContentWidth,
           child: Column(
@@ -454,7 +474,7 @@ class _AgentCommandDialog extends StatelessWidget {
               const SizedBox(height: 12),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 240),
-                child: SingleChildScrollView(
+                child: SerlinkScrollView(
                   child: SelectableText(
                     prompt.command,
                     style: const TextStyle(fontFamily: 'monospace'),

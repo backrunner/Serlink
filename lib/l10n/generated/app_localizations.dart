@@ -5355,6 +5355,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search'**
   String get searchAction;
+
+  /// No description provided for @settingsMcpGuardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Command protection'**
+  String get settingsMcpGuardTitle;
+
+  /// No description provided for @settingsMcpGuardLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local rules'**
+  String get settingsMcpGuardLocal;
+
+  /// No description provided for @settingsMcpGuardEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Local rules + {model}'**
+  String settingsMcpGuardEnabled(String model);
+
+  /// No description provided for @settingsMcpGuardLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading protection settings…'**
+  String get settingsMcpGuardLoading;
+
+  /// No description provided for @settingsMcpGuardUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Protection settings unavailable'**
+  String get settingsMcpGuardUnavailable;
+
+  /// No description provided for @settingsMcpGuardConfigure.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure'**
+  String get settingsMcpGuardConfigure;
+
+  /// No description provided for @settingsMcpGuardDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Model command protection'**
+  String get settingsMcpGuardDialogTitle;
+
+  /// No description provided for @settingsMcpGuardDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, agent commands are sent to TypeSafe for risk assessment. Dangerous or uncertain commands and failed checks are blocked. Your API key stays on this device.'**
+  String get settingsMcpGuardDescription;
+
+  /// No description provided for @settingsMcpGuardInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents must submit complete commands. Partial input, history controls and bare Enter are blocked; Ctrl-C remains available.'**
+  String get settingsMcpGuardInputHint;
+
+  /// No description provided for @settingsMcpGuardEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable model protection'**
+  String get settingsMcpGuardEnable;
+
+  /// No description provided for @settingsMcpGuardModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get settingsMcpGuardModel;
+
+  /// No description provided for @settingsMcpGuardApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'TypeSafe API key'**
+  String get settingsMcpGuardApiKey;
+
+  /// No description provided for @settingsMcpGuardKeySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Key saved; leave blank to keep it'**
+  String get settingsMcpGuardKeySaved;
+
+  /// No description provided for @settingsMcpGuardKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your TypeSafe API key'**
+  String get settingsMcpGuardKeyHint;
+
+  /// No description provided for @settingsMcpGuardRemoveKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove key and disable model protection'**
+  String get settingsMcpGuardRemoveKey;
+
+  /// No description provided for @settingsMcpGuardInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid model name and API key before enabling protection.'**
+  String get settingsMcpGuardInvalid;
+
+  /// No description provided for @settingsMcpGuardSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save protection settings. Please retry.'**
+  String get settingsMcpGuardSaveFailed;
 }
 
 class _AppLocalizationsDelegate

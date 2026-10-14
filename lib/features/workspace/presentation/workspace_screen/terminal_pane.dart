@@ -1111,7 +1111,7 @@ class _TerminalAccessoryBarState extends State<_TerminalAccessoryBar> {
       ),
       child: SizedBox(
         height: 70,
-        child: SingleChildScrollView(
+        child: SerlinkScrollView(
           scrollDirection: Axis.horizontal,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(8, 5, 0, 5),

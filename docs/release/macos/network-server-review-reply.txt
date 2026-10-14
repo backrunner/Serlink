@@ -1,0 +1,35 @@
+Hello App Review Team,
+
+Serlink requires com.apple.security.network.server for three features included
+in the submitted Mac App Store build:
+
+1. SSH local port forwarding. Serlink listens on 127.0.0.1 at a user-selected
+   port, accepts incoming connections from local applications, and forwards
+   them through an SSH tunnel to the remote service selected by the user.
+2. SSH dynamic port forwarding. Serlink provides a SOCKS proxy that listens on
+   the user-selected bind address and port; the default address is 127.0.0.1.
+3. MCP / Agent access. Serlink runs an embedded HTTP MCP server at
+   http://127.0.0.1:<random-port>/mcp, accepting incoming requests from local
+   MCP clients. It is restricted to loopback and requires a per-start bearer
+   token. Opening an agent-controlled SSH session additionally requires
+   explicit authorization in the app. The app does not include an AI model
+   or contact an AI provider by itself.
+
+The MCP server starts automatically and can be stopped using Settings >
+MCP / Agent access > Manage > Agent server. The Mac App Store build does not
+include the standalone stdio helper.
+
+The entitlement is needed to create these TCP listeners inside App Sandbox.
+com.apple.security.network.client alone permits outgoing connections but does
+not enable this incoming-connection functionality.
+
+We have added the entitlement explanation and detailed verification steps to
+App Review Information. You can verify the MCP HTTP listener without an SSH
+server: open Settings > MCP / Agent access > Manage, use the displayed URL and
+token to send the documented MCP initialization request, and turn Agent server
+off to confirm that the listener closes. Requests without a valid token return
+HTTP 403. For SSH forwarding, connect to an SSH host you control and open
+Manage port forwarding in the connected terminal toolbar.
+
+Please continue reviewing the existing submission with this information.
+Thank you.

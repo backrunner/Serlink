@@ -3100,4 +3100,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchAction => 'Search';
+
+  @override
+  String get settingsMcpGuardTitle => 'Command protection';
+
+  @override
+  String get settingsMcpGuardLocal => 'Local rules';
+
+  @override
+  String settingsMcpGuardEnabled(String model) {
+    return 'Local rules + $model';
+  }
+
+  @override
+  String get settingsMcpGuardLoading => 'Loading protection settings…';
+
+  @override
+  String get settingsMcpGuardUnavailable => 'Protection settings unavailable';
+
+  @override
+  String get settingsMcpGuardConfigure => 'Configure';
+
+  @override
+  String get settingsMcpGuardDialogTitle => 'Model command protection';
+
+  @override
+  String get settingsMcpGuardDescription =>
+      'When enabled, agent commands are sent to TypeSafe for risk assessment. Dangerous or uncertain commands and failed checks are blocked. Your API key stays on this device.';
+
+  @override
+  String get settingsMcpGuardInputHint =>
+      'Agents must submit complete commands. Partial input, history controls and bare Enter are blocked; Ctrl-C remains available.';
+
+  @override
+  String get settingsMcpGuardEnable => 'Enable model protection';
+
+  @override
+  String get settingsMcpGuardModel => 'Model';
+
+  @override
+  String get settingsMcpGuardApiKey => 'TypeSafe API key';
+
+  @override
+  String get settingsMcpGuardKeySaved => 'Key saved; leave blank to keep it';
+
+  @override
+  String get settingsMcpGuardKeyHint => 'Enter your TypeSafe API key';
+
+  @override
+  String get settingsMcpGuardRemoveKey =>
+      'Remove key and disable model protection';
+
+  @override
+  String get settingsMcpGuardInvalid =>
+      'Enter a valid model name and API key before enabling protection.';
+
+  @override
+  String get settingsMcpGuardSaveFailed =>
+      'Could not save protection settings. Please retry.';
 }

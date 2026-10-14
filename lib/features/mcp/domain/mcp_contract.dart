@@ -49,6 +49,11 @@ const serlinkMcpInstructions =
     '- command_blocked / command_denied means the risk policy rejected '
     'the command — do not rephrase, split, encode, or otherwise disguise '
     'it to get it through.\n'
+    '- With model command protection enabled, submit complete commands with '
+    'serlink_exec. serlink_send_input accepts complete submitted commands or '
+    'Ctrl-C only; partial input, editing/history controls and bare Enter are '
+    'blocked. If command_input_reset_required is reported, send Ctrl-C before '
+    'a new complete command. Never bypass a rejected risk judgment.\n'
     '- The user watches every session in a visible Serlink tab and can '
     'take back control at any time; act accordingly.';
 
@@ -94,7 +99,8 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
         'Run a shell command in an open Serlink session and return the '
         'terminal screen after the output settles. Risky commands require '
         'user confirmation in the Serlink app; destructive commands are '
-        'blocked outright. The result is the last screen lines (including '
+        'blocked outright. Optional model protection also blocks dangerous or '
+        'uncertain judgments and failed checks before any input is sent. The result is the last screen lines (including '
         'the echoed command), not a byte-exact output capture.',
     inputSchema: JsonSchema.object(
       properties: {
@@ -135,7 +141,9 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
         'Send raw keystrokes to an open Serlink session, for interactive '
         'programs (e.g. answering a prompt or pressing keys in a TUI). '
         'Text containing newlines submits commands and is checked against '
-        'the same risk policy as serlink_exec.',
+        'the same risk policy as serlink_exec. When model protection is enabled, '
+        'only complete submitted commands or Ctrl-C are accepted; partial input, '
+        'editing/history controls and bare Enter are blocked.',
     inputSchema: JsonSchema.object(
       properties: {
         'sessionId': JsonSchema.string(

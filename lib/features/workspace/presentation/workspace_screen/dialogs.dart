@@ -165,24 +165,86 @@ class _DialogList extends StatelessWidget {
     if (rows.isEmpty) {
       return _DialogStateView(state: empty);
     }
-    return ListView.separated(
-      padding: EdgeInsets.zero,
-      itemCount: rows.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final item = rows[index];
-        return EntranceFade(
-          key: ValueKey('dialog-row-${item.title}-$index'),
-          delay: Duration(milliseconds: 30 * (index.clamp(0, 8))),
-          offsetY: 8,
-          child: _DialogRow(item: item),
-        );
-      },
+    return SerlinkScrollFade(
+      child: ListView.separated(
+        padding: EdgeInsets.zero,
+        itemCount: rows.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final item = rows[index];
+          return EntranceFade(
+            key: ValueKey('dialog-row-${item.title}-$index'),
+            delay: Duration(milliseconds: 30 * (index.clamp(0, 8))),
+            offsetY: 8,
+            child: _DialogRow(item: item),
+          );
+        },
+      ),
     );
   }
 }
 
-class _DialogScrollFrame extends StatefulWidget {
+/// A form section whose surface stays distinct from the surrounding dialog.
+class _DialogSection extends StatelessWidget {
+  const _DialogSection({
+    required this.title,
+    required this.children,
+    this.subtitle,
+    this.action,
+  });
+
+  final String title;
+  final String? subtitle;
+  final Widget? action;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: t.surfaceBase,
+        borderRadius: SerlinkRadii.dialog,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: t.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle!,
+                        style: TextStyle(color: t.textSecondary, fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (action != null) ...[const SizedBox(width: 12), action!],
+            ],
+          ),
+          if (children.isNotEmpty) ...[const SizedBox(height: 14), ...children],
+        ],
+      ),
+    );
+  }
+}
+
+class _DialogScrollFrame extends StatelessWidget {
   const _DialogScrollFrame({
     super.key,
     required this.width,
@@ -199,145 +261,33 @@ class _DialogScrollFrame extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
 
-  /// When false the frame shrinks to the content height and only starts
-  /// scrolling once the content exceeds [height].
+  /// Shrink to the content height unless it exceeds [height].
   final bool fillHeight;
 
   @override
-  State<_DialogScrollFrame> createState() => _DialogScrollFrameState();
-}
-
-class _DialogScrollFrameState extends State<_DialogScrollFrame> {
-  bool _showTopFade = false;
-  bool _showBottomFade = false;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_updateFades);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateFades());
-  }
-
-  @override
-  void didUpdateWidget(covariant _DialogScrollFrame oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
-      oldWidget.controller.removeListener(_updateFades);
-      widget.controller.addListener(_updateFades);
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateFades());
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_updateFades);
-    super.dispose();
-  }
-
-  void _updateFades() {
-    if (!mounted || !widget.controller.hasClients) {
-      return;
-    }
-    final position = widget.controller.position;
-    final showTop = position.pixels > 0.5;
-    final showBottom = position.pixels < position.maxScrollExtent - 0.5;
-    if (showTop != _showTopFade || showBottom != _showBottomFade) {
-      setState(() {
-        _showTopFade = showTop;
-        _showBottomFade = showBottom;
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    final scrollView = ClipRect(
-      child: Scrollbar(
-        controller: widget.controller,
-        child: ScrollConfiguration(
-          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-          child: SingleChildScrollView(
-            controller: widget.controller,
-            physics: Theme.of(context).platform == TargetPlatform.iOS
-                ? const BouncingScrollPhysics()
-                : const ClampingScrollPhysics(),
-            padding: widget.padding,
-            child: widget.child,
-          ),
+    final scrollView = Scrollbar(
+      controller: controller,
+      thickness: 4,
+      radius: const Radius.circular(2),
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: SerlinkScrollView(
+          controller: controller,
+          physics: Theme.of(context).platform == TargetPlatform.iOS
+              ? const BouncingScrollPhysics()
+              : const ClampingScrollPhysics(),
+          padding: padding.add(const EdgeInsetsDirectional.only(end: 14)),
+          child: child,
         ),
       ),
     );
-    final framed = widget.fillHeight
-        ? SizedBox(
-            width: widget.width,
-            height: widget.height,
-            child: scrollView,
-          )
-        : SizedBox(
-            width: widget.width,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: widget.height),
-              child: scrollView,
-            ),
-          );
-    return Stack(
-      children: [
-        framed,
-        _ScrollFadeEdge(
-          visible: _showTopFade,
-          color: Theme.of(context).platform == TargetPlatform.iOS
-              ? t.surfaceBase
-              : t.surfaceRaised,
-          alignment: Alignment.topCenter,
-        ),
-        _ScrollFadeEdge(
-          visible: _showBottomFade,
-          color: Theme.of(context).platform == TargetPlatform.iOS
-              ? t.surfaceBase
-              : t.surfaceRaised,
-          alignment: Alignment.bottomCenter,
-        ),
-      ],
-    );
-  }
-}
-
-/// Soft gradient that fades scrolled-off content into the dialog background.
-class _ScrollFadeEdge extends StatelessWidget {
-  const _ScrollFadeEdge({
-    required this.visible,
-    required this.color,
-    required this.alignment,
-  });
-
-  final bool visible;
-  final Color color;
-  final Alignment alignment;
-
-  @override
-  Widget build(BuildContext context) {
-    final top = alignment == Alignment.topCenter;
-    return Positioned(
-      top: top ? 0 : null,
-      bottom: top ? null : 0,
-      left: 0,
-      right: 8,
-      child: IgnorePointer(
-        child: AnimatedOpacity(
-          opacity: visible ? 1 : 0,
-          duration: const Duration(milliseconds: 150),
-          child: Container(
-            height: 20,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: top ? Alignment.topCenter : Alignment.bottomCenter,
-                end: top ? Alignment.bottomCenter : Alignment.topCenter,
-                colors: [color, color.withValues(alpha: 0)],
-              ),
-            ),
-          ),
-        ),
+    return SizedBox(
+      width: width,
+      height: fillHeight ? height : null,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: height),
+        child: scrollView,
       ),
     );
   }
@@ -483,194 +433,17 @@ String? _defaultImportUsername() {
   return trimmed == null || trimmed.isEmpty ? null : trimmed;
 }
 
-const double _snackBarMaxWidth = 320;
-const double _snackBarMinWidth = 120;
-const double _snackBarMargin = 16;
-const double _snackBarCloseButtonSize = 22;
 const double _mobileBottomNavigationBaseHeight = 56;
-const Duration _snackBarFadeInDuration = Duration(milliseconds: 180);
-const Duration _snackBarFadeOutDuration = Duration(milliseconds: 140);
-const Duration _snackBarDisplayDuration = Duration(seconds: 4);
-
-/// Fraction of the bottom safe-area inset reserved behind the mobile bottom
-/// navigation bar. The bar already covers part of the gesture area visually,
-/// so only two thirds of the inset is added on top of the bar height.
 const double _mobileBottomNavigationSafeAreaFraction = 2 / 3;
 
-_OverlayToastHandle? _activeToast;
-
 void _showSnackBar(BuildContext context, String message, {Duration? duration}) {
-  final t = context.tokens;
-  final l10n = context.l10n;
-  final bottomMargin = _snackBarMargin + _snackBarBottomReservedHeight(context);
-  final screenWidth = MediaQuery.sizeOf(context).width;
-  final availableWidth = math.max(0.0, screenWidth - (_snackBarMargin * 2));
-  final messageStyle = TextStyle(color: t.textPrimary);
-  final messagePainter = TextPainter(
-    text: TextSpan(text: message, style: messageStyle),
-    textDirection: Directionality.of(context),
-    textScaler: MediaQuery.textScalerOf(context),
-  )..layout();
-  // 14 + 8 horizontal padding, 10 gap before the close button.
-  final contentWidth =
-      messagePainter.width + 14 + 8 + 10 + _snackBarCloseButtonSize;
-  final snackBarWidth = contentWidth
-      .clamp(_snackBarMinWidth, math.min(_snackBarMaxWidth, availableWidth))
-      .toDouble();
-
-  late final OverlayEntry entry;
-  late final _OverlayToastHandle handle;
-  _activeToast?.dismissImmediately();
-  entry = OverlayEntry(
-    builder: (context) => Positioned(
-      right: _snackBarMargin,
-      bottom: bottomMargin,
-      width: snackBarWidth,
-      child: _OverlayToast(
-        message: message,
-        messageStyle: messageStyle,
-        duration: duration ?? _snackBarDisplayDuration,
-        closeTooltip: l10n.closeAction,
-        onDismissed: () {
-          handle.dismissImmediately();
-          if (identical(_activeToast, handle)) {
-            _activeToast = null;
-          }
-        },
-      ),
-    ),
+  showSerlinkToast(
+    context,
+    message,
+    closeLabel: context.l10n.closeAction,
+    duration: duration ?? const Duration(seconds: 4),
+    bottomReservedHeight: _snackBarBottomReservedHeight(context),
   );
-  handle = _OverlayToastHandle(entry);
-  _activeToast = handle;
-  Overlay.of(context).insert(entry);
-}
-
-class _OverlayToastHandle {
-  _OverlayToastHandle(this.entry);
-
-  final OverlayEntry entry;
-  bool _removed = false;
-
-  void dismissImmediately() {
-    if (_removed) {
-      return;
-    }
-    _removed = true;
-    entry.remove();
-  }
-}
-
-class _OverlayToast extends StatefulWidget {
-  const _OverlayToast({
-    required this.message,
-    required this.messageStyle,
-    required this.duration,
-    required this.closeTooltip,
-    required this.onDismissed,
-  });
-
-  final String message;
-  final TextStyle messageStyle;
-  final Duration duration;
-  final String closeTooltip;
-  final VoidCallback onDismissed;
-
-  @override
-  State<_OverlayToast> createState() => _OverlayToastState();
-}
-
-class _OverlayToastState extends State<_OverlayToast>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: _snackBarFadeInDuration,
-    reverseDuration: _snackBarFadeOutDuration,
-  );
-  Timer? _autoDismissTimer;
-  bool _dismissing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_controller.forward());
-    _autoDismissTimer = Timer(widget.duration, _dismiss);
-  }
-
-  @override
-  void dispose() {
-    _autoDismissTimer?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _dismiss() {
-    if (_dismissing || !mounted) {
-      return;
-    }
-    _dismissing = true;
-    _autoDismissTimer?.cancel();
-    unawaited(
-      _controller.reverse().then((_) {
-        if (mounted) {
-          widget.onDismissed();
-        }
-      }),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    // The toast floats above dialogs in the root overlay, so the visual layer
-    // must not absorb pointer events meant for the content behind it; only the
-    // close button is hit-testable.
-    return FadeTransition(
-      opacity: CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOut,
-        reverseCurve: Curves.easeIn,
-      ),
-      child: Stack(
-        children: [
-          IgnorePointer(
-            child: Material(
-              key: const ValueKey('app-toast'),
-              elevation: 8,
-              color: t.surfaceRaised,
-              borderRadius: SerlinkRadii.dialog,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-                decoration: BoxDecoration(
-                  borderRadius: SerlinkRadii.dialog,
-                  border: Border.all(color: t.borderSubtle),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(widget.message, style: widget.messageStyle),
-                    ),
-                    const SizedBox(width: 10),
-                    const SizedBox.square(dimension: _snackBarCloseButtonSize),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 8,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: _SnackBarCloseButton(
-                tooltip: widget.closeTooltip,
-                onPressed: _dismiss,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 double _snackBarBottomReservedHeight(BuildContext context) {
@@ -685,31 +458,6 @@ double _snackBarBottomReservedHeight(BuildContext context) {
       MediaQuery.viewPaddingOf(context).bottom *
       _mobileBottomNavigationSafeAreaFraction;
   return _mobileBottomNavigationBaseHeight + bottomSafePadding;
-}
-
-class _SnackBarCloseButton extends StatelessWidget {
-  const _SnackBarCloseButton({required this.tooltip, required this.onPressed});
-
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return SerlinkTooltip(
-      message: tooltip,
-      child: SerlinkPressable(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(5),
-        hoverColor: t.accentPrimary.withValues(alpha: 0.08),
-        pressedColor: t.accentPrimary.withValues(alpha: 0.14),
-        child: SizedBox.square(
-          dimension: _snackBarCloseButtonSize,
-          child: Icon(Icons.close, size: 12, color: t.textSecondary),
-        ),
-      ),
-    );
-  }
 }
 
 class _PlaceholderSurface extends StatelessWidget {

@@ -282,7 +282,7 @@ class _RecoveryCodeDialogState extends ConsumerState<_RecoveryCodeDialog> {
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(context).height * 0.72,
           ),
-          child: SingleChildScrollView(
+          child: SerlinkScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,

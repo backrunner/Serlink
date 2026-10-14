@@ -6,7 +6,7 @@ Design principles:
 
 - **Credentials never leave the app.** The agent never receives passwords or private keys. Serlink opens the SSH session itself, as a normal workspace terminal tab.
 - **Explicit user authorization.** The first time an agent requests a session on a host, Serlink shows an approval dialog. If the vault is locked, tool calls fail with `vault_locked` until the user unlocks it in the app.
-- **Dangerous command interception.** Commands sent by the agent are screened by a risk policy (`lib/features/mcp/data/command_risk_policy.dart`). Risky commands require an in-app confirmation (Allow once / Allow for session); a small set of destructive commands (disk overwrites, `mkfs`, fork bombs) is always blocked.
+- **Dangerous command interception.** Commands sent by the agent are screened by a risk policy (`lib/features/mcp/data/command_risk_policy.dart`). Risky commands require an in-app confirmation (Allow once / Allow for session); a small set of destructive commands (disk overwrites, `mkfs`, fork bombs) is always blocked, even by a session allowlist. Optional decision-model protection adds semantic screening before execution.
 - **Take back control anytime.** An agent session is a regular terminal tab — type in it to retake control. A badge marks agent-controlled panes; closing the tab or revoking the grant in Settings immediately ends agent access.
 - **Quiet capability checks.** Starting the stdio server, initializing MCP, sending heartbeats, and listing tools do not connect to or launch the desktop app. A valid Serlink tool call connects to the running app or launches it on demand. The standalone process does not access the vault or SSH credentials itself.
 
@@ -22,7 +22,7 @@ The desktop HTTP backend in both variants binds `127.0.0.1` only, uses a random 
 
 ## Setting up an MCP client
 
-Open **Settings → Agent access** and start the server, then either:
+The embedded HTTP server starts automatically on macOS. Open **Settings → MCP / Agent access → Manage** to view its loopback URL and access token, or stop it with the **Agent server** switch. If it is stopped, enable the switch before using the HTTP configuration. Then either:
 
 - **Copy HTTP MCP config (JSON)** — works in both channels while Serlink is running:
   ```json
@@ -60,13 +60,70 @@ All tools are prefixed `serlink_`:
 - `serlink_open_session` — opens a terminal tab on a host; triggers the in-app approval dialog on first use per client+host.
 - `serlink_exec` — sends a command and returns the settled screen text (heuristic: output quiet for ~400 ms).
 - `serlink_read_screen` — last N buffer lines.
-- `serlink_send_input` — raw input for interactive programs (risk-checked when it contains newlines).
+- `serlink_send_input` — raw input for interactive programs in local-rule mode. With model protection, only complete submitted commands or Ctrl-C are accepted.
 - `serlink_close_session`, `serlink_list_sessions`.
 
 ## Authorization lifecycle
 
 - Grants are **in-memory only**: they expire when the app quits. Revoke individual grants in **Settings → Agent access → Active grants**; agent sessions are listed there too and can be closed.
 - Error codes surfaced to the agent: `vault_locked`, `authorization_denied`, `authorization_required`, `command_blocked`, `command_denied`, `session_not_found`, `connect_timeout`. The stdio helper also returns `app_unavailable` for discovery/launch failures and `app_connection_lost` for failed in-flight calls.
+
+## Decision-model command protection
+
+Open **Settings → MCP / Agent access → Manage → Command protection → Configure**.
+Enter your own TypeSafe API key, choose a System One model (default `jev-1.13.0`),
+and enable model protection. It is disabled until you configure and enable it.
+The API key, model and enablement are stored together in device-local secure
+storage, separately from vault records, sync and backups. Removing the saved key
+also disables model protection. Editing protection does not close agent sessions.
+
+The first adapter implements [TypeSafe's System One API](https://docs.typesafe.ai/api),
+`POST https://api.typesafe.ai/v1/systemone`. The application owns the execution
+gate; `CommandDecisionModel` is the adapter interface for another decision provider.
+Requests contain the command text and a typed Choice question. They do not attach
+host records, credentials from the vault, terminal screens or command output.
+Secrets embedded in a command are part of its text and would be sent too.
+
+The enforcement order is:
+
+1. Local hard blocks reject the command without contacting the model.
+2. When enabled, the model evaluates every remaining command, including commands
+   covered by a previous local-rule session approval. Only a validated `safe`
+   Choice with safe probability ≥ 0.98, dangerous probability ≤ 0.01 and confidence
+   ≥ 0.90 passes. Dangerous, uncertain, malformed, oversized and unavailable
+   results fail closed. These thresholds are conservative defaults, not a claim
+   of measured shell-command detection accuracy.
+3. Local rules that require confirmation still require it; a model result cannot
+   loosen those rules. Grant, vault, pane and configuration revision are rechecked
+   after every asynchronous model/confirmation wait before sending any input.
+
+HTTP calls have bounded deadlines and response sizes, no automatic retries,
+no redirects and no command/result caching. Provider error bodies and commands
+are not included in errors or diagnostic logs. Concurrent input in a single
+session is serialized so assessed commands cannot be interleaved.
+
+Use `serlink_exec` for complete commands. While model protection is enabled,
+`serlink_send_input` rejects partial input, editing/history control sequences,
+standalone Enter and text with an unsubmitted suffix. Complete submitted commands
+are checked as a whole. Ctrl-C bypasses the input queue and invalidates pending submissions, so a late
+safe judgment cannot execute after an interruption. It can interrupt a program or clear
+input typed before protection was enabled. If `command_input_reset_required`
+is returned, send Ctrl-C, then submit a new complete command. Interactive TUI/REPL
+keystrokes may be refused; do not split or disguise commands to bypass a refusal.
+
+Rejections use the existing `command_blocked` code with a bounded detail such as
+`command_model_blocked`, `command_model_uncertain`, `command_guard_unavailable`,
+`command_guard_changed`, `command_input_requires_exec` or
+`command_input_reset_required` or `command_input_interrupted`. The same gate protects both HTTP clients and the
+stdio helper. Manual typing in the visible user-owned terminal remains outside
+MCP screening. Local rules and model judgments are layered checks, not a shell
+sandbox, and cannot establish the effects of arbitrary remote state or scripts.
+
+For a billable, synthetic model evaluation without SSH execution, set
+`TYPESAFE_API_KEY` in your local environment and run
+`dart run tool/check_mcp_command_model.dart` with the project SDK. It checks benign,
+opaque, destructive, credential-reading and prompt-injection examples. No real
+model accuracy or latency claim follows from the local fake-provider tests.
 
 ## App Store review notes
 

@@ -830,7 +830,7 @@ class _HostAuthenticationFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SingleChildScrollView(
+        SerlinkScrollView(
           scrollDirection: Axis.horizontal,
           child: Align(
             alignment: Alignment.centerLeft,

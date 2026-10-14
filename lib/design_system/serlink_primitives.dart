@@ -5,6 +5,7 @@ import 'package:forui/forui.dart';
 import 'serlink_context.dart';
 import 'serlink_dimensions.dart';
 import 'serlink_effects.dart';
+import 'serlink_scroll.dart';
 import 'serlink_forui.dart';
 import 'serlink_tokens.dart';
 
@@ -32,7 +33,7 @@ class SerlinkEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
+      builder: (context, constraints) => SerlinkScrollView(
         child: ConstrainedBox(
           constraints: BoxConstraints(
             minHeight: constraints.hasBoundedHeight ? constraints.maxHeight : 0,

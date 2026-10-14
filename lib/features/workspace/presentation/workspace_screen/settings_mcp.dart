@@ -90,11 +90,14 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
     return SerlinkDialog(
       maxWidth: _adaptiveDialogWidth(context, _dialogWidthManagement),
       title: Text(l10n.settingsMcpSection),
-      content: SingleChildScrollView(
+      content: SerlinkScrollView(
+        key: const ValueKey('settings-mcp-scroll'),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildServerCard(l10n, serverState, url),
+            const SizedBox(height: 12),
+            const _McpCommandGuardSection(),
             const SizedBox(height: 18),
             _buildConfigGroup(l10n, serverState, url, showStdioTab),
             if (showStdioTab) ...[
@@ -130,7 +133,10 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
       children: [
         Row(
           children: [
-            _McpStatusDot(active: running),
+            SizedBox.square(
+              dimension: 18,
+              child: Center(child: _McpStatusDot(active: running)),
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -146,9 +152,8 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
                   const SizedBox(height: 2),
                   Text(
                     _mcpServerSubtitle(l10n, serverState, url),
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: t.textSecondary),
                   ),
                 ],
               ),
@@ -164,9 +169,11 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
         ),
         const _McpCardGap(),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.key_outlined, size: 16, color: t.textSecondary),
+            SizedBox.square(
+              dimension: 18,
+              child: Icon(Icons.key_outlined, size: 16, color: t.textSecondary),
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -177,26 +184,29 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: t.textMuted,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 0.4,
+                      letterSpacing: 0,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   if (token == null)
                     Text(
                       l10n.settingsMcpTokenNotAvailable,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: t.textMuted),
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: t.textMuted),
                     )
                   else
-                    SelectableText(
-                      token,
-                      style: TextStyle(
-                        color: t.textSecondary,
-                        fontFamily: _mcpMonoFontFamily,
-                        fontFamilyFallback: _mcpMonoFontFallback,
-                        fontSize: 12,
-                        height: 1.3,
+                    SerlinkScrollView(
+                      key: const ValueKey('settings-mcp-token-scroll'),
+                      scrollDirection: Axis.horizontal,
+                      child: SelectableText(
+                        token,
+                        style: TextStyle(
+                          color: t.textSecondary,
+                          fontFamily: _mcpMonoFontFamily,
+                          fontFamilyFallback: _mcpMonoFontFallback,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
                       ),
                     ),
                 ],
@@ -243,85 +253,108 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
       _McpConfigTab.stdio => l10n.settingsMcpStdioNotInstalled,
     };
 
+    final controls = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showStdioTab)
+          SerlinkSegmentedControl<_McpConfigTab>(
+            compact: true,
+            value: effectiveTab,
+            segments: const [
+              SerlinkSegment(
+                value: _McpConfigTab.http,
+                label: 'HTTP',
+                icon: Icons.cloud_outlined,
+              ),
+              SerlinkSegment(
+                value: _McpConfigTab.stdio,
+                label: 'stdio',
+                icon: Icons.terminal_outlined,
+              ),
+            ],
+            onChanged: (tab) => setState(() => _tab = tab),
+          ),
+        if (config != null) ...[
+          if (showStdioTab) const SizedBox(width: 8),
+          SerlinkIconButton(
+            key: ValueKey(
+              effectiveTab == _McpConfigTab.http
+                  ? 'settings-mcp-copy-http-config-button'
+                  : 'settings-mcp-copy-stdio-config-button',
+            ),
+            tooltip: l10n.copyAction,
+            constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+            iconSize: 15,
+            onPressed: () => _copyMcpClientConfig(context, config),
+            icon: const Icon(Icons.copy_outlined),
+          ),
+        ],
+      ],
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(child: _McpGroupLabel(title: l10n.settingsMcpConfigTitle)),
-            if (showStdioTab)
-              SerlinkSegmentedControl<_McpConfigTab>(
-                compact: true,
-                value: effectiveTab,
-                segments: const [
-                  SerlinkSegment(
-                    value: _McpConfigTab.http,
-                    label: 'HTTP',
-                    icon: Icons.cloud_outlined,
-                  ),
-                  SerlinkSegment(
-                    value: _McpConfigTab.stdio,
-                    label: 'stdio',
-                    icon: Icons.terminal_outlined,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final label = _McpGroupLabel(title: l10n.settingsMcpConfigTitle);
+            if (showStdioTab &&
+                (constraints.maxWidth < 420 ||
+                    MediaQuery.textScalerOf(context).scale(14) > 18)) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  label,
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: controls,
                   ),
                 ],
-                onChanged: (tab) => setState(() => _tab = tab),
-              ),
-          ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: label),
+                const SizedBox(width: 12),
+                controls,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 10),
         Container(
+          key: const ValueKey('settings-mcp-config-preview'),
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: t.surfaceSunken,
             borderRadius: SerlinkRadii.control,
             border: Border.all(color: t.borderSubtle),
           ),
-          padding: const EdgeInsets.fromLTRB(12, 4, 6, 4),
           child: config == null
               ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.all(14),
                   child: Text(
                     unavailableHint,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: t.textMuted),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: t.textMuted),
                   ),
                 )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: SelectableText.rich(
-                          TextSpan(
-                            style: const TextStyle(
-                              fontFamily: _mcpMonoFontFamily,
-                              fontFamilyFallback: _mcpMonoFontFallback,
-                              fontSize: 11.5,
-                              height: 1.45,
-                            ).copyWith(color: t.textMuted),
-                            children: _jsonHighlightSpans(config, t),
-                          ),
-                        ),
-                      ),
+              : SerlinkScrollView(
+                  key: const ValueKey('settings-mcp-config-scroll'),
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.all(14),
+                  child: SelectableText.rich(
+                    TextSpan(
+                      style: const TextStyle(
+                        fontFamily: _mcpMonoFontFamily,
+                        fontFamilyFallback: _mcpMonoFontFallback,
+                        fontSize: 12,
+                        height: 1.5,
+                      ).copyWith(color: t.textMuted),
+                      children: _jsonHighlightSpans(config, t),
                     ),
-                    SerlinkIconButton(
-                      key: ValueKey(
-                        effectiveTab == _McpConfigTab.http
-                            ? 'settings-mcp-copy-http-config-button'
-                            : 'settings-mcp-copy-stdio-config-button',
-                      ),
-                      tooltip: l10n.copyAction,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 30,
-                        height: 30,
-                      ),
-                      iconSize: 15,
-                      onPressed: () => _copyMcpClientConfig(context, config),
-                      icon: const Icon(Icons.copy_outlined),
-                    ),
-                  ],
+                  ),
                 ),
         ),
       ],
@@ -445,10 +478,8 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
           const SizedBox(width: 5),
           Text(
             l10n.settingsMcpInstalledLabel,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: t.accentPrimary,
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: t.accentPrimary, fontWeight: FontWeight.w600),
           ),
         ],
       );
@@ -584,7 +615,7 @@ class _McpCard extends StatelessWidget {
         color: t.surfaceSunken,
         borderRadius: SerlinkRadii.control,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: children,
@@ -598,7 +629,10 @@ class _McpCardGap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(height: 20);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Divider(height: 1, indent: 28, color: context.tokens.borderSubtle),
+    );
   }
 }
 
@@ -614,13 +648,7 @@ class _McpStatusDot extends StatelessWidget {
     return Container(
       width: 9,
       height: 9,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: active
-            ? [BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 6)]
-            : null,
-      ),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }
@@ -638,7 +666,7 @@ class _McpGroupLabel extends StatelessWidget {
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
         color: t.textMuted,
         fontWeight: FontWeight.w700,
-        letterSpacing: 0.4,
+        letterSpacing: 0,
       ),
     );
   }
@@ -656,9 +684,8 @@ class _McpEmptyCard extends StatelessWidget {
       children: [
         Text(
           label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: t.textSecondary),
         ),
       ],
     );
@@ -723,9 +750,8 @@ class _McpListItem extends StatelessWidget {
                 subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: t.textSecondary),
               ),
             ],
           ),

@@ -37,6 +37,90 @@ void main() {
     }
   });
 
+  test('push excludes legacy transfer history and its tombstones', () async {
+    await records.upsert(
+      await vault.encryptRecord(
+        id: VaultRecordId('transfer_task:legacy'),
+        type: 'transfer_task',
+        plaintext: utf8.encode('{}'),
+      ),
+    );
+    await EncryptedSyncDeleteTombstoneRepository(
+      vault: vault,
+      records: records,
+    ).save(
+      SyncDeleteTombstone(
+        targetRecordId: VaultRecordId('transfer_task:removed'),
+        targetRecordType: 'transfer_task',
+        deletedAt: DateTime.now().toUtc(),
+      ),
+    );
+    final host = await vault.encryptRecord(
+      id: VaultRecordId('host:local'),
+      type: 'host',
+      plaintext: utf8.encode('{}'),
+    );
+    await records.upsert(host);
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final result = await service.pushEncryptedSnapshot(provider);
+    expect(result.recordsUploaded, 1);
+    expect(await _manifestRecordIds(vault: vault, provider: provider), [
+      host.id.value,
+    ]);
+    expect(await records.list(type: 'transfer_task'), hasLength(1));
+  });
+
+  test('pull ignores legacy transfer objects and deletion without downloading them', () async {
+    final remoteRecords = InMemoryVaultRecordRepository();
+    final localLegacy = await vault.encryptRecord(
+      id: VaultRecordId('transfer_task:local-legacy'),
+      type: 'transfer_task',
+      plaintext: utf8.encode('{}'),
+    );
+    await records.upsert(localLegacy);
+    final remoteTransfer = await vault.encryptRecord(
+      id: VaultRecordId('transfer_task:other-device'),
+      type: 'transfer_task',
+      plaintext: utf8.encode('{}'),
+    );
+    await remoteRecords.upsert(remoteTransfer);
+    await EncryptedSyncDeleteTombstoneRepository(
+      vault: vault,
+      records: remoteRecords,
+    ).save(
+      SyncDeleteTombstone(
+        targetRecordId: localLegacy.id,
+        targetRecordType: 'transfer_task',
+        deletedAt: DateTime.now().toUtc(),
+      ),
+    );
+    final host = await vault.encryptRecord(
+      id: VaultRecordId('host:remote'),
+      type: 'host',
+      plaintext: utf8.encode('{}'),
+    );
+    await remoteRecords.upsert(host);
+    final provider = LocalDirectorySyncProvider(tempDir);
+    final refs = await _writeLegacySnapshot(
+      provider: provider,
+      vault: vault,
+      records: await remoteRecords.list(),
+    );
+    // Missing legacy objects must not break sync or make it fetch their content.
+    await provider.deleteObject(refs[remoteTransfer.id]!);
+    await provider.deleteObject(refs[tombstoneRecordId(localLegacy.id)]!);
+    final result = await service.pullEncryptedSnapshot(provider);
+    expect(result.recordsDownloaded, 1);
+    expect(result.conflicts, isEmpty);
+    expect(await records.read(remoteTransfer.id), isNull);
+    expect(await records.read(tombstoneRecordId(localLegacy.id)), isNull);
+    expect(
+      (await records.read(localLegacy.id))?.revision,
+      localLegacy.revision,
+    );
+    expect(await records.read(host.id), isNotNull);
+  });
+
   for (final resolution in SyncConflictResolution.values) {
     test(
       'conflict resolution retries an asynchronous manifest race ($resolution)',

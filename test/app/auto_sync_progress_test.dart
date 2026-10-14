@@ -8,7 +8,7 @@ import 'package:serlink/features/vault/application/vault_service.dart';
 
 void main() {
   test(
-    'transfer changes coalesce without delaying host edits or starving sync',
+    'transfer changes never schedule sync while host edits remain immediate',
     () {
       fakeAsync((async) {
         final container = ProviderContainer(
@@ -25,9 +25,9 @@ void main() {
           autoSyncControllerProvider,
           (_, _) {},
         );
-        final controller =
-            container.read(autoSyncControllerProvider.notifier)
-                as _RecordingAutoSync;
+        final controller = container.read(
+          autoSyncControllerProvider.notifier,
+        ) as _RecordingAutoSync;
         final changes = container.read(vaultRecordChangeBusProvider);
         async.flushMicrotasks();
         void change(
@@ -53,15 +53,15 @@ void main() {
         change('host');
         expect(controller.requests, 1);
         async.elapse(const Duration(milliseconds: 100));
-        expect(controller.requests, 2);
+        expect(controller.requests, 1);
         change('transfer_task', origin: VaultRecordChangeOrigin.remoteSync);
         async.elapse(const Duration(seconds: 2));
-        expect(controller.requests, 2);
+        expect(controller.requests, 1);
         change('transfer_task');
         listener.close();
         container.dispose();
         async.elapse(const Duration(seconds: 2));
-        expect(controller.requests, 2);
+        expect(controller.requests, 1);
       });
     },
   );

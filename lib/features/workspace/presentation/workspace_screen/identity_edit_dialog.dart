@@ -75,12 +75,12 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
                   ),
                 ),
               )
-            : SingleChildScrollView(
+            : SerlinkScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (_creating) ...[
-                      SingleChildScrollView(
+                      SerlinkScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Align(
                           alignment: Alignment.centerLeft,
@@ -170,7 +170,7 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
           Row(
             children: [
               Expanded(
-                child: SingleChildScrollView(
+                child: SerlinkScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Align(
                     alignment: Alignment.centerLeft,

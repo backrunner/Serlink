@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart' as mui;
 import 'serlink_context.dart';
 import 'serlink_dimensions.dart';
 import 'serlink_effects.dart';
+import 'serlink_scroll.dart';
 
 enum SerlinkButtonVariant { primary, secondary, outline, ghost, danger }
 
@@ -118,7 +119,11 @@ class SerlinkDialog extends StatelessWidget {
             child: SizedBox.expand(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                child: content ?? const SizedBox.shrink(),
+                child: ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context)
+                      .copyWith(scrollbars: false),
+                  child: content ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),
@@ -166,7 +171,11 @@ class SerlinkDialog extends StatelessWidget {
                         const EdgeInsets.fromLTRB(24, 18, 24, 0),
                     child: DefaultTextStyle.merge(
                       style: bodyStyle,
-                      child: content!,
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context)
+                            .copyWith(scrollbars: false),
+                        child: content!,
+                      ),
                     ),
                   ),
                 ),
@@ -177,6 +186,7 @@ class SerlinkDialog extends StatelessWidget {
                       const EdgeInsets.fromLTRB(24, 18, 24, 24),
                   child: Wrap(
                     alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     spacing: 10,
                     runSpacing: 10,
                     children: actions,
@@ -705,7 +715,7 @@ class _SerlinkContextMenuOverlay extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: SerlinkRadii.control,
-            child: SingleChildScrollView(
+            child: SerlinkScrollView(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Column(
                 mainAxisSize: MainAxisSize.min,

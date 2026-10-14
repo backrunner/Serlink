@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -91,71 +92,108 @@ void main() {
     expect(find.byType(CupertinoTabBar), findsOneWidget);
   });
 
-  testWidgets('iOS snack bars float above the bottom navigation', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(390, 844);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  for (final language in ['en', 'zh']) {
+    for (final scale in [1.0, 1.3]) {
+      testWidgets(
+        'iOS snack bars fit their text above navigation ($language, $scale)',
+        (tester) async {
+          tester.platformDispatcher.localesTestValue = [Locale(language)];
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(390, 844);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
 
-    final database = SerlinkDatabase(NativeDatabase.memory());
-    final transferQueue = TransferQueueController();
-    final privacySettings = _MemoryAppPrivacySettingsRepository(false);
-    addTearDown(database.close);
-    addTearDown(transferQueue.dispose);
+          final database = SerlinkDatabase(NativeDatabase.memory());
+          final transferQueue = TransferQueueController();
+          final privacySettings = _MemoryAppPrivacySettingsRepository(false);
+          addTearDown(database.close);
+          addTearDown(transferQueue.dispose);
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          platformCapabilitiesProvider.overrideWithValue(
-            const PlatformCapabilities(
-              operatingSystem: 'ios',
-              targetPlatform: TargetPlatform.iOS,
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                platformCapabilitiesProvider.overrideWithValue(
+                  const PlatformCapabilities(
+                    operatingSystem: 'ios',
+                    targetPlatform: TargetPlatform.iOS,
+                  ),
+                ),
+                serlinkDatabaseProvider.overrideWithValue(database),
+                vaultCryptoConfigProvider.overrideWithValue(
+                  const VaultCryptoConfig.testing(),
+                ),
+                transferQueueControllerProvider.overrideWithValue(
+                  transferQueue,
+                ),
+                secretStoreProvider.overrideWithValue(InMemorySecretStore()),
+                appPrivacySettingsRepositoryProvider.overrideWithValue(
+                  privacySettings,
+                ),
+                autoSyncEnabledProvider.overrideWithValue(false),
+              ],
+              child: const SerlinkApp(),
             ),
-          ),
-          serlinkDatabaseProvider.overrideWithValue(database),
-          vaultCryptoConfigProvider.overrideWithValue(
-            const VaultCryptoConfig.testing(),
-          ),
-          transferQueueControllerProvider.overrideWithValue(transferQueue),
-          secretStoreProvider.overrideWithValue(InMemorySecretStore()),
-          appPrivacySettingsRepositoryProvider.overrideWithValue(
-            privacySettings,
-          ),
-          autoSyncEnabledProvider.overrideWithValue(false),
-        ],
-        child: const SerlinkApp(),
-      ),
-    );
-    await _pumpUntilFound(
-      tester,
-      find.byKey(const ValueKey('mobile-workspace-bottom-navigation')),
-    );
+          );
+          await _pumpUntilFound(
+            tester,
+            find.byKey(const ValueKey('mobile-workspace-bottom-navigation')),
+          );
 
-    await tester.tap(find.text('Settings').last);
-    await _pumpUntilFound(
-      tester,
-      find.byKey(const ValueKey('settings-background-privacy-switch')),
-    );
+          await tester.tap(
+            find.text(language == 'zh' ? '设置' : 'Settings').last,
+          );
+          await _pumpUntilFound(
+            tester,
+            find.byKey(const ValueKey('settings-background-privacy-switch')),
+          );
 
-    await tester.tap(
-      find.byKey(const ValueKey('settings-background-privacy-switch')),
-    );
-    await _pumpUntilFound(tester, find.byKey(const ValueKey('app-toast')));
-    await tester.pump(const Duration(milliseconds: 300));
+          await tester.tap(
+            find.byKey(const ValueKey('settings-background-privacy-switch')),
+          );
+          await _pumpUntilFound(
+            tester,
+            find.byKey(const ValueKey('app-toast')),
+          );
+          await tester.pump(const Duration(milliseconds: 300));
 
-    final snackBarTextRect = tester.getRect(
-      find.text('Background privacy updated.'),
-    );
-    final bottomNavigationRect = tester.getRect(
-      find.byKey(const ValueKey('mobile-workspace-bottom-navigation')),
-    );
-    expect(
-      snackBarTextRect.bottom,
-      lessThanOrEqualTo(bottomNavigationRect.top),
-    );
-  });
+          final message = language == 'zh'
+              ? '后台隐私保护已更新'
+              : 'Background privacy updated.';
+          final text = find.text(message);
+          final snackBarTextRect = tester.getRect(text);
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: text, matching: find.byType(RichText)),
+          );
+          final lines = paragraph
+              .getBoxesForSelection(
+                TextSelection(baseOffset: 0, extentOffset: message.length),
+              )
+              .map((box) => box.top)
+              .toSet();
+          if (language == 'zh') {
+            expect(lines, hasLength(1));
+          }
+          final toastRect = tester.getRect(
+            find.byKey(const ValueKey('app-toast')),
+          );
+          expect(toastRect.left, greaterThanOrEqualTo(16));
+          expect(toastRect.right, lessThanOrEqualTo(390 - 16));
+          expect(snackBarTextRect.right, lessThan(toastRect.right - 30));
+          expect(find.text('后台隐私保护已更新。'), findsNothing);
+          final bottomNavigationRect = tester.getRect(
+            find.byKey(const ValueKey('mobile-workspace-bottom-navigation')),
+          );
+          expect(
+            snackBarTextRect.bottom,
+            lessThanOrEqualTo(bottomNavigationRect.top),
+          );
+        },
+      );
+    }
+  }
 
   testWidgets('iOS transfer tasks support workspace search', (tester) async {
     tester.view.devicePixelRatio = 1;

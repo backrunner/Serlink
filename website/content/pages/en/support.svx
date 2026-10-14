@@ -5,16 +5,18 @@ description: "Get help with connections, transfers and your workspace."
 
 ## Contact the Serlink team
 
-Email [support@serlink.alkinum.com](mailto:support@serlink.alkinum.com?subject=Serlink%20Support) for product help, private security reports or privacy requests.
+Use the form below for product help, problem reports, suggestions or privacy requests. A Serlink account is not required. Keep the reference shown after sending.
 
-For a reproducible public bug or feature request, use [GitHub Issues](https://github.com/backrunner/Serlink/issues). Issues are public; use email for private reports.
+<SupportForm locale="en" />
+
+For a reproducible public bug or feature request, use [GitHub Issues](https://github.com/backrunner/Serlink/issues). Issues are public; use the support form for private reports.
 
 ## Include the useful details
 
 - Serlink version and operating system version.
 - The action that failed and the approximate time.
 - Whether this is an App Store or direct build.
-- A screenshot or redacted diagnostic export, if it helps and you choose to share it.
+- Relevant redacted diagnostic text, if it helps. This form has no file upload.
 
 Diagnostic exports are available in **Settings → Diagnostic logs**. Review them before sending. Do not include passwords, private keys, recovery keys, MCP tokens or private terminal output.
 
@@ -22,7 +24,7 @@ Diagnostic exports are available in **Settings → Diagnostic logs**. Review the
 
 [Connection troubleshooting](/docs/troubleshooting), [vault recovery](/docs/vault) and [sync guidance](/docs/sync) cover common issues. Check [release availability](/download) if you cannot find an installer.
 
-Email opens your own mail application. This website does not upload diagnostics or submit a support request for you. See [privacy](/privacy) for handling of messages you choose to send.
+The form sends only the information you enter. It does not automatically upload diagnostics, terminal output or vault data. See [privacy](/privacy) for support data handling.
 
 ## iPhone and iPad transfers
 

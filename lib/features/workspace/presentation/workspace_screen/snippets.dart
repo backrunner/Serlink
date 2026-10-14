@@ -475,15 +475,17 @@ class _TerminalSnippetPickerDialog extends ConsumerWidget {
                         ),
                       );
                     }
-                    return ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: items.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final snippet = items[index];
-                        return _TerminalSnippetPickerRow(snippet: snippet);
-                      },
+                    return SerlinkScrollFade(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: items.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final snippet = items[index];
+                          return _TerminalSnippetPickerRow(snippet: snippet);
+                        },
+                      ),
                     );
                   },
                 ),
@@ -695,7 +697,7 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
                       const SizedBox(width: 24),
                       SizedBox(
                         width: 240,
-                        child: SingleChildScrollView(
+                        child: SerlinkScrollView(
                           controller: _scrollController,
                           child: details,
                         ),
@@ -703,7 +705,7 @@ class _SnippetDialogState extends ConsumerState<_SnippetDialog> {
                     ],
                   );
                 } else {
-                  content = SingleChildScrollView(
+                  content = SerlinkScrollView(
                     controller: _scrollController,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,

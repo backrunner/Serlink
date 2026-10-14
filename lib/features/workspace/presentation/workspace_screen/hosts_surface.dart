@@ -318,7 +318,7 @@ class _HostListState extends ConsumerState<_HostList> {
   final _listKey = GlobalKey<AnimatedListState>();
   Timer? _settleTimer;
   late List<_HostListEntry> _displayedEntries;
-  Set<HostId> _entranceHostIds = const {};
+  Set<String> _entranceEntryKeys = const {};
   bool _playEntrance = false;
 
   @override
@@ -337,7 +337,7 @@ class _HostListState extends ConsumerState<_HostList> {
         MediaQuery.disableAnimationsOf(context)) {
       _settleTimer?.cancel();
       _playEntrance = false;
-      _entranceHostIds = const {};
+      _entranceEntryKeys = const {};
     }
   }
 
@@ -363,11 +363,8 @@ class _HostListState extends ConsumerState<_HostList> {
     _playEntrance = ref
         .read(_hostListEntranceTrackerProvider)
         .claim(unlockGeneration);
-    _entranceHostIds = _playEntrance
-        ? {
-            for (final entry in _displayedEntries)
-              if (entry is _HostEntry) entry.host.id,
-          }
+    _entranceEntryKeys = _playEntrance
+        ? {for (final entry in _displayedEntries) entry.key}
         : const {};
     if (!_playEntrance) {
       return;
@@ -376,7 +373,7 @@ class _HostListState extends ConsumerState<_HostList> {
       if (mounted) {
         setState(() {
           _playEntrance = false;
-          _entranceHostIds = const {};
+          _entranceEntryKeys = const {};
         });
       }
     });
@@ -468,10 +465,24 @@ class _HostListState extends ConsumerState<_HostList> {
     Animation<double> animation, {
     bool removing = false,
   }) {
-    final Widget child = switch (entry) {
+    Widget child = switch (entry) {
       _HostGroupEntry() => _buildGroupHeader(context, entry),
-      _HostEntry() => _buildHostRow(context, entry.host, index),
+      _HostEntry() => _buildHostRow(context, entry.host),
     };
+    // Headers and hosts enter in their shared visual order, including empty
+    // and collapsed groups. Later inserts use only the list-change transition.
+    if (!removing && _playEntrance && _entranceEntryKeys.contains(entry.key)) {
+      child = EntranceFade(
+        key: ValueKey('host-list-entrance-${entry.key}'),
+        duration: _hostListEntranceDuration,
+        delay: Duration(
+          milliseconds:
+              _hostListEntranceStaggerMs *
+              math.min(index, _hostListEntranceMaxStaggerItems),
+        ),
+        child: child,
+      );
+    }
     return IgnorePointer(
       ignoring: removing,
       child: _HostListChangeTransition(
@@ -506,7 +517,7 @@ class _HostListState extends ConsumerState<_HostList> {
     }
   }
 
-  Widget _buildHostRow(BuildContext context, HostSummary host, int index) {
+  Widget _buildHostRow(BuildContext context, HostSummary host) {
     final controller = ref.read(workspaceTabControllerProvider.notifier);
     Widget row = _HostRow(
       mobile: widget.mobile,
@@ -537,19 +548,7 @@ class _HostListState extends ConsumerState<_HostList> {
         child: row,
       );
     }
-    row = KeyedSubtree(key: ValueKey('host-row-${host.id.value}'), child: row);
-    if (_playEntrance && _entranceHostIds.contains(host.id)) {
-      row = EntranceFade(
-        duration: _hostListEntranceDuration,
-        delay: Duration(
-          milliseconds:
-              _hostListEntranceStaggerMs *
-              math.min(index, _hostListEntranceMaxStaggerItems),
-        ),
-        child: row,
-      );
-    }
-    return row;
+    return KeyedSubtree(key: ValueKey('host-row-${host.id.value}'), child: row);
   }
 }
 

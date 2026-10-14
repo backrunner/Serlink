@@ -4,7 +4,38 @@
   "compatibility_date": "2026-09-30",
   "workers_dev": false,
   "preview_urls": false,
-  "assets": { "directory": "build", "html_handling": "force-trailing-slash", "not_found_handling": "404-page" },
-  "routes": [{ "pattern": "serlink.alkinum.com", "custom_domain": true }],
-  "observability": { "enabled": false }
+  "assets": {
+    "directory": "build",
+    "html_handling": "force-trailing-slash",
+    "not_found_handling": "404-page",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/support",
+      "/api/support/"
+    ]
+  },
+  "routes": [
+    {
+      "pattern": "serlink.alkinum.com",
+      "custom_domain": true
+    }
+  ],
+  "observability": {
+    "enabled": false
+  },
+  "main": "worker.ts",
+  "ratelimits": [
+    {
+      "name": "SUPPORT_RATE_LIMIT",
+      "namespace_id": "1050",
+      "simple": {
+        "limit": 5,
+        "period": 60
+      }
+    }
+  ],
+  "vars": {
+    "ONFIRE_PRODUCT_ID": "018100f3-863b-4e11-98fa-b4863caccae0",
+    "ONFIRE_TICKET_TYPES": "{\"problem\":\"4cf28268-04ee-412a-9fa2-f8814e91af39\",\"feature\":\"282e749d-981c-480c-8439-ec3bcc28699e\",\"question\":\"3c439e61-8f08-4909-a201-7507cf8a81a2\",\"privacy\":\"16ad0956-f332-4a10-863f-0cd8dd87ad6a\"}"
+  }
 }

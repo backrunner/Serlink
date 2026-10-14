@@ -47,8 +47,8 @@ move between servers often and want their connection data to stay private.
 
 The official site targets `serlink.alkinum.com`; its custom svedocs source,
 usage documentation and deployment instructions are in [website/](website/README.md).
-Support uses **support@serlink.alkinum.com**. The site is prepared locally;
-public hosting and mailbox delivery are separate deployment checks.
+Support uses the [OnFire form](https://serlink.alkinum.com/support/).
+Website availability, ticket creation and reply delivery are verified separately.
 
 ## Development
 
@@ -110,8 +110,9 @@ website/        custom svedocs product site and multilingual usage guides
 
 ## Security Notes
 
-- Host data, identities, snippets, transfer history, sync settings, and recovery
-  data are designed to live in encrypted vault records.
+- Host data, identities, snippets, sync settings, and recovery data are designed
+  to live in encrypted vault records.
+- Transfer history is encrypted in local storage and never synced between devices.
 - WebDAV and CloudKit sync store encrypted manifests and encrypted objects, not
   plaintext host data.
 - Diagnostic exports are redacted and exclude terminal output, commands, hosts,

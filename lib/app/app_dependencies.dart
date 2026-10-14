@@ -19,6 +19,8 @@ import '../features/mcp/application/agent_session_bridge.dart';
 import '../features/mcp/application/mcp_authorization_service.dart';
 import '../features/mcp/application/mcp_server_controller.dart';
 import '../features/mcp/data/command_risk_policy.dart';
+import '../features/mcp/data/typesafe_command_decision_model.dart';
+import '../features/mcp/application/command_decision_guard.dart';
 import '../features/mcp/domain/agent_grant.dart';
 import '../features/mcp/domain/agent_session.dart';
 import '../features/import_export/application/identity_metadata_export_service.dart';
@@ -138,8 +140,9 @@ final localDeviceInfoProvider = Provider<LocalDeviceInfo>((ref) {
 
 typedef CloudKitAvailabilityCheck = Future<bool> Function();
 typedef SyncProviderFactory = SyncProvider Function();
-typedef WebDavSyncProviderFactory =
-    Future<SyncProvider> Function(SyncSettingsService service);
+typedef WebDavSyncProviderFactory = Future<SyncProvider> Function(
+  SyncSettingsService service,
+);
 
 final cloudKitAvailabilityCheckProvider = Provider<CloudKitAvailabilityCheck>((
   ref,
@@ -1247,7 +1250,6 @@ class CloudKitEncryptedSnapshotPrefetchNotifier extends Notifier<void> {
 
 class AutoSyncController extends Notifier<AutoSyncStatus> {
   Timer? _debounceTimer;
-  Timer? _transferSyncTimer;
   bool _running = false;
   bool _rerunRequested = false;
   bool _configureQueued = false;
@@ -1258,7 +1260,6 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
   AutoSyncStatus build() {
     ref.onDispose(() {
       _debounceTimer?.cancel();
-      _transferSyncTimer?.cancel();
     });
     ref.listen<AsyncValue<VaultSessionState>>(
       vaultSessionControllerProvider,
@@ -1279,12 +1280,6 @@ class AutoSyncController extends Notifier<AutoSyncStatus> {
       if (change.hasValue &&
           change.value?.origin == VaultRecordChangeOrigin.local) {
         if (change.value?.type == 'transfer_task') {
-          // Coalesce checkpoints with a fixed deadline, even during a long
-          // transfer. Host edits and explicit sync requests remain immediate.
-          _transferSyncTimer ??= Timer(const Duration(seconds: 2), () {
-            _transferSyncTimer = null;
-            if (ref.mounted) requestSync(delay: Duration.zero);
-          });
           return;
         }
         _scheduleConfigure();
@@ -3612,9 +3607,8 @@ class VaultSessionController extends AsyncNotifier<VaultSessionState> {
     );
     try {
       await _closeDatabaseIfOpen();
-      await (await ref.read(
-        vaultBackupRestoreServiceProvider.future,
-      )).restoreFromBackupBytes(bytes);
+      await (await ref.read(vaultBackupRestoreServiceProvider.future))
+          .restoreFromBackupBytes(bytes);
       await _reloadAfterDatabaseReplacement();
       return null;
     } on Object catch (error) {
@@ -3988,6 +3982,18 @@ final encryptedConnectionProfileResolverProvider =
       );
     });
 
+final commandDecisionGuardProvider = Provider<CommandDecisionGuard>((ref) {
+  return CommandDecisionGuard(
+    secrets: ref.watch(secretStoreProvider),
+    model: TypeSafeCommandDecisionModel(),
+  );
+});
+
+final commandDecisionSettingsProvider =
+    FutureProvider<CommandDecisionSettings>((ref) {
+      return ref.watch(commandDecisionGuardProvider).readSettings();
+    });
+
 final commandRiskPolicyProvider = Provider<CommandRiskPolicy>((ref) {
   return CommandRiskPolicy();
 });
@@ -4011,6 +4017,7 @@ final agentSessionBridgeProvider = Provider<AgentSessionBridge>((ref) {
     ref: ref,
     authorization: ref.watch(mcpAuthorizationServiceProvider),
     riskPolicy: ref.watch(commandRiskPolicyProvider),
+    decisionGuard: ref.watch(commandDecisionGuardProvider),
     securityModalService: ref.watch(securityModalServiceProvider),
   );
   // Drop session handles whose workspace tab or pane the user closed

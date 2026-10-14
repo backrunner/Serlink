@@ -15,6 +15,7 @@ import '../data/command_risk_policy.dart';
 import '../domain/agent_session.dart';
 import '../domain/command_risk.dart';
 import 'mcp_authorization_service.dart';
+import 'command_decision_guard.dart';
 
 /// Error thrown by [AgentSessionBridge] with a machine-readable [code] such
 /// as `vault_locked` or `authorization_denied`; surfaced to MCP clients as
@@ -42,6 +43,9 @@ class _AgentSessionEntry {
 
   /// Risk-rule ids the user approved with "allow for session".
   final Set<String> allowedRuleIds = {};
+  Future<void> inputQueue = Future<void>.value();
+  bool hasUnsubmittedInput = false;
+  int inputGeneration = 0;
 }
 
 /// Coordinates MCP agent requests with app-owned SSH terminal sessions:
@@ -59,6 +63,7 @@ class AgentSessionBridge {
     required McpAuthorizationService authorization,
     required CommandRiskPolicy riskPolicy,
     required SecurityModalService securityModalService,
+    CommandDecisionGuard? decisionGuard,
     this.attachTimeout = const Duration(seconds: 45),
     this.attachPollInterval = const Duration(milliseconds: 200),
     this.settleQuietPeriod = const Duration(milliseconds: 400),
@@ -74,12 +79,16 @@ class AgentSessionBridge {
        _riskPolicy = riskPolicy,
        // ignore: prefer_initializing_formals
        _securityModalService = securityModalService,
+       // Named parameters cannot initialize private fields directly.
+       // ignore: prefer_initializing_formals
+       _decisionGuard = decisionGuard,
        _now = now ?? DateTime.now;
 
   final Ref _ref;
   final McpAuthorizationService _authorization;
   final CommandRiskPolicy _riskPolicy;
   final SecurityModalService _securityModalService;
+  final CommandDecisionGuard? _decisionGuard;
   final DateTime Function() _now;
 
   /// How long [openSession] waits for the SSH channel to attach.
@@ -213,23 +222,38 @@ class AgentSessionBridge {
     Duration timeout = const Duration(seconds: 10),
   }) async {
     final entry = _requireAuthorizedSession(clientName, sessionId);
-    _requireConnectedPane(sessionId);
-    await _enforceRiskPolicy(
-      clientName: clientName,
-      entry: entry,
-      command: command,
-    );
-    final sent = _ref
-        .read(workspaceRuntimeRegistryProvider)
-        .sendTerminalInput(sessionId, '$command\r');
-    if (!sent) {
-      throw const McpBridgeException(
-        'session_not_attached',
-        'terminal is no longer attached to an SSH channel',
+    final generation = entry.inputGeneration;
+    return _serializeInput(entry, () async {
+      if (entry.inputGeneration != generation) {
+        throw const McpBridgeException(
+          'command_blocked',
+          'command_input_interrupted',
+        );
+      }
+      _requireAuthorizedSession(clientName, sessionId);
+      _requireConnectedPane(sessionId);
+      final permit = await _enforceRiskPolicy(
+        clientName: clientName,
+        entry: entry,
+        command: command,
       );
-    }
-    await _waitForOutputSettled(sessionId, timeout: timeout);
-    return _readScreenText(sessionId, lines: execOutputLines);
+      await _validateBeforeSend(
+        clientName,
+        sessionId,
+        entry,
+        permit,
+        generation,
+      );
+      final sent = _ref
+          .read(workspaceRuntimeRegistryProvider)
+          .sendTerminalInput(sessionId, '$command\r');
+      if (!sent) {
+        throw const McpBridgeException('session_not_attached');
+      }
+      entry.hasUnsubmittedInput = false;
+      await _waitForOutputSettled(sessionId, timeout: timeout);
+      return _readScreenText(sessionId, lines: execOutputLines);
+    });
   }
 
   Future<String> readScreen({
@@ -241,30 +265,99 @@ class AgentSessionBridge {
     return _readScreenText(sessionId, lines: lines);
   }
 
-  /// Sends raw [text] (keystrokes) for interactive programs. Text containing
-  /// newlines can submit commands, so it goes through the same risk policy
-  /// and confirmation flow as [exec].
+  /// With model protection, accept whole submitted commands or Ctrl-C only.
+  /// Partial keystrokes, history/editing controls and bare Enter cannot be
+  /// reliably assessed as commands in arbitrary shells or interactive programs.
   Future<void> sendInput({
     required String clientName,
     required SessionId sessionId,
     required String text,
   }) async {
     final entry = _requireAuthorizedSession(clientName, sessionId);
-    _requireConnectedPane(sessionId);
-    if (text.contains('\n') || text.contains('\r')) {
-      await _enforceRiskPolicy(
+    // Interrupts must not wait behind a model request or long-running exec.
+    // Invalidate queued/pending submissions so a late safe result cannot run.
+    if (text == '\x03') {
+      _requireConnectedPane(sessionId);
+      final sent = _ref
+          .read(workspaceRuntimeRegistryProvider)
+          .sendTerminalInput(sessionId, text);
+      if (!sent) throw const McpBridgeException('session_not_attached');
+      entry.inputGeneration += 1;
+      entry.hasUnsubmittedInput = false;
+      return;
+    }
+    final generation = entry.inputGeneration;
+    return _serializeInput(entry, () async {
+      if (entry.inputGeneration != generation) {
+        throw const McpBridgeException(
+          'command_blocked',
+          'command_input_interrupted',
+        );
+      }
+      _requireAuthorizedSession(clientName, sessionId);
+      _requireConnectedPane(sessionId);
+      final permit = await _enforceRiskPolicy(
         clientName: clientName,
         entry: entry,
         command: text,
+        rawInput: true,
       );
+      await _validateBeforeSend(
+        clientName,
+        sessionId,
+        entry,
+        permit,
+        generation,
+      );
+      final sent = _ref
+          .read(workspaceRuntimeRegistryProvider)
+          .sendTerminalInput(sessionId, text);
+      if (!sent) throw const McpBridgeException('session_not_attached');
+      if (text.isNotEmpty) {
+        final newline = text.lastIndexOf('\n');
+        final carriageReturn = text.lastIndexOf('\r');
+        final lastSubmit = newline > carriageReturn ? newline : carriageReturn;
+        entry.hasUnsubmittedInput = lastSubmit < text.length - 1;
+      }
+    });
+  }
+
+  Future<T> _serializeInput<T>(
+    _AgentSessionEntry entry,
+    Future<T> Function() operation,
+  ) {
+    final result = entry.inputQueue.then((_) => operation());
+    entry.inputQueue = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return result;
+  }
+
+  Future<void> _validateBeforeSend(
+    String clientName,
+    SessionId sessionId,
+    _AgentSessionEntry entry,
+    CommandDecisionPermit? permit,
+    int generation,
+  ) async {
+    if (permit != null) {
+      try {
+        await _decisionGuard!.validate(permit);
+      } on CommandDecisionException catch (error) {
+        throw McpBridgeException('command_blocked', error.code);
+      }
     }
-    final sent = _ref
-        .read(workspaceRuntimeRegistryProvider)
-        .sendTerminalInput(sessionId, text);
-    if (!sent) {
+    // Model requests and confirmation dialogs are asynchronous. Never send
+    // after a grant was revoked, the vault locked, or the pane closed meanwhile.
+    if (!identical(_requireAuthorizedSession(clientName, sessionId), entry)) {
+      throw const McpBridgeException('session_not_found');
+    }
+    _requireConnectedPane(sessionId);
+    if (entry.inputGeneration != generation) {
       throw const McpBridgeException(
-        'session_not_attached',
-        'terminal is no longer attached to an SSH channel',
+        'command_blocked',
+        'command_input_interrupted',
       );
     }
   }
@@ -410,22 +503,38 @@ class AgentSessionBridge {
     return vault;
   }
 
-  Future<void> _enforceRiskPolicy({
+  Future<CommandDecisionPermit?> _enforceRiskPolicy({
     required String clientName,
     required _AgentSessionEntry entry,
     required String command,
+    bool rawInput = false,
   }) async {
     final assessment = _riskPolicy.assess(command);
+    if (assessment.level == CommandRiskLevel.blocked) {
+      throw McpBridgeException('command_blocked', assessment.matchedRule);
+    }
+    CommandDecisionPermit? permit;
+    try {
+      permit = await _decisionGuard?.check(
+        command: command,
+        rawInput: rawInput,
+        hasUnsubmittedInput: entry.hasUnsubmittedInput,
+      );
+    } on CommandDecisionException catch (error) {
+      throw McpBridgeException('command_blocked', error.code);
+    }
+    // In legacy mode, non-submitting input retains its interactive behavior.
+    if (rawInput && !command.contains('\n') && !command.contains('\r')) {
+      return permit;
+    }
     switch (assessment.level) {
       case CommandRiskLevel.safe:
-        return;
+        return permit;
       case CommandRiskLevel.blocked:
         throw McpBridgeException('command_blocked', assessment.matchedRule);
       case CommandRiskLevel.needsConfirm:
         final rule = assessment.matchedRule ?? 'unknown_rule';
-        if (entry.allowedRuleIds.contains(rule)) {
-          return;
-        }
+        if (entry.allowedRuleIds.contains(rule)) return permit;
         final decision = await _securityModalService.confirmAgentCommand(
           AgentCommandPrompt(
             clientName: clientName,
@@ -438,10 +547,10 @@ class AgentSessionBridge {
           case AgentCommandDecision.deny:
             throw McpBridgeException('command_denied', rule);
           case AgentCommandDecision.allowOnce:
-            return;
+            return permit;
           case AgentCommandDecision.allowSession:
             entry.allowedRuleIds.add(rule);
-            return;
+            return permit;
         }
     }
   }

@@ -32,6 +32,19 @@ void main() {
     await changes.close();
   });
 
+  test('legacy transfer writes and deletes never trigger sync', () async {
+    final transfer = await vault.encryptRecord(
+      id: VaultRecordId('transfer_task:legacy'),
+      type: 'transfer_task',
+      plaintext: utf8.encode('{}'),
+    );
+    await repository.upsert(transfer);
+    await repository.delete(transfer.id);
+    await repository.upsert(transfer);
+    await repository.clear();
+    expect(emitted, isEmpty);
+  });
+
   test('emits change events for syncable encrypted record writes', () async {
     final envelope = await vault.encryptRecord(
       id: VaultRecordId('host:prod'),

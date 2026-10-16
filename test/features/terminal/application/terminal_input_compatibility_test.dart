@@ -1,9 +1,47 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xterm/xterm.dart';
 
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final platform in [
+    TargetPlatform.windows,
+    TargetPlatform.linux,
+    TargetPlatform.iOS,
+    TargetPlatform.macOS,
+  ]) {
+    testWidgets('$platform forwards screen prefix and TUI control keys', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = platform;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final output = <String>[];
+      final terminal = Terminal(onOutput: output.add);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: TerminalView(terminal, autofocus: true)),
+        ),
+      );
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      for (final key in [
+        LogicalKeyboardKey.keyA,
+        LogicalKeyboardKey.keyB,
+        LogicalKeyboardKey.keyC,
+        LogicalKeyboardKey.keyF,
+        LogicalKeyboardKey.keyV,
+      ]) {
+        await tester.sendKeyEvent(key);
+      }
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      expect(output.join(), '\x01\x02\x03\x06\x16');
+      await tester.pumpWidget(const SizedBox.shrink());
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
 
   testWidgets('accepts CJK text input through TerminalView', (tester) async {
     final output = <String>[];
@@ -352,9 +390,9 @@ void main() {
 
     final terminalViewState =
         tester.state(find.byType(TerminalView)) as dynamic;
-    final firstCellOffset =
-        terminalViewState.renderTerminal.getOffset(const CellOffset(0, 0))
-            as Offset;
+    final firstCellOffset = terminalViewState.renderTerminal.getOffset(
+      const CellOffset(0, 0),
+    ) as Offset;
 
     expect(firstCellOffset.dy, 0);
   });

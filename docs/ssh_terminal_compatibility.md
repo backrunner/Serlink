@@ -3,6 +3,36 @@
 Audited on 2026-09-06 with Flutter 3.44.4 / Dart 3.12.2, dartssh2 4.0.0,
 and the vendored xterm 4.0.0 branch on macOS.
 
+## Remote coding TUI follow-up (2026-10-16)
+
+Codex 0.162.1 and Claude Code 2.1.299 passed eight real SSH cases: both
+applications through tmux 3.7c and GNU screen 5.0.2, at desktop and phone
+viewport sizes. The production terminal adapter and ZMODEM-aware path preserved
+Chinese/emoji input, arrows, Shift+Tab, slash-command redraws, PTY resizing and
+pending editor text after a new SSH connection reattached to the same process.
+Shared terminal components were also checked in a native macOS window and an
+iPhone 17 / iOS 27 simulator, including the editor above the software keyboard.
+
+The audit fixed unsupported DCS/APC/PM/SOS payloads leaking into terminal cells,
+omitted/zero cursor-position parameters, alternate-screen cursor-style recovery,
+and Windows/Linux edit shortcuts intercepting remote Ctrl keys. Local editing
+now uses Ctrl+Shift chords there; Apple retains Cmd chords. Persistent regression
+coverage lives in `test/features/terminal/application/terminal_*_test.dart`.
+
+Use `tmux new-session -A -s coding`, then run `codex` or `claude`. Detach with
+Ctrl+B, then D; reconnect with the same command. For screen, use
+`screen -U -S coding`, detach with Ctrl+A, then D, and resume with
+`screen -U -r coding`. macOS's bundled screen 4.00.03 replaces emoji with U+FFFD
+before SSH output; the tested tmux and modern screen preserve it.
+
+The audit passed 138 terminal, SSH and workspace tests, static analysis and a
+debug build of the normal macOS application. One-off native probes and
+CLI-dependent fixtures were removed after validation; retained tests do not
+require installed coding CLIs. Local evidence remains in `build/tui-audit-modern`.
+This was local SSH and shared-component validation with dummy loopback model
+providers; physical devices, native Windows/Linux, WAN behavior and live model
+inference were not verified.
+
 ## Immediate terminal connection failure
 
 `TerminalAdapter.attach()` called `stream.transform(Utf8Decoder(...))` on

@@ -21,6 +21,12 @@ Current patches:
   rows inside `IndexAwareCircularBuffer`.
 - Reply to CPR cursor position queries with 1-indexed VT coordinates and support
   CHT/CBT cursor tab CSI sequences used by ncurses applications.
+- Consume unsupported DCS/APC/PM/SOS strings through their terminator, including
+  across SSH chunks, so capability probes never become visible TUI text.
+- Preserve omitted CSI parameters, apply cursor-position defaults, and restore
+  saved cursor attributes when returning from the 1049 alternate screen.
+- Reserve bare Ctrl+A/C/F/V for remote applications on Windows/Linux; local
+  copy, paste, select-all and search use Ctrl+Shift chords. Apple keeps Cmd chords.
 - Ignore keyboard visibility metric callbacks after `TerminalView` disposal.
 - Detect ZMODEM handshakes across SSH chunks and ignore pending file selection
   and transfer callbacks after the terminal closes.

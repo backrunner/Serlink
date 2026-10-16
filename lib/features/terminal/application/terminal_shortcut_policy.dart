@@ -18,6 +18,10 @@ bool shouldHandleTerminalShortcutLocally(KeyEvent event) {
   if (!primaryModifier) {
     return false;
   }
+  // Reserve bare Ctrl keys for the remote shell/TUI (screen uses Ctrl+A).
+  if (!isApple && !HardwareKeyboard.instance.isShiftPressed) {
+    return false;
+  }
   final key = event.logicalKey;
   return key == LogicalKeyboardKey.keyC ||
       key == LogicalKeyboardKey.keyV ||

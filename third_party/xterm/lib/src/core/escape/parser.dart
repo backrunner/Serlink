@@ -19,6 +19,11 @@ class EscapeParser {
 
   final _queue = ByteConsumer();
 
+  // Unsupported DCS/APC/PM/SOS payloads are control data, never visible text.
+  // Consume incrementally rather than retaining an unbounded string until ST.
+  bool _inControlString = false;
+  bool _controlStringEscape = false;
+
   /// Start of sequence or character being processed. Useful for debugging.
   var tokenBegin = 0;
 
@@ -35,6 +40,16 @@ class EscapeParser {
     while (_queue.isNotEmpty) {
       tokenBegin = _queue.totalConsumed;
       final char = _queue.consume();
+
+      if (_inControlString) {
+        if ((_controlStringEscape && char == Ascii.backslash) ||
+            char == 0x18 ||
+            char == 0x1a) {
+          _inControlString = false;
+        }
+        _controlStringEscape = char == Ascii.ESC;
+        continue;
+      }
 
       if (char == Ascii.ESC) {
         final processed = _processEscape();
@@ -100,7 +115,10 @@ class EscapeParser {
     'E'.charCode: _escHandleNextLine,
     'H'.charCode: _escHandleTabSet,
     'M'.charCode: _escHandleReverseIndex,
-    // 'P'.charCode: _unsupportedHandler, // Sixel
+    'P'.charCode: _escHandleControlString, // DCS (including unsupported Sixel)
+    '_'.charCode: _escHandleControlString, // APC
+    '^'.charCode: _escHandleControlString, // PM
+    'X'.charCode: _escHandleControlString, // SOS
     // 'c'.charCode: _unsupportedHandler,
     // '#'.charCode: _unsupportedHandler,
     '('.charCode: _escHandleDesignateCharset0, //  SCS - G0
@@ -110,6 +128,12 @@ class EscapeParser {
     '>'.charCode: _escHandleResetAppKeypadMode, // TODO: Normal Keypad
     '='.charCode: _escHandleSetAppKeypadMode, // TODO: Application Keypad
   });
+
+  bool _escHandleControlString() {
+    _inControlString = true;
+    _controlStringEscape = false;
+    return true;
+  }
 
   /// `ESC 7` Save Cursor (DECSC)
   ///
@@ -219,7 +243,7 @@ class EscapeParser {
 
     // test whether the csi is a `CSI ? Ps ...` or `CSI Ps ...`
     final prefix = _queue.peek();
-    if (prefix >= Ascii.colon && prefix <= Ascii.questionMark) {
+    if (prefix >= Ascii.lessThan && prefix <= Ascii.questionMark) {
       _csi.prefix = prefix;
       _queue.consume();
     } else {
@@ -237,10 +261,9 @@ class EscapeParser {
       final char = _queue.consume();
 
       if (char == Ascii.semicolon) {
-        if (hasParam) {
-          _csi.params.add(param);
-        }
+        _csi.params.add(param);
         param = 0;
+        hasParam = false;
         continue;
       }
 
@@ -257,7 +280,7 @@ class EscapeParser {
       }
 
       if (char >= Ascii.atSign && char <= Ascii.tilde) {
-        if (hasParam) {
+        if (hasParam || _csi.params.isNotEmpty) {
           _csi.params.add(param);
         }
 
@@ -360,8 +383,10 @@ class EscapeParser {
     var row = 1;
     var col = 1;
 
-    if (_csi.params.length == 2) {
+    if (_csi.params.isNotEmpty && _csi.params[0] != 0) {
       row = _csi.params[0];
+    }
+    if (_csi.params.length >= 2 && _csi.params[1] != 0) {
       col = _csi.params[1];
     }
 
@@ -1061,6 +1086,7 @@ class EscapeParser {
           handler.useAltBuffer();
         } else {
           handler.useMainBuffer();
+          handler.restoreCursor();
         }
         return;
       case 2004:

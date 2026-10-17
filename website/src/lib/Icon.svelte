@@ -2,6 +2,12 @@
   export let name = 'arrow';
   export let size = 20;
   const paths: Record<string, string> = {
+    plus: 'M12 5v14M5 12h14', up: 'M12 20V4m-6 6 6-6 6 6',
+    transfer: 'M3 7h18m-4-4 4 4-4 4M21 17H3m4-4-4 4 4 4',
+    settings: 'M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-6 0v6',
+    file: 'M5 3h9l5 5v13H5Zm9 0v6h5M8 13h8m-8 4h8',
+    reset: 'M3 4v6h6M3 10a9 9 0 1 1 1 8',
+    return: 'M19 5v9H5m5-5-5 5 5 5', play: 'm8 4 12 8-12 8Z',
     arrow: 'M5 12h14m-6-6 6 6-6 6', down: 'M12 4v16m-6-6 6 6 6-6',
     terminal: 'm5 7 5 5-5 5m8 0h6', folder: 'M3 7h6l2-3h10v16H3Z',
     shield: 'm12 3 8 3v6c0 5-8 9-8 9S4 17 4 12V6Z',

@@ -6,7 +6,7 @@ the OnFire support form. The domain and support integration are configuration;
 a local build does not establish live hosting, ticket creation or reply delivery.
 
 The site has English, Simplified Chinese and Japanese translations, a responsive
-product screenshot gallery, local browser search, and light/dark/system themes.
+interactive app demo, local browser search, and light/dark/system themes.
 It includes release availability, support, privacy and license pages, plus guides
 for hosts, terminals, SFTP, vault recovery, sync and macOS MCP access.
 
@@ -38,12 +38,18 @@ against the Cloudflare local static-assets server at port 4189; they cover deskt
 three languages, search scoping and keyboard operation, theme persistence,
 language switching with translated fragments, code copying, 404 navigation and
 static discovery endpoints. Screenshots are saved under ignored `test-results/`.
+The homepage demo tests cover command input and history, independent host
+sessions, file previews, simulated transfers, snippets, reset, narrow layouts,
+both themes and the screenshot fallback when JavaScript is disabled.
 
 ## Structure
 
 - `svedocs.config.ts`: typed site metadata, i18n, navigation, SEO and local search.
 - `vite.config.ts`: replacement theme registrations.
 - `src/lib/Landing.svelte`: custom homepage composed through the `DocsApp` landing slot.
+- `src/lib/demo/`: browser-only workspace demo, sample command/file data and
+  localized interaction labels. Commands read a fixed set of sample records;
+  they never execute a shell, connect to a host, or persist visitor input.
 - `src/lib/theme/`: custom navbar, locale menu, footer, sidebar, article, standalone
   page/error shell and theme control. Framework search and outline behavior retain
   their controllers, with site-owned visual styling.
@@ -108,7 +114,7 @@ all three translations when release gates have actually been completed.
 
 ## 中文说明
 
-官网使用独立定制的首页与文档主题，包含中、英、日三语、真实应用截图切换、
+官网使用独立定制的首页与文档主题，包含中、英、日三语、应用交互演示、
 本地搜索、深浅主题、支持、隐私、许可及功能指南。域名配置为
 `serlink.alkinum.com`，支持入口为 OnFire 表单 `https://serlink.alkinum.com/zh/support/`。
 构建与部署预演通过不代表网站、真实工单创建及回复送达已经验证。

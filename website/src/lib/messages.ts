@@ -1,4 +1,7 @@
+import { demoEn, demoZh, demoJa } from './demo/messages.ts';
+
 export const en = {
+  ...demoEn,
   "site.home": "Serlink home",
   "site.features": "Features",
   "site.docs": "Documentation",
@@ -92,6 +95,7 @@ export const en = {
 };
 
 export const zh = {
+  ...demoZh,
   "site.home": "Serlink 首页",
   "site.features": "功能",
   "site.docs": "使用文档",
@@ -185,6 +189,7 @@ export const zh = {
 };
 
 export const ja = {
+  ...demoJa,
   "site.home": "Serlink ホーム",
   "site.features": "機能",
   "site.docs": "ドキュメント",

@@ -6,7 +6,7 @@ const locales = [
   { code: 'ja', prefix: '/ja', vault: 'ボールトと復旧', search: 'ボールト', lang: 'ja' },
 ];
 for (const locale of locales) {
-  test(`${locale.code}: homepage, gallery, navigation and contact`, async ({ page }, info) => {
+  test(`${locale.code}: homepage, interactive preview, navigation and contact`, async ({ page }, info) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(`${locale.prefix}/`);
@@ -15,11 +15,11 @@ for (const locale of locales) {
     await expect(page.locator('html')).toHaveAttribute('lang', locale.lang);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `https://serlink.alkinum.com${locale.prefix}/`);
     await expect(page.locator('link[rel="alternate"][hreflang]')).toHaveCount(4);
-    const image = page.locator('.sl-product-image img');
-    for (const [index, file] of ['01-hosts', '02-terminal', '03-sftp'].entries()) {
+    const demo = page.locator('.demo-shell');
+    await expect(demo).toBeVisible();
+    for (const [index, view] of ['hosts', 'terminal', 'sftp'].entries()) {
       await page.locator('.sl-preview-switcher button').nth(index).click();
-      await expect(image).toHaveAttribute('src', `/screenshots/${locale.code}/${file}.jpg`);
-      await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBeTruthy();
+      await expect(demo).toHaveAttribute('data-view', view);
       await expect(page.locator('.sl-preview-switcher button').nth(index)).toHaveAttribute('aria-pressed', 'true');
     }
     await page.locator('.sl-preview-switcher button').nth(1).click();

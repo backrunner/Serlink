@@ -2,13 +2,8 @@
   import type { SvedocsThemeContext } from 'svedocs/theme/types';
   import { resolveLocalizedHref } from 'svedocs/theme/headless';
   import Icon from './Icon.svelte';
+  import WorkspaceDemo from './demo/WorkspaceDemo.svelte';
   export let context: SvedocsThemeContext;
-  let active = 1;
-  const views = [
-    { file: '01-hosts', icon: 'hosts', key: 'hosts' },
-    { file: '02-terminal', icon: 'terminal', key: 'terminal' },
-    { file: '03-sftp', icon: 'folder', key: 'sftp' }
-  ];
   const features = [
     { key: 'terminal', href: '/docs/terminal' },
     { key: 'sftp', href: '/docs/sftp' },
@@ -20,7 +15,6 @@
     { key: 'agents', href: '/docs/agents' }
   ];
   $: t = context.t;
-  $: locale = ['en', 'zh', 'ja'].includes(context.localeCode) ? context.localeCode : 'en';
 </script>
 <div class="sl-landing">
   <section class="sl-hero" aria-labelledby="hero-title">
@@ -37,22 +31,7 @@
     </div>
   </section>
 
-  <section class="sl-showcase" aria-label={t('preview.label')}>
-    <div class="sl-showcase-bar">
-      <span class="sl-label">{t('preview.label')}</span>
-      <div class="sl-preview-switcher" role="group" aria-label={t('preview.switch')}>
-        {#each views as view, i}
-          <button type="button" aria-pressed={active === i} class:sl-selected={active === i} on:click={() => active = i}>
-            <Icon name={view.icon} size={16} /><span>{t(`preview.${view.key}`)}</span>
-          </button>
-        {/each}
-      </div>
-    </div>
-    <div class="sl-product-image">
-      <img src={`/screenshots/${locale}/${views[active].file}.jpg`} width="2560" height="1600" alt={t(`preview.${views[active].key}.alt`)} fetchpriority="high" />
-    </div>
-    <p class="sl-image-caption">{t('preview.caption')}</p>
-  </section>
+  <WorkspaceDemo {context} />
 
   <section id="features" class="sl-section" aria-labelledby="features-title">
     <div class="sl-section-heading"><h2 id="features-title">{t('features.title')}</h2></div>

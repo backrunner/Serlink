@@ -135,19 +135,38 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
           children: [
             SizedBox.square(
               dimension: 18,
-              child: Center(child: _McpStatusDot(active: running)),
+              child: Icon(Icons.dns_outlined, size: 16, color: t.textSecondary),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    l10n.settingsMcpServerTitle,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: t.textPrimary,
-                    ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        l10n.settingsMcpServerTitle,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: t.textPrimary,
+                        ),
+                      ),
+                      StatusPill(
+                        label: serverState.lastError != null
+                            ? l10n.settingsMcpStatusError
+                            : running
+                            ? l10n.settingsMcpStatusRunning
+                            : l10n.settingsMcpStatusStopped,
+                        color: serverState.lastError != null
+                            ? Theme.of(context).colorScheme.error
+                            : running
+                            ? t.accentPrimary
+                            : t.textMuted,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -632,23 +651,6 @@ class _McpCardGap extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Divider(height: 1, indent: 28, color: context.tokens.borderSubtle),
-    );
-  }
-}
-
-class _McpStatusDot extends StatelessWidget {
-  const _McpStatusDot({required this.active});
-
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final color = active ? t.accentPrimary : t.textMuted;
-    return Container(
-      width: 9,
-      height: 9,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }

@@ -396,6 +396,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsMcpServerTitle => 'Agent server';
 
   @override
+  String get settingsMcpStatusRunning => 'Running';
+
+  @override
+  String get settingsMcpStatusStopped => 'Stopped';
+
+  @override
+  String get settingsMcpStatusError => 'Error';
+
+  @override
   String get settingsMcpServerSemantics => 'Enable the agent server';
 
   @override

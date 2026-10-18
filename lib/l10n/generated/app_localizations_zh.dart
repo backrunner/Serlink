@@ -356,6 +356,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsMcpServerTitle => '代理服务器';
 
   @override
+  String get settingsMcpStatusRunning => '运行中';
+
+  @override
+  String get settingsMcpStatusStopped => '已停止';
+
+  @override
+  String get settingsMcpStatusError => '错误';
+
+  @override
   String get settingsMcpServerSemantics => '启用代理服务器';
 
   @override

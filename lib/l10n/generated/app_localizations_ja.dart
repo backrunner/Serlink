@@ -360,6 +360,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsMcpServerTitle => 'エージェントサーバー';
 
   @override
+  String get settingsMcpStatusRunning => '実行中';
+
+  @override
+  String get settingsMcpStatusStopped => '停止中';
+
+  @override
+  String get settingsMcpStatusError => 'エラー';
+
+  @override
   String get settingsMcpServerSemantics => 'エージェントサーバーを有効にする';
 
   @override

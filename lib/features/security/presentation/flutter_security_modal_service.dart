@@ -453,6 +453,19 @@ class _AgentCommandDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final codeController = ShellCodeController(text: prompt.command);
+    final code = codeController.buildTextSpan(
+      context: context,
+      style: TextStyle(
+        fontFamily: 'JetBrainsMono Nerd Font Mono',
+        fontFamilyFallback: const ['Menlo', 'Consolas', 'monospace'],
+        fontSize: 13,
+        height: 1.6,
+        color: context.tokens.textPrimary,
+      ),
+      withComposing: false,
+    );
+    codeController.dispose();
     return SerlinkDialog(
       maxWidth: _hostKeyDialogMaxWidth,
       title: Text(l10n.securityAgentCommandTitle),
@@ -472,12 +485,21 @@ class _AgentCommandDialog extends StatelessWidget {
               const SizedBox(height: 8),
               Text(l10n.securityAgentCommandRuleLabel(prompt.ruleDescription)),
               const SizedBox(height: 12),
-              ConstrainedBox(
+              Container(
+                key: const ValueKey('agent-command-code-block'),
+                width: double.infinity,
                 constraints: const BoxConstraints(maxHeight: 240),
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: context.tokens.surfaceSunken,
+                  border: Border.all(color: context.tokens.borderSubtle),
+                  borderRadius: SerlinkRadii.control,
+                ),
                 child: SerlinkScrollView(
-                  child: SelectableText(
-                    prompt.command,
-                    style: const TextStyle(fontFamily: 'monospace'),
+                  padding: const EdgeInsets.all(SerlinkSpacing.md),
+                  child: SelectableText.rich(
+                    code,
+                    textDirection: TextDirection.ltr,
                   ),
                 ),
               ),

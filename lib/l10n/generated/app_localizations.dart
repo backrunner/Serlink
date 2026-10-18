@@ -766,6 +766,24 @@ abstract class AppLocalizations {
   /// **'Agent server'**
   String get settingsMcpServerTitle;
 
+  /// No description provided for @settingsMcpStatusRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get settingsMcpStatusRunning;
+
+  /// No description provided for @settingsMcpStatusStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get settingsMcpStatusStopped;
+
+  /// No description provided for @settingsMcpStatusError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get settingsMcpStatusError;
+
   /// No description provided for @settingsMcpServerSemantics.
   ///
   /// In en, this message translates to:

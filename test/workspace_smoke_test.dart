@@ -55,6 +55,7 @@ import 'package:xterm/xterm.dart';
 
 part 'workspace_smoke_test_fakes.dart';
 part 'workspace_smoke_test_host_groups.dart';
+part 'workspace_smoke_test_credentials.dart';
 part 'workspace_smoke_test_terminal_fonts.dart';
 part 'workspace_smoke_test_sftp_mobile.dart';
 part 'workspace_smoke_test_transfer_swipe.dart';
@@ -62,6 +63,7 @@ part 'workspace_smoke_test_transfer_menu.dart';
 
 void main() {
   _hostGroupTests();
+  _credentialPaginationTests();
   _terminalFontTests();
   _sftpMobileTests();
   _mobileTransferSwipeTests();

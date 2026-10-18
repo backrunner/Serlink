@@ -1212,6 +1212,20 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostEditCredentialTooltip => '認証情報を編集';
 
   @override
+  String get hostOtherCredentialsTitle => '他の認証情報';
+
+  @override
+  String hostCredentialPage(int page, int total) {
+    return '$page / $total ページ';
+  }
+
+  @override
+  String get hostCredentialPreviousPage => '前の認証情報';
+
+  @override
+  String get hostCredentialNextPage => '次の認証情報';
+
+  @override
   String get hostCredentialOptionalNote => '認証情報なしでホストを保存し、後で追加できます。';
 
   @override

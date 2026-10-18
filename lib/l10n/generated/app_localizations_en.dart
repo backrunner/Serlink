@@ -1295,6 +1295,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostEditCredentialTooltip => 'Edit credential';
 
   @override
+  String get hostOtherCredentialsTitle => 'Other credentials';
+
+  @override
+  String hostCredentialPage(int page, int total) {
+    return '$page / $total';
+  }
+
+  @override
+  String get hostCredentialPreviousPage => 'Previous credentials';
+
+  @override
+  String get hostCredentialNextPage => 'Next credentials';
+
+  @override
   String get hostCredentialOptionalNote =>
       'You can save the host without credentials and add one later.';
 

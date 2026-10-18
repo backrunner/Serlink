@@ -2296,6 +2296,30 @@ abstract class AppLocalizations {
   /// **'Edit credential'**
   String get hostEditCredentialTooltip;
 
+  /// No description provided for @hostOtherCredentialsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Other credentials'**
+  String get hostOtherCredentialsTitle;
+
+  /// No description provided for @hostCredentialPage.
+  ///
+  /// In en, this message translates to:
+  /// **'{page} / {total}'**
+  String hostCredentialPage(int page, int total);
+
+  /// No description provided for @hostCredentialPreviousPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous credentials'**
+  String get hostCredentialPreviousPage;
+
+  /// No description provided for @hostCredentialNextPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Next credentials'**
+  String get hostCredentialNextPage;
+
   /// No description provided for @hostCredentialOptionalNote.
   ///
   /// In en, this message translates to:

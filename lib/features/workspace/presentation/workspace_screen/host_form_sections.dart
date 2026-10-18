@@ -195,7 +195,7 @@ class _AdvancedConnectionSettingsSection extends StatelessWidget {
   }
 }
 
-class _HostCollapsibleSection extends StatelessWidget {
+class _HostCollapsibleSection extends StatefulWidget {
   const _HostCollapsibleSection({
     required this.title,
     required this.icon,
@@ -213,42 +213,55 @@ class _HostCollapsibleSection extends StatelessWidget {
   final Widget child;
 
   @override
+  State<_HostCollapsibleSection> createState() =>
+      _HostCollapsibleSectionState();
+}
+
+class _HostCollapsibleSectionState extends State<_HostCollapsibleSection> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final inset = Theme.of(context).platform == TargetPlatform.iOS
         ? 16.0
-        : (compact ? 12.0 : 16.0);
+        : (widget.compact ? 12.0 : 16.0);
     return _HostSectionFrame(
       padding: EdgeInsets.all(inset),
-      header: Semantics(
-        expanded: expanded,
-        child: SerlinkPressable(
-          onTap: onToggle,
-          borderRadius: expanded
-              ? const BorderRadius.vertical(top: SerlinkRadii.dialogR)
-              : SerlinkRadii.dialog,
-          hoverColor: t.surfaceOverlay,
-          pressedColor: t.textPrimary.withValues(alpha: 0.12),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: inset, vertical: 12),
-            child: _HostSectionHeading(
-              title: title,
-              icon: icon,
-              trailing: AnimatedRotation(
-                turns: expanded ? 0.25 : 0,
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOut,
-                child: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 13,
-                  color: t.textMuted,
+      borderColor: _hovered ? t.borderStrong : t.borderSubtle,
+      header: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Semantics(
+          expanded: widget.expanded,
+          child: SerlinkPressable(
+            onTap: widget.onToggle,
+            borderRadius: widget.expanded
+                ? const BorderRadius.vertical(top: SerlinkRadii.dialogR)
+                : SerlinkRadii.dialog,
+            hoverColor: t.surfaceOverlay,
+            pressedColor: t.textPrimary.withValues(alpha: 0.12),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: inset, vertical: 12),
+              child: _HostSectionHeading(
+                title: widget.title,
+                icon: widget.icon,
+                trailing: AnimatedRotation(
+                  turns: widget.expanded ? 0.25 : 0,
+                  duration: const Duration(milliseconds: 160),
+                  curve: Curves.easeOut,
+                  child: Icon(
+                    Icons.arrow_forward_ios,
+                    size: 13,
+                    color: t.textMuted,
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
-      child: expanded ? child : null,
+      child: widget.expanded ? widget.child : null,
     );
   }
 }
@@ -550,9 +563,8 @@ class _HostForwardingRuleEditor extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: t.textSecondary),
                   ),
                 ],
               ),
@@ -637,9 +649,8 @@ class _HostForwardingRuleList extends StatelessWidget {
                       child: Text(
                         entries[index],
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: t.textSecondary),
                       ),
                     ),
                     SerlinkTooltip(
@@ -696,37 +707,49 @@ class _HostSectionFrame extends StatelessWidget {
     required this.header,
     required this.padding,
     this.child,
+    this.borderColor,
   });
 
   final Widget header;
   final EdgeInsetsGeometry padding;
   final Widget? child;
+  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: t.surfaceRaised,
-        border: Border.all(color: t.borderSubtle),
+    return AnimatedContainer(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      // Paint one outline above the clipped header and hover fill, without an
+      // inset that would give their rounded corners a second, mismatched edge.
+      foregroundDecoration: BoxDecoration(
+        border: Border.all(color: borderColor ?? t.borderSubtle),
         borderRadius: SerlinkRadii.dialog,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ColoredBox(
-            color: Color.alphaBlend(
-              t.surfaceBase.withValues(alpha: 0.7),
-              t.surfaceRaised,
-            ),
-            child: header,
+      child: ClipRRect(
+        borderRadius: SerlinkRadii.dialog,
+        child: ColoredBox(
+          color: t.surfaceRaised,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ColoredBox(
+                color: Color.alphaBlend(
+                  t.surfaceBase.withValues(alpha: 0.7),
+                  t.surfaceRaised,
+                ),
+                child: header,
+              ),
+              if (child != null) ...[
+                Divider(height: 1, color: t.borderSubtle),
+                Padding(padding: padding, child: child),
+              ],
+            ],
           ),
-          if (child != null) ...[
-            Divider(height: 1, color: t.borderSubtle),
-            Padding(padding: padding, child: child),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -921,7 +944,7 @@ class _SshAgentAuthNote extends StatelessWidget {
   }
 }
 
-class _SavedCredentialFields extends StatelessWidget {
+class _SavedCredentialFields extends StatefulWidget {
   const _SavedCredentialFields({
     required this.identityOptions,
     required this.selectedIdentityIds,
@@ -941,35 +964,138 @@ class _SavedCredentialFields extends StatelessWidget {
   final VoidCallback onAddIdentity;
 
   @override
+  State<_SavedCredentialFields> createState() => _SavedCredentialFieldsState();
+}
+
+class _SavedCredentialFieldsState extends State<_SavedCredentialFields> {
+  static const _pageSize = 3;
+  int _page = 0;
+
+  @override
+  void didUpdateWidget(covariant _SavedCredentialFields oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final remaining = widget.identityOptions
+        .where((identity) => !widget.selectedIdentityIds.contains(identity.id))
+        .length;
+    _page = math.min(_page, math.max(0, (remaining - 1) ~/ _pageSize));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final byId = {
+      for (final identity in widget.identityOptions) identity.id: identity,
+    };
+    // Preserve the host's configured identity order; sorting is presentation
+    // only and must not change the order in which SSH tries its credentials.
+    final selected = [for (final id in widget.selectedIdentityIds) ?byId[id]];
+    final remaining = widget.identityOptions
+        .where((identity) => !widget.selectedIdentityIds.contains(identity.id))
+        .toList();
+    final pageCount = math.max(
+      1,
+      (remaining.length + _pageSize - 1) ~/ _pageSize,
+    );
+    final visible = remaining.skip(_page * _pageSize).take(_pageSize).toList();
+    final buttonSide = Theme.of(context).platform == TargetPlatform.iOS
+        ? 44.0
+        : 32.0;
+
+    Widget row(IdentityConfig identity) => _CredentialSelectionRow(
+      key: ValueKey('credential-row-${identity.id.value}'),
+      identity: identity,
+      selected: widget.selectedIdentityIds.contains(identity.id),
+      enabled: !widget.loadingOptions,
+      onToggle: widget.onToggleIdentity,
+      onEdit: widget.onEditIdentity,
+      onDelete: widget.onDeleteIdentity,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (identityOptions.isEmpty)
+        if (widget.identityOptions.isEmpty)
           const _CredentialsEmptyState()
         else
           AnimatedOpacity(
             duration: const Duration(milliseconds: 130),
-            opacity: loadingOptions ? 0.54 : 1,
+            opacity: widget.loadingOptions ? 0.54 : 1,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (
-                  var index = 0;
-                  index < identityOptions.length;
-                  index += 1
-                ) ...[
+                for (var index = 0; index < selected.length; index += 1) ...[
                   if (index > 0) const SizedBox(height: 8),
-                  _CredentialSelectionRow(
-                    identity: identityOptions[index],
-                    selected: selectedIdentityIds.contains(
-                      identityOptions[index].id,
-                    ),
-                    enabled: !loadingOptions,
-                    onToggle: onToggleIdentity,
-                    onEdit: onEditIdentity,
-                    onDelete: onDeleteIdentity,
+                  row(selected[index]),
+                ],
+                if (remaining.isNotEmpty &&
+                    (selected.isNotEmpty || pageCount > 1)) ...[
+                  if (selected.isNotEmpty) const SizedBox(height: 12),
+                  Wrap(
+                    key: const ValueKey('credential-pagination'),
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 4,
+                    children: [
+                      Text(
+                        selected.isEmpty
+                            ? l10n.credentialsDialogTitle
+                            : l10n.hostOtherCredentialsTitle,
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: context.tokens.textSecondary),
+                      ),
+                      if (pageCount > 1)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              l10n.hostCredentialPage(_page + 1, pageCount),
+                              key: const ValueKey('credential-page-label'),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(width: 8),
+                            SerlinkIconButton(
+                              key: const ValueKey('credential-previous-page'),
+                              tooltip: l10n.hostCredentialPreviousPage,
+                              constraints: BoxConstraints.tightFor(
+                                width: buttonSide,
+                                height: buttonSide,
+                              ),
+                              onPressed: widget.loadingOptions || _page == 0
+                                  ? null
+                                  : () => setState(() {
+                                      _page = math.max(0, _page - 1);
+                                    }),
+                              icon: const Icon(Icons.chevron_left, size: 18),
+                            ),
+                            SerlinkIconButton(
+                              key: const ValueKey('credential-next-page'),
+                              tooltip: l10n.hostCredentialNextPage,
+                              constraints: BoxConstraints.tightFor(
+                                width: buttonSide,
+                                height: buttonSide,
+                              ),
+                              onPressed:
+                                  widget.loadingOptions ||
+                                      _page >= pageCount - 1
+                                  ? null
+                                  : () => setState(() {
+                                      _page = math.min(
+                                        pageCount - 1,
+                                        _page + 1,
+                                      );
+                                    }),
+                              icon: const Icon(Icons.chevron_right, size: 18),
+                            ),
+                          ],
+                        ),
+                    ],
                   ),
+                  const SizedBox(height: 8),
+                ],
+                for (var index = 0; index < visible.length; index += 1) ...[
+                  if (index > 0) const SizedBox(height: 8),
+                  row(visible[index]),
                 ],
                 const SizedBox(height: 8),
                 const _CredentialOptionalNote(),
@@ -981,7 +1107,7 @@ class _SavedCredentialFields extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: SerlinkOutlinedButton.icon(
             key: const ValueKey('credential-add-button'),
-            onPressed: loadingOptions ? null : onAddIdentity,
+            onPressed: widget.loadingOptions ? null : widget.onAddIdentity,
             icon: const Icon(Icons.add_rounded, size: 18),
             label: Text(context.l10n.hostAddCredentialAction),
           ),
@@ -1025,17 +1151,15 @@ class _CredentialsEmptyState extends StatelessWidget {
           Text(
             l10n.hostNoSavedCredentials,
             textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: t.textSecondary),
           ),
           const SizedBox(height: 2),
           Text(
             l10n.hostCredentialOptionalNote,
             textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: t.textMuted),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: t.textMuted),
           ),
         ],
       ),
@@ -1045,6 +1169,7 @@ class _CredentialsEmptyState extends StatelessWidget {
 
 class _CredentialSelectionRow extends StatelessWidget {
   const _CredentialSelectionRow({
+    super.key,
     required this.identity,
     required this.selected,
     required this.enabled,
@@ -1125,9 +1250,8 @@ class _CredentialSelectionRow extends StatelessWidget {
                   Text(
                     subtitle,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: t.textSecondary),
                   ),
                 ],
               ),
@@ -1138,16 +1262,6 @@ class _CredentialSelectionRow extends StatelessWidget {
                 key: ValueKey('credential-edit-${identity.id.value}'),
                 onPressed: enabled ? () => onEdit(identity) : null,
                 icon: const Icon(Icons.edit_outlined, size: 18),
-              ),
-            ),
-            const SizedBox(width: 4),
-            AnimatedOpacity(
-              duration: const Duration(milliseconds: 130),
-              opacity: selected ? 1 : 0,
-              child: Icon(
-                Icons.check_circle_rounded,
-                size: 18,
-                color: t.accentPrimary,
               ),
             ),
           ],
@@ -1166,9 +1280,8 @@ class _CredentialOptionalNote extends StatelessWidget {
       padding: const EdgeInsets.only(left: 2),
       child: Text(
         context.l10n.hostCredentialOptionalNote,
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: context.tokens.textMuted),
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: context.tokens.textMuted),
       ),
     );
   }

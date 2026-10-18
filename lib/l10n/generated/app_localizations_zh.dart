@@ -1197,6 +1197,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostEditCredentialTooltip => '编辑凭据';
 
   @override
+  String get hostOtherCredentialsTitle => '其他凭据';
+
+  @override
+  String hostCredentialPage(int page, int total) {
+    return '第 $page / $total 页';
+  }
+
+  @override
+  String get hostCredentialPreviousPage => '上一页凭据';
+
+  @override
+  String get hostCredentialNextPage => '下一页凭据';
+
+  @override
   String get hostCredentialOptionalNote => '你可以先保存不带凭据的主机，稍后再添加。';
 
   @override

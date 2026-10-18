@@ -79,6 +79,8 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   List<HostDynamicPortForward> _dynamicForwards = const [];
   HostRemoteSessionManager _remoteSessionManager =
       HostRemoteSessionManager.auto;
+  bool _showAuthentication = true;
+  bool _showRouting = true;
   bool _showStartup = false;
   bool _showRemoteSession = false;
   bool _showPortForwarding = false;
@@ -282,10 +284,16 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
               ),
             ),
             SizedBox(height: layout.sectionGap),
-            _HostFormSection(
+            _HostCollapsibleSection(
               title: l10n.hostSectionAuthentication,
               icon: Icons.lock_outline_rounded,
-              padding: layout.sectionPadding,
+              expanded: _showAuthentication,
+              compact: layout.compact,
+              onToggle: () {
+                setState(() {
+                  _showAuthentication = !_showAuthentication;
+                });
+              },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -404,10 +412,16 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
             ),
             if (_jumpHostOptions.isNotEmpty) ...[
               SizedBox(height: layout.sectionGap),
-              _HostFormSection(
+              _HostCollapsibleSection(
                 title: l10n.hostSectionRouting,
                 icon: Icons.alt_route_rounded,
-                padding: layout.sectionPadding,
+                expanded: _showRouting,
+                compact: layout.compact,
+                onToggle: () {
+                  setState(() {
+                    _showRouting = !_showRouting;
+                  });
+                },
                 child: _JumpHostSelectionSection(
                   hosts: _jumpHostOptions,
                   selectedHostIds: _selectedJumpHostIds,

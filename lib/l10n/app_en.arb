@@ -660,6 +660,16 @@
   "hostNoSavedCredentials": "No saved credentials are available yet.",
   "hostCredentialsHeading": "Credentials",
   "hostEditCredentialTooltip": "Edit credential",
+  "hostOtherCredentialsTitle": "Other credentials",
+  "hostCredentialPage": "{page} / {total}",
+  "@hostCredentialPage": {
+    "placeholders": {
+      "page": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "hostCredentialPreviousPage": "Previous credentials",
+  "hostCredentialNextPage": "Next credentials",
   "hostCredentialOptionalNote": "You can save the host without credentials and add one later.",
   "hostJumpHostsHeading": "Jump hosts",
   "hostPortNumberError": "Port must be a number.",

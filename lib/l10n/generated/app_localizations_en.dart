@@ -1194,6 +1194,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostGroupNew => 'New group…';
 
   @override
+  String get hostGroupAddToMenu => 'Add to group…';
+
+  @override
   String get hostGroupNewHint => 'Group name';
 
   @override

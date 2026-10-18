@@ -334,6 +334,7 @@
   "hostGroupLabel": "グループ",
   "hostGroupNone": "グループなし",
   "hostGroupNew": "新しいグループ…",
+  "hostGroupAddToMenu": "グループに追加…",
   "hostGroupNewHint": "グループ名",
   "hostGroupCreateTitle": "新しいグループ",
   "hostGroupNameRequired": "有効なグループ名を入力してください。",

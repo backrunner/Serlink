@@ -280,6 +280,16 @@ class _HostsSurface extends ConsumerWidget {
                               ),
                               unlockGeneration: session.unlockGeneration,
                               mobile: mobile,
+                              groupNames:
+                                  ({
+                                    ...savedGroups,
+                                    for (final host in hosts)
+                                      if (host.groupId != null) host.groupId!,
+                                  }.toList()..sort(
+                                    (a, b) => a.toLowerCase().compareTo(
+                                      b.toLowerCase(),
+                                    ),
+                                  )),
                             ),
                     ),
                   ),
@@ -304,18 +314,26 @@ class _HostList extends ConsumerStatefulWidget {
     required this.entries,
     required this.unlockGeneration,
     required this.mobile,
+    required this.groupNames,
   });
 
   final List<_HostListEntry> entries;
   final int unlockGeneration;
   final bool mobile;
+  final List<String> groupNames;
 
   @override
   ConsumerState<_HostList> createState() => _HostListState();
 }
 
-class _HostListState extends ConsumerState<_HostList> {
+class _HostListState extends ConsumerState<_HostList>
+    with SingleTickerProviderStateMixin {
   final _listKey = GlobalKey<AnimatedListState>();
+  final _scrollController = ScrollController();
+  late final Ticker _dragScrollTicker;
+  _HostListDrag? _activeDrag;
+  Duration _lastDragScrollTick = Duration.zero;
+  bool _dragTargetRefreshScheduled = false;
   Timer? _settleTimer;
   late List<_HostListEntry> _displayedEntries;
   Set<String> _entranceEntryKeys = const {};
@@ -324,6 +342,8 @@ class _HostListState extends ConsumerState<_HostList> {
   @override
   void initState() {
     super.initState();
+    _dragScrollTicker = createTicker(_scrollDuringDrag);
+    _scrollController.addListener(_scheduleDragTargetRefresh);
     _displayedEntries = List.of(widget.entries);
     _claimEntrance(widget.unlockGeneration);
   }
@@ -338,6 +358,9 @@ class _HostListState extends ConsumerState<_HostList> {
       _settleTimer?.cancel();
       _playEntrance = false;
       _entranceEntryKeys = const {};
+    }
+    if (!TickerMode.valuesOf(context).enabled) {
+      _stopHostDrag(_activeDrag);
     }
   }
 
@@ -354,8 +377,68 @@ class _HostListState extends ConsumerState<_HostList> {
 
   @override
   void dispose() {
+    _activeDrag = null;
+    _dragScrollTicker.dispose();
+    _scrollController.dispose();
     _settleTimer?.cancel();
     super.dispose();
+  }
+
+  void _startHostDrag(_HostListDrag drag) {
+    _activeDrag = drag;
+    _lastDragScrollTick = Duration.zero;
+    if (!_dragScrollTicker.isActive) _dragScrollTicker.start();
+  }
+
+  void _stopHostDrag(_HostListDrag? drag) {
+    if (!identical(_activeDrag, drag) || _activeDrag == null) return;
+    _activeDrag = null;
+    _dragScrollTicker.stop();
+  }
+
+  void _scrollDuringDrag(Duration elapsed) {
+    final seconds = math.min(
+      (elapsed - _lastDragScrollTick).inMicroseconds / 1000000,
+      0.05,
+    );
+    _lastDragScrollTick = elapsed;
+    final drag = _activeDrag;
+    final viewport = _listKey.currentContext?.findRenderObject();
+    if (drag == null ||
+        viewport is! RenderBox ||
+        !_scrollController.hasClients) {
+      return;
+    }
+    final pointer = viewport.globalToLocal(drag.position);
+    if (pointer.dx < 0 ||
+        pointer.dx > viewport.size.width ||
+        pointer.dy < 0 ||
+        pointer.dy > viewport.size.height) {
+      return;
+    }
+    final edgeExtent = math.min(72.0, viewport.size.height / 3);
+    if (edgeExtent <= 0) return;
+    final proximity = pointer.dy < edgeExtent
+        ? -(1 - pointer.dy / edgeExtent)
+        : pointer.dy > viewport.size.height - edgeExtent
+        ? 1 - (viewport.size.height - pointer.dy) / edgeExtent
+        : 0.0;
+    if (proximity == 0) return;
+    final position = _scrollController.position;
+    // Accelerate towards the edge; use frame time so speed is independent of
+    // display refresh rate, and clamp to prevent bouncing at either end.
+    final next = (position.pixels + proximity * proximity.abs() * 560 * seconds)
+        .clamp(position.minScrollExtent, position.maxScrollExtent);
+    if (next != position.pixels) _scrollController.jumpTo(next);
+  }
+
+  void _scheduleDragTargetRefresh() {
+    if (_activeDrag == null || _dragTargetRefreshScheduled) return;
+    _dragTargetRefreshScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _dragTargetRefreshScheduled = false;
+      if (mounted) _activeDrag?.refreshTarget();
+    });
   }
 
   void _claimEntrance(int unlockGeneration) {
@@ -373,7 +456,8 @@ class _HostListState extends ConsumerState<_HostList> {
       if (mounted) {
         setState(() {
           _playEntrance = false;
-          _entranceEntryKeys = const {};
+          // Keep settled wrappers in place so an open row menu retains its
+          // state when the entrance animation finishes.
         });
       }
     });
@@ -445,6 +529,7 @@ class _HostListState extends ConsumerState<_HostList> {
   Widget build(BuildContext context) {
     return AnimatedList(
       key: _listKey,
+      controller: _scrollController,
       padding: widget.mobile
           ? _mobileSurfaceListPadding
           : SerlinkSizes.listPadding,
@@ -471,13 +556,13 @@ class _HostListState extends ConsumerState<_HostList> {
     };
     // Headers and hosts enter in their shared visual order, including empty
     // and collapsed groups. Later inserts use only the list-change transition.
-    if (!removing && _playEntrance && _entranceEntryKeys.contains(entry.key)) {
+    if (!removing && _entranceEntryKeys.contains(entry.key)) {
       child = EntranceFade(
         key: ValueKey('host-list-entrance-${entry.key}'),
-        duration: _hostListEntranceDuration,
+        duration: _playEntrance ? _hostListEntranceDuration : Duration.zero,
         delay: Duration(
           milliseconds:
-              _hostListEntranceStaggerMs *
+              (_playEntrance ? _hostListEntranceStaggerMs : 0) *
               math.min(index, _hostListEntranceMaxStaggerItems),
         ),
         child: child,
@@ -522,6 +607,8 @@ class _HostListState extends ConsumerState<_HostList> {
     Widget row = _HostRow(
       mobile: widget.mobile,
       host: host,
+      groupNames: widget.groupNames,
+      onMoveToGroup: (groupId) => _moveHost(host, groupId),
       onTerminal: () => controller.openTerminal(host),
       onSftp: () => controller.openSftp(host),
       onEdit: () => _showEditHostDialog(context, host),
@@ -531,6 +618,8 @@ class _HostListState extends ConsumerState<_HostList> {
     if (!widget.mobile) {
       row = _HostDraggable(
         data: host,
+        onSessionStarted: _startHostDrag,
+        onSessionEnded: _stopHostDrag,
         feedback: Material(
           color: Colors.transparent,
           child: Container(
@@ -558,16 +647,76 @@ class _HostDraggable extends Draggable<HostSummary> {
     required super.feedback,
     required super.childWhenDragging,
     required super.child,
+    required this.onSessionStarted,
+    required this.onSessionEnded,
   }) : super(maxSimultaneousDrags: 1);
+
+  final ValueChanged<_HostListDrag> onSessionStarted;
+  final ValueChanged<_HostListDrag> onSessionEnded;
 
   @override
   MultiDragGestureRecognizer createRecognizer(
     GestureMultiDragStartCallback onStart,
   ) {
     return ImmediateMultiDragGestureRecognizer(
-      supportedDevices: const {PointerDeviceKind.mouse},
-      allowedButtonsFilter: (buttons) => buttons == kPrimaryButton,
-    )..onStart = onStart;
+        supportedDevices: const {PointerDeviceKind.mouse},
+        allowedButtonsFilter: (buttons) => buttons == kPrimaryButton,
+      )
+      ..onStart = (position) {
+        final delegate = onStart(position);
+        if (delegate == null) return null;
+        final drag = _HostListDrag(
+          delegate,
+          position: position,
+          onEnd: onSessionEnded,
+        );
+        onSessionStarted(drag);
+        return drag;
+      };
+  }
+}
+
+// AnimatedList can recycle the source row while it is being dragged. Track the
+// recognizer's drag session, whose lifetime outlasts that row, so scrolling and
+// cleanup continue even after Draggable's mounted-only callbacks stop firing.
+class _HostListDrag implements Drag {
+  _HostListDrag(this._delegate, {required this.position, required this.onEnd});
+
+  final Drag _delegate;
+  final ValueChanged<_HostListDrag> onEnd;
+  Offset position;
+
+  @override
+  void update(DragUpdateDetails details) {
+    position = details.globalPosition;
+    _delegate.update(details);
+  }
+
+  void refreshTarget() {
+    // Scrolling moves drop targets beneath a stationary pointer. Re-hit-test
+    // after layout, including wheel/trackpad scrolling, before accepting a drop.
+    _delegate.update(
+      DragUpdateDetails(globalPosition: position, delta: Offset.zero),
+    );
+  }
+
+  @override
+  void end(DragEndDetails details) {
+    try {
+      refreshTarget();
+      _delegate.end(details);
+    } finally {
+      onEnd(this);
+    }
+  }
+
+  @override
+  void cancel() {
+    try {
+      _delegate.cancel();
+    } finally {
+      onEnd(this);
+    }
   }
 }
 
@@ -766,10 +915,8 @@ class _HostsHeader extends ConsumerWidget {
         children: [
           Text(
             l10n.hostsTitle,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: t.textPrimary,
-            ),
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600, color: t.textPrimary),
           ),
           const SizedBox(width: 8),
           _CountBadge(count: count),

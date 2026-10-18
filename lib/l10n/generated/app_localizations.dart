@@ -2104,6 +2104,12 @@ abstract class AppLocalizations {
   /// **'New group…'**
   String get hostGroupNew;
 
+  /// No description provided for @hostGroupAddToMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to group…'**
+  String get hostGroupAddToMenu;
+
   /// No description provided for @hostGroupNewHint.
   ///
   /// In en, this message translates to:

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -463,13 +464,17 @@ class SerlinkLoadingIndicator extends StatelessWidget {
 class SerlinkMenuAction {
   const SerlinkMenuAction({
     required this.label,
-    required this.onPressed,
+    this.onPressed,
     this.icon,
-  });
+    this.children = const [],
+    this.checked = false,
+  }) : assert(onPressed == null || children.length == 0);
 
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final IconData? icon;
+  final List<SerlinkMenuAction> children;
+  final bool checked;
 }
 
 class SerlinkMenuButton extends StatelessWidget {
@@ -502,10 +507,12 @@ class SerlinkMenuButton extends StatelessWidget {
                 prefix: action.icon == null
                     ? null
                     : Icon(action.icon, size: 16),
-                onPress: () {
-                  controller.hide();
-                  action.onPressed();
-                },
+                onPress: action.onPressed == null
+                    ? null
+                    : () {
+                        controller.hide();
+                        action.onPressed!();
+                      },
               ),
           ],
         ),
@@ -525,12 +532,14 @@ class SerlinkContextMenu extends StatefulWidget {
   const SerlinkContextMenu({
     super.key,
     required this.actions,
-    required this.child,
+    this.child,
+    this.builder,
     this.enabled = true,
-  });
+  }) : assert(child != null || builder != null);
 
   final List<SerlinkMenuAction> actions;
-  final Widget child;
+  final Widget? child;
+  final Widget Function(BuildContext context, bool active)? builder;
   final bool enabled;
 
   @override
@@ -538,7 +547,7 @@ class SerlinkContextMenu extends StatefulWidget {
 }
 
 class _SerlinkContextMenuState extends State<SerlinkContextMenu> {
-  static const double _menuWidth = 184;
+  static const double _menuWidth = 224;
   static const double _rowHeight = 38;
   static const double _verticalPadding = 6;
   static const double _screenMargin = 8;
@@ -547,15 +556,17 @@ class _SerlinkContextMenuState extends State<SerlinkContextMenu> {
 
   OverlayEntry? _entry;
   Rect? _menuRect;
+  Rect? _submenuRect;
   bool _listeningForGlobalPointers = false;
 
   @override
   void dispose() {
-    _hideMenu();
+    _hideMenu(disposing: true);
     super.dispose();
   }
 
-  void _hideMenu() {
+  void _hideMenu({bool disposing = false}) {
+    final wasOpen = _entry != null;
     if (_openMenu == this) {
       _openMenu = null;
     }
@@ -563,6 +574,8 @@ class _SerlinkContextMenuState extends State<SerlinkContextMenu> {
     _entry?.remove();
     _entry = null;
     _menuRect = null;
+    _submenuRect = null;
+    if (wasOpen && mounted && !disposing) setState(() {});
   }
 
   void _showMenuAt(Offset globalPosition) {
@@ -619,11 +632,13 @@ class _SerlinkContextMenuState extends State<SerlinkContextMenu> {
         maxHeight: menuHeight,
         actions: widget.actions,
         onDismiss: _hideMenu,
+        onSubmenuRectChanged: (rect) => _submenuRect = rect,
       ),
     );
     overlay.insert(_entry!);
     _openMenu = this;
     _attachGlobalPointerRoute();
+    setState(() {});
   }
 
   void _attachGlobalPointerRoute() {
@@ -661,7 +676,8 @@ class _SerlinkContextMenuState extends State<SerlinkContextMenu> {
       return;
     }
     final localPosition = overlayBox.globalToLocal(event.position);
-    if (!menuRect.contains(localPosition)) {
+    if (!menuRect.contains(localPosition) &&
+        !(_submenuRect?.contains(localPosition) ?? false)) {
       _hideMenu();
     }
   }
@@ -670,18 +686,19 @@ class _SerlinkContextMenuState extends State<SerlinkContextMenu> {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onSecondaryTapDown: widget.enabled
+      // Tap-down callbacks can fire on both nested targets before a winner.
+      onSecondaryTapUp: widget.enabled
           ? (details) => _showMenuAt(details.globalPosition)
           : null,
       onLongPressStart: widget.enabled
           ? (details) => _showMenuAt(details.globalPosition)
           : null,
-      child: widget.child,
+      child: widget.builder?.call(context, _entry != null) ?? widget.child,
     );
   }
 }
 
-class _SerlinkContextMenuOverlay extends StatelessWidget {
+class _SerlinkContextMenuOverlay extends StatefulWidget {
   const _SerlinkContextMenuOverlay({
     required this.left,
     required this.top,
@@ -689,6 +706,7 @@ class _SerlinkContextMenuOverlay extends StatelessWidget {
     required this.maxHeight,
     required this.actions,
     required this.onDismiss,
+    required this.onSubmenuRectChanged,
   });
 
   final double left;
@@ -697,42 +715,196 @@ class _SerlinkContextMenuOverlay extends StatelessWidget {
   final double maxHeight;
   final List<SerlinkMenuAction> actions;
   final VoidCallback onDismiss;
+  final ValueChanged<Rect?> onSubmenuRectChanged;
 
   @override
-  Widget build(BuildContext context) {
+  State<_SerlinkContextMenuOverlay> createState() =>
+      _SerlinkContextMenuOverlayState();
+}
+
+class _SerlinkContextMenuOverlayState
+    extends State<_SerlinkContextMenuOverlay> {
+  final _focusNode = FocusNode();
+  SerlinkMenuAction? _submenu;
+  Rect? _submenuRect;
+  Timer? _closeSubmenuTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _closeSubmenuTimer?.cancel();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _closeSubmenu() {
+    _closeSubmenuTimer?.cancel();
+    if (_submenu == null) return;
+    setState(() {
+      _submenu = null;
+      _submenuRect = null;
+    });
+    widget.onSubmenuRectChanged(null);
+  }
+
+  void _hoverAction(SerlinkMenuAction action, BuildContext itemContext) {
+    _closeSubmenuTimer?.cancel();
+    if (action.children.isNotEmpty) {
+      _openSubmenu(action, itemContext);
+    } else if (_submenu != null) {
+      // Allow a diagonal movement from the parent row into the submenu.
+      _closeSubmenuTimer = Timer(
+        const Duration(milliseconds: 180),
+        _closeSubmenu,
+      );
+    }
+  }
+
+  void _openSubmenu(SerlinkMenuAction action, BuildContext itemContext) {
+    _closeSubmenuTimer?.cancel();
+    if (identical(action, _submenu)) return;
+    final box = itemContext.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (box == null || overlay == null || !box.hasSize || !overlay.hasSize) {
+      return;
+    }
+    final itemTopLeft = overlay.globalToLocal(box.localToGlobal(Offset.zero));
+    final itemBottomRight = overlay.globalToLocal(
+      box.localToGlobal(box.size.bottomRight(Offset.zero)),
+    );
+    const margin = _SerlinkContextMenuState._screenMargin;
+    final width = math.min(
+      widget.width,
+      math.max(0.0, overlay.size.width - margin * 2),
+    );
+    final height = math.min(
+      action.children.length * _SerlinkContextMenuState._rowHeight + 12,
+      math.max(
+        _SerlinkContextMenuState._rowHeight,
+        overlay.size.height - margin * 2,
+      ),
+    );
+    var left = widget.left + widget.width - 2;
+    if (left + width + margin > overlay.size.width) {
+      left = widget.left - width + 2;
+    }
+    left = left.clamp(
+      margin,
+      math.max(margin, overlay.size.width - width - margin),
+    );
+    final top = (itemTopLeft.dy - 6).clamp(
+      margin,
+      math.max(margin, overlay.size.height - height - margin),
+    );
+    final rect = Rect.fromLTWH(left, top.toDouble(), width, height);
+    // Keep the branch tied to its actual row even when the root is scrollable.
+    if (itemBottomRight.dy < widget.top ||
+        itemTopLeft.dy > widget.top + widget.maxHeight) {
+      return;
+    }
+    setState(() {
+      _submenu = action;
+      _submenuRect = rect;
+    });
+    widget.onSubmenuRectChanged(rect);
+  }
+
+  Widget _panel(List<SerlinkMenuAction> actions, {required bool root}) {
     final t = context.tokens;
-    return Positioned(
-      left: left,
-      top: top,
-      width: width,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: t.surfaceRaised,
-            borderRadius: SerlinkRadii.control,
-            boxShadow: serlinkShadow(t, elevation: 12),
-          ),
-          child: ClipRRect(
-            borderRadius: SerlinkRadii.control,
-            child: SerlinkScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final action in actions)
-                    _SerlinkContextMenuItem(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.surfaceRaised,
+        borderRadius: SerlinkRadii.control,
+        boxShadow: serlinkShadow(t, elevation: 12),
+      ),
+      child: ClipRRect(
+        borderRadius: SerlinkRadii.control,
+        child: NotificationListener<ScrollUpdateNotification>(
+          onNotification: (_) {
+            if (root && _submenu != null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _closeSubmenu();
+              });
+            }
+            return false;
+          },
+          child: SerlinkScrollView(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final action in actions)
+                  Builder(
+                    builder: (itemContext) => _SerlinkContextMenuItem(
                       action: action,
-                      onSelected: () {
-                        onDismiss();
-                        action.onPressed();
-                      },
+                      active: identical(action, _submenu),
+                      onHover: root
+                          ? () => _hoverAction(action, itemContext)
+                          : null,
+                      onSelected: action.children.isNotEmpty
+                          ? () => _openSubmenu(action, itemContext)
+                          : action.onPressed == null
+                          ? null
+                          : () {
+                              widget.onDismiss();
+                              action.onPressed!();
+                            },
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final submenu = _submenu;
+    final submenuRect = _submenuRect;
+    return Focus(
+      focusNode: _focusNode,
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          if (_submenu == null) {
+            widget.onDismiss();
+          } else {
+            _closeSubmenu();
+          }
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Stack(
+        children: [
+          Positioned(
+            left: widget.left,
+            top: widget.top,
+            width: widget.width,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: widget.maxHeight),
+              child: _panel(widget.actions, root: true),
+            ),
+          ),
+          if (submenu != null && submenuRect != null)
+            Positioned.fromRect(
+              rect: submenuRect,
+              child: MouseRegion(
+                onEnter: (_) => _closeSubmenuTimer?.cancel(),
+                child: _panel(submenu.children, root: false),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -742,10 +914,14 @@ class _SerlinkContextMenuItem extends StatefulWidget {
   const _SerlinkContextMenuItem({
     required this.action,
     required this.onSelected,
+    this.onHover,
+    this.active = false,
   });
 
   final SerlinkMenuAction action;
-  final VoidCallback onSelected;
+  final VoidCallback? onSelected;
+  final VoidCallback? onHover;
+  final bool active;
 
   @override
   State<_SerlinkContextMenuItem> createState() =>
@@ -761,8 +937,13 @@ class _SerlinkContextMenuItemState extends State<_SerlinkContextMenuItem> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
+        cursor: widget.onSelected == null
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.click,
+        onEnter: (_) {
+          setState(() => _hovered = true);
+          widget.onHover?.call();
+        },
         onExit: (_) => setState(() => _hovered = false),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -773,7 +954,7 @@ class _SerlinkContextMenuItemState extends State<_SerlinkContextMenuItem> {
             height: _SerlinkContextMenuState._rowHeight,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              color: _hovered
+              color: (_hovered && widget.onSelected != null) || widget.active
                   ? t.accentPrimary.withValues(alpha: 0.08)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(7),
@@ -790,11 +971,17 @@ class _SerlinkContextMenuItemState extends State<_SerlinkContextMenuItem> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: t.textPrimary,
+                      color: widget.onSelected == null
+                          ? t.textMuted
+                          : t.textPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+                if (widget.action.children.isNotEmpty)
+                  Icon(Icons.chevron_right, size: 16, color: t.textSecondary)
+                else if (widget.action.checked)
+                  Icon(Icons.check, size: 16, color: t.textMuted),
               ],
             ),
           ),

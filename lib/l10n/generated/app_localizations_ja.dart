@@ -1114,6 +1114,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostGroupNew => '新しいグループ…';
 
   @override
+  String get hostGroupAddToMenu => 'グループに追加…';
+
+  @override
   String get hostGroupNewHint => 'グループ名';
 
   @override

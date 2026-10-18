@@ -628,6 +628,7 @@
   "hostGroupLabel": "Group",
   "hostGroupNone": "No group",
   "hostGroupNew": "New group…",
+  "hostGroupAddToMenu": "Add to group…",
   "hostGroupNewHint": "Group name",
   "hostGroupCreateTitle": "New Group",
   "hostGroupNameRequired": "Enter a valid group name.",

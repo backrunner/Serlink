@@ -9,6 +9,8 @@ class _HostRow extends StatelessWidget {
     required this.onEdit,
     required this.onDuplicate,
     required this.onDelete,
+    required this.groupNames,
+    required this.onMoveToGroup,
   });
 
   final bool mobile;
@@ -18,13 +20,16 @@ class _HostRow extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDuplicate;
   final VoidCallback onDelete;
+  final List<String> groupNames;
+  final ValueChanged<String?> onMoveToGroup;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final t = context.tokens;
     final subtitle = '${host.username}@${host.hostname}:${host.port}';
-    final row = ListRow(
+    Widget buildRow(bool active) => ListRow(
+      selected: active,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
@@ -157,7 +162,7 @@ class _HostRow extends StatelessWidget {
             danger: true,
           ),
         ],
-        child: row,
+        child: buildRow(false),
       );
     }
 
@@ -174,12 +179,35 @@ class _HostRow extends StatelessWidget {
           onPressed: onDuplicate,
         ),
         SerlinkMenuAction(
+          label: l10n.hostGroupAddToMenu,
+          icon: Icons.drive_file_move_outlined,
+          children: [
+            for (final group in groupNames)
+              SerlinkMenuAction(
+                label: group,
+                icon: Icons.folder_outlined,
+                checked: host.groupId == group,
+                onPressed: host.groupId == group
+                    ? null
+                    : () => onMoveToGroup(group),
+              ),
+            SerlinkMenuAction(
+              label: l10n.hostsUngroupedGroup,
+              icon: Icons.folder_off_outlined,
+              checked: host.groupId == null,
+              onPressed: host.groupId == null
+                  ? null
+                  : () => onMoveToGroup(null),
+            ),
+          ],
+        ),
+        SerlinkMenuAction(
           label: l10n.hostDeleteMenu,
           icon: Icons.delete_outline,
           onPressed: onDelete,
         ),
       ],
-      child: row,
+      builder: (context, active) => buildRow(active),
     );
   }
 }

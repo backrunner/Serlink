@@ -1100,6 +1100,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostGroupNew => '新建分组…';
 
   @override
+  String get hostGroupAddToMenu => '添加到分组…';
+
+  @override
   String get hostGroupNewHint => '分组名称';
 
   @override

@@ -334,6 +334,7 @@
   "hostGroupLabel": "分组",
   "hostGroupNone": "不分组",
   "hostGroupNew": "新建分组…",
+  "hostGroupAddToMenu": "添加到分组…",
   "hostGroupNewHint": "分组名称",
   "hostGroupCreateTitle": "新建分组",
   "hostGroupNameRequired": "请输入有效的分组名称。",

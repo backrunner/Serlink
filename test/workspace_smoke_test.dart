@@ -712,7 +712,7 @@ void main() {
     );
     await tester.tap(find.widgetWithText(SerlinkFilledButton, 'Apply'));
     await tester.pumpAndSettle();
-    expect(find.text('rwx------'), findsOneWidget);
+    expect(find.textContaining('rwx------'), findsOneWidget);
 
     await tester.tap(_byTooltipLabel('Move').first);
     await tester.pumpAndSettle();
@@ -2193,7 +2193,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('app.env'), findsOneWidget);
-    expect(find.text('rw-r-----'), findsOneWidget);
+    expect(find.textContaining('rw-r-----'), findsOneWidget);
     final listRect = tester.getRect(
       find.byKey(const ValueKey('sftp-entry-list')),
     );

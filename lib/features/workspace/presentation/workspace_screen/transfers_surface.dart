@@ -649,7 +649,7 @@ String _sftpEntryMetadataLabel(SftpEntry entry) {
   final ownerGroup = _ownerGroupLabel(entry);
   final parts = [
     if (entry.modifiedAt case final modifiedAt?)
-      _shortLocalDateTime(modifiedAt),
+      _shortLocalDateTime(modifiedAt).replaceFirst('T', ' '),
     ?ownerGroup,
   ];
   return parts.join(' · ');

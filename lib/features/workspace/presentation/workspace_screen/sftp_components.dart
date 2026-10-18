@@ -347,6 +347,8 @@ class _CompactSftpEntryRow extends StatelessWidget {
     final l10n = context.l10n;
     final t = context.tokens;
     final metadataParts = [
+      typeLabel,
+      if (permissionsLabel.isNotEmpty) permissionsLabel,
       if (sizeLabel.isNotEmpty) sizeLabel,
       if (metadataLabel.isNotEmpty) metadataLabel,
     ];
@@ -374,33 +376,12 @@ class _CompactSftpEntryRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      typeLabel,
-                      style: Theme.of(context).textTheme.bodySmall
-                          ?.copyWith(color: t.textSecondary),
-                    ),
-                    if (permissionsLabel.isNotEmpty)
-                      Text(
-                        permissionsLabel,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: t.textSecondary,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    for (final part in metadataParts)
-                      Text(
-                        part,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: t.textSecondary),
-                      ),
-                  ],
+                Text(
+                  metadataParts.join(' · '),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: t.textSecondary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ],
             ),

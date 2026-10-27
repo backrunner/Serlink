@@ -452,11 +452,13 @@ class _SettingsAboutFooter extends StatelessWidget {
                     color: t.textSecondary,
                   ),
                 ),
-                Text(
-                  _settingsAppVersionLabel(l10n, packageInfo),
-                  key: const ValueKey('settings-about-version-label'),
-                  style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(color: t.textMuted),
+                DemoEntry(
+                  child: Text(
+                    _settingsAppVersionLabel(l10n, packageInfo),
+                    key: const ValueKey('settings-about-version-label'),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: t.textMuted),
+                  ),
                 ),
               ],
             ),

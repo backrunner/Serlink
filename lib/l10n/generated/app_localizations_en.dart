@@ -1239,6 +1239,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostImportPrivateKeyTooltip => 'Import private key';
 
   @override
+  String get credentialImportPrivateKeyAction => 'Import from file';
+
+  @override
+  String get credentialPrivateKeyFileHint =>
+      'Choose a private key file to keep it out of the clipboard.';
+
+  @override
+  String get credentialPrivateKeyLoaded => 'Private key loaded';
+
+  @override
+  String get credentialPastePrivateKeyAction => 'Enter or paste manually';
+
+  @override
+  String get credentialHidePrivateKeyInputAction => 'Hide private key input';
+
+  @override
+  String get credentialPrivateKeyImportFailed =>
+      'Could not read the private key file. Choose a non-empty UTF-8 text file.';
+
+  @override
   String get hostKeyPassphraseLabel => 'Key passphrase';
 
   @override
@@ -1292,6 +1312,108 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hostSshAgentNote =>
       'Private keys stay in your SSH agent. Use the system agent or enter a compatible agent endpoint.';
+
+  @override
+  String get agentProviderOptionsTooltip => 'SSH agent options';
+
+  @override
+  String get agentProviderLabel => 'SSH Agent';
+
+  @override
+  String get agentChooseProviderHint =>
+      'Find and choose an available local SSH agent';
+
+  @override
+  String get agentManualEndpointAction => 'Use a custom endpoint';
+
+  @override
+  String get agentHideEndpointAction => 'Hide custom endpoint';
+
+  @override
+  String get agentRefreshProvidersAction => 'Search again';
+
+  @override
+  String get agentFindEndpointAction => 'Find SSH agents';
+
+  @override
+  String get agentChooseEndpointTitle => 'Choose SSH agent';
+
+  @override
+  String get agentSystemTitle => 'System agent';
+
+  @override
+  String get agentLocalTitle => 'Local agent';
+
+  @override
+  String get agentDiscoveryEmptyMessage =>
+      'No SSH agent was found. Start a compatible agent, or enter its endpoint manually.';
+
+  @override
+  String agentDiscoveredKeysCount(int count) {
+    return '$count keys';
+  }
+
+  @override
+  String get sshAuthAgentAmbiguousMessage =>
+      'Multiple SSH agents are available. Choose a key or an agent endpoint in the credential settings.';
+
+  @override
+  String get agentAuthenticationKeyLabel => 'Authentication key';
+
+  @override
+  String get agentAllKeysTitle => 'All available keys';
+
+  @override
+  String get agentAllKeysDescription =>
+      'The agent provides available keys when connecting.';
+
+  @override
+  String get agentChooseKeyAction => 'Choose key';
+
+  @override
+  String get agentChangeKeyAction => 'Change key';
+
+  @override
+  String get agentKeyOptionsTooltip => 'More key options';
+
+  @override
+  String get agentEnterPublicKeyAction => 'Enter public key manually';
+
+  @override
+  String get agentHidePublicKeyInputAction => 'Hide public key input';
+
+  @override
+  String get agentSelectKeyAction => 'Select key from agent';
+
+  @override
+  String get agentPublicKeySelected => 'Public key selected';
+
+  @override
+  String get agentUseAllKeysAction => 'Use all agent keys';
+
+  @override
+  String get agentSocketLabel => 'Agent endpoint (optional)';
+
+  @override
+  String get agentSocketHint => 'Unix socket path or local OpenSSH named pipe';
+
+  @override
+  String get agentPublicKeyLabel => 'Public key (optional)';
+
+  @override
+  String get agentPublicKeyHint =>
+      'Choose a public key to use only its matching key in the agent.';
+
+  @override
+  String get agentImportPublicKeyAction => 'Select public key file';
+
+  @override
+  String get agentPublicKeyImportFailed =>
+      'Could not read a public key from this file.';
+
+  @override
+  String get agentHardwareKeyNote =>
+      'First load your hardware key into a compatible SSH agent (OpenSSH FIDO2 or smart card / PKCS#11). The agent handles device access, touch and PIN prompts.';
 
   @override
   String get hostNoSavedCredentials =>
@@ -3186,128 +3308,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not save protection settings. Please retry.';
 
   @override
-  String get credentialImportPrivateKeyAction => 'Import from file';
-
-  @override
-  String get credentialPrivateKeyFileHint =>
-      'Choose a private key file to keep it out of the clipboard.';
-
-  @override
-  String get credentialPrivateKeyLoaded => 'Private key loaded';
-
-  @override
-  String get credentialPastePrivateKeyAction => 'Enter or paste manually';
-
-  @override
-  String get credentialHidePrivateKeyInputAction => 'Hide private key input';
-
-  @override
-  String get credentialPrivateKeyImportFailed =>
-      'Could not read the private key file. Choose a non-empty UTF-8 text file.';
-
-  @override
-  String get agentProviderOptionsTooltip => 'SSH agent options';
-
-  @override
-  String get agentProviderLabel => 'SSH Agent';
-
-  @override
-  String get agentChooseProviderHint =>
-      'Find and choose an available local SSH agent';
-
-  @override
-  String get agentManualEndpointAction => 'Use a custom endpoint';
-
-  @override
-  String get agentHideEndpointAction => 'Hide custom endpoint';
-
-  @override
-  String get agentRefreshProvidersAction => 'Search again';
-
-  @override
-  String get agentFindEndpointAction => 'Find SSH agents';
-
-  @override
-  String get agentChooseEndpointTitle => 'Choose SSH agent';
-
-  @override
-  String get agentSystemTitle => 'System agent';
-
-  @override
-  String get agentLocalTitle => 'Local agent';
-
-  @override
-  String get agentDiscoveryEmptyMessage =>
-      'No SSH agent was found. Start a compatible agent, or enter its endpoint manually.';
-
-  @override
-  String agentDiscoveredKeysCount(int count) {
-    return '$count keys';
-  }
-
-  @override
-  String get sshAuthAgentAmbiguousMessage =>
-      'Multiple SSH agents are available. Choose a key or an agent endpoint in the credential settings.';
-
-  @override
-  String get agentAuthenticationKeyLabel => 'Authentication key';
-
-  @override
-  String get agentAllKeysTitle => 'All available keys';
-
-  @override
-  String get agentAllKeysDescription =>
-      'The agent provides available keys when connecting.';
-
-  @override
-  String get agentChooseKeyAction => 'Choose key';
-
-  @override
-  String get agentChangeKeyAction => 'Change key';
-
-  @override
-  String get agentKeyOptionsTooltip => 'More key options';
-
-  @override
-  String get agentEnterPublicKeyAction => 'Enter public key manually';
-
-  @override
-  String get agentHidePublicKeyInputAction => 'Hide public key input';
-
-  @override
-  String get agentSelectKeyAction => 'Select key from agent';
-
-  @override
-  String get agentPublicKeySelected => 'Public key selected';
-
-  @override
-  String get agentUseAllKeysAction => 'Use all agent keys';
-
-  @override
-  String get agentSocketLabel => 'Agent endpoint (optional)';
-
-  @override
-  String get agentSocketHint => 'Unix socket path or local OpenSSH named pipe';
-
-  @override
-  String get agentPublicKeyLabel => 'Public key (optional)';
-
-  @override
-  String get agentPublicKeyHint =>
-      'Choose a public key to use only its matching key in the agent.';
-
-  @override
-  String get agentImportPublicKeyAction => 'Select public key file';
-
-  @override
-  String get agentPublicKeyImportFailed =>
-      'Could not read a public key from this file.';
-
-  @override
-  String get agentHardwareKeyNote =>
-      'First load your hardware key into a compatible SSH agent (OpenSSH FIDO2 or smart card / PKCS#11). The agent handles device access, touch and PIN prompts.';
-
-  @override
   String get settingsMcpStrictPrivacy => 'Strict host privacy';
 
   @override
@@ -3317,6 +3317,26 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsMcpPrivacyUnavailable =>
       'Host privacy settings are unavailable. Host metadata access is blocked.';
+
+  @override
+  String get demoBanner => 'Demo mode: simulated terminal and remote files';
+
+  @override
+  String get demoGuideTitle => 'Demo help';
+
+  @override
+  String get demoGuide =>
+      'Open Review Sandbox from Hosts, then explore Terminal and SFTP. Try help, ls, cat README.txt, mkdir and echo. SFTP edits share the simulated filesystem with the terminal. Native file pickers allow actual upload/download of disposable local files. Hosts, Snippets, Transfers and Credentials contain example data.\n\nReset restores the examples. Exit discards this demo workspace and returns to your own vault.\n\nFor real SSH/SFTP and port forwarding, exit this demo, create or unlock a local vault, add a password credential and host using the private connection details in App Review Information, verify the supplied SSH host-key fingerprint, then connect. Cloud sync and MCP use normal mode; the offline demo does not contact those services.';
+
+  @override
+  String get demoReset => 'Reset demo';
+
+  @override
+  String get demoExit => 'Exit demo';
+
+  @override
+  String get demoLoadFailed =>
+      'Could not prepare the demo. Reset to try again.';
 
   @override
   String get mcpApprovalReviewDetails =>

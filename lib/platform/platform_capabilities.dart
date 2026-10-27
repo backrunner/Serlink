@@ -37,6 +37,8 @@ class PlatformCapabilities {
   final TargetPlatform targetPlatform;
   final SerlinkDistribution distribution;
 
+  bool get isDemo => false;
+
   bool get isAppStoreDistribution =>
       distribution == SerlinkDistribution.appStore;
 

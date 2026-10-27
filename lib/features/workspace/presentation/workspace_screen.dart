@@ -27,6 +27,7 @@ import '../../../l10n/l10n.dart';
 import '../../../platform/app_window.dart';
 import '../../../platform/ios_native_tab_bar.dart';
 import '../../../platform/platform_capabilities.dart';
+import '../../demo/demo_entry.dart';
 import '../../hosts/application/host_store.dart';
 import '../../hosts/application/host_group_repository.dart';
 import '../../hosts/application/host_write_service.dart';

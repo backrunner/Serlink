@@ -865,6 +865,7 @@ final syncSettingsServiceProvider = Provider<SyncSettingsService>((ref) {
     cloudKitSettings: ref.watch(cloudKitSyncSettingsRepositoryProvider),
     secrets: ref.watch(secretStoreProvider),
     cloudKitAvailable: ref.watch(platformCapabilitiesProvider).cloudKitSync,
+    networkEnabled: !ref.watch(platformCapabilitiesProvider).isDemo,
   );
 });
 

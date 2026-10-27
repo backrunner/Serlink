@@ -80,7 +80,9 @@ class _NativeTerminationGuardState
   @override
   void initState() {
     super.initState();
-    AppWindow.setTerminateRequestHandler(_confirmTermination);
+    if (!ref.read(platformCapabilitiesProvider).isDemo) {
+      AppWindow.setTerminateRequestHandler(_confirmTermination);
+    }
   }
 
   // The handler is intentionally not cleared in dispose: the native side may

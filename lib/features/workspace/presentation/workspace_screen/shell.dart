@@ -29,7 +29,8 @@ class WorkspaceScreen extends ConsumerWidget {
     if (capabilities.prefersMobileWorkspaceShell) {
       return const MobileWorkspaceScreen();
     }
-    final showTopBar = AppWindow.usesTrailingWindowControls;
+    final showTopBar =
+        AppWindow.usesTrailingWindowControls && !capabilities.isDemo;
 
     return _NativeTerminationGuard(
       child: _SshConfigImportPromptGate(
@@ -148,11 +149,17 @@ class _Sidebar extends StatelessWidget {
   }
 }
 
-class _BrandHeader extends StatelessWidget {
+class _BrandHeader extends ConsumerWidget {
   const _BrandHeader();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(platformCapabilitiesProvider).isDemo) {
+      return const SizedBox(
+        height: SerlinkSizes.toolbarHeight,
+        child: _WindowDragRegion(),
+      );
+    }
     final content = AppWindow.usesMacStyleChrome
         ? SizedBox(
             height: SerlinkSizes.toolbarHeight,

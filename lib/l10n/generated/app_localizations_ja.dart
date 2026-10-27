@@ -1159,6 +1159,26 @@ class AppLocalizationsJa extends AppLocalizations {
   String get hostImportPrivateKeyTooltip => '秘密鍵をインポート';
 
   @override
+  String get credentialImportPrivateKeyAction => 'ファイルからインポート';
+
+  @override
+  String get credentialPrivateKeyFileHint =>
+      '秘密鍵をクリップボードに残さないよう、ファイルを選択してください。';
+
+  @override
+  String get credentialPrivateKeyLoaded => '秘密鍵を読み込みました';
+
+  @override
+  String get credentialPastePrivateKeyAction => '手入力・貼り付け';
+
+  @override
+  String get credentialHidePrivateKeyInputAction => '秘密鍵の入力欄を閉じる';
+
+  @override
+  String get credentialPrivateKeyImportFailed =>
+      '秘密鍵ファイルを読み込めませんでした。空でない UTF-8 テキストファイルを選択してください。';
+
+  @override
   String get hostKeyPassphraseLabel => '鍵のパスフレーズ';
 
   @override
@@ -1210,6 +1230,104 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get hostSshAgentNote =>
       '秘密鍵は SSH Agent に保持されます。システムの Agent、または互換 Agent の接続先を指定できます。';
+
+  @override
+  String get agentProviderOptionsTooltip => 'SSH Agent の設定';
+
+  @override
+  String get agentProviderLabel => 'SSH Agent';
+
+  @override
+  String get agentChooseProviderHint => '利用可能なローカル SSH Agent を検索して選択';
+
+  @override
+  String get agentManualEndpointAction => 'カスタム接続先を使用';
+
+  @override
+  String get agentHideEndpointAction => 'カスタム接続先を閉じる';
+
+  @override
+  String get agentRefreshProvidersAction => '再検索';
+
+  @override
+  String get agentFindEndpointAction => 'SSH Agent を自動検索';
+
+  @override
+  String get agentChooseEndpointTitle => 'SSH Agent を選択';
+
+  @override
+  String get agentSystemTitle => 'システム Agent';
+
+  @override
+  String get agentLocalTitle => 'ローカル Agent';
+
+  @override
+  String get agentDiscoveryEmptyMessage =>
+      'SSH Agent が見つかりません。互換 Agent を起動するか、接続先を手入力してください。';
+
+  @override
+  String agentDiscoveredKeysCount(int count) {
+    return '鍵 $count 個';
+  }
+
+  @override
+  String get sshAuthAgentAmbiguousMessage =>
+      '複数の SSH Agent が利用可能です。資格情報の設定で鍵または Agent 接続先を選択してください。';
+
+  @override
+  String get agentAuthenticationKeyLabel => '認証に使う鍵';
+
+  @override
+  String get agentAllKeysTitle => '利用可能なすべての鍵';
+
+  @override
+  String get agentAllKeysDescription => '接続時に Agent が提供する鍵を使用します。';
+
+  @override
+  String get agentChooseKeyAction => '鍵を選択';
+
+  @override
+  String get agentChangeKeyAction => '鍵を変更';
+
+  @override
+  String get agentKeyOptionsTooltip => 'その他の鍵の操作';
+
+  @override
+  String get agentEnterPublicKeyAction => '公開鍵を手入力';
+
+  @override
+  String get agentHidePublicKeyInputAction => '公開鍵の入力欄を閉じる';
+
+  @override
+  String get agentSelectKeyAction => 'Agent から鍵を選択';
+
+  @override
+  String get agentPublicKeySelected => '公開鍵を選択済み';
+
+  @override
+  String get agentUseAllKeysAction => 'Agent のすべての鍵を使用';
+
+  @override
+  String get agentSocketLabel => 'Agent 接続先（任意）';
+
+  @override
+  String get agentSocketHint => 'Unix ソケットパスまたはローカル OpenSSH 名前付きパイプ';
+
+  @override
+  String get agentPublicKeyLabel => '公開鍵（任意）';
+
+  @override
+  String get agentPublicKeyHint => '公開鍵を選択すると、Agent 内の一致する鍵のみを使用します。';
+
+  @override
+  String get agentImportPublicKeyAction => '公開鍵ファイルを選択';
+
+  @override
+  String get agentPublicKeyImportFailed => 'このファイルから公開鍵を読み込めませんでした。';
+
+  @override
+  String get agentHardwareKeyNote =>
+      'ハードウェア鍵を互換 SSH Agent に読み込んでください（OpenSSH FIDO2 またはスマートカード / PKCS#11）。デバイスへのアクセス、タッチ、PIN 認証は Agent が処理します。';
 
   @override
   String get hostNoSavedCredentials => '保存済みの認証情報はまだありません。';
@@ -3009,124 +3127,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsMcpGuardSaveFailed => '保護設定を保存できませんでした。再試行してください。';
 
   @override
-  String get credentialImportPrivateKeyAction => 'ファイルからインポート';
-
-  @override
-  String get credentialPrivateKeyFileHint =>
-      '秘密鍵をクリップボードに残さないよう、ファイルを選択してください。';
-
-  @override
-  String get credentialPrivateKeyLoaded => '秘密鍵を読み込みました';
-
-  @override
-  String get credentialPastePrivateKeyAction => '手入力・貼り付け';
-
-  @override
-  String get credentialHidePrivateKeyInputAction => '秘密鍵の入力欄を閉じる';
-
-  @override
-  String get credentialPrivateKeyImportFailed =>
-      '秘密鍵ファイルを読み込めませんでした。空でない UTF-8 テキストファイルを選択してください。';
-
-  @override
-  String get agentProviderOptionsTooltip => 'SSH Agent の設定';
-
-  @override
-  String get agentProviderLabel => 'SSH Agent';
-
-  @override
-  String get agentChooseProviderHint => '利用可能なローカル SSH Agent を検索して選択';
-
-  @override
-  String get agentManualEndpointAction => 'カスタム接続先を使用';
-
-  @override
-  String get agentHideEndpointAction => 'カスタム接続先を閉じる';
-
-  @override
-  String get agentRefreshProvidersAction => '再検索';
-
-  @override
-  String get agentFindEndpointAction => 'SSH Agent を自動検索';
-
-  @override
-  String get agentChooseEndpointTitle => 'SSH Agent を選択';
-
-  @override
-  String get agentSystemTitle => 'システム Agent';
-
-  @override
-  String get agentLocalTitle => 'ローカル Agent';
-
-  @override
-  String get agentDiscoveryEmptyMessage =>
-      'SSH Agent が見つかりません。互換 Agent を起動するか、接続先を手入力してください。';
-
-  @override
-  String agentDiscoveredKeysCount(int count) {
-    return '鍵 $count 個';
-  }
-
-  @override
-  String get sshAuthAgentAmbiguousMessage =>
-      '複数の SSH Agent が利用可能です。資格情報の設定で鍵または Agent 接続先を選択してください。';
-
-  @override
-  String get agentAuthenticationKeyLabel => '認証に使う鍵';
-
-  @override
-  String get agentAllKeysTitle => '利用可能なすべての鍵';
-
-  @override
-  String get agentAllKeysDescription => '接続時に Agent が提供する鍵を使用します。';
-
-  @override
-  String get agentChooseKeyAction => '鍵を選択';
-
-  @override
-  String get agentChangeKeyAction => '鍵を変更';
-
-  @override
-  String get agentKeyOptionsTooltip => 'その他の鍵の操作';
-
-  @override
-  String get agentEnterPublicKeyAction => '公開鍵を手入力';
-
-  @override
-  String get agentHidePublicKeyInputAction => '公開鍵の入力欄を閉じる';
-
-  @override
-  String get agentSelectKeyAction => 'Agent から鍵を選択';
-
-  @override
-  String get agentPublicKeySelected => '公開鍵を選択済み';
-
-  @override
-  String get agentUseAllKeysAction => 'Agent のすべての鍵を使用';
-
-  @override
-  String get agentSocketLabel => 'Agent 接続先（任意）';
-
-  @override
-  String get agentSocketHint => 'Unix ソケットパスまたはローカル OpenSSH 名前付きパイプ';
-
-  @override
-  String get agentPublicKeyLabel => '公開鍵（任意）';
-
-  @override
-  String get agentPublicKeyHint => '公開鍵を選択すると、Agent 内の一致する鍵のみを使用します。';
-
-  @override
-  String get agentImportPublicKeyAction => '公開鍵ファイルを選択';
-
-  @override
-  String get agentPublicKeyImportFailed => 'このファイルから公開鍵を読み込めませんでした。';
-
-  @override
-  String get agentHardwareKeyNote =>
-      'ハードウェア鍵を互換 SSH Agent に読み込んでください（OpenSSH FIDO2 またはスマートカード / PKCS#11）。デバイスへのアクセス、タッチ、PIN 認証は Agent が処理します。';
-
-  @override
   String get settingsMcpStrictPrivacy => '厳格なホストプライバシー';
 
   @override
@@ -3136,6 +3136,25 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get settingsMcpPrivacyUnavailable =>
       'プライバシー設定を取得できないため、ホスト情報へのアクセスを停止しました。';
+
+  @override
+  String get demoBanner => 'デモモード（ターミナルとリモートファイルは仮想です）';
+
+  @override
+  String get demoGuideTitle => 'デモの使い方';
+
+  @override
+  String get demoGuide =>
+      'ホスト画面で Review Sandbox を開き、端末と SFTP をお試しください。help、ls、cat README.txt、mkdir、echo などを実行できます。端末と SFTP は同じ仮想ファイルを使用します。システムのファイル選択画面で使い捨てのローカルファイルを実際に転送できます。ホスト、スニペット、転送、認証情報にはサンプルがあります。\n\nリセットでサンプルを復元し、終了するとデモの変更を破棄して元の保管庫に戻ります。\n\n実際の SSH、SFTP、ポート転送はデモを終了し、ローカル保管庫を作成または解除して、App Review Information に非公開で提供した情報でパスワード認証情報とホストを追加してください。SSH ホスト鍵の指紋を照合して接続してください。クラウド同期と MCP は通常モードで使用します。オフラインデモはこれらのサービスに接続しません。';
+
+  @override
+  String get demoReset => 'デモをリセット';
+
+  @override
+  String get demoExit => 'デモを終了';
+
+  @override
+  String get demoLoadFailed => 'デモを準備できませんでした。リセットしてお試しください。';
 
   @override
   String get mcpApprovalReviewDetails => 'Serlink でコマンド全体を確認してください。';

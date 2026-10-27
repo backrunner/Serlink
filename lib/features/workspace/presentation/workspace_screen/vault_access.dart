@@ -137,7 +137,9 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _VaultLockBadge(initializing: isInitializing),
+                  DemoEntry(
+                    child: _VaultLockBadge(initializing: isInitializing),
+                  ),
                   const SizedBox(height: 22),
                   Text(
                     isInitializing
@@ -155,10 +157,8 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                         ? l10n.vaultCreateSubtitle
                         : l10n.vaultUnlockSubtitle,
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: t.textSecondary,
-                      height: 1.4,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: t.textSecondary, height: 1.4),
                   ),
                   const SizedBox(height: 24),
                   SerlinkTextField(
@@ -176,7 +176,9 @@ class _VaultAccessSurfaceState extends ConsumerState<_VaultAccessSurface>
                           : l10n.vaultPassphraseLabel,
                       prefixIcon: const Icon(Icons.lock_outline, size: 19),
                       suffixIcon: SerlinkIconButton(
-                        key: const ValueKey('vault-passphrase-visibility-toggle'),
+                        key: const ValueKey(
+                          'vault-passphrase-visibility-toggle',
+                        ),
                         tooltip: _passphraseVisible
                             ? l10n.hostHidePasswordTooltip
                             : l10n.hostShowPasswordTooltip,
@@ -442,10 +444,8 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
                 Text(
                   body,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: t.textSecondary,
-                    height: 1.4,
-                  ),
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: t.textSecondary, height: 1.4),
                 ),
                 const SizedBox(height: 22),
                 if (showQuarantine) ...[
@@ -526,10 +526,8 @@ class _VaultRecoverySurfaceState extends ConsumerState<_VaultRecoverySurface> {
                       padding: const EdgeInsets.only(top: 8),
                       child: SelectableText(
                         detail,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: t.textSecondary,
-                          height: 1.4,
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: t.textSecondary, height: 1.4),
                       ),
                     ),
                 ],

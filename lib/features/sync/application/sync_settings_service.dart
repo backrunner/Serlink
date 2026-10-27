@@ -333,11 +333,13 @@ class SyncSettingsService {
     required CloudKitSyncSettingsRepository cloudKitSettings,
     required SecretStore secrets,
     bool cloudKitAvailable = true,
+    bool networkEnabled = true,
   }) : this._(
          settings,
          cloudKitSettings,
          secrets,
          cloudKitAvailable: cloudKitAvailable,
+         networkEnabled: networkEnabled,
        );
 
   const SyncSettingsService._(
@@ -345,7 +347,19 @@ class SyncSettingsService {
     this._cloudKitSettings,
     this._secrets, {
     this.cloudKitAvailable = true,
+    this.networkEnabled = true,
   });
+
+  final bool networkEnabled;
+
+  void _requireNetwork() {
+    if (!networkEnabled) {
+      throw const SyncSettingsException(
+        'sync.demo_offline',
+        'Cloud sync requires leaving the offline demo.',
+      );
+    }
+  }
 
   static const _webDavPasswordRef = SecretRef('sync:webdav:password');
 
@@ -399,6 +413,7 @@ class SyncSettingsService {
   Future<SyncProvider> buildWebDavProviderFromDraft(
     WebDavSyncSettingsDraft draft,
   ) async {
+    _requireNetwork();
     final existing = await _settings.readWebDav();
     final parsed = _parseWebDavDraft(draft, existing: existing);
     final password = draft.password.isNotEmpty
@@ -463,6 +478,7 @@ class SyncSettingsService {
   }
 
   Future<WebDavSyncProvider> buildWebDavProvider() async {
+    _requireNetwork();
     final settings = await _settings.readWebDav();
     if (settings == null) {
       throw const SyncSettingsException(
@@ -542,6 +558,7 @@ class SyncSettingsService {
   /// Automatic sync uses this as a fan-out list: each provider is pulled into
   /// the local vault and the merged local snapshot is pushed back out.
   Future<List<SyncProvider>> activeSyncProviders() async {
+    if (!networkEnabled) return const [];
     final providers = <SyncProvider>[];
     if (cloudKitAvailable && (await readCloudKit())?.enabled == true) {
       providers.add(CloudKitSyncProvider());

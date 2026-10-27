@@ -14,7 +14,9 @@ import 'app_router.dart';
 import 'app_theme.dart';
 
 class SerlinkApp extends ConsumerWidget {
-  const SerlinkApp({super.key});
+  const SerlinkApp({super.key, this.workspaceBuilder});
+
+  final Widget Function(BuildContext context, Widget child)? workspaceBuilder;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -70,7 +72,8 @@ class SerlinkApp extends ConsumerWidget {
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: router,
       builder: (context, child) {
-        final body = child ?? const SizedBox.shrink();
+        final routedBody = child ?? const SizedBox.shrink();
+        final body = workspaceBuilder?.call(context, routedBody) ?? routedBody;
         final themedBody = FTheme(
           data: foruiTheme,
           platform: capabilities.foruiPlatformVariant,

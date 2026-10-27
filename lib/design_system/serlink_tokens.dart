@@ -23,6 +23,8 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
     required this.accentStrong,
     required this.accentSecondary,
     required this.onAccent,
+    required this.switchTrackOff,
+    required this.switchTrackOn,
     required this.statusSuccess,
     required this.statusWarning,
     required this.statusDanger,
@@ -73,6 +75,11 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
   /// crisp, commercial look.
   final Color onAccent;
 
+  /// Switch tracks stay distinct from both the surrounding surfaces and
+  /// their white thumb, including when the switch is off.
+  final Color switchTrackOff;
+  final Color switchTrackOn;
+
   final Color statusSuccess;
   final Color statusWarning;
   final Color statusDanger;
@@ -105,6 +112,8 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
     accentStrong: Color(0xFF087D73),
     accentSecondary: Color(0xFF22A8E8),
     onAccent: Color(0xFFFFFFFF),
+    switchTrackOff: Color(0xFF74747D),
+    switchTrackOn: Color(0xFF138C80),
     statusSuccess: Color(0xFF3FB950),
     statusWarning: Color(0xFFD29922),
     statusDanger: Color(0xFFF85149),
@@ -129,6 +138,8 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
     accentStrong: Color(0xFF0B7E74),
     accentSecondary: Color(0xFF0EA5E9),
     onAccent: Color(0xFFFFFFFF),
+    switchTrackOff: Color(0xFF76767F),
+    switchTrackOn: Color(0xFF0B7E74),
     statusSuccess: Color(0xFF1A7F37),
     statusWarning: Color(0xFF9A6700),
     statusDanger: Color(0xFFCF222E),
@@ -154,6 +165,8 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
     Color? accentStrong,
     Color? accentSecondary,
     Color? onAccent,
+    Color? switchTrackOff,
+    Color? switchTrackOn,
     Color? statusSuccess,
     Color? statusWarning,
     Color? statusDanger,
@@ -178,6 +191,8 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
       accentStrong: accentStrong ?? this.accentStrong,
       accentSecondary: accentSecondary ?? this.accentSecondary,
       onAccent: onAccent ?? this.onAccent,
+      switchTrackOff: switchTrackOff ?? this.switchTrackOff,
+      switchTrackOn: switchTrackOn ?? this.switchTrackOn,
       statusSuccess: statusSuccess ?? this.statusSuccess,
       statusWarning: statusWarning ?? this.statusWarning,
       statusDanger: statusDanger ?? this.statusDanger,
@@ -209,6 +224,8 @@ class SerlinkTokens extends ThemeExtension<SerlinkTokens> {
       accentStrong: Color.lerp(accentStrong, other.accentStrong, t)!,
       accentSecondary: Color.lerp(accentSecondary, other.accentSecondary, t)!,
       onAccent: Color.lerp(onAccent, other.onAccent, t)!,
+      switchTrackOff: Color.lerp(switchTrackOff, other.switchTrackOff, t)!,
+      switchTrackOn: Color.lerp(switchTrackOn, other.switchTrackOn, t)!,
       statusSuccess: Color.lerp(statusSuccess, other.statusSuccess, t)!,
       statusWarning: Color.lerp(statusWarning, other.statusWarning, t)!,
       statusDanger: Color.lerp(statusDanger, other.statusDanger, t)!,

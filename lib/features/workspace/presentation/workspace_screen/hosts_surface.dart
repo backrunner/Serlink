@@ -758,12 +758,15 @@ class _HostGroupHeader extends StatelessWidget {
             Icon(Icons.folder_outlined, size: 16, color: t.textSecondary),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                entry.label,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: t.textPrimary,
-                  fontWeight: FontWeight.w700,
+              child: SerlinkTooltip(
+                message: entry.label,
+                child: Text(
+                  entry.label,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: t.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),

@@ -131,6 +131,17 @@ class SerlinkDialog extends StatelessWidget {
         ),
       );
     }
+    // A single horizontal inset keeps the title, scrolling body and footer
+    // on the same edges, including dialogs with custom vertical spacing.
+    final direction = Directionality.of(context);
+    final inset =
+        titlePadding?.resolve(direction).left ??
+        (MediaQuery.sizeOf(context).width < 600 ? 16.0 : 24.0);
+    EdgeInsets alignedPadding(EdgeInsetsGeometry? value, EdgeInsets fallback) {
+      final resolved = (value ?? fallback).resolve(direction);
+      return EdgeInsets.fromLTRB(inset, resolved.top, inset, resolved.bottom);
+    }
+
     return FDialog(
       style: style,
       clipBehavior: Clip.antiAlias,
@@ -157,8 +168,10 @@ class SerlinkDialog extends StatelessWidget {
             children: [
               if (title != null)
                 Padding(
-                  padding:
-                      titlePadding ?? const EdgeInsets.fromLTRB(24, 22, 24, 0),
+                  padding: alignedPadding(
+                    titlePadding,
+                    const EdgeInsets.fromLTRB(24, 22, 24, 0),
+                  ),
                   child: DefaultTextStyle.merge(
                     style: titleStyle,
                     child: title!,
@@ -167,9 +180,10 @@ class SerlinkDialog extends StatelessWidget {
               if (content != null)
                 Flexible(
                   child: Padding(
-                    padding:
-                        contentPadding ??
-                        const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                    padding: alignedPadding(
+                      contentPadding,
+                      const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                    ),
                     child: DefaultTextStyle.merge(
                       style: bodyStyle,
                       child: ScrollConfiguration(
@@ -182,9 +196,10 @@ class SerlinkDialog extends StatelessWidget {
                 ),
               if (actions.isNotEmpty)
                 Padding(
-                  padding:
-                      actionsPadding ??
-                      const EdgeInsets.fromLTRB(24, 18, 24, 24),
+                  padding: alignedPadding(
+                    actionsPadding,
+                    const EdgeInsets.fromLTRB(24, 18, 24, 24),
+                  ),
                   child: Wrap(
                     alignment: WrapAlignment.end,
                     crossAxisAlignment: WrapCrossAlignment.center,
@@ -433,14 +448,43 @@ class SerlinkIconButton extends StatelessWidget {
 }
 
 class SerlinkTooltip extends StatelessWidget {
-  const SerlinkTooltip({super.key, required this.message, required this.child});
+  const SerlinkTooltip({
+    super.key,
+    required this.message,
+    required this.child,
+    this.preferBelow = false,
+  });
 
   final String message;
   final Widget child;
+  final bool preferBelow;
 
   @override
   Widget build(BuildContext context) {
     return FTooltip(
+      tipAnchor: preferBelow ? Alignment.topLeft : Alignment.bottomCenter,
+      childAnchor: preferBelow ? Alignment.bottomLeft : Alignment.topCenter,
+      arrow: preferBelow ? null : FPortalArrowAlignment.childCenter,
+      style: preferBelow
+          ? FTooltipStyleDelta.delta(
+              constraints: const BoxConstraints(maxWidth: 420),
+              decoration: DecorationDelta.value(
+                BoxDecoration(
+                  color: context.tokens.surfaceRaised,
+                  borderRadius: SerlinkRadii.control,
+                  border: Border.all(color: context.tokens.borderSubtle),
+                  boxShadow: serlinkShadow(context.tokens, elevation: 8),
+                ),
+              ),
+              textStyle: TextStyleDelta.value(
+                (Theme.of(context).textTheme.bodySmall ?? const TextStyle())
+                    .copyWith(color: context.tokens.textPrimary),
+              ),
+              padding: const EdgeInsetsDelta.value(
+                EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            )
+          : const FTooltipStyleDelta.context(),
       tipBuilder: (context, _) => Text(message),
       child: Semantics(label: message, child: child),
     );
@@ -1482,7 +1526,9 @@ class SerlinkSwitch extends StatelessWidget {
           child: CupertinoSwitch(
             value: value,
             onChanged: onChanged,
-            activeTrackColor: context.tokens.accentStrong,
+            activeTrackColor: context.tokens.switchTrackOn,
+            inactiveTrackColor: context.tokens.switchTrackOff,
+            thumbColor: context.tokens.onAccent,
           ),
         ),
       );

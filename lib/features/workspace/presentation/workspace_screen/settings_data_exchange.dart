@@ -89,7 +89,7 @@ class _DataExchangeDialog extends StatelessWidget {
         constraints: const BoxConstraints(maxHeight: 720),
         child: SerlinkScrollView(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 4, 24, 18),
+            padding: const EdgeInsets.only(top: 4, bottom: 18),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -277,7 +277,7 @@ class _DialogScrollFrame extends StatelessWidget {
           physics: Theme.of(context).platform == TargetPlatform.iOS
               ? const BouncingScrollPhysics()
               : const ClampingScrollPhysics(),
-          padding: padding.add(const EdgeInsetsDirectional.only(end: 14)),
+          padding: padding,
           child: child,
         ),
       ),
@@ -302,7 +302,7 @@ class _DialogRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return ListRow(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           Container(

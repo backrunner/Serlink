@@ -42,22 +42,28 @@ class _HostRow extends StatelessWidget {
                     mobile ||
                     constraints.maxWidth < 420 ||
                     MediaQuery.textScalerOf(context).scale(14) > 18;
-                final title = Text(
-                  host.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: t.textPrimary,
+                final title = SerlinkTooltip(
+                  message: host.displayName,
+                  child: Text(
+                    host.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: t.textPrimary,
+                    ),
                   ),
                 );
-                final address = Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: t.textSecondary,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                final address = SerlinkTooltip(
+                  message: subtitle,
+                  child: Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: t.textSecondary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
                 );
                 final hasMetadata =

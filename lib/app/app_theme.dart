@@ -119,6 +119,23 @@ FThemeData _buildForui({
     style: style,
     cardStyle: _foruiCardStyle(tokens, colors, typography, style, touch),
     dialogStyle: _foruiDialogStyle(tokens, colors, typography, style, touch),
+    switchStyle: FSwitchStyle.inherit(colors: colors, style: style).copyWith(
+      trackColor: FVariants(
+        tokens.switchTrackOff,
+        variants: {
+          [FSwitchVariant.disabled]: colors.disable(tokens.switchTrackOff),
+          [FSwitchVariant.selected]: tokens.switchTrackOn,
+          [FSwitchVariant.selected.and(FSwitchVariant.disabled)]: colors
+              .disable(tokens.switchTrackOn),
+        },
+      ),
+      thumbColor: FVariants(
+        tokens.onAccent,
+        variants: {
+          [FSwitchVariant.disabled]: colors.disable(tokens.onAccent),
+        },
+      ),
+    ),
   );
 }
 

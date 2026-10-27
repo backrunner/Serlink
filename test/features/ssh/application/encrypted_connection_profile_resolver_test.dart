@@ -448,6 +448,60 @@ void main() {
     );
   });
 
+  test(
+    'resolves an agent certificate without requiring a private key',
+    () async {
+      final id = IdentityId('external-certificate');
+      await _saveSecret(
+        vault: vault,
+        records: records,
+        id: VaultRecordId('secret:external-certificate'),
+        material: const IdentitySecretMaterial(
+          openSshCertificate: 'certificate',
+        ),
+      );
+      await identities.save(
+        IdentityConfig(
+          id: id,
+          displayName: 'Certificate',
+          kind: IdentityKind.openSshCertificate,
+          agent: const IdentityAgentConfig(socketPath: '/custom/agent.sock'),
+          secretRecordId: VaultRecordId('secret:external-certificate'),
+          createdAt: DateTime.utc(2026),
+          updatedAt: DateTime.utc(2026),
+        ),
+      );
+      await hosts.save(_host(identityIds: [id]));
+      final profile = await resolver.resolve(
+        hostId: HostId('production'),
+        sessionId: SessionId('agent-cert'),
+      );
+      final method = profile.authMethods.single as SshOpenSshCertificateAuth;
+      expect(method.privateKeyPem, isNull);
+      expect(method.agent?.socketPath, '/custom/agent.sock');
+      final restricted = EncryptedConnectionProfileResolver(
+        hosts: hosts,
+        identities: identities,
+        records: records,
+        vault: vault,
+        sshAgentAuthAvailable: false,
+      );
+      await expectLater(
+        restricted.resolve(
+          hostId: HostId('production'),
+          sessionId: SessionId('restricted'),
+        ),
+        throwsA(
+          isA<ConnectionProfileResolutionException>().having(
+            (e) => e.code,
+            'code',
+            'connection_profile.ssh_agent_unsupported',
+          ),
+        ),
+      );
+    },
+  );
+
   test('locked vault prevents profile resolution', () async {
     await _saveSecret(
       vault: vault,

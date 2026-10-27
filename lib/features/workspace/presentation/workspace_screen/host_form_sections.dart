@@ -66,50 +66,151 @@ class _HostGroupField extends StatelessWidget {
   }
 }
 
-class _PrivateKeyFields extends StatelessWidget {
+class _PrivateKeyFields extends ConsumerStatefulWidget {
   const _PrivateKeyFields({
+    super.key,
     required this.privateKeyController,
     required this.passphraseController,
-    required this.onImportKey,
+    this.onKeyChanged,
   });
 
   final TextEditingController privateKeyController;
   final TextEditingController passphraseController;
-  final VoidCallback onImportKey;
+  final VoidCallback? onKeyChanged;
+
+  @override
+  ConsumerState<_PrivateKeyFields> createState() => _PrivateKeyFieldsState();
+}
+
+class _PrivateKeyFieldsState extends ConsumerState<_PrivateKeyFields> {
+  bool _manualEntry = false;
+  bool _importing = false;
+  String? _fileName;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.privateKeyController.addListener(_keyChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PrivateKeyFields oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.privateKeyController != widget.privateKeyController) {
+      oldWidget.privateKeyController.removeListener(_keyChanged);
+      widget.privateKeyController.addListener(_keyChanged);
+      _fileName = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.privateKeyController.removeListener(_keyChanged);
+    super.dispose();
+  }
+
+  void _keyChanged() {
+    setState(() {
+      _fileName = null;
+      _error = null;
+    });
+  }
+
+  Future<void> _importKey() async {
+    setState(() {
+      _importing = true;
+      _error = null;
+    });
+    try {
+      final file = await ref
+          .read(documentGatewayProvider)
+          .pickTextFile(
+            acceptedTypeGroups: [
+              XTypeGroup(label: context.l10n.credentialSshPrivateKeyTypeLabel),
+            ],
+          );
+      if (!mounted || file == null) return;
+      if (file.contents.trim().isEmpty) {
+        setState(() => _error = context.l10n.credentialPrivateKeyImportFailed);
+        return;
+      }
+      widget.privateKeyController.text = file.contents;
+      widget.onKeyChanged?.call();
+      setState(() {
+        _fileName = file.name;
+        _manualEntry = false;
+      });
+    } on Object {
+      if (mounted) {
+        setState(() => _error = context.l10n.credentialPrivateKeyImportFailed);
+      }
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: SerlinkTextField(
-                key: const ValueKey('host-private-key-field'),
-                controller: privateKeyController,
-                minLines: 5,
-                maxLines: 8,
-                decoration: InputDecoration(
-                  labelText: l10n.hostPrivateKeyLabel,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            SerlinkTooltip(
-              message: l10n.hostImportPrivateKeyTooltip,
-              child: SerlinkIconButton(
-                key: const ValueKey('host-import-private-key-button'),
-                onPressed: onImportKey,
-                icon: const Icon(Icons.file_open_outlined),
-              ),
-            ),
-          ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SerlinkFilledButton.icon(
+            key: const ValueKey('host-import-private-key-button'),
+            onPressed: _importing ? null : _importKey,
+            icon: const Icon(Icons.file_open_outlined, size: 18),
+            label: Text(l10n.credentialImportPrivateKeyAction),
+          ),
         ),
+        const SizedBox(height: 8),
+        Text(
+          widget.privateKeyController.text.isEmpty
+              ? l10n.credentialPrivateKeyFileHint
+              : (_fileName ?? l10n.credentialPrivateKeyLoaded),
+          key: const ValueKey('private-key-import-status'),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: context.tokens.textSecondary),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          SerlinkAlert.danger(message: _error!, compact: true),
+        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SerlinkTextButton(
+            key: const ValueKey('private-key-manual-entry-toggle'),
+            onPressed: _importing
+                ? null
+                : () => setState(() {
+                    _manualEntry = !_manualEntry;
+                  }),
+            child: Text(
+              _manualEntry
+                  ? l10n.credentialHidePrivateKeyInputAction
+                  : l10n.credentialPastePrivateKeyAction,
+            ),
+          ),
+        ),
+        if (_manualEntry) ...[
+          SerlinkTextField(
+            key: const ValueKey('host-private-key-field'),
+            controller: widget.privateKeyController,
+            minLines: 5,
+            maxLines: 8,
+            autocorrect: false,
+            enableSuggestions: false,
+            onChanged: (_) => widget.onKeyChanged?.call(),
+            decoration: InputDecoration(labelText: l10n.hostPrivateKeyLabel),
+          ),
+          const SizedBox(height: 8),
+        ],
         const SizedBox(height: 12),
         SerlinkTextField(
           key: const ValueKey('host-key-passphrase-field'),
-          controller: passphraseController,
+          controller: widget.passphraseController,
           decoration: InputDecoration(labelText: l10n.hostKeyPassphraseLabel),
           obscureText: true,
         ),
@@ -732,14 +833,14 @@ class _HostSectionFrame extends StatelessWidget {
       child: ClipRRect(
         borderRadius: SerlinkRadii.dialog,
         child: ColoredBox(
-          color: t.surfaceRaised,
+          color: t.surfaceSunken,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ColoredBox(
                 color: Color.alphaBlend(
                   t.surfaceBase.withValues(alpha: 0.7),
-                  t.surfaceRaised,
+                  t.surfaceSunken,
                 ),
                 child: header,
               ),
@@ -795,61 +896,48 @@ class _HostSectionHeading extends StatelessWidget {
 
 class _HostAuthenticationFields extends StatelessWidget {
   const _HostAuthenticationFields({
-    required this.useSavedCredentialPicker,
     required this.authMode,
     required this.loadingOptions,
     required this.passwordController,
     required this.passwordVisible,
     required this.privateKeyController,
     required this.keyPassphraseController,
+    required this.agentSocketController,
+    required this.agentPublicKeyController,
     required this.showSshAgent,
     required this.identityOptions,
     required this.selectedIdentityIds,
     required this.onAuthModeChanged,
-    required this.onImportPrivateKey,
     required this.onTogglePasswordVisible,
     required this.onToggleIdentity,
     required this.onEditIdentity,
     required this.onDeleteIdentity,
-    required this.onAddIdentity,
     required this.onSubmit,
     required this.compact,
   });
 
-  final bool useSavedCredentialPicker;
   final _HostAuthInputMode authMode;
   final bool loadingOptions;
   final TextEditingController passwordController;
   final bool passwordVisible;
   final TextEditingController privateKeyController;
   final TextEditingController keyPassphraseController;
+  final TextEditingController agentSocketController;
+  final TextEditingController agentPublicKeyController;
   final bool showSshAgent;
   final List<IdentityConfig> identityOptions;
   final Set<IdentityId> selectedIdentityIds;
   final ValueChanged<_HostAuthInputMode> onAuthModeChanged;
-  final VoidCallback onImportPrivateKey;
   final VoidCallback onTogglePasswordVisible;
   final ValueChanged<IdentityId> onToggleIdentity;
   final ValueChanged<IdentityConfig> onEditIdentity;
   final ValueChanged<IdentityConfig> onDeleteIdentity;
-  final VoidCallback onAddIdentity;
   final VoidCallback onSubmit;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    if (useSavedCredentialPicker) {
-      return _SavedCredentialFields(
-        identityOptions: identityOptions,
-        selectedIdentityIds: selectedIdentityIds,
-        loadingOptions: loadingOptions,
-        onToggleIdentity: onToggleIdentity,
-        onEditIdentity: onEditIdentity,
-        onDeleteIdentity: onDeleteIdentity,
-        onAddIdentity: onAddIdentity,
-      );
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -914,9 +1002,11 @@ class _HostAuthenticationFields extends StatelessWidget {
           _HostAuthInputMode.privateKey => _PrivateKeyFields(
             privateKeyController: privateKeyController,
             passphraseController: keyPassphraseController,
-            onImportKey: onImportPrivateKey,
           ),
-          _HostAuthInputMode.sshAgent => const _SshAgentAuthNote(),
+          _HostAuthInputMode.sshAgent => _AgentFields(
+            socketController: agentSocketController,
+            publicKeyController: agentPublicKeyController,
+          ),
           _HostAuthInputMode.savedOrNone => _SavedCredentialFields(
             identityOptions: identityOptions,
             selectedIdentityIds: selectedIdentityIds,
@@ -924,7 +1014,6 @@ class _HostAuthenticationFields extends StatelessWidget {
             onToggleIdentity: onToggleIdentity,
             onEditIdentity: onEditIdentity,
             onDeleteIdentity: onDeleteIdentity,
-            onAddIdentity: onAddIdentity,
           ),
         },
       ],
@@ -932,14 +1021,653 @@ class _HostAuthenticationFields extends StatelessWidget {
   }
 }
 
-class _SshAgentAuthNote extends StatelessWidget {
-  const _SshAgentAuthNote();
+IdentityAgentConfig _agentConfig(
+  TextEditingController socket,
+  TextEditingController publicKey,
+) => IdentityAgentConfig(
+  socketPath: socket.text.trim().isEmpty ? null : socket.text.trim(),
+  publicKey: publicKey.text.trim().isEmpty ? null : publicKey.text.trim(),
+);
+
+class _AgentFields extends ConsumerStatefulWidget {
+  const _AgentFields({
+    required this.socketController,
+    required this.publicKeyController,
+    this.hardwareKey = false,
+  });
+
+  final TextEditingController socketController;
+  final TextEditingController publicKeyController;
+  final bool hardwareKey;
+
+  @override
+  ConsumerState<_AgentFields> createState() => _AgentFieldsState();
+}
+
+class _AgentFieldsState extends ConsumerState<_AgentFields> {
+  bool _importing = false;
+  bool _findingEndpoint = false;
+  bool _customEndpoint = false;
+  DiscoveredSshAgent? _chosenProvider;
+  bool _manualPublicKey = false;
+  String? _selectedLabel;
+  String? _selectedFingerprint;
+  String? _error;
+
+  Future<void> _findEndpoint() async {
+    if (_importing) return;
+    var refresh = false;
+    setState(() {
+      _importing = true;
+      _findingEndpoint = true;
+      _error = null;
+    });
+    try {
+      final endpoints =
+          (await ref.read(sshAgentEndpointLoaderProvider)()).toList()..sort((
+            a,
+            b,
+          ) {
+            final byKeys = b.identities.length.compareTo(a.identities.length);
+            return byKeys == 0 ? a.socketPath.compareTo(b.socketPath) : byKeys;
+          });
+      if (!mounted) return;
+      setState(() => _findingEndpoint = false);
+      final selected = await showSerlinkDialog<DiscoveredSshAgent>(
+        context: context,
+        builder: (dialogContext) => SerlinkDialog(
+          maxWidth: _adaptiveDialogWidth(dialogContext, _dialogWidthMedium),
+          title: Text(dialogContext.l10n.agentChooseEndpointTitle),
+          content: SizedBox(
+            width: 560,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: SerlinkScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (endpoints.isEmpty)
+                      SerlinkAlert.info(
+                        message: dialogContext.l10n.agentDiscoveryEmptyMessage,
+                        compact: true,
+                      ),
+                    for (final endpoint in endpoints)
+                      ListRow(
+                        onTap: () => Navigator.of(dialogContext).pop(endpoint),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        selected:
+                            widget.socketController.text.trim() ==
+                            endpoint.socketPath,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.hub_outlined, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${endpoint.providerHint ?? (endpoint.isSystem ? dialogContext.l10n.agentSystemTitle : dialogContext.l10n.agentLocalTitle)} · ${dialogContext.l10n.agentDiscoveredKeysCount(endpoint.identities.length)}',
+                                  ),
+                                  const SizedBox(height: 4),
+                                  _endpointText(
+                                    dialogContext,
+                                    endpoint.socketPath,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            SerlinkTextButton(
+              key: const ValueKey('agent-refresh-providers-button'),
+              onPressed: () {
+                refresh = true;
+                Navigator.of(dialogContext).pop();
+              },
+              child: Text(dialogContext.l10n.agentRefreshProvidersAction),
+            ),
+            SerlinkTextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(dialogContext.l10n.cancelAction),
+            ),
+          ],
+        ),
+      );
+      if (mounted && selected != null) {
+        final changed =
+            widget.socketController.text.trim() != selected.socketPath;
+        widget.socketController.text = selected.socketPath;
+        if (changed) widget.publicKeyController.clear();
+        setState(() {
+          _chosenProvider = selected;
+          _customEndpoint = false;
+          if (changed) {
+            _selectedLabel = null;
+            _selectedFingerprint = null;
+            _manualPublicKey = false;
+          }
+        });
+      }
+    } on Object {
+      if (mounted) {
+        setState(() => _error = context.l10n.agentDiscoveryEmptyMessage);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _importing = false;
+          _findingEndpoint = false;
+        });
+      }
+    }
+    if (mounted && refresh) await _findEndpoint();
+  }
+
+  Future<void> _selectAgentKey() async {
+    if (_importing) return;
+    if (widget.socketController.text.trim().isEmpty) {
+      await _findEndpoint();
+      if (!mounted || widget.socketController.text.trim().isEmpty) return;
+    }
+    setState(() => _importing = true);
+    final endpoint = widget.socketController.text.trim();
+    final choices = ref.read(sshAgentIdentityLoaderProvider)(
+      endpoint.isEmpty ? null : endpoint,
+    );
+    unawaited(choices.then<void>((_) {}, onError: (Object _, StackTrace _) {}));
+    final selected = await showSerlinkDialog<SshAgentIdentityChoice>(
+      context: context,
+      builder: (dialogContext) => SerlinkDialog(
+        maxWidth: _adaptiveDialogWidth(dialogContext, _dialogWidthMedium),
+        title: Text(dialogContext.l10n.agentSelectKeyAction),
+        content: SizedBox(
+          width: 560,
+          height: 320,
+          child: FutureBuilder<List<SshAgentIdentityChoice>>(
+            future: choices,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return SerlinkAlert.danger(
+                  message: context.l10n.sshAuthAgentUnavailableMessage,
+                  compact: true,
+                );
+              }
+              if (!snapshot.hasData) {
+                return const Center(child: SerlinkLoadingIndicator());
+              }
+              final keys = snapshot.data!;
+              if (keys.isEmpty) {
+                return SerlinkAlert.info(
+                  message: context.l10n.sshAuthAgentEmptyMessage,
+                  compact: true,
+                );
+              }
+              return SerlinkScrollView(
+                child: Column(
+                  children: [
+                    for (final key in keys)
+                      ListRow(
+                        onTap: () => Navigator.of(dialogContext).pop(key),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.key_outlined, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SerlinkTooltip(
+                                    message: key.label,
+                                    child: Text(
+                                      key.label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    key.fingerprint,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                  if (key.socketPath case final endpoint?)
+                                    SerlinkTooltip(
+                                      message: endpoint,
+                                      child: Text(
+                                        endpoint,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color:
+                                                  context.tokens.textSecondary,
+                                            ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          SerlinkTextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(dialogContext.l10n.cancelAction),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _importing = false);
+    if (selected == null) return;
+    widget.publicKeyController.text = selected.publicKey;
+    if (selected.socketPath case final endpoint?) {
+      widget.socketController.text = endpoint;
+    }
+    setState(() {
+      _selectedLabel = selected.label;
+      _selectedFingerprint = selected.fingerprint;
+      _manualPublicKey = false;
+      _error = null;
+    });
+  }
+
+  Future<void> _importPublicKey() async {
+    setState(() {
+      _importing = true;
+      _error = null;
+    });
+    try {
+      final file = await ref.read(documentGatewayProvider).pickTextFile();
+      if (!mounted || file == null) return;
+      final parts = file.contents.trim().split(RegExp(r'\s+'));
+      if (parts.length < 2 ||
+          !(parts.first.startsWith('ssh-') ||
+              parts.first.startsWith('ecdsa-') ||
+              parts.first.startsWith('sk-'))) {
+        throw const FormatException('Expected a public key');
+      }
+      base64Decode(parts[1]);
+      widget.publicKeyController.text = file.contents.trim();
+      setState(() {
+        _selectedLabel = file.name;
+        _selectedFingerprint = null;
+        _manualPublicKey = false;
+      });
+    } on Object {
+      if (mounted) {
+        setState(() => _error = context.l10n.agentPublicKeyImportFailed);
+      }
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
+  void _clearSelection() {
+    widget.publicKeyController.clear();
+    setState(() {
+      _selectedLabel = null;
+      _selectedFingerprint = null;
+      _manualPublicKey = false;
+      _error = null;
+    });
+  }
+
+  Widget _keySelection(TextEditingValue value) {
+    final l10n = context.l10n;
+    final t = context.tokens;
+    final publicKey = value.text.trim();
+    final selected = publicKey.isNotEmpty;
+    final comment = publicKey.split(RegExp(r'\s+')).skip(2).join(' ');
+    final title = selected
+        ? (_selectedLabel ??
+              (comment.isEmpty ? l10n.agentPublicKeySelected : comment))
+        : l10n.agentAllKeysTitle;
+    final fingerprint = selected
+        ? (_selectedFingerprint ?? sshAgentPublicKeyFingerprint(publicKey))
+        : null;
+    final subtitle = fingerprint ?? l10n.agentPublicKeyHint;
+    final selectButton = SerlinkOutlinedButton.icon(
+      key: const ValueKey('agent-select-key-button'),
+      onPressed: _importing ? null : _selectAgentKey,
+      icon: const Icon(Icons.key_outlined, size: 16),
+      label: Text(
+        selected ? l10n.agentChangeKeyAction : l10n.agentChooseKeyAction,
+      ),
+    );
+    final options = SerlinkMenuButton(
+      key: const ValueKey('agent-key-options-button'),
+      tooltip: l10n.agentKeyOptionsTooltip,
+      enabled: !_importing,
+      icon: const Icon(Icons.more_horiz, size: 20),
+      actions: [
+        SerlinkMenuAction(
+          label: l10n.agentImportPublicKeyAction,
+          icon: Icons.file_open_outlined,
+          onPressed: _importPublicKey,
+        ),
+        SerlinkMenuAction(
+          label: _manualPublicKey
+              ? l10n.agentHidePublicKeyInputAction
+              : l10n.agentEnterPublicKeyAction,
+          icon: Icons.edit_outlined,
+          onPressed: () => setState(() => _manualPublicKey = !_manualPublicKey),
+        ),
+        if (selected)
+          SerlinkMenuAction(
+            label: l10n.agentUseAllKeysAction,
+            icon: Icons.layers_clear_outlined,
+            onPressed: _clearSelection,
+          ),
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l10n.agentAuthenticationKeyLabel,
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        const SizedBox(height: 8),
+        Container(
+          key: const ValueKey('agent-selected-key-summary'),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: selected ? 12 : 4,
+          ),
+          decoration: BoxDecoration(
+            color: t.surfaceSunken,
+            borderRadius: SerlinkRadii.control,
+            border: Border.all(color: t.borderSubtle),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 420;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: selected ? 36 : 20,
+                        height: selected ? 36 : 20,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? t.accentPrimary.withValues(alpha: 0.12)
+                              : t.surfaceSunken,
+                          borderRadius: SerlinkRadii.control,
+                        ),
+                        child: Icon(
+                          selected ? Icons.key_rounded : Icons.layers_outlined,
+                          size: 18,
+                          color: selected ? t.accentPrimary : t.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SerlinkTooltip(
+                              message: title,
+                              child: Text(
+                                title,
+                                key: const ValueKey('agent-selected-key-name'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            if (selected) ...[
+                              const SizedBox(height: 4),
+                              SerlinkTooltip(
+                                message: subtitle,
+                                child: Text(
+                                  subtitle,
+                                  key: const ValueKey(
+                                    'agent-selected-key-fingerprint',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: t.textSecondary,
+                                        fontFamily: fingerprint == null
+                                            ? null
+                                            : 'monospace',
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (!compact) ...[selectButton, const SizedBox(width: 4)],
+                      if (compact && !selected)
+                        SerlinkIconButton(
+                          key: const ValueKey('agent-select-key-button'),
+                          onPressed: _importing ? null : _selectAgentKey,
+                          icon: const Icon(Icons.key_outlined, size: 18),
+                          tooltip: l10n.agentChooseKeyAction,
+                        ),
+                      options,
+                    ],
+                  ),
+                  if (compact && selected) ...[
+                    const SizedBox(height: 12),
+                    selectButton,
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _endpointText(BuildContext context, String endpoint, {Key? textKey}) {
+    final style = Theme.of(context).textTheme.bodySmall
+        ?.copyWith(color: context.tokens.textSecondary);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final text = Text(
+          endpoint,
+          key: textKey,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: style,
+        );
+        final painter = TextPainter(
+          text: TextSpan(text: endpoint, style: style),
+          maxLines: 1,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: constraints.maxWidth);
+        final truncated = painter.didExceedMaxLines;
+        painter.dispose();
+        return truncated
+            ? SerlinkTooltip(message: endpoint, preferBelow: true, child: text)
+            : text;
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SerlinkAlert.info(
-      message: context.l10n.hostSshAgentNote,
-      compact: true,
+    final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Text(
+              l10n.agentProviderLabel,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(width: 6),
+            SerlinkTooltip(
+              message: widget.hardwareKey
+                  ? l10n.agentHardwareKeyNote
+                  : l10n.hostSshAgentNote,
+              child: Icon(
+                Icons.info_outline,
+                size: 15,
+                color: context.tokens.textSecondary,
+              ),
+            ),
+            const Spacer(),
+            SerlinkMenuButton(
+              key: const ValueKey('agent-provider-options-button'),
+              tooltip: l10n.agentProviderOptionsTooltip,
+              enabled: !_importing,
+              icon: const Icon(Icons.more_horiz, size: 20),
+              actions: [
+                SerlinkMenuAction(
+                  label: l10n.agentRefreshProvidersAction,
+                  icon: Icons.refresh,
+                  onPressed: _findEndpoint,
+                ),
+                SerlinkMenuAction(
+                  label: _customEndpoint
+                      ? l10n.agentHideEndpointAction
+                      : l10n.agentManualEndpointAction,
+                  icon: Icons.tune,
+                  onPressed: () =>
+                      setState(() => _customEndpoint = !_customEndpoint),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: widget.socketController,
+          builder: (context, value, _) {
+            final endpoint = value.text.trim();
+            final provider = _chosenProvider?.socketPath == endpoint
+                ? _chosenProvider
+                : null;
+            final label = endpoint.isEmpty
+                ? l10n.agentChooseEndpointTitle
+                : (provider?.providerHint ??
+                      sshAgentProviderHint(endpoint) ??
+                      (endpoint.contains('com.apple.launchd')
+                          ? l10n.agentSystemTitle
+                          : l10n.agentLocalTitle));
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SerlinkOutlinedButton(
+                  key: const ValueKey('agent-discover-endpoint-button'),
+                  onPressed: _importing ? null : _findEndpoint,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.key_outlined,
+                        size: 17,
+                        color: context.tokens.textSecondary,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          provider == null
+                              ? label
+                              : '$label · ${l10n.agentDiscoveredKeysCount(provider.identities.length)}',
+                          key: const ValueKey('agent-selected-provider-name'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (_findingEndpoint)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: SerlinkLoadingIndicator(),
+                        )
+                      else
+                        const Icon(Icons.expand_more, size: 18),
+                    ],
+                  ),
+                ),
+                if (endpoint.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  _endpointText(
+                    context,
+                    endpoint,
+                    textKey: const ValueKey('agent-selected-provider-path'),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+        if (_customEndpoint) ...[
+          const SizedBox(height: 10),
+          SerlinkTextField(
+            key: const ValueKey('agent-socket-field'),
+            controller: widget.socketController,
+            autocorrect: false,
+            enableSuggestions: false,
+            decoration: InputDecoration(
+              labelText: l10n.agentManualEndpointAction,
+              hintText: l10n.agentSocketHint,
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: widget.publicKeyController,
+          builder: (context, value, _) => _keySelection(value),
+        ),
+        if (_manualPublicKey) ...[
+          const SizedBox(height: 12),
+          SerlinkTextField(
+            key: const ValueKey('agent-public-key-field'),
+            controller: widget.publicKeyController,
+            autocorrect: false,
+            enableSuggestions: false,
+            minLines: 2,
+            maxLines: 3,
+            onChanged: (_) => setState(() {
+              _selectedLabel = null;
+              _selectedFingerprint = null;
+            }),
+            decoration: InputDecoration(
+              labelText: l10n.agentPublicKeyLabel,
+              hintText: l10n.agentPublicKeyHint,
+            ),
+          ),
+        ],
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          SerlinkAlert.danger(message: _error!, compact: true),
+        ],
+      ],
     );
   }
 }
@@ -952,7 +1680,6 @@ class _SavedCredentialFields extends StatefulWidget {
     required this.onToggleIdentity,
     required this.onEditIdentity,
     required this.onDeleteIdentity,
-    required this.onAddIdentity,
   });
 
   final List<IdentityConfig> identityOptions;
@@ -961,7 +1688,6 @@ class _SavedCredentialFields extends StatefulWidget {
   final ValueChanged<IdentityId> onToggleIdentity;
   final ValueChanged<IdentityConfig> onEditIdentity;
   final ValueChanged<IdentityConfig> onDeleteIdentity;
-  final VoidCallback onAddIdentity;
 
   @override
   State<_SavedCredentialFields> createState() => _SavedCredentialFieldsState();
@@ -1097,21 +1823,9 @@ class _SavedCredentialFieldsState extends State<_SavedCredentialFields> {
                   if (index > 0) const SizedBox(height: 8),
                   row(visible[index]),
                 ],
-                const SizedBox(height: 8),
-                const _CredentialOptionalNote(),
               ],
             ),
           ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: SerlinkOutlinedButton.icon(
-            key: const ValueKey('credential-add-button'),
-            onPressed: widget.loadingOptions ? null : widget.onAddIdentity,
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: Text(context.l10n.hostAddCredentialAction),
-          ),
-        ),
       ],
     );
   }
@@ -1153,13 +1867,6 @@ class _CredentialsEmptyState extends StatelessWidget {
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall
                 ?.copyWith(color: t.textSecondary),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            l10n.hostCredentialOptionalNote,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: t.textMuted),
           ),
         ],
       ),
@@ -1266,22 +1973,6 @@ class _CredentialSelectionRow extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _CredentialOptionalNote extends StatelessWidget {
-  const _CredentialOptionalNote();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 2),
-      child: Text(
-        context.l10n.hostCredentialOptionalNote,
-        style: Theme.of(context).textTheme.bodySmall
-            ?.copyWith(color: context.tokens.textMuted),
       ),
     );
   }

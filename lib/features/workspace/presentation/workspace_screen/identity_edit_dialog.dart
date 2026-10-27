@@ -15,6 +15,9 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
   final TextEditingController _usernameHintController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _privateKeyController = TextEditingController();
+  final TextEditingController _agentSocketController = TextEditingController();
+  final TextEditingController _agentPublicKeyController =
+      TextEditingController();
   final TextEditingController _passphraseController = TextEditingController();
   final TextEditingController _certificateController = TextEditingController();
   final TextEditingController _keyboardResponsesController =
@@ -27,6 +30,7 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
   GeneratedSshKeyType _keyType = GeneratedSshKeyType.ed25519;
   GeneratedSshKeyPair? _generatedKey;
   bool _generatingKey = false;
+  bool _certificateUsesAgent = true;
 
   bool get _creating => widget.identity == null;
 
@@ -38,6 +42,9 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
       return;
     }
     _kind = identity.kind;
+    _certificateUsesAgent = identity.agent != null;
+    _agentSocketController.text = identity.agent?.socketPath ?? '';
+    _agentPublicKeyController.text = identity.agent?.publicKey ?? '';
     _loadingSecret = true;
     _displayNameController.text = identity.displayName;
     _usernameHintController.text = identity.usernameHint ?? '';
@@ -50,6 +57,8 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
     _usernameHintController.dispose();
     _passwordController.dispose();
     _privateKeyController.dispose();
+    _agentSocketController.dispose();
+    _agentPublicKeyController.dispose();
     _passphraseController.dispose();
     _certificateController.dispose();
     _keyboardResponsesController.dispose();
@@ -88,11 +97,19 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
                             key: const ValueKey('credential-kind-control'),
                             value: _kind,
                             segments: [
-                              for (final kind in const [
+                              for (final kind in [
                                 IdentityKind.password,
                                 IdentityKind.privateKey,
                                 IdentityKind.openSshCertificate,
                                 IdentityKind.keyboardInteractive,
+                                if (ref
+                                    .watch(platformCapabilitiesProvider)
+                                    .sshAgentAuth)
+                                  IdentityKind.sshAgent,
+                                if (ref
+                                    .watch(platformCapabilitiesProvider)
+                                    .hardwareKeyAuth)
+                                  IdentityKind.hardwareKey,
                               ])
                                 SerlinkSegment(
                                   value: kind,
@@ -216,17 +233,23 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
           ],
           const SizedBox(height: 12),
           _PrivateKeyFields(
+            key: const ValueKey('credential-private-key-fields'),
             privateKeyController: _privateKeyController,
             passphraseController: _passphraseController,
-            onImportKey: _importPrivateKey,
+            onKeyChanged: () => setState(() => _generatedKey = null),
           ),
         ],
       ),
       IdentityKind.openSshCertificate => _CertificateFields(
+        canUseAgent: ref.watch(platformCapabilitiesProvider).sshAgentAuth,
+        useAgent: _certificateUsesAgent,
+        onUseAgentChanged: (value) =>
+            setState(() => _certificateUsesAgent = value),
+        agentSocketController: _agentSocketController,
+        agentPublicKeyController: _agentPublicKeyController,
         privateKeyController: _privateKeyController,
         passphraseController: _passphraseController,
         certificateController: _certificateController,
-        onImportKey: _importPrivateKey,
         onImportCertificate: _importCertificate,
       ),
       IdentityKind.keyboardInteractive => SerlinkTextField(
@@ -239,9 +262,10 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
           helperText: l10n.credentialKeyboardResponsesHelper,
         ),
       ),
-      IdentityKind.sshAgent || IdentityKind.hardwareKey => Align(
-        alignment: Alignment.centerLeft,
-        child: Text(l10n.credentialNoSecretMaterial),
+      IdentityKind.sshAgent || IdentityKind.hardwareKey => _AgentFields(
+        socketController: _agentSocketController,
+        publicKeyController: _agentPublicKeyController,
+        hardwareKey: _kind == IdentityKind.hardwareKey,
       ),
     };
   }
@@ -322,6 +346,15 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
     });
     try {
       final service = ref.read(identityWriteServiceProvider);
+      final useAgent =
+          _kind == IdentityKind.sshAgent ||
+          _kind == IdentityKind.hardwareKey ||
+          (_kind == IdentityKind.openSshCertificate &&
+              _certificateUsesAgent &&
+              ref.read(platformCapabilitiesProvider).sshAgentAuth);
+      final agent = useAgent
+          ? _agentConfig(_agentSocketController, _agentPublicKeyController)
+          : null;
       final password = _kind == IdentityKind.password
           ? _passwordController.text
           : null;
@@ -351,6 +384,7 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
       if (identity == null) {
         result = await service.create(
           IdentityCreateDraft(
+            agent: agent,
             kind: _kind,
             displayName: _displayNameController.text,
             usernameHint: _usernameHintController.text,
@@ -365,6 +399,7 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
       } else {
         await service.update(
           IdentityUpdateDraft(
+            agent: agent,
             id: identity.id,
             displayName: _displayNameController.text,
             usernameHint: _usernameHintController.text,
@@ -398,15 +433,6 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
     }
   }
 
-  Future<void> _importPrivateKey() async {
-    await _importTextFile(
-      controller: _privateKeyController,
-      typeGroup: XTypeGroup(
-        label: context.l10n.credentialSshPrivateKeyTypeLabel,
-      ),
-    );
-  }
-
   Future<void> _importCertificate() async {
     await _importTextFile(
       controller: _certificateController,
@@ -435,26 +461,60 @@ class _CertificateFields extends StatelessWidget {
     required this.privateKeyController,
     required this.passphraseController,
     required this.certificateController,
-    required this.onImportKey,
     required this.onImportCertificate,
+    required this.canUseAgent,
+    required this.useAgent,
+    required this.onUseAgentChanged,
+    required this.agentSocketController,
+    required this.agentPublicKeyController,
   });
 
   final TextEditingController privateKeyController;
   final TextEditingController passphraseController;
   final TextEditingController certificateController;
-  final VoidCallback onImportKey;
   final VoidCallback onImportCertificate;
+  final bool canUseAgent;
+  final bool useAgent;
+  final ValueChanged<bool> onUseAgentChanged;
+  final TextEditingController agentSocketController;
+  final TextEditingController agentPublicKeyController;
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _PrivateKeyFields(
-          privateKeyController: privateKeyController,
-          passphraseController: passphraseController,
-          onImportKey: onImportKey,
-        ),
+        if (canUseAgent) ...[
+          SerlinkSegmentedControl<bool>(
+            key: const ValueKey('certificate-key-source-control'),
+            value: useAgent,
+            segments: [
+              SerlinkSegment(
+                value: true,
+                icon: Icons.vpn_key_outlined,
+                label: l10n.hostAuthAgentSegment,
+              ),
+              SerlinkSegment(
+                value: false,
+                icon: Icons.key_outlined,
+                label: l10n.hostPrivateKeyLabel,
+              ),
+            ],
+            onChanged: onUseAgentChanged,
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (canUseAgent && useAgent)
+          _AgentFields(
+            socketController: agentSocketController,
+            publicKeyController: agentPublicKeyController,
+          )
+        else
+          _PrivateKeyFields(
+            privateKeyController: privateKeyController,
+            passphraseController: passphraseController,
+          ),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -514,9 +574,8 @@ class _GeneratedPublicKeyPanel extends StatelessWidget {
               Expanded(
                 child: Text(
                   l10n.credentialGeneratedPublicKeyLabel,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(color: t.textPrimary),
+                  style: Theme.of(context).textTheme.labelLarge
+                      ?.copyWith(color: t.textPrimary),
                 ),
               ),
               SerlinkTooltip(
@@ -531,24 +590,20 @@ class _GeneratedPublicKeyPanel extends StatelessWidget {
           ),
           SelectableText(
             generatedKey.publicKey,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: t.textPrimary,
-              fontFamily: 'monospace',
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: t.textPrimary, fontFamily: 'monospace'),
           ),
           const SizedBox(height: 6),
           Text(
             generatedKey.fingerprint,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: t.textMuted),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: t.textMuted),
           ),
           const SizedBox(height: 6),
           Text(
             l10n.credentialGeneratedPublicKeyNote,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: t.textSecondary),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: t.textSecondary),
           ),
         ],
       ),

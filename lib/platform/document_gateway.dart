@@ -16,10 +16,29 @@ class PickedLocalDocument {
   final String path;
 }
 
+class PickedTextDocument {
+  const PickedTextDocument({required this.name, required this.contents});
+
+  final String name;
+  final String contents;
+}
+
 class DocumentGateway {
   const DocumentGateway({required this.capabilities});
 
   final PlatformCapabilities capabilities;
+
+  /// Reads a selected text document without creating an upload staging copy.
+  Future<PickedTextDocument?> pickTextFile({
+    List<XTypeGroup> acceptedTypeGroups = const <XTypeGroup>[],
+  }) async {
+    final file = await openFile(acceptedTypeGroups: acceptedTypeGroups);
+    if (file == null) return null;
+    return PickedTextDocument(
+      name: _displayName(file),
+      contents: await file.readAsString(),
+    );
+  }
 
   /// Presents the system's file actions on iOS, or opens the desktop handler.
   /// A successful result means the system UI was presented, not that the user

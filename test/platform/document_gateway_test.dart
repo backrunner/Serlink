@@ -118,11 +118,48 @@ void main() {
     expect(fakePlatform.suggestedName, 'source.txt');
     expect(await destination.readAsString(), 'hello from mac');
   });
+
+  test(
+    'reads selected private keys in memory on iOS without staging',
+    () async {
+      fakePlatform.openFileResult = XFile.fromData(
+        Uint8List.fromList('private key contents'.codeUnits),
+        path: 'id_ed25519',
+      );
+      const gateway = DocumentGateway(
+        capabilities: PlatformCapabilities(
+          operatingSystem: 'ios',
+          targetPlatform: TargetPlatform.iOS,
+        ),
+      );
+      final document = await gateway.pickTextFile();
+      expect(document?.name, 'id_ed25519');
+      expect(document?.contents, 'private key contents');
+    },
+  );
+
+  test('canceling text file selection returns no document', () async {
+    const gateway = DocumentGateway(
+      capabilities: PlatformCapabilities(
+        operatingSystem: 'macos',
+        targetPlatform: TargetPlatform.macOS,
+      ),
+    );
+    expect(await gateway.pickTextFile(), isNull);
+  });
 }
 
 class _FakeFileSelectorPlatform extends FileSelectorPlatform {
   FileSaveLocation? saveLocation;
   String? suggestedName;
+  XFile? openFileResult;
+
+  @override
+  Future<XFile?> openFile({
+    List<XTypeGroup>? acceptedTypeGroups,
+    String? initialDirectory,
+    String? confirmButtonText,
+  }) async => openFileResult;
 
   @override
   Future<FileSaveLocation?> getSaveLocation({

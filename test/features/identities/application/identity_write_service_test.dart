@@ -9,6 +9,47 @@ import 'package:serlink/features/vault/application/vault_record_repository.dart'
 import 'package:serlink/features/vault/application/vault_service.dart';
 
 void main() {
+  test('agent certificates persist without private key material', () async {
+    final fixture = await _Fixture.create();
+    const agent = IdentityAgentConfig(
+      socketPath: '~/agents/provider.sock',
+      publicKey: 'ssh-ed25519 AAAA',
+    );
+    final identity = await fixture.service.create(
+      const IdentityCreateDraft(
+        kind: IdentityKind.openSshCertificate,
+        displayName: 'External certificate',
+        agent: agent,
+        openSshCertificate: 'ssh-ed25519-cert-v01@openssh.com AAAAB3NzaC1yc2EAAAADAQABAAABAQ== test',
+      ),
+    );
+    final restored = IdentityConfig.fromJson(identity.toJson());
+    expect(restored.agent?.socketPath, agent.socketPath);
+    expect(restored.agent?.publicKey, agent.publicKey);
+    final secret = await fixture.service.readSecretMaterial(identity);
+    expect(secret?.privateKeyPem, isNull);
+    expect(secret?.privateKeyPassphrase, isNull);
+    expect(secret?.openSshCertificate, contains('-cert-v01@openssh.com'));
+    final updated = await fixture.service.update(
+      IdentityUpdateDraft(
+        id: identity.id,
+        displayName: 'Updated certificate',
+        agent: agent,
+        privateKeyPem: 'must not be stored',
+        privateKeyPassphrase: 'must not be stored',
+        openSshCertificate: secret!.openSshCertificate,
+      ),
+    );
+    expect(
+      (await fixture.service.readSecretMaterial(updated))?.privateKeyPem,
+      isNull,
+    );
+    expect(
+      IdentityConfig.fromJson({...updated.toJson()}..remove('agent')).agent,
+      isNull,
+    );
+  });
+
   test('updates credential metadata and password secret material', () async {
     final fixture = await _Fixture.create();
     await fixture.saveIdentity(
@@ -41,10 +82,8 @@ void main() {
       id: IdentityId('deploy-cert'),
       kind: IdentityKind.openSshCertificate,
       material: const IdentitySecretMaterial(
-        privateKeyPem:
-            '-----BEGIN OPENSSH PRIVATE KEY-----\nold\n-----END OPENSSH PRIVATE KEY-----',
-        openSshCertificate:
-            'ssh-ed25519-cert-v01@openssh.com AAAAB3NzaC1yc2EAAAADAQABAAABAQ== old@example',
+        privateKeyPem: '-----BEGIN OPENSSH PRIVATE KEY-----\nold\n-----END OPENSSH PRIVATE KEY-----',
+        openSshCertificate: 'ssh-ed25519-cert-v01@openssh.com AAAAB3NzaC1yc2EAAAADAQABAAABAQ== old@example',
       ),
     );
 
@@ -53,10 +92,8 @@ void main() {
         id: IdentityId('deploy-cert'),
         displayName: 'Deploy Certificate',
         usernameHint: 'deploy',
-        privateKeyPem:
-            '-----BEGIN OPENSSH PRIVATE KEY-----\nnew\n-----END OPENSSH PRIVATE KEY-----',
-        openSshCertificate:
-            'ssh-ed25519-cert-v01@openssh.com AAAAB3NzaC1yc2EAAAADAQABAAABAQ== deploy@example',
+        privateKeyPem: '-----BEGIN OPENSSH PRIVATE KEY-----\nnew\n-----END OPENSSH PRIVATE KEY-----',
+        openSshCertificate: 'ssh-ed25519-cert-v01@openssh.com AAAAB3NzaC1yc2EAAAADAQABAAABAQ== deploy@example',
       ),
     );
 
@@ -66,40 +103,42 @@ void main() {
     expect(secret.openSshCertificate, contains('deploy@example'));
   });
 
-  test('rejects invalid private key without replacing existing secret', () async {
-    final fixture = await _Fixture.create();
-    await fixture.saveIdentity(
-      id: IdentityId('ops-key'),
-      kind: IdentityKind.privateKey,
-      material: const IdentitySecretMaterial(
-        privateKeyPem:
-            '-----BEGIN OPENSSH PRIVATE KEY-----\nold\n-----END OPENSSH PRIVATE KEY-----',
-      ),
-    );
-    final before = await fixture.identities.read(IdentityId('ops-key'));
-
-    await expectLater(
-      fixture.service.update(
-        IdentityUpdateDraft(
-          id: IdentityId('ops-key'),
-          displayName: 'Ops Key',
-          privateKeyPem: 'not a key',
+  test(
+    'rejects invalid private key without replacing existing secret',
+    () async {
+      final fixture = await _Fixture.create();
+      await fixture.saveIdentity(
+        id: IdentityId('ops-key'),
+        kind: IdentityKind.privateKey,
+        material: const IdentitySecretMaterial(
+          privateKeyPem: '-----BEGIN OPENSSH PRIVATE KEY-----\nold\n-----END OPENSSH PRIVATE KEY-----',
         ),
-      ),
-      throwsA(
-        isA<IdentityWriteException>().having(
-          (error) => error.code,
-          'code',
-          'identity.private_key_invalid',
-        ),
-      ),
-    );
+      );
+      final before = await fixture.identities.read(IdentityId('ops-key'));
 
-    final after = await fixture.identities.read(IdentityId('ops-key'));
-    expect(after!.updatedAt, before!.updatedAt);
-    final secret = await fixture.service.readSecretMaterial(after);
-    expect(secret!.privateKeyPem, contains('old'));
-  });
+      await expectLater(
+        fixture.service.update(
+          IdentityUpdateDraft(
+            id: IdentityId('ops-key'),
+            displayName: 'Ops Key',
+            privateKeyPem: 'not a key',
+          ),
+        ),
+        throwsA(
+          isA<IdentityWriteException>().having(
+            (error) => error.code,
+            'code',
+            'identity.private_key_invalid',
+          ),
+        ),
+      );
+
+      final after = await fixture.identities.read(IdentityId('ops-key'));
+      expect(after!.updatedAt, before!.updatedAt);
+      final secret = await fixture.service.readSecretMaterial(after);
+      expect(secret!.privateKeyPem, contains('old'));
+    },
+  );
 }
 
 class _Fixture {

@@ -27,6 +27,9 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _privateKeyController = TextEditingController();
+  final TextEditingController _agentSocketController = TextEditingController();
+  final TextEditingController _agentPublicKeyController =
+      TextEditingController();
   final TextEditingController _keyPassphraseController =
       TextEditingController();
   final TextEditingController _startupCommandsController =
@@ -95,10 +98,6 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
   bool _saving = false;
   String? _errorMessage;
 
-  bool get _usesSavedCredentialPicker =>
-      widget.mode == _HostFormMode.edit ||
-      widget.mode == _HostFormMode.duplicate;
-
   @override
   void initState() {
     super.initState();
@@ -106,6 +105,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     if (host == null) {
       return;
     }
+    _authMode = _HostAuthInputMode.savedOrNone;
     _displayNameController.text = host.displayName;
     _hostnameController.text = host.hostname;
     _portController.text = host.port.toString();
@@ -130,6 +130,8 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     _usernameController.dispose();
     _passwordController.dispose();
     _privateKeyController.dispose();
+    _agentSocketController.dispose();
+    _agentPublicKeyController.dispose();
     _keyPassphraseController.dispose();
     _startupCommandsController.dispose();
     _remoteSessionNameController.dispose();
@@ -307,13 +309,14 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                   ),
                   SizedBox(height: layout.fieldGap),
                   _HostAuthenticationFields(
-                    useSavedCredentialPicker: _usesSavedCredentialPicker,
                     authMode: _authMode,
                     loadingOptions: _loadingOptions,
                     passwordController: _passwordController,
                     passwordVisible: _passwordVisible,
                     privateKeyController: _privateKeyController,
                     keyPassphraseController: _keyPassphraseController,
+                    agentSocketController: _agentSocketController,
+                    agentPublicKeyController: _agentPublicKeyController,
                     showSshAgent: capabilities.sshAgentAuth,
                     identityOptions: _identityOptions,
                     selectedIdentityIds: _selectedIdentityIds,
@@ -322,7 +325,6 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                         _authMode = authMode;
                       });
                     },
-                    onImportPrivateKey: _importPrivateKey,
                     onTogglePasswordVisible: () {
                       setState(() {
                         _passwordVisible = !_passwordVisible;
@@ -331,7 +333,6 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
                     onToggleIdentity: _toggleIdentity,
                     onEditIdentity: _editIdentity,
                     onDeleteIdentity: _deleteIdentity,
-                    onAddIdentity: _addIdentity,
                     onSubmit: _save,
                     compact: layout.compact,
                   ),
@@ -567,6 +568,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
         await service.updateHostMetadata(
           HostMetadataDraft(
             id: host.id,
+            newCredential: _newCredentialDraft(),
             displayName: _displayNameController.text,
             hostname: _hostnameController.text,
             port: port,
@@ -587,6 +589,7 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
         await service.duplicateHost(
           DuplicateHostDraft(
             sourceHostId: host.id,
+            newCredential: _newCredentialDraft(),
             displayName: _displayNameController.text,
             hostname: _hostnameController.text,
             port: port,
@@ -646,6 +649,10 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
           ref.read(platformCapabilitiesProvider).sshAgentAuth) {
         await service.createSshAgentHost(
           SshAgentHostDraft(
+            agent: _agentConfig(
+              _agentSocketController,
+              _agentPublicKeyController,
+            ),
             displayName: _displayNameController.text,
             hostname: _hostnameController.text,
             port: port,
@@ -685,6 +692,13 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
       if (mounted) {
         Navigator.of(context).pop();
       }
+    } on IdentityWriteException catch (error) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _errorMessage = error.message;
+        });
+      }
     } on HostWriteException catch (error) {
       if (mounted) {
         setState(() {
@@ -702,24 +716,38 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     }
   }
 
+  IdentityCreateDraft? _newCredentialDraft() {
+    if (_authMode == _HostAuthInputMode.savedOrNone) return null;
+    final name = _displayNameController.text.trim().isEmpty
+        ? _hostnameController.text.trim()
+        : _displayNameController.text.trim();
+    final (kind, suffix) = switch (_authMode) {
+      _HostAuthInputMode.password => (IdentityKind.password, 'Password'),
+      _HostAuthInputMode.privateKey => (IdentityKind.privateKey, 'Key'),
+      _HostAuthInputMode.sshAgent => (IdentityKind.sshAgent, 'SSH Agent'),
+      _HostAuthInputMode.savedOrNone => throw StateError(
+        'Saved credential mode',
+      ),
+    };
+    return IdentityCreateDraft(
+      kind: kind,
+      displayName: '$name $suffix',
+      usernameHint: _usernameController.text,
+      password: _passwordController.text,
+      privateKeyPem: _privateKeyController.text,
+      privateKeyPassphrase: _keyPassphraseController.text,
+      agent: kind == IdentityKind.sshAgent
+          ? _agentConfig(_agentSocketController, _agentPublicKeyController)
+          : null,
+    );
+  }
+
   String _title(AppLocalizations l10n) {
     return switch (widget.mode) {
       _HostFormMode.add => l10n.hostAddTitle,
       _HostFormMode.edit => l10n.hostEditTitle,
       _HostFormMode.duplicate => l10n.hostDuplicateTitle,
     };
-  }
-
-  Future<void> _importPrivateKey() async {
-    final file = await ref
-        .read(documentGatewayProvider)
-        .pickUploadFile(
-          acceptedTypeGroups: const [XTypeGroup(label: 'SSH Private Key')],
-        );
-    if (file == null) {
-      return;
-    }
-    _privateKeyController.text = await File(file.path).readAsString();
   }
 
   Future<void> _loadOptions() async {
@@ -1016,24 +1044,6 @@ class _HostFormDialogState extends ConsumerState<_HostFormDialog> {
     }
   }
 
-  Future<void> _addIdentity() async {
-    final created = await showSerlinkFormDialog<Object?>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const _IdentityEditDialog(),
-    );
-    if (created is! IdentityConfig || !mounted) {
-      return;
-    }
-    await _reloadIdentityOptions();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _selectedIdentityIds = {..._selectedIdentityIds, created.id};
-    });
-  }
-
   Future<void> _editIdentity(IdentityConfig identity) async {
     final updated = await showSerlinkFormDialog<bool>(
       context: context,
@@ -1174,8 +1184,8 @@ class _HostFormDialogLayout {
             )
           : const FDialogStyleDelta.context(),
       scrollPadding: compact
-          ? const EdgeInsets.fromLTRB(0, 4, 4, 0)
-          : const EdgeInsets.fromLTRB(2, 8, 10, 2),
+          ? const EdgeInsets.only(top: 4)
+          : const EdgeInsets.only(top: 8, bottom: 2),
       sectionPadding: EdgeInsets.all(
         capabilities.isIOS ? 16 : (compact ? 12 : 16),
       ),
@@ -1227,6 +1237,10 @@ bool _identitySupportedByCapabilities(
   IdentityConfig identity,
   PlatformCapabilities capabilities,
 ) {
+  if (identity.kind == IdentityKind.openSshCertificate &&
+      identity.agent != null) {
+    return capabilities.sshAgentAuth;
+  }
   return switch (identity.kind) {
     IdentityKind.sshAgent => capabilities.sshAgentAuth,
     IdentityKind.hardwareKey => capabilities.hardwareKeyAuth,

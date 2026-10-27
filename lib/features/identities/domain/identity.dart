@@ -1,4 +1,7 @@
 import '../../../core/ids/entity_id.dart';
+import 'identity_agent.dart';
+
+export 'identity_agent.dart';
 
 enum IdentityKind {
   password,
@@ -20,6 +23,7 @@ class IdentityConfig {
     this.secretRecordId,
     this.publicKeyFingerprint,
     this.certificatePrincipal,
+    this.agent,
   });
 
   final IdentityId id;
@@ -32,6 +36,9 @@ class IdentityConfig {
   final String? publicKeyFingerprint;
   final String? certificatePrincipal;
 
+  /// For certificates, non-null means the private key stays in this agent.
+  final IdentityAgentConfig? agent;
+
   Map<String, Object?> toJson() {
     return {
       'id': id.value,
@@ -41,6 +48,7 @@ class IdentityConfig {
       'secretRecordId': secretRecordId?.value,
       'publicKeyFingerprint': publicKeyFingerprint,
       'certificatePrincipal': certificatePrincipal,
+      if (agent != null) 'agent': agent!.toJson(),
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
     };
@@ -58,6 +66,10 @@ class IdentityConfig {
       },
       publicKeyFingerprint: json['publicKeyFingerprint'] as String?,
       certificatePrincipal: json['certificatePrincipal'] as String?,
+      agent: switch (json['agent']) {
+        final Map<String, Object?> value => IdentityAgentConfig.fromJson(value),
+        _ => null,
+      },
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );

@@ -254,7 +254,7 @@ class OpenSshConfigImportService {
               lineNumber: line.lineNumber,
               code: 'ssh_config.identity_agent_unsupported',
               message:
-                  'IdentityAgent on line ${line.lineNumber} is not imported because SSH agent authentication is not enabled for this release.',
+                  'IdentityAgent on line ${line.lineNumber} is not imported automatically. Select SSH Agent and set this endpoint after import.',
             ),
           );
         case 'userknownhostsfile' || 'globalknownhostsfile':

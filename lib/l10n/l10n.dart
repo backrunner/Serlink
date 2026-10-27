@@ -22,7 +22,9 @@ AppLocalizations lookupSerlinkLocalizations(AppLanguage language) {
     AppLanguage.simplifiedChinese => const Locale('zh'),
     // PlatformDispatcher.instance works without an initialized
     // WidgetsBinding, so non-widget tests can localize failure messages.
-    AppLanguage.system => _supportedLocaleFor(ui.PlatformDispatcher.instance.locale),
+    AppLanguage.system => _supportedLocaleFor(
+      ui.PlatformDispatcher.instance.locale,
+    ),
   };
   return lookupAppLocalizations(locale);
 }
@@ -137,6 +139,7 @@ String localizedSessionFailureMessage(
     'ssh_auth.hardware_key_unsupported' =>
       l10n.sshAuthHardwareKeyUnsupportedMessage,
     'ssh_auth.agent_empty' => l10n.sshAuthAgentEmptyMessage,
+    'ssh_auth.agent_ambiguous' => l10n.sshAuthAgentAmbiguousMessage,
     'ssh_auth.empty' => l10n.sshAuthEmptyMessage,
     'ssh_auth.certificate_invalid' => l10n.sshAuthCertificateInvalidMessage,
     'local_terminal.exited' => l10n.localTerminalExitedMessage,

@@ -42,7 +42,7 @@ void main() {
     expect(capabilities.openLocalFile, isTrue);
     expect(capabilities.sshAgentAuth, isTrue);
     expect(capabilities.sshConfigImport, isTrue);
-    expect(capabilities.hardwareKeyAuth, isFalse);
+    expect(capabilities.hardwareKeyAuth, isTrue);
     expect(capabilities.mcpServer, isTrue);
     expect(capabilities.mcpStdioHelper, isTrue);
     expect(capabilities.terminalSoftwareKeyboardDeleteDetection, isFalse);

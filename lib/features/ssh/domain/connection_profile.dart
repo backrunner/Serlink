@@ -1,5 +1,6 @@
 import '../../../core/ids/entity_id.dart';
 import '../../../core/security/secret_bytes.dart';
+import '../../identities/domain/identity_agent.dart';
 
 class ConnectionProfileSnapshot {
   const ConnectionProfileSnapshot({
@@ -161,23 +162,29 @@ class SshKeyboardInteractiveAuth extends SshAuthMethod {
 }
 
 class SshAgentAuth extends SshAuthMethod {
-  const SshAgentAuth();
+  const SshAgentAuth({this.agent = const IdentityAgentConfig()});
+
+  final IdentityAgentConfig agent;
 }
 
 class SshOpenSshCertificateAuth extends SshAuthMethod {
   const SshOpenSshCertificateAuth({
-    required this.privateKeyPem,
+    this.privateKeyPem,
     required this.certificate,
     this.passphrase,
+    this.agent,
   });
 
-  final SecretBytes privateKeyPem;
+  final SecretBytes? privateKeyPem;
   final SecretBytes certificate;
   final SecretBytes? passphrase;
+  final IdentityAgentConfig? agent;
 }
 
 class SshHardwareKeyAuth extends SshAuthMethod {
-  const SshHardwareKeyAuth();
+  const SshHardwareKeyAuth({this.agent = const IdentityAgentConfig()});
+
+  final IdentityAgentConfig agent;
 }
 
 class UnsupportedSshAuthException implements Exception {

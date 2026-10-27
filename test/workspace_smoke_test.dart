@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/native.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ import 'package:serlink/features/hosts/application/host_group_repository.dart';
 import 'package:serlink/features/hosts/application/host_write_service.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/identities/application/identity_repository.dart';
+import 'package:serlink/features/identities/application/identity_write_service.dart';
 import 'package:serlink/features/identities/domain/identity.dart';
 import 'package:serlink/features/import_export/application/macos_ssh_config_startup_service.dart';
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
@@ -31,6 +33,8 @@ import 'package:serlink/features/ssh/application/connection_profile_resolver.dar
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
 import 'package:serlink/features/ssh/application/known_host_repository.dart';
+import 'package:serlink/features/ssh/application/ssh_agent_identity_catalog.dart';
+import 'package:serlink/features/ssh/data/ssh_agent_client.dart';
 import 'package:serlink/features/sync/application/auto_sync_controller.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
 import 'package:serlink/features/sync/application/sync_device_service.dart';
@@ -893,7 +897,7 @@ void main() {
     expect(find.text(freeIdentity.displayName), findsNothing);
   });
 
-  testWidgets('host form adds a new credential from the saved picker', (
+  testWidgets('host form creates credentials through password input', (
     tester,
   ) async {
     final hosts = _MemoryHostRepository();
@@ -912,25 +916,17 @@ void main() {
     await tester.tap(find.text('Saved'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('credential-add-button')));
-    await tester.pumpAndSettle();
-    expect(find.text('Add Credential'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const ValueKey('credential-display-name-field')),
-      'Deploy password',
+    expect(find.byKey(const ValueKey('credential-add-button')), findsNothing);
+    expect(
+      find.textContaining('save the host without credentials'),
+      findsNothing,
     );
+    await tester.tap(find.text('Password'));
+    await tester.pumpAndSettle();
     await tester.enterText(
-      find.byKey(const ValueKey('credential-password-field')),
+      find.byKey(const ValueKey('host-password-field')),
       's3cret',
     );
-    await tester.tap(find.byKey(const ValueKey('credential-save-button')));
-    await tester.pumpAndSettle();
-
-    final created = (await identities.list()).single;
-    expect(created.displayName, 'Deploy password');
-    expect(created.kind, IdentityKind.password);
-    expect(find.text('Deploy password'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('host-hostname-field')),
@@ -943,6 +939,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('host-save-button')));
     await tester.pumpAndSettle();
 
+    final created = (await identities.list()).single;
+    expect(created.kind, IdentityKind.password);
     expect(hosts.hosts.single.identityIds, [created.id]);
   });
 
@@ -995,17 +993,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The public key is shown for deployment and the private key field is
-    // filled with the generated key.
+    // Show the public key for deployment while keeping private material hidden.
     expect(find.textContaining('ssh-ed25519 '), findsOneWidget);
     expect(find.textContaining('SHA256:'), findsOneWidget);
-    final privateKeyField = tester.widget<SerlinkTextField>(
-      find.byKey(const ValueKey('host-private-key-field')),
-    );
-    expect(
-      privateKeyField.controller!.text,
-      contains('BEGIN OPENSSH PRIVATE KEY'),
-    );
+    expect(find.byKey(const ValueKey('host-private-key-field')), findsNothing);
+    expect(find.text('Private key loaded'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('credential-save-button')));
     await tester.pumpAndSettle();
@@ -1015,6 +1007,13 @@ void main() {
     expect(created.kind, IdentityKind.privateKey);
     expect(created.secretRecordId, isNotNull);
     expect(created.publicKeyFingerprint, startsWith('SHA256:'));
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SerlinkApp)),
+    );
+    final secret = await container
+        .read(identityWriteServiceProvider)
+        .readSecretMaterial(created);
+    expect(secret?.privateKeyPem, contains('BEGIN OPENSSH PRIVATE KEY'));
     expect(find.text('Generated key'), findsOneWidget);
   });
 
@@ -3246,6 +3245,8 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
   AppLanguageSettingsRepository? languageRepository,
   TerminalFontDiscovery? fontDiscovery,
   DocumentGateway? documentGateway,
+  SshAgentIdentityLoader? agentIdentityLoader,
+  SshAgentEndpointLoader? agentEndpointLoader,
 }) async {
   final database = SerlinkDatabase(NativeDatabase.memory());
   final transferQueue = TransferQueueController();
@@ -3283,6 +3284,10 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
         platformCapabilitiesProvider.overrideWithValue(resolvedCapabilities),
         if (documentGateway != null)
           documentGatewayProvider.overrideWithValue(documentGateway),
+        if (agentIdentityLoader != null)
+          sshAgentIdentityLoaderProvider.overrideWithValue(agentIdentityLoader),
+        if (agentEndpointLoader != null)
+          sshAgentEndpointLoaderProvider.overrideWithValue(agentEndpointLoader),
         if (languageRepository != null)
           appLanguageSettingsRepositoryProvider.overrideWithValue(
             languageRepository,

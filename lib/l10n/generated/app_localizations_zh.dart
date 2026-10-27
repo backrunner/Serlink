@@ -1194,7 +1194,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hostSshAgentNote =>
-      '使用本地 SSH agent 中的身份。在 macOS 上，载入 ssh-agent 的密钥可以由钥匙串保护。';
+      '私钥保留在 SSH Agent 中。可使用系统 Agent，或填写兼容 Agent 的连接端点。';
 
   @override
   String get hostNoSavedCredentials => '还没有可用的已保存凭据。';
@@ -2964,4 +2964,120 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsMcpGuardSaveFailed => '无法保存防护设置，请重试。';
+
+  @override
+  String get credentialImportPrivateKeyAction => '从文件导入';
+
+  @override
+  String get credentialPrivateKeyFileHint => '选择私钥文件，避免私钥经过剪贴板。';
+
+  @override
+  String get credentialPrivateKeyLoaded => '私钥已载入';
+
+  @override
+  String get credentialPastePrivateKeyAction => '手动输入或粘贴';
+
+  @override
+  String get credentialHidePrivateKeyInputAction => '收起私钥输入';
+
+  @override
+  String get credentialPrivateKeyImportFailed => '无法读取私钥文件，请选择非空的 UTF-8 文本文件。';
+
+  @override
+  String get agentProviderOptionsTooltip => 'SSH Agent 选项';
+
+  @override
+  String get agentProviderLabel => 'SSH Agent';
+
+  @override
+  String get agentChooseProviderHint => '查找并选择本机可用的 SSH Agent';
+
+  @override
+  String get agentManualEndpointAction => '自定义端点';
+
+  @override
+  String get agentHideEndpointAction => '收起自定义端点';
+
+  @override
+  String get agentRefreshProvidersAction => '重新查找';
+
+  @override
+  String get agentFindEndpointAction => '自动查找 SSH Agent';
+
+  @override
+  String get agentChooseEndpointTitle => '选择 SSH Agent';
+
+  @override
+  String get agentSystemTitle => '系统 Agent';
+
+  @override
+  String get agentLocalTitle => '本地 Agent';
+
+  @override
+  String get agentDiscoveryEmptyMessage =>
+      '未找到可用的 SSH Agent。请启动兼容的 Agent，或手动填写端点。';
+
+  @override
+  String agentDiscoveredKeysCount(int count) {
+    return '$count 把密钥';
+  }
+
+  @override
+  String get sshAuthAgentAmbiguousMessage =>
+      '发现多个 SSH Agent，请在凭据中选择密钥或指定 Agent 端点。';
+
+  @override
+  String get agentAuthenticationKeyLabel => '认证密钥';
+
+  @override
+  String get agentAllKeysTitle => '全部可用密钥';
+
+  @override
+  String get agentAllKeysDescription => '连接时使用 Agent 提供的可用密钥。';
+
+  @override
+  String get agentChooseKeyAction => '选择密钥';
+
+  @override
+  String get agentChangeKeyAction => '更换密钥';
+
+  @override
+  String get agentKeyOptionsTooltip => '更多密钥选项';
+
+  @override
+  String get agentEnterPublicKeyAction => '手动输入公钥';
+
+  @override
+  String get agentHidePublicKeyInputAction => '收起公钥输入';
+
+  @override
+  String get agentSelectKeyAction => '从 Agent 选择密钥';
+
+  @override
+  String get agentPublicKeySelected => '已选择公钥';
+
+  @override
+  String get agentUseAllKeysAction => '使用 Agent 中的全部密钥';
+
+  @override
+  String get agentSocketLabel => 'Agent 端点（可选）';
+
+  @override
+  String get agentSocketHint => 'Unix socket 路径或本地 OpenSSH 命名管道';
+
+  @override
+  String get agentPublicKeyLabel => '公钥（可选）';
+
+  @override
+  String get agentPublicKeyHint => '选择公钥后，仅使用 Agent 中与之匹配的密钥。';
+
+  @override
+  String get agentImportPublicKeyAction => '选择公钥文件';
+
+  @override
+  String get agentPublicKeyImportFailed => '无法从此文件读取公钥。';
+
+  @override
+  String get agentHardwareKeyNote =>
+      '请先将硬件密钥加载到兼容 SSH Agent 中（OpenSSH FIDO2 或智能卡 / PKCS#11）。设备访问、触摸和 PIN 验证由 Agent 处理。';
 }

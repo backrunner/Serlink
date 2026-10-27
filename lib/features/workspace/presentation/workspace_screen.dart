@@ -64,6 +64,7 @@ import '../../sync/application/sync_settings_service.dart';
 import '../../sync/domain/sync_provider.dart';
 import '../../sync/domain/webdav_tls_certificate_details.dart';
 import '../../ssh/application/known_host_repository.dart';
+import '../../ssh/application/ssh_agent_identity_catalog.dart';
 import '../../terminal/application/terminal_buffer_search_controller.dart';
 import '../../terminal/application/terminal_display_settings.dart';
 import '../../terminal/application/terminal_font_discovery.dart';

@@ -2293,7 +2293,7 @@ abstract class AppLocalizations {
   /// No description provided for @hostSshAgentNote.
   ///
   /// In en, this message translates to:
-  /// **'Uses identities from the local SSH agent. On macOS, keys loaded into ssh-agent can be backed by Keychain.'**
+  /// **'Private keys stay in your SSH agent. Use the system agent or enter a compatible agent endpoint.'**
   String get hostSshAgentNote;
 
   /// No description provided for @hostNoSavedCredentials.
@@ -5505,6 +5505,228 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not save protection settings. Please retry.'**
   String get settingsMcpGuardSaveFailed;
+
+  /// No description provided for @credentialImportPrivateKeyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from file'**
+  String get credentialImportPrivateKeyAction;
+
+  /// No description provided for @credentialPrivateKeyFileHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a private key file to keep it out of the clipboard.'**
+  String get credentialPrivateKeyFileHint;
+
+  /// No description provided for @credentialPrivateKeyLoaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Private key loaded'**
+  String get credentialPrivateKeyLoaded;
+
+  /// No description provided for @credentialPastePrivateKeyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter or paste manually'**
+  String get credentialPastePrivateKeyAction;
+
+  /// No description provided for @credentialHidePrivateKeyInputAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide private key input'**
+  String get credentialHidePrivateKeyInputAction;
+
+  /// No description provided for @credentialPrivateKeyImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the private key file. Choose a non-empty UTF-8 text file.'**
+  String get credentialPrivateKeyImportFailed;
+
+  /// No description provided for @agentProviderOptionsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH agent options'**
+  String get agentProviderOptionsTooltip;
+
+  /// No description provided for @agentProviderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH Agent'**
+  String get agentProviderLabel;
+
+  /// No description provided for @agentChooseProviderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Find and choose an available local SSH agent'**
+  String get agentChooseProviderHint;
+
+  /// No description provided for @agentManualEndpointAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a custom endpoint'**
+  String get agentManualEndpointAction;
+
+  /// No description provided for @agentHideEndpointAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide custom endpoint'**
+  String get agentHideEndpointAction;
+
+  /// No description provided for @agentRefreshProvidersAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Search again'**
+  String get agentRefreshProvidersAction;
+
+  /// No description provided for @agentFindEndpointAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Find SSH agents'**
+  String get agentFindEndpointAction;
+
+  /// No description provided for @agentChooseEndpointTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose SSH agent'**
+  String get agentChooseEndpointTitle;
+
+  /// No description provided for @agentSystemTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System agent'**
+  String get agentSystemTitle;
+
+  /// No description provided for @agentLocalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local agent'**
+  String get agentLocalTitle;
+
+  /// No description provided for @agentDiscoveryEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No SSH agent was found. Start a compatible agent, or enter its endpoint manually.'**
+  String get agentDiscoveryEmptyMessage;
+
+  /// No description provided for @agentDiscoveredKeysCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} keys'**
+  String agentDiscoveredKeysCount(int count);
+
+  /// No description provided for @sshAuthAgentAmbiguousMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple SSH agents are available. Choose a key or an agent endpoint in the credential settings.'**
+  String get sshAuthAgentAmbiguousMessage;
+
+  /// No description provided for @agentAuthenticationKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication key'**
+  String get agentAuthenticationKeyLabel;
+
+  /// No description provided for @agentAllKeysTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'All available keys'**
+  String get agentAllKeysTitle;
+
+  /// No description provided for @agentAllKeysDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent provides available keys when connecting.'**
+  String get agentAllKeysDescription;
+
+  /// No description provided for @agentChooseKeyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose key'**
+  String get agentChooseKeyAction;
+
+  /// No description provided for @agentChangeKeyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change key'**
+  String get agentChangeKeyAction;
+
+  /// No description provided for @agentKeyOptionsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'More key options'**
+  String get agentKeyOptionsTooltip;
+
+  /// No description provided for @agentEnterPublicKeyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter public key manually'**
+  String get agentEnterPublicKeyAction;
+
+  /// No description provided for @agentHidePublicKeyInputAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide public key input'**
+  String get agentHidePublicKeyInputAction;
+
+  /// No description provided for @agentSelectKeyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Select key from agent'**
+  String get agentSelectKeyAction;
+
+  /// No description provided for @agentPublicKeySelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Public key selected'**
+  String get agentPublicKeySelected;
+
+  /// No description provided for @agentUseAllKeysAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Use all agent keys'**
+  String get agentUseAllKeysAction;
+
+  /// No description provided for @agentSocketLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent endpoint (optional)'**
+  String get agentSocketLabel;
+
+  /// No description provided for @agentSocketHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Unix socket path or local OpenSSH named pipe'**
+  String get agentSocketHint;
+
+  /// No description provided for @agentPublicKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Public key (optional)'**
+  String get agentPublicKeyLabel;
+
+  /// No description provided for @agentPublicKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a public key to use only its matching key in the agent.'**
+  String get agentPublicKeyHint;
+
+  /// No description provided for @agentImportPublicKeyAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Select public key file'**
+  String get agentImportPublicKeyAction;
+
+  /// No description provided for @agentPublicKeyImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read a public key from this file.'**
+  String get agentPublicKeyImportFailed;
+
+  /// No description provided for @agentHardwareKeyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'First load your hardware key into a compatible SSH agent (OpenSSH FIDO2 or smart card / PKCS#11). The agent handles device access, touch and PIN prompts.'**
+  String get agentHardwareKeyNote;
 }
 
 class _AppLocalizationsDelegate

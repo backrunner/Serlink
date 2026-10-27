@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../app/app_dependencies.dart';
 import '../../../core/ids/entity_id.dart';
 import '../../identities/application/identity_repository.dart';
+import '../../identities/application/identity_write_service.dart';
 import '../../identities/domain/identity.dart';
 import '../../identities/domain/identity_secret.dart';
 import '../../sync/application/sync_delete_tombstone_repository.dart';
@@ -144,6 +145,7 @@ class SshAgentHostDraft {
     this.remoteSessionSettings = const HostRemoteSessionSettings(),
     this.groupId,
     this.writeBackToSshConfig = false,
+    this.agent = const IdentityAgentConfig(),
   });
 
   final String displayName;
@@ -159,6 +161,7 @@ class SshAgentHostDraft {
   final HostRemoteSessionSettings remoteSessionSettings;
   final String? groupId;
   final bool writeBackToSshConfig;
+  final IdentityAgentConfig agent;
 }
 
 class HostMetadataDraft {
@@ -170,6 +173,7 @@ class HostMetadataDraft {
     required this.username,
     required this.tags,
     required this.identityIds,
+    this.newCredential,
     this.startupCommands = const [],
     this.jumpHostIds = const [],
     this.sftpDefaultDirectory = '/',
@@ -187,6 +191,7 @@ class HostMetadataDraft {
   final String username;
   final Set<String> tags;
   final List<IdentityId> identityIds;
+  final IdentityCreateDraft? newCredential;
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
   final String sftpDefaultDirectory;
@@ -206,6 +211,7 @@ class DuplicateHostDraft {
     required this.username,
     required this.tags,
     required this.identityIds,
+    this.newCredential,
     this.startupCommands = const [],
     this.jumpHostIds = const [],
     this.sftpDefaultDirectory = '/',
@@ -223,6 +229,7 @@ class DuplicateHostDraft {
   final String username;
   final Set<String> tags;
   final List<IdentityId> identityIds;
+  final IdentityCreateDraft? newCredential;
   final List<String> startupCommands;
   final List<HostId> jumpHostIds;
   final String sftpDefaultDirectory;
@@ -488,6 +495,7 @@ class HostWriteService {
         id: identityId,
         displayName: '${normalized.displayName} SSH Agent',
         kind: IdentityKind.sshAgent,
+        agent: draft.agent,
         usernameHint: normalized.username,
         createdAt: now,
         updatedAt: now,
@@ -530,7 +538,9 @@ class HostWriteService {
       port: draft.port,
       username: draft.username,
     );
-    final identityIds = _normalizeIdentityIds(draft.identityIds);
+    final identityIds = draft.newCredential == null
+        ? _normalizeIdentityIds(draft.identityIds)
+        : const <IdentityId>[];
     final authKinds = await _resolveAuthKinds(identityIds);
     final connectionSettings = _normalizeConnectionSettings(
       draft.connectionSettings,
@@ -565,8 +575,7 @@ class HostWriteService {
       createdAt: now,
       updatedAt: now,
     );
-    await _hosts.save(duplicated);
-    return duplicated.toSummary();
+    return _saveWithCredential(duplicated, draft.newCredential);
   }
 
   Future<HostSummary> updateHostMetadata(HostMetadataDraft draft) async {
@@ -580,7 +589,9 @@ class HostWriteService {
       port: draft.port,
       username: draft.username,
     );
-    final identityIds = _normalizeIdentityIds(draft.identityIds);
+    final identityIds = draft.newCredential == null
+        ? _normalizeIdentityIds(draft.identityIds)
+        : const <IdentityId>[];
     final authKinds = await _resolveAuthKinds(identityIds);
     final connectionSettings = _normalizeConnectionSettings(
       draft.connectionSettings,
@@ -620,8 +631,47 @@ class HostWriteService {
       createdAt: existing.createdAt,
       updatedAt: DateTime.now().toUtc(),
     );
-    await _hosts.save(updated);
-    return updated.toSummary();
+    return _saveWithCredential(updated, draft.newCredential);
+  }
+
+  Future<HostSummary> _saveWithCredential(
+    HostConfig host,
+    IdentityCreateDraft? draft,
+  ) async {
+    if (draft == null) {
+      await _hosts.save(host);
+      return host.toSummary();
+    }
+    final identity = await IdentityWriteService(
+      identities: _identities,
+      records: _records,
+      vault: _vault,
+    ).create(draft);
+    final updated = HostConfig.fromJson({
+      ...host.toJson(),
+      'identityIds': [identity.id.value],
+      'authKinds': [_hostAuthKindFor(identity.kind).name],
+    });
+    try {
+      await _hosts.save(updated);
+      return updated.toSummary();
+    } on Object {
+      // A repository may throw after persisting. Keep credentials that the
+      // host already references; otherwise clean up the failed save's draft.
+      final stored = await _hosts.read(host.id);
+      if (stored == null || !stored.identityIds.contains(identity.id)) {
+        if (identity.secretRecordId case final secretId?) {
+          await _recordDeletion(secretId, 'identity_secret');
+          await _records.delete(secretId);
+        }
+        await _recordDeletion(
+          _identityRecordId(identity.id),
+          EncryptedIdentityRepository.recordType,
+        );
+        await _identities.delete(identity.id);
+      }
+      rethrow;
+    }
   }
 
   Future<HostSummary> moveHostToGroup(HostId id, String? groupId) async {

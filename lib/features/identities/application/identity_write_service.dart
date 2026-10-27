@@ -30,6 +30,7 @@ class IdentityUpdateDraft {
     this.openSshCertificate,
     this.keyboardInteractiveResponses,
     this.publicKeyFingerprint,
+    this.agent,
   });
 
   final IdentityId id;
@@ -41,6 +42,7 @@ class IdentityUpdateDraft {
   final String? openSshCertificate;
   final List<String>? keyboardInteractiveResponses;
   final String? publicKeyFingerprint;
+  final IdentityAgentConfig? agent;
 }
 
 class IdentityCreateDraft {
@@ -54,6 +56,7 @@ class IdentityCreateDraft {
     this.openSshCertificate,
     this.keyboardInteractiveResponses,
     this.publicKeyFingerprint,
+    this.agent,
   });
 
   final IdentityKind kind;
@@ -65,6 +68,7 @@ class IdentityCreateDraft {
   final String? openSshCertificate;
   final List<String>? keyboardInteractiveResponses;
   final String? publicKeyFingerprint;
+  final IdentityAgentConfig? agent;
 }
 
 class IdentityWriteService {
@@ -95,6 +99,7 @@ class IdentityWriteService {
     final id = IdentityId(_uuid.v4());
     final secret = _secretFor(
       draft.kind,
+      agent: draft.agent,
       password: draft.password,
       privateKeyPem: draft.privateKeyPem,
       privateKeyPassphrase: draft.privateKeyPassphrase,
@@ -117,6 +122,7 @@ class IdentityWriteService {
       id: id,
       displayName: displayName,
       kind: draft.kind,
+      agent: draft.agent,
       usernameHint: _blankToNull(draft.usernameHint),
       secretRecordId: secretRecordId,
       publicKeyFingerprint: draft.publicKeyFingerprint,
@@ -165,6 +171,7 @@ class IdentityWriteService {
 
     final secret = _secretFor(
       existing.kind,
+      agent: draft.agent,
       password: draft.password,
       privateKeyPem: draft.privateKeyPem,
       privateKeyPassphrase: draft.privateKeyPassphrase,
@@ -188,6 +195,7 @@ class IdentityWriteService {
       id: existing.id,
       displayName: displayName,
       kind: existing.kind,
+      agent: draft.agent,
       usernameHint: _blankToNull(draft.usernameHint),
       secretRecordId: secretRecordId,
       publicKeyFingerprint:
@@ -204,6 +212,7 @@ class IdentityWriteService {
 
   IdentitySecretMaterial? _secretFor(
     IdentityKind kind, {
+    IdentityAgentConfig? agent,
     String? password,
     String? privateKeyPem,
     String? privateKeyPassphrase,
@@ -223,8 +232,12 @@ class IdentityWriteService {
         privateKeyPassphrase: _blankToNull(privateKeyPassphrase),
       ),
       IdentityKind.openSshCertificate => IdentitySecretMaterial(
-        privateKeyPem: _requiredPrivateKey(privateKeyPem),
-        privateKeyPassphrase: _blankToNull(privateKeyPassphrase),
+        privateKeyPem: agent == null
+            ? _requiredPrivateKey(privateKeyPem)
+            : null,
+        privateKeyPassphrase: agent == null
+            ? _blankToNull(privateKeyPassphrase)
+            : null,
         openSshCertificate: _requiredCertificate(openSshCertificate),
       ),
       IdentityKind.keyboardInteractive => IdentitySecretMaterial(

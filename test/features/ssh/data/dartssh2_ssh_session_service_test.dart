@@ -1,8 +1,11 @@
+// ignore_for_file: implementation_imports
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
+import 'package:dartssh2/src/ssh_message.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/core/logging/offline_diagnostic_logger.dart';
@@ -10,6 +13,8 @@ import 'package:serlink/core/security/secret_bytes.dart';
 import 'package:serlink/features/ssh/data/dartssh2_ssh_session_service.dart';
 import 'package:serlink/features/ssh/data/ssh_agent_client.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
+import 'package:serlink/features/identities/domain/identity_agent.dart';
+import 'package:serlink/features/identities/application/ssh_key_pair_generator.dart';
 
 void main() {
   test('builds password and keyboard-interactive auth material', () {
@@ -28,16 +33,13 @@ void main() {
   });
 
   test('builds OpenSSH certificate auth material', () {
+    final keyPair = SSHKeyPair.fromPem(_legacyEcPrivateKey).single;
+    final certificate = _certificateFor(keyPair);
     final material = DartSsh2AuthMaterial.fromProfile(
       _profile([
         SshOpenSshCertificateAuth(
           privateKeyPem: SecretBytes(utf8.encode(_legacyEcPrivateKey)),
-          certificate: SecretBytes(
-            utf8.encode(
-              'ecdsa-sha2-nistp256-cert-v01@openssh.com '
-              'aGVsbG8= deploy@example',
-            ),
-          ),
+          certificate: SecretBytes(utf8.encode(certificate)),
         ),
       ]),
     );
@@ -48,8 +50,8 @@ void main() {
       'ecdsa-sha2-nistp256-cert-v01@openssh.com',
     );
     expect(
-      utf8.decode(material.identities.single.toPublicKey().encode()),
-      ['hello'].join(),
+      material.identities.single.toPublicKey().encode(),
+      base64Decode(certificate.split(' ')[1]),
     );
   });
 
@@ -73,7 +75,7 @@ void main() {
     );
   });
 
-  test('builds SSH agent auth material from local agent identities', () {
+  test('builds SSH agent auth material from local agent identities', () async {
     final keyPair = SSHKeyPair.fromPem(_legacyEcPrivateKey).single;
     final agent = _FakeAgentClient([keyPair]);
 
@@ -84,7 +86,7 @@ void main() {
 
     expect(material.identities, hasLength(1));
     expect(material.identities.single.type, 'ecdsa-sha2-nistp256');
-    final signature = material.identities.single.sign(
+    final signature = await material.identities.single.sign(
       Uint8List.fromList([1, 2, 3]),
     );
     expect(signature.encode(), isNotEmpty);
@@ -106,6 +108,117 @@ void main() {
       ),
     );
   });
+
+  test(
+    'selects an agent endpoint and offers only the configured public key',
+    () async {
+      final other = await const SshKeyPairGenerator().generate(
+        GeneratedSshKeyType.ed25519,
+      );
+      final key = SSHKeyPair.fromPem(_legacyEcPrivateKey).single;
+      final agent = _FakeAgentClient([
+        SSHKeyPair.fromPem(other.privateKeyPem).single,
+        key,
+      ]);
+      final material = DartSsh2AuthMaterial.fromAuthMethods([
+        SshAgentAuth(
+          agent: IdentityAgentConfig(
+            socketPath: '/custom/agent.sock',
+            publicKey:
+                '${key.name} ${base64Encode(key.toPublicKey().encode())}',
+          ),
+        ),
+      ], agentClient: agent);
+      expect(material.identities, hasLength(1));
+      expect(material.identities.single.shouldProbe, isTrue);
+      expect(agent.lastSocketPath, '/custom/agent.sock');
+      expect(agent.signRequests, 0);
+      await material.identities.single.sign(Uint8List.fromList([1, 2, 3]));
+      expect(agent.lastSocketPath, '/custom/agent.sock');
+      expect(agent.signRequests, 1);
+    },
+  );
+
+  test(
+    'pairs a certificate with its matching agent key without a private key',
+    () async {
+      final key = SSHKeyPair.fromPem(_legacyEcPrivateKey).single;
+      final certificate = _certificateFor(key);
+      final agent = _FakeAgentClient([key]);
+      final material = DartSsh2AuthMaterial.fromAuthMethods([
+        SshOpenSshCertificateAuth(
+          certificate: SecretBytes(utf8.encode(certificate)),
+          agent: const IdentityAgentConfig(socketPath: '/external/agent.sock'),
+        ),
+      ], agentClient: agent);
+      expect(material.identities.single.type, certificate.split(' ').first);
+      expect(material.identities.single.shouldProbe, isTrue);
+      expect(
+        material.identities.single.toPublicKey().encode(),
+        base64Decode(certificate.split(' ')[1]),
+      );
+      await material.identities.single.sign(Uint8List.fromList([4, 5, 6]));
+      expect(agent.signRequests, 1);
+      expect(agent.lastSocketPath, '/external/agent.sock');
+    },
+  );
+
+  test('rejects a certificate whose key is missing from the agent', () async {
+    final other = await const SshKeyPairGenerator().generate(
+      GeneratedSshKeyType.ed25519,
+    );
+    final key = SSHKeyPair.fromPem(_legacyEcPrivateKey).single;
+    expect(
+      () => DartSsh2AuthMaterial.fromAuthMethods(
+        [
+          SshOpenSshCertificateAuth(
+            certificate: SecretBytes(utf8.encode(_certificateFor(key))),
+            agent: const IdentityAgentConfig(),
+          ),
+        ],
+        agentClient: _FakeAgentClient(SSHKeyPair.fromPem(other.privateKeyPem)),
+      ),
+      throwsA(
+        isA<UnsupportedSshAuthException>().having(
+          (e) => e.code,
+          'code',
+          'ssh_auth.certificate_invalid',
+        ),
+      ),
+    );
+  });
+
+  for (final algorithm in [
+    'sk-ssh-ed25519@openssh.com',
+    'sk-ecdsa-sha2-nistp256@openssh.com',
+  ]) {
+    test(
+      'preserves $algorithm public keys and signatures from a hardware agent',
+      () async {
+        final blob = SSHMessageWriter()..writeUtf8(algorithm);
+        if (algorithm.contains('ecdsa')) blob.writeUtf8('nistp256');
+        blob.writeString(Uint8List(algorithm.contains('ecdsa') ? 65 : 32));
+        blob.writeUtf8('ssh:');
+        final signature = SSHMessageWriter()
+          ..writeUtf8(algorithm)
+          ..writeString(Uint8List(64))
+          ..writeUint8(1)
+          ..writeUint32(17);
+        final encoded = signature.takeBytes();
+        final agent = _HardwareAgent(blob.takeBytes(), encoded);
+        final material = DartSsh2AuthMaterial.fromAuthMethods(const [
+          SshHardwareKeyAuth(),
+        ], agentClient: agent);
+        expect(material.identities.single.type, algorithm);
+        expect(material.identities.single.shouldProbe, isTrue);
+        expect(
+          (await material.identities.single.sign(Uint8List.fromList([1])))
+              .encode(),
+          encoded,
+        );
+      },
+    );
+  }
 
   test('rejects profiles with no supported auth methods', () {
     expect(
@@ -206,6 +319,7 @@ void main() {
       expect(logger.events.map((event) => event.event), [
         'ssh.connect.start',
         'ssh.transport.closed',
+        'ssh.auth.summary',
         'ssh.connect.failure',
       ]);
       expect(
@@ -217,6 +331,12 @@ void main() {
         containsPair('code', 'ssh.authentication_aborted'),
       );
       expect(socket.closed, isTrue);
+      final summary = logger.events
+          .singleWhere((event) => event.event == 'ssh.auth.summary')
+          .details;
+      expect(summary, containsPair('authenticated', false));
+      expect(summary, containsPair('signRequests', 0));
+      expect(jsonEncode(summary), isNot(contains('test-secret')));
     },
   );
 
@@ -315,9 +435,11 @@ class _FakeAgentClient implements SshAgentClient {
 
   final List<SSHKeyPair> _keyPairs;
   int signRequests = 0;
+  String? lastSocketPath;
 
   @override
-  List<SshAgentIdentity> listIdentities() {
+  List<SshAgentIdentity> listIdentities({String? socketPath}) {
+    lastSocketPath = socketPath;
     return [
       for (final keyPair in _keyPairs)
         SshAgentIdentity(
@@ -332,7 +454,9 @@ class _FakeAgentClient implements SshAgentClient {
     required Uint8List publicKeyBlob,
     required Uint8List data,
     required int flags,
+    String? socketPath,
   }) {
+    lastSocketPath = socketPath;
     signRequests += 1;
     final keyPair = _keyPairs.singleWhere(
       (candidate) =>
@@ -340,6 +464,46 @@ class _FakeAgentClient implements SshAgentClient {
     );
     return keyPair.sign(data).encode();
   }
+}
+
+String _certificateFor(SSHKeyPair key) {
+  final publicKey = key.toPublicKey().encode();
+  final type = SSHMessageReader(publicKey).readUtf8();
+  final writer = SSHMessageWriter()
+    ..writeUtf8('$type-cert-v01@openssh.com')
+    ..writeString(Uint8List(32))
+    ..writeBytes(publicKey.sublist(4 + utf8.encode(type).length))
+    ..writeUint64(1)
+    ..writeUint32(1)
+    ..writeUtf8('test-certificate')
+    ..writeString(Uint8List(0))
+    ..writeUint64(0)
+    ..writeUint64(0x7fffffffffffffff)
+    ..writeString(Uint8List(0))
+    ..writeString(Uint8List(0))
+    ..writeString(Uint8List(0))
+    ..writeString(publicKey)
+    ..writeString(Uint8List(0));
+  return '$type-cert-v01@openssh.com ${base64Encode(writer.takeBytes())} test';
+}
+
+class _HardwareAgent implements SshAgentClient {
+  _HardwareAgent(this.publicKey, this.signature);
+  final Uint8List publicKey;
+  final Uint8List signature;
+
+  @override
+  List<SshAgentIdentity> listIdentities({String? socketPath}) => [
+    SshAgentIdentity(publicKeyBlob: publicKey, comment: 'hardware'),
+  ];
+
+  @override
+  Uint8List sign({
+    required Uint8List publicKeyBlob,
+    required Uint8List data,
+    required int flags,
+    String? socketPath,
+  }) => signature;
 }
 
 class _CapturedDiagnosticEvent {

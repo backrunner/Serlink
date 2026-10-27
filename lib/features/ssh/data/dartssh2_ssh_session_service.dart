@@ -6,18 +6,24 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dartssh2/dartssh2.dart';
+import 'package:dartssh2/src/ssh_message.dart';
 
 import '../../../core/ids/entity_id.dart';
 import '../../../core/logging/offline_diagnostic_logger.dart';
 import '../../sftp/application/sftp_connection.dart';
 import '../../sftp/data/dartssh2_sftp_connection.dart';
+import '../../identities/domain/identity_agent.dart';
 import '../application/ssh_session_service.dart';
 import '../domain/connection_profile.dart';
 import 'ssh_agent_client.dart';
+import 'ssh_agent_discovery.dart';
 import 'ssh_diagnostic_details.dart';
 
-typedef SshSocketFactory =
-    Future<SSHSocket> Function(String host, int port, {Duration? timeout});
+typedef SshSocketFactory = Future<SSHSocket> Function(
+  String host,
+  int port, {
+  Duration? timeout,
+});
 
 class DartSsh2SessionService implements SshSessionService {
   static const _probeTimeout = Duration(seconds: 5);
@@ -421,7 +427,11 @@ class DartSsh2SessionService implements SshSessionService {
           final jump = profile.jumpHosts[index];
           hop = index;
           stage = 'authentication';
-          final jumpClient = _createClient(socket, _SshEndpoint.fromJump(jump));
+          final jumpClient = await _createClient(
+            socket,
+            _SshEndpoint.fromJump(jump),
+            diagnostics: {...details, 'hop': hop},
+          );
           clients.add(jumpClient);
           _observeTransport(jumpClient, details: details, hop: hop);
           await jumpClient.authenticated;
@@ -438,7 +448,11 @@ class DartSsh2SessionService implements SshSessionService {
 
       hop = profile.jumpHosts.length;
       stage = 'authentication';
-      final target = _createClient(socket, _SshEndpoint.fromProfile(profile));
+      final target = await _createClient(
+        socket,
+        _SshEndpoint.fromProfile(profile),
+        diagnostics: {...details, 'hop': hop},
+      );
       clients.add(target);
       _observeTransport(target, details: details, hop: hop);
       await target.authenticated;
@@ -535,15 +549,49 @@ class DartSsh2SessionService implements SshSessionService {
     },
   );
 
-  SSHClient _createClient(SSHSocket socket, _SshEndpoint endpoint) {
-    final material = DartSsh2AuthMaterial.fromAuthMethods(
-      endpoint.authMethods,
-      agentClient: _agentClient,
-    );
-    return SSHClient(
+  Future<SSHClient> _createClient(
+    SSHSocket socket,
+    _SshEndpoint endpoint, {
+    required Map<String, Object?> diagnostics,
+  }) async {
+    final DartSsh2AuthMaterial material;
+    try {
+      material = await DartSsh2AuthMaterial.loadAuthMethods(
+        endpoint.authMethods,
+        agentClient: _agentClient,
+      );
+    } on Object {
+      await socket.close();
+      rethrow;
+    }
+    var probes = 0;
+    var signRequests = 0;
+    var signSuccesses = 0;
+    final client = SSHClient(
       socket,
       username: endpoint.username,
-      identities: material.identities.isEmpty ? null : material.identities,
+      identities: material.identities.isEmpty
+          ? null
+          : [
+              for (final identity in material.identities)
+                SSHIdentity.custom(
+                  type: identity.type,
+                  publicKey: identity.toPublicKey(),
+                  shouldProbe: identity.shouldProbe,
+                  comment: identity.comment,
+                  signer: (data) async {
+                    signRequests++;
+                    final result = await identity.sign(data);
+                    signSuccesses++;
+                    return result;
+                  },
+                ),
+            ],
+      printDebug: (message) {
+        if (message?.startsWith('Probing public key for identity:') ?? false) {
+          probes++;
+        }
+      },
       onPasswordRequest: material.password == null
           ? null
           : () => material.password,
@@ -556,6 +604,24 @@ class DartSsh2SessionService implements SshSessionService {
         return _verifyHostKey(endpoint, algorithm, fingerprint);
       },
     );
+    Future<void> summarize(bool authenticated) => _diagnosticLogger.record(
+      'ssh.auth.summary',
+      details: {
+        ...diagnostics,
+        'candidateIdentities': material.identities.length,
+        'publicKeyProbes': probes,
+        'signRequests': signRequests,
+        'signSuccesses': signSuccesses,
+        'authenticated': authenticated,
+      },
+    );
+    unawaited(
+      client.authenticated.then<void>(
+        (_) => summarize(true),
+        onError: (Object _, StackTrace _) => summarize(false),
+      ),
+    );
+    return client;
   }
 
   Future<bool> _verifyHostKey(
@@ -589,9 +655,122 @@ class DartSsh2AuthMaterial {
     this.password,
   });
 
-  final List<SSHKeyPair> identities;
+  final List<SSHIdentity> identities;
   final String? password;
   final List<String> keyboardInteractiveResponses;
+
+  /// Resolve automatic agent selection before creating the SSH client. Only
+  /// public identity lists are queried; signing stays pinned to that endpoint.
+  static Future<DartSsh2AuthMaterial> loadAuthMethods(
+    List<SshAuthMethod> authMethods, {
+    SshAgentClient agentClient = const LocalSshAgentClient(),
+    Future<List<DiscoveredSshAgent>> Function()? discoverAgents,
+    SshAgentIdentityQuery? queryIdentities,
+  }) async {
+    if (agentClient is! LocalSshAgentClient) {
+      return DartSsh2AuthMaterial.fromAuthMethods(
+        authMethods,
+        agentClient: agentClient,
+      );
+    }
+    final query = queryIdentities ?? querySshAgentIdentities;
+    final cache = <String, List<SshAgentIdentity>>{};
+    List<DiscoveredSshAgent>? discovered;
+    Future<IdentityAgentConfig> resolve(
+      IdentityAgentConfig config, {
+      Uint8List? certificateKey,
+    }) async {
+      final explicit = config.socketPath ?? agentClient.socketPath;
+      String path;
+      if (explicit != null && explicit.trim().isNotEmpty) {
+        path = SshAgentSocketPathResolver.resolve(socketPath: explicit)!;
+        cache[path] ??= await query(path);
+      } else {
+        discovered ??= await (discoverAgents ?? SshAgentDiscovery().discover)();
+        final selected = config.publicKey?.trim();
+        final filter = selected == null || selected.isEmpty
+            ? certificateKey
+            : _parsePublicKeyLine(selected);
+        final eligible = discovered!
+            .where(
+              (endpoint) => endpoint.identities.any(
+                (identity) =>
+                    filter == null ||
+                    _sameBytes(
+                      filter,
+                      _underlyingPublicKey(identity.publicKeyBlob),
+                    ),
+              ),
+            )
+            .toList();
+        final DiscoveredSshAgent chosen;
+        if (eligible.length == 1 &&
+            (filter != null || discovered!.length == 1)) {
+          chosen = eligible.single;
+        } else if (discovered!.length > 1) {
+          throw const UnsupportedSshAuthException(
+            'ssh_auth.agent_ambiguous',
+            'Choose an agent endpoint or a key before connecting.',
+          );
+        } else {
+          throw UnsupportedSshAuthException(
+            discovered!.isEmpty
+                ? 'ssh_auth.agent_unavailable'
+                : 'ssh_auth.agent_empty',
+            'No matching SSH agent identity is available.',
+          );
+        }
+        path = chosen.socketPath;
+        cache[path] = chosen.identities;
+      }
+      return IdentityAgentConfig(socketPath: path, publicKey: config.publicKey);
+    }
+
+    final resolved = <SshAuthMethod>[];
+    try {
+      for (final method in authMethods) {
+        resolved.add(switch (method) {
+          SshAgentAuth(:final agent) => SshAgentAuth(
+            agent: await resolve(agent),
+          ),
+          SshHardwareKeyAuth(:final agent) => SshHardwareKeyAuth(
+            agent: await resolve(agent),
+          ),
+          SshOpenSshCertificateAuth(
+            :final agent,
+            :final certificate,
+            :final privateKeyPem,
+            :final passphrase,
+          )
+              when agent != null =>
+            SshOpenSshCertificateAuth(
+              agent: await resolve(
+                agent,
+                certificateKey: _OpenSshUserCertificate.parse(
+                  utf8.decode(certificate.copyBytes()),
+                ).publicKey,
+              ),
+              certificate: certificate,
+              privateKeyPem: privateKeyPem,
+              passphrase: passphrase,
+            ),
+          _ => method,
+        });
+      }
+    } on UnsupportedSshAuthException {
+      rethrow;
+    } on Object {
+      throw const UnsupportedSshAuthException(
+        'ssh_auth.agent_unavailable',
+        'SSH agent could not be queried.',
+      );
+    }
+    return DartSsh2AuthMaterial.fromAuthMethods(
+      resolved,
+      agentClient: agentClient,
+      agentIdentityCache: cache,
+    );
+  }
 
   factory DartSsh2AuthMaterial.fromProfile(
     ConnectionProfileSnapshot profile, {
@@ -606,11 +785,55 @@ class DartSsh2AuthMaterial {
   factory DartSsh2AuthMaterial.fromAuthMethods(
     List<SshAuthMethod> authMethods, {
     SshAgentClient agentClient = const LocalSshAgentClient(),
+    Map<String, List<SshAgentIdentity>> agentIdentityCache = const {},
   }) {
-    final identities = <SSHKeyPair>[];
+    final identities = <SSHIdentity>[];
     final keyboardResponses = <String>[];
     String? passwordValue;
     var agentRequested = false;
+
+    List<SSHIdentity> agentKeys(IdentityAgentConfig config) {
+      agentRequested = true;
+      try {
+        final client = agentClient;
+        final endpoint = client is LocalSshAgentClient
+            ? SshAgentSocketPathResolver.resolve(
+                socketPath: config.socketPath ?? client.socketPath,
+              )
+            : config.socketPath;
+        final selected = config.publicKey?.trim();
+        final filter = selected == null || selected.isEmpty
+            ? null
+            : _parsePublicKeyLine(selected);
+        return [
+          for (final identity
+              in agentIdentityCache[endpoint] ??
+                  agentClient.listIdentities(socketPath: endpoint))
+            if (filter == null ||
+                _sameBytes(
+                  filter,
+                  _underlyingPublicKey(identity.publicKeyBlob),
+                ))
+              SshAgentKeyPair(
+                identity: identity,
+                agent: agentClient,
+                socketPath: endpoint,
+              ),
+        ];
+      } on SshAgentException catch (error) {
+        throw UnsupportedSshAuthException(
+          'ssh_auth.agent_unavailable',
+          error.message,
+        );
+      } on UnsupportedSshAuthException {
+        rethrow;
+      } on Object {
+        throw const UnsupportedSshAuthException(
+          'ssh_auth.agent_unavailable',
+          'SSH agent returned invalid identity data.',
+        );
+      }
+    }
 
     for (final method in authMethods) {
       switch (method) {
@@ -627,51 +850,57 @@ class DartSsh2AuthMaterial {
           keyboardResponses.addAll([
             for (final response in responses) utf8.decode(response.copyBytes()),
           ]);
-        case SshAgentAuth():
-          if (agentRequested) {
-            continue;
-          }
-          agentRequested = true;
-          try {
-            identities.addAll([
-              for (final identity in agentClient.listIdentities())
-                SshAgentKeyPair(identity: identity, agent: agentClient),
-            ]);
-          } on SshAgentException catch (error) {
-            throw UnsupportedSshAuthException(
-              'ssh_auth.agent_unavailable',
-              error.message,
-            );
-          } on Object {
-            throw const UnsupportedSshAuthException(
-              'ssh_auth.agent_unavailable',
-              'SSH agent is not available.',
-            );
-          }
+        case SshAgentAuth(:final agent):
+          identities.addAll(agentKeys(agent));
         case SshOpenSshCertificateAuth(
           :final privateKeyPem,
           :final certificate,
           :final passphrase,
+          :final agent,
         ):
+          if (agent == null && privateKeyPem == null) {
+            throw const UnsupportedSshAuthException(
+              'ssh_auth.certificate_invalid',
+              'A certificate requires a private key or an SSH agent.',
+            );
+          }
           final userCertificate = _OpenSshUserCertificate.parse(
             utf8.decode(certificate.copyBytes()),
           );
+          final keys = agent != null
+              ? agentKeys(agent)
+              : SSHKeyPair.fromPem(
+                  utf8.decode(privateKeyPem!.copyBytes()),
+                  passphrase == null
+                      ? null
+                      : utf8.decode(passphrase.copyBytes()),
+                );
+          final matching = keys
+              .where(
+                (key) => _sameBytes(
+                  _underlyingPublicKey(key.toPublicKey().encode()),
+                  userCertificate.publicKey,
+                ),
+              )
+              .toList();
+          if (matching.isEmpty) {
+            throw const UnsupportedSshAuthException(
+              'ssh_auth.certificate_invalid',
+              'The certificate does not match an available signing key.',
+            );
+          }
           identities.addAll(
-            SSHKeyPair.fromPem(
-              utf8.decode(privateKeyPem.copyBytes()),
-              passphrase == null ? null : utf8.decode(passphrase.copyBytes()),
-            ).map(
-              (keyPair) => _OpenSshCertificateKeyPair(
-                keyPair: keyPair,
-                certificate: userCertificate,
-              ),
-            ),
+            matching
+                .take(1)
+                .map(
+                  (keyPair) => _OpenSshCertificateKeyPair(
+                    keyPair: keyPair,
+                    certificate: userCertificate,
+                  ),
+                ),
           );
-        case SshHardwareKeyAuth():
-          throw const UnsupportedSshAuthException(
-            'ssh_auth.hardware_key_unsupported',
-            'Hardware security key authentication requires platform support.',
-          );
+        case SshHardwareKeyAuth(:final agent):
+          identities.addAll(agentKeys(agent));
       }
     }
 
@@ -857,10 +1086,15 @@ const _sshAlgorithms = SSHAlgorithms(
 );
 
 class _OpenSshUserCertificate {
-  const _OpenSshUserCertificate({required this.algorithm, required this.blob});
+  const _OpenSshUserCertificate({
+    required this.algorithm,
+    required this.blob,
+    required this.publicKey,
+  });
 
   final String algorithm;
   final Uint8List blob;
+  final Uint8List publicKey;
 
   static _OpenSshUserCertificate parse(String value) {
     final parts = value.trim().split(RegExp(r'\s+'));
@@ -871,30 +1105,68 @@ class _OpenSshUserCertificate {
       );
     }
     try {
+      final blob = base64Decode(parts[1]);
+      final reader = SSHMessageReader(blob);
+      if (reader.readUtf8() != parts.first) {
+        throw const FormatException('Certificate algorithm mismatch');
+      }
+      reader.readString(); // nonce
+      final rawType = switch (parts.first) {
+        'sk-ssh-ed25519-cert-v01@openssh.com' => 'sk-ssh-ed25519@openssh.com',
+        'sk-ecdsa-sha2-nistp256-cert-v01@openssh.com' =>
+          'sk-ecdsa-sha2-nistp256@openssh.com',
+        _ => parts.first.replaceFirst('-cert-v01@openssh.com', ''),
+      };
+      final fieldCount = switch (rawType) {
+        'ssh-rsa' => 2,
+        'ssh-ed25519' => 1,
+        'ecdsa-sha2-nistp256' ||
+        'ecdsa-sha2-nistp384' ||
+        'ecdsa-sha2-nistp521' => 2,
+        'sk-ssh-ed25519@openssh.com' => 2,
+        'sk-ecdsa-sha2-nistp256@openssh.com' => 3,
+        _ => throw const FormatException('Unsupported certificate key type'),
+      };
+      final publicKey = SSHMessageWriter()..writeUtf8(rawType);
+      for (var index = 0; index < fieldCount; index++) {
+        publicKey.writeString(reader.readString());
+      }
+      reader.readUint64(); // serial
+      if (reader.readUint32() != 1) {
+        throw const FormatException('A user certificate is required');
+      }
+      reader.readString(); // key ID
+      reader.readString(); // principals
+      reader.readUint64(); // valid after
+      reader.readUint64(); // valid before
+      for (var index = 0; index < 5; index++) {
+        reader.readString(); // options, extensions, reserved, CA key, signature
+      }
+      if (!reader.isDone) {
+        throw const FormatException('Trailing certificate data');
+      }
       return _OpenSshUserCertificate(
         algorithm: parts.first,
-        blob: base64Decode(parts[1]),
+        blob: blob,
+        publicKey: publicKey.takeBytes(),
       );
-    } on FormatException {
+    } on Object {
       throw const UnsupportedSshAuthException(
         'ssh_auth.certificate_invalid',
-        'OpenSSH certificate public-key payload is not valid base64.',
+        'OpenSSH certificate public-key payload is invalid.',
       );
     }
   }
 }
 
-class _OpenSshCertificateKeyPair implements SSHKeyPair {
+class _OpenSshCertificateKeyPair implements SSHIdentity {
   const _OpenSshCertificateKeyPair({
     required this.keyPair,
     required this.certificate,
   });
 
-  final SSHKeyPair keyPair;
+  final SSHIdentity keyPair;
   final _OpenSshUserCertificate certificate;
-
-  @override
-  String get name => keyPair.name;
 
   @override
   String? get comment => keyPair.comment;
@@ -903,16 +1175,46 @@ class _OpenSshCertificateKeyPair implements SSHKeyPair {
   bool get shouldProbe => keyPair.shouldProbe;
 
   @override
-  String get type => certificate.algorithm;
+  String get type => certificate.algorithm == 'ssh-rsa-cert-v01@openssh.com'
+      ? 'rsa-sha2-256-cert-v01@openssh.com'
+      : certificate.algorithm;
 
   @override
-  SSHSignature sign(Uint8List data) => keyPair.sign(data);
+  FutureOr<SSHSignature> sign(Uint8List data) => keyPair.sign(data);
 
   @override
   SSHHostKey toPublicKey() => _RawSshHostKey(certificate.blob);
+}
 
-  @override
-  String toPem() => keyPair.toPem();
+Uint8List _parsePublicKeyLine(String value) {
+  try {
+    final parts = value.trim().split(RegExp(r'\s+'));
+    final blob = base64Decode(parts[1]);
+    if (SSHMessageReader(blob).readUtf8() != parts.first) {
+      throw const FormatException();
+    }
+    return _underlyingPublicKey(blob);
+  } on Object {
+    throw const UnsupportedSshAuthException(
+      'ssh_auth.agent_unavailable',
+      'The selected agent public key is invalid.',
+    );
+  }
+}
+
+Uint8List _underlyingPublicKey(Uint8List blob) {
+  final type = SSHMessageReader(blob).readUtf8();
+  return type.endsWith('-cert-v01@openssh.com')
+      ? _OpenSshUserCertificate.parse('$type ${base64Encode(blob)}').publicKey
+      : blob;
+}
+
+bool _sameBytes(List<int> a, List<int> b) {
+  if (a.length != b.length) return false;
+  for (var index = 0; index < a.length; index++) {
+    if (a[index] != b[index]) return false;
+  }
+  return true;
 }
 
 class _RawSshHostKey implements SSHHostKey {

@@ -234,29 +234,31 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
         ],
       ),
       IdentityKind.openSshCertificate => _certificateAuth(identity),
-      IdentityKind.sshAgent => _sshAgentAuth(),
-      IdentityKind.hardwareKey => _hardwareKeyAuth(),
+      IdentityKind.sshAgent => _sshAgentAuth(identity),
+      IdentityKind.hardwareKey => _hardwareKeyAuth(identity),
     };
   }
 
-  SshAgentAuth _sshAgentAuth() {
+  SshAgentAuth _sshAgentAuth(IdentityConfig identity) {
     if (!_sshAgentAuthAvailable) {
       throw ConnectionProfileResolutionException(
         'connection_profile.ssh_agent_unsupported',
         'SSH agent authentication is not available on this platform.',
       );
     }
-    return const SshAgentAuth();
+    return SshAgentAuth(agent: identity.agent ?? const IdentityAgentConfig());
   }
 
-  SshHardwareKeyAuth _hardwareKeyAuth() {
+  SshHardwareKeyAuth _hardwareKeyAuth(IdentityConfig identity) {
     if (!_hardwareKeyAuthAvailable) {
       throw ConnectionProfileResolutionException(
         'connection_profile.hardware_key_unsupported',
         'Hardware key authentication is not available on this platform.',
       );
     }
-    return const SshHardwareKeyAuth();
+    return SshHardwareKeyAuth(
+      agent: identity.agent ?? const IdentityAgentConfig(),
+    );
   }
 
   Future<SshPrivateKeyAuth> _privateKeyAuth(IdentityConfig identity) async {
@@ -273,9 +275,13 @@ class EncryptedConnectionProfileResolver implements ConnectionProfileResolver {
     IdentityConfig identity,
   ) async {
     final secret = await _secretMaterial(identity);
+    if (identity.agent != null) _sshAgentAuth(identity);
     return SshOpenSshCertificateAuth(
-      privateKeyPem: SecretBytes(secret.requirePrivateKey(identity.id)),
+      privateKeyPem: identity.agent != null
+          ? null
+          : SecretBytes(secret.requirePrivateKey(identity.id)),
       certificate: SecretBytes(secret.requireCertificate(identity.id)),
+      agent: identity.agent,
       passphrase: secret.privateKeyPassphrase == null
           ? null
           : SecretBytes(utf8.encode(secret.privateKeyPassphrase!)),

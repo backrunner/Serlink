@@ -77,7 +77,8 @@ class PlatformCapabilities {
 
   bool get mcpStdioHelper => isMacOS && !isAppStoreDistribution;
 
-  bool get hardwareKeyAuth => false;
+  /// Hardware keys and smart cards loaded into the local SSH agent.
+  bool get hardwareKeyAuth => sshAgentAuth;
 
   bool get stableLocalFilePaths => !isIOS;
 

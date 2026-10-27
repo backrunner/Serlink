@@ -6,6 +6,7 @@ import 'package:serlink/features/hosts/application/host_repository.dart';
 import 'package:serlink/features/hosts/application/host_write_service.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/identities/application/identity_repository.dart';
+import 'package:serlink/features/identities/application/identity_write_service.dart';
 import 'package:serlink/features/identities/domain/identity.dart';
 import 'package:serlink/features/identities/domain/identity_secret.dart';
 import 'package:serlink/features/sync/application/sync_delete_tombstone_repository.dart';
@@ -17,6 +18,87 @@ import 'package:serlink/features/vault/application/vault_record_repository.dart'
 import 'package:serlink/features/vault/application/vault_service.dart';
 
 void main() {
+  for (final persisted in [false, true]) {
+    test(
+      'failed credential replacement preserves bindings (persisted: $persisted)',
+      () async {
+        final vault = InMemoryVaultService(
+          config: const VaultCryptoConfig.testing(),
+        );
+        final records = InMemoryVaultRecordRepository();
+        final hosts = _FailingHostRepository(vault: vault, records: records);
+        final identities = EncryptedIdentityRepository(
+          vault: vault,
+          records: records,
+        );
+        await vault.initialize(passphrase: 'good passphrase');
+        final service = HostWriteService(
+          hosts: hosts,
+          identities: identities,
+          knownHosts: EncryptedKnownHostRepository(
+            vault: vault,
+            records: records,
+          ),
+          tombstones: EncryptedSyncDeleteTombstoneRepository(
+            vault: vault,
+            records: records,
+          ),
+          records: records,
+          vault: vault,
+        );
+        final summary = await service.createSshAgentHost(
+          const SshAgentHostDraft(
+            displayName: 'Source',
+            hostname: 'source.test',
+            port: 22,
+            username: 'root',
+            tags: {},
+          ),
+        );
+        final original = (await hosts.read(summary.id))!;
+        hosts.failNextSave = true;
+        hosts.persistBeforeFailure = persisted;
+        final draft = HostMetadataDraft(
+          id: original.id,
+          displayName: original.displayName,
+          hostname: original.hostname,
+          port: original.port,
+          username: original.username,
+          tags: original.tags,
+          identityIds: original.identityIds,
+          newCredential: const IdentityCreateDraft(
+            kind: IdentityKind.password,
+            displayName: 'Source Password',
+            password: 'replacement',
+          ),
+        );
+        await expectLater(service.updateHostMetadata(draft), throwsStateError);
+        final stored = (await hosts.read(original.id))!;
+        final all = await identities.list();
+        // The old shared identity always survives. A failed unpersisted host
+        // update leaves neither a draft identity nor its encrypted secret.
+        expect(await identities.read(original.identityIds.single), isNotNull);
+        expect(all, hasLength(persisted ? 2 : 1));
+        expect(
+          await records.list(type: 'identity_secret'),
+          hasLength(persisted ? 1 : 0),
+        );
+        if (persisted) {
+          final replacement = all.singleWhere(
+            (item) => item.kind == IdentityKind.password,
+          );
+          expect(stored.identityIds, [replacement.id]);
+        } else {
+          expect(stored.toJson(), original.toJson());
+          // Retrying creates one usable credential after the failed draft was removed.
+          await service.updateHostMetadata(draft);
+          expect(await identities.list(), hasLength(2));
+          expect(await records.list(type: 'identity_secret'), hasLength(1));
+        }
+      },
+    );
+  }
+
   test('creates password host and stores all data encrypted', () async {
     final vault = InMemoryVaultService(
       config: const VaultCryptoConfig.testing(),
@@ -512,8 +594,7 @@ void main() {
         hostname: 'key.internal',
         port: 2222,
         username: 'deploy',
-        privateKeyPem:
-            '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----',
+        privateKeyPem: '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----',
         privateKeyPassphrase: 'key-passphrase',
         tags: {'key'},
       ),
@@ -845,10 +926,8 @@ void main() {
       secretRecordId: VaultRecordId('secret:cert-1'),
       kind: IdentityKind.openSshCertificate,
       material: const IdentitySecretMaterial(
-        privateKeyPem:
-            '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----',
-        openSshCertificate:
-            'ssh-ed25519-cert-v01@openssh.com AAAAB3NzaC1yc2EAAAADAQABAAABAQ== ops@example',
+        privateKeyPem: '-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----',
+        openSshCertificate: 'ssh-ed25519-cert-v01@openssh.com AAAAB3NzaC1yc2EAAAADAQABAAABAQ== ops@example',
       ),
     );
     await _saveIdentity(
@@ -1140,4 +1219,19 @@ Future<void> _saveIdentity({
       updatedAt: DateTime.utc(2026, 5, 28),
     ),
   );
+}
+
+class _FailingHostRepository extends EncryptedHostRepository {
+  _FailingHostRepository({required super.vault, required super.records});
+
+  bool failNextSave = false;
+  bool persistBeforeFailure = false;
+
+  @override
+  Future<void> save(HostConfig host) async {
+    if (!failNextSave) return super.save(host);
+    failNextSave = false;
+    if (persistBeforeFailure) await super.save(host);
+    throw StateError('Simulated host persistence failure');
+  }
 }

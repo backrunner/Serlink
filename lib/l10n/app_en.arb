@@ -1656,5 +1656,18 @@
   "agentPublicKeyHint": "Choose a public key to use only its matching key in the agent.",
   "agentImportPublicKeyAction": "Select public key file",
   "agentPublicKeyImportFailed": "Could not read a public key from this file.",
-  "agentHardwareKeyNote": "First load your hardware key into a compatible SSH agent (OpenSSH FIDO2 or smart card / PKCS#11). The agent handles device access, touch and PIN prompts."
+  "agentHardwareKeyNote": "First load your hardware key into a compatible SSH agent (OpenSSH FIDO2 or smart card / PKCS#11). The agent handles device access, touch and PIN prompts.",
+  "settingsMcpStrictPrivacy": "Strict host privacy",
+  "settingsMcpStrictPrivacyDescription": "Off by default: agents can read host addresses and other non-secret settings. When enabled, host discovery returns only display names and IDs. Credentials are never shared. Terminal output may still contain addresses.",
+  "settingsMcpPrivacyUnavailable": "Host privacy settings are unavailable. Host metadata access is blocked.",
+  "mcpApprovalReviewDetails": "Open Serlink to review the complete command.",
+  "mcpApprovalDetailsAction": "View details",
+  "mcpApprovalNotificationsTitle": "Approval notifications",
+  "mcpApprovalNotificationsEnabled": "Enabled · approve from system notifications",
+  "mcpApprovalNotificationsNotAsked": "Allow notifications to approve requests without switching apps",
+  "mcpApprovalNotificationsDenied": "Notifications are off · approve inside Serlink",
+  "mcpApprovalNotificationsUnavailable": "Approve inside Serlink",
+  "mcpApprovalEnableAction": "Enable",
+  "mcpApprovalSystemSettingsAction": "System settings",
+  "mcpApprovalWaitHint": "Requests wait up to 60 seconds for approval. Long commands open in Serlink for review."
 }

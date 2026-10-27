@@ -5727,6 +5727,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'First load your hardware key into a compatible SSH agent (OpenSSH FIDO2 or smart card / PKCS#11). The agent handles device access, touch and PIN prompts.'**
   String get agentHardwareKeyNote;
+
+  /// No description provided for @settingsMcpStrictPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Strict host privacy'**
+  String get settingsMcpStrictPrivacy;
+
+  /// No description provided for @settingsMcpStrictPrivacyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Off by default: agents can read host addresses and other non-secret settings. When enabled, host discovery returns only display names and IDs. Credentials are never shared. Terminal output may still contain addresses.'**
+  String get settingsMcpStrictPrivacyDescription;
+
+  /// No description provided for @settingsMcpPrivacyUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Host privacy settings are unavailable. Host metadata access is blocked.'**
+  String get settingsMcpPrivacyUnavailable;
+
+  /// No description provided for @mcpApprovalReviewDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Serlink to review the complete command.'**
+  String get mcpApprovalReviewDetails;
+
+  /// No description provided for @mcpApprovalDetailsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'View details'**
+  String get mcpApprovalDetailsAction;
+
+  /// No description provided for @mcpApprovalNotificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approval notifications'**
+  String get mcpApprovalNotificationsTitle;
+
+  /// No description provided for @mcpApprovalNotificationsEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled · approve from system notifications'**
+  String get mcpApprovalNotificationsEnabled;
+
+  /// No description provided for @mcpApprovalNotificationsNotAsked.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow notifications to approve requests without switching apps'**
+  String get mcpApprovalNotificationsNotAsked;
+
+  /// No description provided for @mcpApprovalNotificationsDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are off · approve inside Serlink'**
+  String get mcpApprovalNotificationsDenied;
+
+  /// No description provided for @mcpApprovalNotificationsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve inside Serlink'**
+  String get mcpApprovalNotificationsUnavailable;
+
+  /// No description provided for @mcpApprovalEnableAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get mcpApprovalEnableAction;
+
+  /// No description provided for @mcpApprovalSystemSettingsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'System settings'**
+  String get mcpApprovalSystemSettingsAction;
+
+  /// No description provided for @mcpApprovalWaitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Requests wait up to 60 seconds for approval. Long commands open in Serlink for review.'**
+  String get mcpApprovalWaitHint;
 }
 
 class _AppLocalizationsDelegate

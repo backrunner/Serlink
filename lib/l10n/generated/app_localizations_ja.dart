@@ -3125,4 +3125,45 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get agentHardwareKeyNote =>
       'ハードウェア鍵を互換 SSH Agent に読み込んでください（OpenSSH FIDO2 またはスマートカード / PKCS#11）。デバイスへのアクセス、タッチ、PIN 認証は Agent が処理します。';
+
+  @override
+  String get settingsMcpStrictPrivacy => '厳格なホストプライバシー';
+
+  @override
+  String get settingsMcpStrictPrivacyDescription =>
+      '既定ではオフです。エージェントはアドレスなどの機密でない設定を取得できます。有効にするとホスト一覧には表示名と ID のみを返します。認証情報は共有しません。端末出力にアドレスが含まれる場合があります。';
+
+  @override
+  String get settingsMcpPrivacyUnavailable =>
+      'プライバシー設定を取得できないため、ホスト情報へのアクセスを停止しました。';
+
+  @override
+  String get mcpApprovalReviewDetails => 'Serlink でコマンド全体を確認してください。';
+
+  @override
+  String get mcpApprovalDetailsAction => '詳細を確認';
+
+  @override
+  String get mcpApprovalNotificationsTitle => '承認通知';
+
+  @override
+  String get mcpApprovalNotificationsEnabled => '有効 · システム通知から承認できます';
+
+  @override
+  String get mcpApprovalNotificationsNotAsked => '通知を許可するとアプリを切り替えずに承認できます';
+
+  @override
+  String get mcpApprovalNotificationsDenied => '通知は無効 · Serlink 内で承認してください';
+
+  @override
+  String get mcpApprovalNotificationsUnavailable => 'Serlink 内で承認してください';
+
+  @override
+  String get mcpApprovalEnableAction => '有効にする';
+
+  @override
+  String get mcpApprovalSystemSettingsAction => 'システム設定';
+
+  @override
+  String get mcpApprovalWaitHint => '承認は最大60秒待機します。長いコマンドは Serlink で確認します。';
 }

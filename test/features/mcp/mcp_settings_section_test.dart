@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -113,6 +114,55 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('notification permission can be enabled and settings opened', (
+    tester,
+  ) async {
+    tester.platformDispatcher.localesTestValue = [const Locale('en')];
+    addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+    _useLargeSurface(tester);
+    const channel = MethodChannel('serlink/mcp-approvals');
+    var status = 'notDetermined';
+    final calls = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+      call,
+    ) async {
+      calls.add(call.method);
+      if (call.method == 'requestPermission') status = 'authorized';
+      return status;
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+    await _pumpSerlinkApp(tester, serverController: _FakeMcpServerController());
+    await _openMcpManager(tester);
+    await tester.pumpAndSettle();
+    expect(calls, ['status']);
+    final button = find.byKey(
+      const ValueKey('mcp-approval-notification-settings'),
+    );
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Enabled · approve from system notifications'),
+      findsOneWidget,
+    );
+    expect(
+      calls.where((method) => method == 'requestPermission'),
+      hasLength(1),
+    );
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(calls, contains('openSettings'));
+    expect(
+      calls.where((method) => method == 'requestPermission'),
+      hasLength(1),
+    );
+  });
 
   testWidgets('model protection settings save keys without exposing them', (
     tester,

@@ -3080,4 +3080,44 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get agentHardwareKeyNote =>
       '请先将硬件密钥加载到兼容 SSH Agent 中（OpenSSH FIDO2 或智能卡 / PKCS#11）。设备访问、触摸和 PIN 验证由 Agent 处理。';
+
+  @override
+  String get settingsMcpStrictPrivacy => '严格主机隐私';
+
+  @override
+  String get settingsMcpStrictPrivacyDescription =>
+      '默认关闭：代理可读取主机地址和其他非凭据配置。开启后，主机列表只返回显示名称和 ID。凭据始终不会共享；终端输出仍可能包含地址';
+
+  @override
+  String get settingsMcpPrivacyUnavailable => '无法读取主机隐私设置，已阻止访问主机信息';
+
+  @override
+  String get mcpApprovalReviewDetails => '打开 Serlink 查看完整命令并审批。';
+
+  @override
+  String get mcpApprovalDetailsAction => '查看详情';
+
+  @override
+  String get mcpApprovalNotificationsTitle => '审批通知';
+
+  @override
+  String get mcpApprovalNotificationsEnabled => '已启用 · 可通过系统通知审批';
+
+  @override
+  String get mcpApprovalNotificationsNotAsked => '允许通知后，无需切换应用即可审批请求';
+
+  @override
+  String get mcpApprovalNotificationsDenied => '通知已关闭 · 请在 Serlink 内审批';
+
+  @override
+  String get mcpApprovalNotificationsUnavailable => '请在 Serlink 内审批';
+
+  @override
+  String get mcpApprovalEnableAction => '启用';
+
+  @override
+  String get mcpApprovalSystemSettingsAction => '系统设置';
+
+  @override
+  String get mcpApprovalWaitHint => '请求最多等待 60 秒审批；长命令需在 Serlink 中查看并确认。';
 }

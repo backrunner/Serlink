@@ -1,4 +1,7 @@
 import 'dart:async';
+
+import '../features/mcp/application/mcp_host_visibility.dart';
+
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -3989,13 +3992,22 @@ final commandDecisionGuardProvider = Provider<CommandDecisionGuard>((ref) {
   );
 });
 
-final commandDecisionSettingsProvider =
-    FutureProvider<CommandDecisionSettings>((ref) {
-      return ref.watch(commandDecisionGuardProvider).readSettings();
-    });
+final commandDecisionSettingsProvider = FutureProvider<CommandDecisionSettings>(
+  (ref) {
+    return ref.watch(commandDecisionGuardProvider).readSettings();
+  },
+);
 
 final commandRiskPolicyProvider = Provider<CommandRiskPolicy>((ref) {
   return CommandRiskPolicy();
+});
+
+final mcpHostVisibilityProvider = Provider<McpHostVisibility>((ref) {
+  return McpHostVisibility(ref.watch(secretStoreProvider));
+});
+
+final mcpStrictHostPrivacyProvider = FutureProvider<bool>((ref) {
+  return ref.watch(mcpHostVisibilityProvider).readStrict();
 });
 
 final mcpAuthorizationServiceProvider = Provider<McpAuthorizationService>((

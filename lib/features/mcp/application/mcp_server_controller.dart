@@ -13,6 +13,7 @@ import '../../../core/security/local_file_security.dart';
 import '../data/mcp_server_transport.dart';
 import '../domain/mcp_contract.dart';
 import 'agent_session_bridge.dart';
+import 'mcp_request_context.dart';
 
 class McpServerState {
   const McpServerState({
@@ -50,11 +51,10 @@ class McpServerState {
 /// true. On direct (non-App-Store) builds a discovery file with the URL and
 /// per-run bearer token is written to the application support directory so a
 /// stdio helper can hand the endpoint to MCP clients.
-typedef McpServerTransportFactory =
-    McpServerTransport Function({
-      required McpServer Function(String sessionId) serverFactory,
-      required String bearerToken,
-    });
+typedef McpServerTransportFactory = McpServerTransport Function({
+  required McpServer Function(String sessionId) serverFactory,
+  required String bearerToken,
+});
 
 class McpServerController extends Notifier<McpServerState> {
   McpServerController({
@@ -85,6 +85,7 @@ class McpServerController extends Notifier<McpServerState> {
   /// Intent flag set synchronously before any await, so a stop() landing
   /// mid-start still wins.
   var _wantRunning = false;
+  final Map<McpRequestContext, McpServer> _requests = {};
 
   @override
   McpServerState build() {
@@ -110,6 +111,9 @@ class McpServerController extends Notifier<McpServerState> {
 
   Future<void> stop() {
     _wantRunning = false;
+    for (final request in _requests.keys.toList()) {
+      request.cancel();
+    }
     return _enqueue(_stopLocked);
   }
 
@@ -139,6 +143,9 @@ class McpServerController extends Notifier<McpServerState> {
         // own session-cleanup wiring, so this survives Protocol.connect.
         server.server.onclose = () {
           _serversBySessionId.remove(sessionId);
+          for (final entry in _requests.entries.toList()) {
+            if (identical(entry.value, server)) entry.key.cancel();
+          }
         };
         return server;
       },
@@ -266,11 +273,57 @@ class McpServerController extends Notifier<McpServerState> {
               ?.name ??
           extra.clientInfo?.name ??
           'unknown';
+      var progress = 0;
+      Timer? progressTimer;
+      void sendWaiting() {
+        final token = extra.meta?['progressToken'];
+        if (token == null || extra.signal.aborted) return;
+        unawaited(
+          extra
+              .sendNotification(
+                JsonRpcNotification(
+                  method: Method.notificationsProgress,
+                  params: {
+                    'progressToken': token,
+                    'progress': ++progress,
+                    'message':
+                        'Waiting for approval in Serlink (up to 60 seconds).',
+                  },
+                ),
+              )
+              .catchError((Object _) {}),
+        );
+      }
+
+      final request = McpRequestContext(
+        onApprovalFinished: () {
+          progressTimer?.cancel();
+          progressTimer = null;
+        },
+        onWaiting: () {
+          sendWaiting();
+          progressTimer ??= Timer.periodic(
+            const Duration(seconds: 10),
+            (_) => sendWaiting(),
+          );
+        },
+      );
+      _requests[request] = server;
+      final subscription = extra.signal.onAbort.listen((_) => request.cancel());
+      if (extra.signal.aborted || !_wantRunning) request.cancel();
       try {
-        final payload = await run(clientName);
+        final payload = await request.run(() async {
+          request.checkActive();
+          return run(clientName);
+        });
         return CallToolResult.fromContent([
           TextContent(text: jsonEncode(payload)),
         ]);
+      } on McpApprovalException catch (error) {
+        return CallToolResult(
+          content: [TextContent(text: error.code)],
+          isError: true,
+        );
       } on McpBridgeException catch (error) {
         return CallToolResult(
           content: [TextContent(text: error.toString())],
@@ -281,22 +334,23 @@ class McpServerController extends Notifier<McpServerState> {
           content: [TextContent(text: 'internal_error: $error')],
           isError: true,
         );
+      } finally {
+        progressTimer?.cancel();
+        await subscription.cancel();
+        _requests.remove(request);
       }
     }
 
     serlinkMcpTools['serlink_list_hosts']!.register(
       server,
       callback: (args, extra) => guard((clientName) async {
-        final hosts = await bridge.listHosts();
-        return [
-          for (final host in hosts)
-            {
-              'id': host.id.value,
-              'displayName': host.displayName,
-              'hostname': host.hostname,
-              'port': host.port,
-            },
-        ];
+        try {
+          return await bridge.describeHosts();
+        } on McpBridgeException {
+          rethrow;
+        } on Object {
+          throw const McpBridgeException('host_metadata_unavailable');
+        }
       }, extra),
     );
 

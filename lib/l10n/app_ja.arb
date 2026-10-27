@@ -938,5 +938,18 @@
   "agentPublicKeyHint": "公開鍵を選択すると、Agent 内の一致する鍵のみを使用します。",
   "agentImportPublicKeyAction": "公開鍵ファイルを選択",
   "agentPublicKeyImportFailed": "このファイルから公開鍵を読み込めませんでした。",
-  "agentHardwareKeyNote": "ハードウェア鍵を互換 SSH Agent に読み込んでください（OpenSSH FIDO2 またはスマートカード / PKCS#11）。デバイスへのアクセス、タッチ、PIN 認証は Agent が処理します。"
+  "agentHardwareKeyNote": "ハードウェア鍵を互換 SSH Agent に読み込んでください（OpenSSH FIDO2 またはスマートカード / PKCS#11）。デバイスへのアクセス、タッチ、PIN 認証は Agent が処理します。",
+  "settingsMcpStrictPrivacy": "厳格なホストプライバシー",
+  "settingsMcpStrictPrivacyDescription": "既定ではオフです。エージェントはアドレスなどの機密でない設定を取得できます。有効にするとホスト一覧には表示名と ID のみを返します。認証情報は共有しません。端末出力にアドレスが含まれる場合があります。",
+  "settingsMcpPrivacyUnavailable": "プライバシー設定を取得できないため、ホスト情報へのアクセスを停止しました。",
+  "mcpApprovalReviewDetails": "Serlink でコマンド全体を確認してください。",
+  "mcpApprovalDetailsAction": "詳細を確認",
+  "mcpApprovalNotificationsTitle": "承認通知",
+  "mcpApprovalNotificationsEnabled": "有効 · システム通知から承認できます",
+  "mcpApprovalNotificationsNotAsked": "通知を許可するとアプリを切り替えずに承認できます",
+  "mcpApprovalNotificationsDenied": "通知は無効 · Serlink 内で承認してください",
+  "mcpApprovalNotificationsUnavailable": "Serlink 内で承認してください",
+  "mcpApprovalEnableAction": "有効にする",
+  "mcpApprovalSystemSettingsAction": "システム設定",
+  "mcpApprovalWaitHint": "承認は最大60秒待機します。長いコマンドは Serlink で確認します。"
 }

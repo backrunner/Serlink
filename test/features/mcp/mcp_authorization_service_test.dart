@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/mcp/application/mcp_authorization_service.dart';
+import 'package:serlink/features/mcp/application/mcp_request_context.dart';
 import 'package:serlink/features/mcp/domain/agent_grant.dart';
 import 'package:serlink/features/security/application/security_modal_service.dart';
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
@@ -13,6 +14,60 @@ void main() {
   final otherHostId = HostId('host-2');
 
   group('McpAuthorizationService', () {
+    test('a cancelled request cannot create a late grant', () async {
+      final modal = _FakeSecurityModalService();
+      final gate = Completer<AgentAccessDecision>();
+      modal.accessGate = gate;
+      final service = McpAuthorizationService(securityModalService: modal);
+      final request = McpRequestContext();
+      final result = request.run(
+        () => service.ensureGrant(
+          clientName: 'agent',
+          hostId: hostId,
+          hostDisplayName: 'Host',
+        ),
+      );
+      final expectation = expectLater(
+        result,
+        throwsA(isA<McpApprovalException>()),
+      );
+      request.cancel();
+      gate.complete(AgentAccessDecision.allow);
+      await expectation;
+      expect(service.grants, isEmpty);
+      modal.accessGate = null;
+      final retry = await service.ensureGrant(
+        clientName: 'agent',
+        hostId: hostId,
+        hostDisplayName: 'Host',
+      );
+      expect(retry, isNotNull);
+      service.dispose();
+    });
+
+    test('revocation or disposal invalidates pending grants', () async {
+      for (final dispose in [false, true]) {
+        final modal = _FakeSecurityModalService();
+        final gate = Completer<AgentAccessDecision>();
+        modal.accessGate = gate;
+        final service = McpAuthorizationService(securityModalService: modal);
+        final result = service.ensureGrant(
+          clientName: 'agent',
+          hostId: hostId,
+          hostDisplayName: 'Host',
+        );
+        if (dispose) {
+          service.dispose();
+        } else {
+          service.revokeAll();
+        }
+        gate.complete(AgentAccessDecision.allow);
+        expect(await result, isNull);
+        expect(service.grants, isEmpty);
+        if (!dispose) service.dispose();
+      }
+    });
+
     test('allow creates and stores a grant', () async {
       final modal = _FakeSecurityModalService();
       final service = McpAuthorizationService(securityModalService: modal);
@@ -102,31 +157,34 @@ void main() {
       expect(service.grants, isEmpty);
     });
 
-    test('concurrent ensureGrant calls share one confirmation dialog', () async {
-      final modal = _FakeSecurityModalService();
-      final gate = Completer<AgentAccessDecision>();
-      modal.accessGate = gate;
-      final service = McpAuthorizationService(securityModalService: modal);
+    test(
+      'concurrent ensureGrant calls share one confirmation dialog',
+      () async {
+        final modal = _FakeSecurityModalService();
+        final gate = Completer<AgentAccessDecision>();
+        modal.accessGate = gate;
+        final service = McpAuthorizationService(securityModalService: modal);
 
-      final first = service.ensureGrant(
-        clientName: 'claude',
-        hostId: hostId,
-        hostDisplayName: 'Test Host',
-      );
-      final second = service.ensureGrant(
-        clientName: 'claude',
-        hostId: hostId,
-        hostDisplayName: 'Test Host',
-      );
-      await Future<void>.delayed(Duration.zero);
-      gate.complete(AgentAccessDecision.allow);
+        final first = service.ensureGrant(
+          clientName: 'claude',
+          hostId: hostId,
+          hostDisplayName: 'Test Host',
+        );
+        final second = service.ensureGrant(
+          clientName: 'claude',
+          hostId: hostId,
+          hostDisplayName: 'Test Host',
+        );
+        await Future<void>.delayed(Duration.zero);
+        gate.complete(AgentAccessDecision.allow);
 
-      final results = await Future.wait([first, second]);
-      expect(results[0], isNotNull);
-      expect(results[0], results[1]);
-      expect(modal.accessCallCount, 1);
-      expect(service.grants, hasLength(1));
-    });
+        final results = await Future.wait([first, second]);
+        expect(results[0], isNotNull);
+        expect(results[0], results[1]);
+        expect(modal.accessCallCount, 1);
+        expect(service.grants, hasLength(1));
+      },
+    );
 
     test('revokeGrant invalidates the grant', () async {
       final modal = _FakeSecurityModalService();
@@ -217,11 +275,7 @@ void main() {
         securityModalService: _FakeSecurityModalService(),
       );
       expect(
-        service.findValidGrant(
-          clientName: 'claude',
-          hostId: hostId,
-          now: now,
-        ),
+        service.findValidGrant(clientName: 'claude', hostId: hostId, now: now),
         isNull,
       );
     });

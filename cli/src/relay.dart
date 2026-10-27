@@ -104,8 +104,10 @@ class SerlinkMcpRelay {
         ),
         CallToolResult.fromJson,
         RequestOptions(
-          // An approval dialog can take as long as the user needs.
-          timeoutEnabled: false,
+          // Bound the approval, connection and output waits together.
+          signal: extra.signal,
+          timeout: const Duration(minutes: 4),
+          maxTotalTimeout: const Duration(minutes: 4),
           onprogress: progressToken == null
               ? null
               : (progress) {
@@ -134,6 +136,7 @@ class SerlinkMcpRelay {
         ),
       );
     } on Object catch (error) {
+      if (extra.signal.aborted) return _toolError('request_cancelled');
       await _connection.invalidate(remote);
       return _toolError(
         'app_connection_lost: $error. The tool call was not retried; '

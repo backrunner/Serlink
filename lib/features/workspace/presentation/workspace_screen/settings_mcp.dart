@@ -71,9 +71,81 @@ class _McpManagerDialog extends ConsumerStatefulWidget {
   ConsumerState<_McpManagerDialog> createState() => _McpManagerDialogState();
 }
 
-class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
+class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
+    with WidgetsBindingObserver {
   var _tab = _McpConfigTab.http;
   var _installExpanded = false;
+  var _notificationStatus = 'unavailable';
+  var _requestingNotifications = false;
+  static const _notifications = McpApprovalNotifications();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_refreshNotifications());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_refreshNotifications());
+  }
+
+  Future<void> _refreshNotifications() async {
+    final status = await _notifications.status();
+    if (mounted) setState(() => _notificationStatus = status);
+  }
+
+  Future<void> _configureNotifications() async {
+    setState(() => _requestingNotifications = true);
+    if (_notificationStatus == 'notDetermined') {
+      await _notifications.requestPermission();
+    } else {
+      await _notifications.openSettings();
+    }
+    await _refreshNotifications();
+    if (mounted) setState(() => _requestingNotifications = false);
+  }
+
+  Widget _buildNotificationCard(AppLocalizations l10n) {
+    return _McpCard(
+      children: [
+        _McpListItem(
+          icon: Icons.notifications_outlined,
+          title: l10n.mcpApprovalNotificationsTitle,
+          subtitle: switch (_notificationStatus) {
+            'authorized' => l10n.mcpApprovalNotificationsEnabled,
+            'notDetermined' => l10n.mcpApprovalNotificationsNotAsked,
+            'denied' => l10n.mcpApprovalNotificationsDenied,
+            _ => l10n.mcpApprovalNotificationsUnavailable,
+          },
+          action: _SettingsTextButton(
+            key: const ValueKey('mcp-approval-notification-settings'),
+            onPressed:
+                _requestingNotifications || _notificationStatus == 'unavailable'
+                ? null
+                : () => unawaited(_configureNotifications()),
+            child: Text(
+              _notificationStatus == 'notDetermined'
+                  ? l10n.mcpApprovalEnableAction
+                  : l10n.mcpApprovalSystemSettingsAction,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          l10n.mcpApprovalWaitHint,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,6 +168,10 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildServerCard(l10n, serverState, url),
+            const SizedBox(height: 12),
+            _buildNotificationCard(l10n),
+            const SizedBox(height: 12),
+            const _McpHostPrivacySection(),
             const SizedBox(height: 12),
             const _McpCommandGuardSection(),
             const SizedBox(height: 18),
@@ -182,7 +258,12 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
               key: const ValueKey('settings-mcp-server-switch'),
               semanticsLabel: l10n.settingsMcpServerSemantics,
               value: running,
-              onChanged: (value) => unawaited(_setMcpServerEnabled(ref, value)),
+              onChanged: (value) => unawaited(
+                _setMcpServerEnabled(
+                  ref,
+                  value,
+                ).then((_) => _refreshNotifications()),
+              ),
             ),
           ],
         ),
@@ -620,6 +701,59 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog> {
   }
 }
 
+class _McpHostPrivacySection extends ConsumerStatefulWidget {
+  const _McpHostPrivacySection();
+  @override
+  ConsumerState<_McpHostPrivacySection> createState() =>
+      _McpHostPrivacySectionState();
+}
+
+class _McpHostPrivacySectionState
+    extends ConsumerState<_McpHostPrivacySection> {
+  bool _saving = false;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final setting = ref.watch(mcpStrictHostPrivacyProvider);
+    return _McpCard(
+      children: [
+        _McpListItem(
+          icon: Icons.visibility_off_outlined,
+          title: l10n.settingsMcpStrictPrivacy,
+          subtitle: setting.hasError
+              ? l10n.settingsMcpPrivacyUnavailable
+              : l10n.settingsMcpStrictPrivacyDescription,
+          action: _SettingsSwitch(
+            key: const ValueKey('settings-mcp-strict-privacy'),
+            semanticsLabel: l10n.settingsMcpStrictPrivacy,
+            value: setting.value ?? true,
+            onChanged: _saving || !setting.hasValue
+                ? null
+                : (value) async {
+                    setState(() => _saving = true);
+                    try {
+                      await ref
+                          .read(mcpHostVisibilityProvider)
+                          .saveStrict(value);
+                      ref.invalidate(mcpStrictHostPrivacyProvider);
+                    } on Object {
+                      if (context.mounted) {
+                        _showSnackBar(
+                          context,
+                          l10n.settingsMcpPrivacyUnavailable,
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _saving = false);
+                    }
+                  },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Sunken rounded card grouping rows inside the MCP manager dialog.
 class _McpCard extends StatelessWidget {
   const _McpCard({required this.children});
@@ -866,6 +1000,7 @@ Future<void> _setMcpServerEnabled(WidgetRef ref, bool enabled) async {
   final notifier = ref.read(mcpServerControllerProvider.notifier);
   if (enabled) {
     await notifier.start();
+    await const McpApprovalNotifications().requestPermission();
   } else {
     await notifier.stop();
   }

@@ -938,5 +938,18 @@
   "agentPublicKeyHint": "选择公钥后，仅使用 Agent 中与之匹配的密钥。",
   "agentImportPublicKeyAction": "选择公钥文件",
   "agentPublicKeyImportFailed": "无法从此文件读取公钥。",
-  "agentHardwareKeyNote": "请先将硬件密钥加载到兼容 SSH Agent 中（OpenSSH FIDO2 或智能卡 / PKCS#11）。设备访问、触摸和 PIN 验证由 Agent 处理。"
+  "agentHardwareKeyNote": "请先将硬件密钥加载到兼容 SSH Agent 中（OpenSSH FIDO2 或智能卡 / PKCS#11）。设备访问、触摸和 PIN 验证由 Agent 处理。",
+  "settingsMcpStrictPrivacy": "严格主机隐私",
+  "settingsMcpStrictPrivacyDescription": "默认关闭：代理可读取主机地址和其他非凭据配置。开启后，主机列表只返回显示名称和 ID。凭据始终不会共享；终端输出仍可能包含地址",
+  "settingsMcpPrivacyUnavailable": "无法读取主机隐私设置，已阻止访问主机信息",
+  "mcpApprovalReviewDetails": "打开 Serlink 查看完整命令并审批。",
+  "mcpApprovalDetailsAction": "查看详情",
+  "mcpApprovalNotificationsTitle": "审批通知",
+  "mcpApprovalNotificationsEnabled": "已启用 · 可通过系统通知审批",
+  "mcpApprovalNotificationsNotAsked": "允许通知后，无需切换应用即可审批请求",
+  "mcpApprovalNotificationsDenied": "通知已关闭 · 请在 Serlink 内审批",
+  "mcpApprovalNotificationsUnavailable": "请在 Serlink 内审批",
+  "mcpApprovalEnableAction": "启用",
+  "mcpApprovalSystemSettingsAction": "系统设置",
+  "mcpApprovalWaitHint": "请求最多等待 60 秒审批；长命令需在 Serlink 中查看并确认。"
 }

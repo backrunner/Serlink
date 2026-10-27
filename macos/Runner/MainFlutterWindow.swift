@@ -8,6 +8,7 @@ class MainFlutterWindow: NSWindow {
   private var windowChannel: FlutterMethodChannel?
   private var platformChannel: FlutterMethodChannel?
   private let cloudKitChannel = CloudKitSyncChannel()
+  private let mcpApprovalNotifications = McpApprovalNotifications()
   private var terminationReplyPending = false
 
   override func awakeFromNib() {
@@ -27,6 +28,7 @@ class MainFlutterWindow: NSWindow {
     registerWindowChannel(flutterViewController: flutterViewController)
     registerPlatformChannel(flutterViewController: flutterViewController)
     cloudKitChannel.register(with: flutterViewController.engine.binaryMessenger)
+    mcpApprovalNotifications.register(with: flutterViewController.engine.binaryMessenger)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 

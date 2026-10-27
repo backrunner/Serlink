@@ -542,6 +542,41 @@ void _relayTests() {
       await call;
     });
 
+    test('client cancellation reaches the matching backend request', () async {
+      final dir = await _tempDirectory();
+      final entered = Completer<void>();
+      final cancelled = Completer<void>();
+      final server = await _startBackend(
+        callback: (args, extra, server) async {
+          final subscription = extra.signal.onAbort.listen((_) {
+            if (!cancelled.isCompleted) cancelled.complete();
+          });
+          entered.complete();
+          await cancelled.future;
+          await subscription.cancel();
+          return CallToolResult.fromContent([TextContent(text: 'cancelled')]);
+        },
+      );
+      final harness = await _startRelay(
+        SerlinkAppConnection(
+          environment: const {},
+          discoveryArg: await _writeDiscovery(dir, server),
+        ),
+      );
+      final abort = BasicAbortController();
+      final call = harness.client.callTool(
+        _listHosts,
+        options: RequestOptions(signal: abort.signal),
+      );
+      final expectation = expectLater(call, throwsA(isA<Object>()));
+      await entered.future;
+      abort.abort();
+      await expectation;
+      await cancelled.future.timeout(const Duration(seconds: 3));
+      // Cancelling one call must not invalidate the shared backend connection.
+      await harness.client.ping();
+    });
+
     test(
       'cancellation notifications cannot cancel a backend request id',
       () async {

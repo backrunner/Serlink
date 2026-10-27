@@ -5,7 +5,8 @@ Serlink provides a standalone [Model Context Protocol](https://modelcontextproto
 Design principles:
 
 - **Credentials never leave the app.** The agent never receives passwords or private keys. Serlink opens the SSH session itself, as a normal workspace terminal tab.
-- **Explicit user authorization.** The first time an agent requests a session on a host, Serlink shows an approval dialog. If the vault is locked, tool calls fail with `vault_locked` until the user unlocks it in the app.
+- **Configurable host privacy.** Host discovery returns non-secret configuration, including hostname/IP, username, tags, routing and connection settings. Settings > MCP / Agent access > Manage > Strict host privacy defaults off. When enabled, discovery returns only opaque host IDs and display names. Credentials and credential references are always excluded. This controls metadata; remote terminal output may still contain addresses.
+- **Explicit user authorization.** The first time an agent requests a session on a host, Serlink shows an approval dialog and, when permitted, an actionable macOS notification. If the vault is locked, tool calls fail with `vault_locked` until the user unlocks it in the app.
 - **Dangerous command interception.** Commands sent by the agent are screened by a risk policy (`lib/features/mcp/data/command_risk_policy.dart`). Risky commands require an in-app confirmation (Allow once / Allow for session); a small set of destructive commands (disk overwrites, `mkfs`, fork bombs) is always blocked, even by a session allowlist. Optional decision-model protection adds semantic screening before execution.
 - **Take back control anytime.** An agent session is a regular terminal tab — type in it to retake control. A badge marks agent-controlled panes; closing the tab or revoking the grant in Settings immediately ends agent access.
 - **Quiet capability checks.** Starting the stdio server, initializing MCP, sending heartbeats, and listing tools do not connect to or launch the desktop app. A valid Serlink tool call connects to the running app or launches it on demand. The standalone process does not access the vault or SSH credentials itself.
@@ -52,6 +53,37 @@ On the first valid tool call, the stdio helper resolves the app's discovery file
 
 Overrides: `--discovery <path>`, `--connect-timeout <seconds>`, `SERLINK_MCP_DISCOVERY`, `SERLINK_APP_PATH`. The connection timeout (default 60 seconds) applies when a tool needs the app, including HTTP initialization. A launch or connection failure is returned as a tool error; the helper stays available for capability checks and subsequent calls. Closing the MCP client cancels pending startup waits. A failed in-flight tool call is never replayed automatically because it may already have executed; a subsequent call can establish a new backend connection.
 
+## Approval notifications
+
+In **Settings → Agent access**, enable **Approval notifications**. Enabling the
+MCP server from this panel also requests macOS alert permission. Permission is
+not requested automatically at app startup. If alerts are denied or unavailable,
+the same approval remains available inside Serlink; System settings opens the
+macOS notification settings, and the status refreshes when you return.
+
+The original tool call waits for a decision for up to **60 seconds**, including
+time queued behind another approval. Short requests offer Allow / Deny / View
+details; long or multiline commands require review in the app. Notification
+command approval allows **one execution** only. Host approval retains the same
+app-lifetime, revocable grant as the existing dialog. Session-level command
+approval remains available only in the full dialog. Notification previews follow
+macOS settings and may include host display names and short commands.
+
+Only one approval is presented at a time. The first decision wins across the
+notification and dialog. Expiration, request cancellation, MCP session closure,
+and server stop withdraw pending approvals. Vault/session validity is checked
+while waiting and again before execution. Old notifications cannot authorize a
+new request or survive an app restart. Cancelling a command that has already
+started does **not** undo its remote effects.
+
+Clients that supply a progress token receive waiting progress notifications.
+Their own timeout may still end the request earlier; configure it above the
+approval window plus connection/execution time. The stdio relay forwards
+cancellation and enforces a four-minute backend request limit. The AI should call
+the tool and wait without asking for a duplicate chat approval. A denial or
+`approval_timeout` / `request_cancelled` must not trigger an automatic retry.
+Vault unlocking and SSH authentication continue inside Serlink.
+
 ## Exposed tools
 
 All tools are prefixed `serlink_`:
@@ -66,7 +98,7 @@ All tools are prefixed `serlink_`:
 ## Authorization lifecycle
 
 - Grants are **in-memory only**: they expire when the app quits. Revoke individual grants in **Settings → Agent access → Active grants**; agent sessions are listed there too and can be closed.
-- Error codes surfaced to the agent: `vault_locked`, `authorization_denied`, `authorization_required`, `command_blocked`, `command_denied`, `session_not_found`, `connect_timeout`. The stdio helper also returns `app_unavailable` for discovery/launch failures and `app_connection_lost` for failed in-flight calls.
+- Error codes surfaced to the agent: `vault_locked`, `authorization_denied`, `authorization_required`, `command_blocked`, `command_denied`, `approval_timeout`, `request_cancelled`, `session_not_found`, `connect_timeout`. The stdio helper also returns `app_unavailable` for discovery/launch failures and `app_connection_lost` for failed in-flight calls.
 
 ## Decision-model command protection
 

@@ -7,6 +7,7 @@ import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/hosts/application/host_store.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/mcp/application/agent_session_bridge.dart';
+import 'package:serlink/features/mcp/application/mcp_request_context.dart';
 import 'package:serlink/features/mcp/application/command_decision_guard.dart';
 import 'package:serlink/features/mcp/domain/command_decision.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
@@ -88,6 +89,41 @@ void main() {
         expect(modal.commandCallCount, 0);
       });
     }
+
+    test(
+      'MCP cancellation during validation prevents terminal input',
+      () async {
+        final model = _DecisionModel()..pending = Completer<CommandDecision>();
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: _FakeSecurityModalService(),
+          decisionGuard: await _enabledGuard(model),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        final request = McpRequestContext();
+        final command = request.run(
+          () => bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'ls',
+          ),
+        );
+        final expectation = expectLater(
+          command,
+          throwsA(isA<McpApprovalException>()),
+        );
+        while (model.commands.isEmpty) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        request.cancel();
+        model.pending!.complete(CommandDecision.safe);
+        await expectation;
+        expect(service.shells.single.writes, isEmpty);
+      },
+    );
 
     test(
       'Ctrl-C interrupts immediately and cancels a pending safe result',

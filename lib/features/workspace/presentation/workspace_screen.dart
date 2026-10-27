@@ -41,6 +41,7 @@ import '../../import_export/application/vault_backup_service.dart';
 import '../../mcp/application/agent_config_installer.dart';
 import '../../mcp/application/command_decision_guard.dart';
 import '../../mcp/application/mcp_server_controller.dart';
+import '../../mcp/application/mcp_approval_notifications.dart';
 import '../../mcp/domain/agent_grant.dart';
 import '../../mcp/domain/agent_session.dart';
 import '../../security/application/security_modal_service.dart';

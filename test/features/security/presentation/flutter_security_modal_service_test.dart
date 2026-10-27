@@ -11,10 +11,163 @@ import 'package:serlink/features/security/presentation/flutter_security_modal_se
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/sync/domain/webdav_tls_certificate_details.dart';
 import 'package:serlink/l10n/l10n.dart';
+import 'package:serlink/features/mcp/application/mcp_approval_notifications.dart';
+import 'package:serlink/features/mcp/application/mcp_request_context.dart';
 
 const double _expectedHostKeyDialogDesktopWidth = 520;
 
 void main() {
+  const prompt = AgentAccessPrompt(
+    clientName: 'agent',
+    hostDisplayName: 'host',
+    hostId: 'host-1',
+  );
+
+  testWidgets('notification approval resolves the same dialog once', (
+    tester,
+  ) async {
+    final key = GlobalKey<NavigatorState>();
+    final notifications = _Notifications();
+    await tester.pumpWidget(_TestApp(navigatorKey: key));
+    final service = FlutterSecurityModalService(
+      key: key,
+      notifications: notifications,
+    );
+    final result = service.confirmAgentAccess(prompt);
+    await tester.pumpAndSettle();
+    expect(find.text('Agent access request'), findsOneWidget);
+    notifications.actions.single.complete('allow');
+    await tester.pumpAndSettle();
+    expect(await result, AgentAccessDecision.allow);
+    expect(find.text('Agent access request'), findsNothing);
+    expect(notifications.dismissed, [notifications.requests.single['id']]);
+  });
+
+  testWidgets('timeout removes approval and ignores a late notification', (
+    tester,
+  ) async {
+    final key = GlobalKey<NavigatorState>();
+    final notifications = _Notifications();
+    await tester.pumpWidget(_TestApp(navigatorKey: key));
+    final service = FlutterSecurityModalService(
+      key: key,
+      notifications: notifications,
+      approvalTimeout: const Duration(seconds: 2),
+    );
+    final result = service.confirmAgentAccess(prompt);
+    final expectation = expectLater(
+      result,
+      throwsA(
+        isA<McpApprovalException>().having(
+          (e) => e.code,
+          'code',
+          'approval_timeout',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    await expectation;
+    expect(find.text('Agent access request'), findsNothing);
+    expect(notifications.dismissed, hasLength(1));
+    notifications.actions.single.complete('allow');
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('cancelling a queued request does not unblock a later approval', (
+    tester,
+  ) async {
+    final key = GlobalKey<NavigatorState>();
+    final notifications = _Notifications();
+    await tester.pumpWidget(_TestApp(navigatorKey: key));
+    final service = FlutterSecurityModalService(
+      key: key,
+      notifications: notifications,
+    );
+    final first = service.confirmAgentAccess(prompt);
+    final scope = McpRequestContext();
+    final second = scope.run(() => service.confirmAgentAccess(prompt));
+    final expectation = expectLater(
+      second,
+      throwsA(isA<McpApprovalException>()),
+    );
+    final third = service.confirmAgentAccess(prompt);
+    await tester.pumpAndSettle();
+    scope.cancel();
+    await tester.pumpAndSettle();
+    await expectation;
+    expect(notifications.requests, hasLength(1));
+    notifications.actions.first.complete('deny');
+    await tester.pumpAndSettle();
+    expect(await first, AgentAccessDecision.deny);
+    expect(notifications.requests, hasLength(2));
+    notifications.actions.last.complete('allow');
+    await tester.pumpAndSettle();
+    expect(await third, AgentAccessDecision.allow);
+  });
+
+  testWidgets('request cancellation withdraws a visible approval', (
+    tester,
+  ) async {
+    final key = GlobalKey<NavigatorState>();
+    final notifications = _Notifications();
+    await tester.pumpWidget(_TestApp(navigatorKey: key));
+    final service = FlutterSecurityModalService(
+      key: key,
+      notifications: notifications,
+    );
+    final scope = McpRequestContext();
+    final result = scope.run(() => service.confirmAgentAccess(prompt));
+    final expectation = expectLater(
+      result,
+      throwsA(
+        isA<McpApprovalException>().having(
+          (e) => e.code,
+          'code',
+          'request_cancelled',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    scope.cancel();
+    await tester.pumpAndSettle();
+    await expectation;
+    notifications.actions.single.complete('allow');
+    await tester.pumpAndSettle();
+    expect(find.text('Agent access request'), findsNothing);
+    expect(notifications.dismissed, hasLength(1));
+  });
+
+  testWidgets('long commands cannot be approved from a notification', (
+    tester,
+  ) async {
+    final key = GlobalKey<NavigatorState>();
+    final notifications = _Notifications();
+    await tester.pumpWidget(_TestApp(navigatorKey: key));
+    final service = FlutterSecurityModalService(
+      key: key,
+      notifications: notifications,
+    );
+    final result = service.confirmAgentCommand(
+      AgentCommandPrompt(
+        clientName: 'agent',
+        hostDisplayName: 'host',
+        command: 'sudo ${'x' * 100}',
+        ruleDescription: 'sudo',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(notifications.requests.single['directApproval'], isFalse);
+    notifications.actions.single.complete('allow');
+    await tester.pumpAndSettle();
+    expect(find.text('Agent command confirmation'), findsOneWidget);
+    await tester.tap(find.text('Deny'));
+    await tester.pumpAndSettle();
+    expect(await result, AgentCommandDecision.deny);
+  });
+
   testWidgets('certificate details scroll on a narrow enlarged viewport', (
     tester,
   ) async {
@@ -347,5 +500,23 @@ class _TestApp extends StatelessWidget {
       ),
       home: const Scaffold(body: SizedBox.shrink()),
     );
+  }
+}
+
+class _Notifications extends McpApprovalNotifications {
+  final requests = <Map<String, Object>>[];
+  final actions = <Completer<String?>>[];
+  final dismissed = <String>[];
+  @override
+  Future<String?> show(Map<String, Object> request) {
+    requests.add(request);
+    final action = Completer<String?>();
+    actions.add(action);
+    return action.future;
+  }
+
+  @override
+  Future<void> dismiss(String id) async {
+    dismissed.add(id);
   }
 }

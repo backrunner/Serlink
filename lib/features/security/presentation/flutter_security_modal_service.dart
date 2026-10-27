@@ -1,4 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../mcp/application/mcp_approval_notifications.dart';
+import '../../mcp/application/mcp_request_context.dart';
 
 import '../../../design_system/design_system.dart';
 import '../../../l10n/l10n.dart';
@@ -6,6 +13,10 @@ import '../../snippets/presentation/shell_code_controller.dart';
 import '../../ssh/application/ssh_session_service.dart';
 import '../../sync/domain/webdav_tls_certificate_details.dart';
 import '../application/security_modal_service.dart';
+
+final _notificationControls = RegExp(
+  r'[\x00-\x1f\x7f\u202a-\u202e\u2066-\u2069]',
+);
 
 const double _securityDialogHorizontalPadding = 24;
 const double _hostKeyDialogMaxWidth = 520;
@@ -16,12 +27,18 @@ const double _certificateDialogContentWidth =
     _certificateDialogMaxWidth - (_securityDialogHorizontalPadding * 2);
 
 class FlutterSecurityModalService implements SecurityModalService {
-  const FlutterSecurityModalService({required GlobalKey<NavigatorState> key})
-    : this._(key);
-
-  const FlutterSecurityModalService._(this._key);
+  FlutterSecurityModalService({
+    required GlobalKey<NavigatorState> key,
+    this.notifications = const McpApprovalNotifications(),
+    this.approvalTimeout = const Duration(seconds: 60),
+    // Public named parameters cannot initialize a private field directly.
+    // ignore: prefer_initializing_formals
+  }) : _key = key;
 
   final GlobalKey<NavigatorState> _key;
+  final McpApprovalNotifications notifications;
+  final Duration approvalTimeout;
+  Future<void> _approvalQueue = Future<void>.value();
 
   @override
   Future<HostKeyDecision> confirmHostKey(HostKeyPrompt prompt) async {
@@ -103,12 +120,22 @@ class FlutterSecurityModalService implements SecurityModalService {
     if (context == null) {
       return AgentAccessDecision.deny;
     }
-    final decision = await showSerlinkDialog<AgentAccessDecision>(
+    final l10n = context.l10n;
+    return _confirmAgent(
       context: context,
-      barrierDismissible: false,
       builder: (context) => _AgentAccessDialog(prompt: prompt),
+      denied: AgentAccessDecision.deny,
+      allowed: AgentAccessDecision.allow,
+      title: l10n.securityAgentAccessTitle,
+      body:
+          '${l10n.securityAgentAccessBody(prompt.clientName, prompt.hostDisplayName)}\n${l10n.securityAgentAccessWarning}',
+      // Access notifications describe the same app-lifetime grant as the UI.
+      directApproval:
+          prompt.clientName.length + prompt.hostDisplayName.length < 80 &&
+          !_notificationControls.hasMatch(
+            '${prompt.clientName}${prompt.hostDisplayName}',
+          ),
     );
-    return decision ?? AgentAccessDecision.deny;
   }
 
   @override
@@ -116,15 +143,131 @@ class FlutterSecurityModalService implements SecurityModalService {
     AgentCommandPrompt prompt,
   ) async {
     final context = _key.currentContext;
-    if (context == null) {
-      return AgentCommandDecision.deny;
-    }
-    final decision = await showSerlinkDialog<AgentCommandDecision>(
+    if (context == null) return AgentCommandDecision.deny;
+    final l10n = context.l10n;
+    final direct =
+        prompt.command.length <= 80 &&
+        !_notificationControls.hasMatch(
+          '${prompt.command}${prompt.clientName}${prompt.hostDisplayName}',
+        ) &&
+        prompt.clientName.length + prompt.hostDisplayName.length < 60;
+    return _confirmAgent(
       context: context,
-      barrierDismissible: false,
       builder: (context) => _AgentCommandDialog(prompt: prompt),
+      denied: AgentCommandDecision.deny,
+      allowed: AgentCommandDecision.allowOnce,
+      title: l10n.securityAgentCommandTitle,
+      body:
+          '${l10n.securityAgentCommandBody(prompt.clientName, prompt.hostDisplayName)}\n${direct ? prompt.command : l10n.mcpApprovalReviewDetails}',
+      directApproval: direct,
     );
-    return decision ?? AgentCommandDecision.deny;
+  }
+
+  Future<T> _confirmAgent<T extends Object>({
+    required BuildContext context,
+    required WidgetBuilder builder,
+    required T denied,
+    required T allowed,
+    required String title,
+    required String body,
+    required bool directApproval,
+  }) async {
+    final request = McpRequestContext.current;
+    request?.checkActive();
+    final result = Completer<T>();
+    final id = const Uuid().v4();
+    FDialogRoute<T>? route;
+    void fail(String code) {
+      if (!result.isCompleted) result.completeError(McpApprovalException(code));
+    }
+
+    final timer = Timer(approvalTimeout, () => fail('approval_timeout'));
+    unawaited(request?.cancelled.then((_) => fail('request_cancelled')));
+    final validityTimer = request == null
+        ? null
+        : Timer.periodic(const Duration(milliseconds: 200), (_) {
+            if (result.isCompleted) return;
+            try {
+              request.checkActive();
+            } on Object catch (error, stack) {
+              result.completeError(error, stack);
+            }
+          });
+    request?.onWaiting?.call();
+    // One active approval at a time: notification details always point to the
+    // matching dialog. Queued requests share the same bounded waiting period.
+    final previous = _approvalQueue;
+    _approvalQueue = previous.then(
+      (_) => result.future.then<void>((_) {}, onError: (Object _) {}),
+    );
+    unawaited(
+      previous
+          .then((_) async {
+            if (result.isCompleted) return;
+            if (!context.mounted) {
+              fail('request_cancelled');
+              return;
+            }
+            final navigator = Navigator.of(context);
+            if (!navigator.mounted) {
+              fail('request_cancelled');
+              return;
+            }
+            final l10n = context.l10n;
+            route = FDialogRoute<T>(
+              style: context.theme.dialogRouteStyle,
+              capturedThemes: InheritedTheme.capture(
+                from: context,
+                to: navigator.context,
+              ),
+              capturedFTheme: FTheme.capture(
+                from: context,
+                to: navigator.context,
+              ),
+              barrierDismissible: false,
+              barrierLabel: l10n.denyAction,
+              useSafeArea: false,
+              builder: (context, animation) => builder(context),
+            );
+            unawaited(
+              navigator.push(route!).then((value) {
+                if (!result.isCompleted) result.complete(value ?? denied);
+              }),
+            );
+            final action = await notifications.show({
+              'id': id,
+              'title': title,
+              'body': body,
+              'allow': l10n.allowAction,
+              'deny': l10n.denyAction,
+              'details': l10n.mcpApprovalDetailsAction,
+              'directApproval': directApproval,
+              'timeoutMs': approvalTimeout.inMilliseconds,
+            });
+            if (result.isCompleted) return;
+            if (action == 'allow' && directApproval) result.complete(allowed);
+            if (action == 'deny') result.complete(denied);
+            // Details opens the app; unsupported/denied notifications leave the
+            // dialog usable until its existing deadline.
+          })
+          .catchError((Object error, StackTrace stack) {
+            if (!result.isCompleted) result.completeError(error, stack);
+          }),
+    );
+    try {
+      final value = await result.future;
+      request?.checkActive();
+      return value;
+    } finally {
+      timer.cancel();
+      validityTimer?.cancel();
+      request?.onApprovalFinished?.call();
+      final activeRoute = route;
+      if (activeRoute != null && activeRoute.isActive) {
+        activeRoute.navigator?.removeRoute(activeRoute);
+      }
+      unawaited(notifications.dismiss(id));
+    }
   }
 }
 

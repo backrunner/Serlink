@@ -16,6 +16,8 @@ import '../domain/agent_session.dart';
 import '../domain/command_risk.dart';
 import 'mcp_authorization_service.dart';
 import 'command_decision_guard.dart';
+import 'mcp_host_visibility.dart';
+import 'mcp_request_context.dart';
 
 /// Error thrown by [AgentSessionBridge] with a machine-readable [code] such
 /// as `vault_locked` or `authorization_denied`; surfaced to MCP clients as
@@ -133,6 +135,19 @@ class AgentSessionBridge {
     return _ref.read(hostSummariesProvider(vault.unlockGeneration).future);
   }
 
+  Future<List<Map<String, Object?>>> describeHosts() async {
+    final generation = _requireUnlockedVault().unlockGeneration;
+    final hosts = await _ref.read(hostRepositoryProvider).list();
+    final strict = await _ref.read(mcpHostVisibilityProvider).readStrict();
+    if (_requireUnlockedVault().unlockGeneration != generation) {
+      throw const McpBridgeException('vault_locked');
+    }
+    return [
+      for (final host in hosts)
+        McpHostVisibility.describe(host, strict: strict),
+    ];
+  }
+
   /// Opens an SSH terminal tab for [hostId] on behalf of [clientName].
   ///
   /// Throws [McpBridgeException] with codes `vault_locked`, `host_not_found`,
@@ -155,6 +170,13 @@ class AgentSessionBridge {
     if (host == null) {
       throw const McpBridgeException('host_not_found');
     }
+    final request = McpRequestContext.current;
+    request?.validate = () {
+      if (_requireUnlockedVault().unlockGeneration != vault.unlockGeneration) {
+        throw const McpBridgeException('vault_locked');
+      }
+    };
+    request?.checkActive();
     final grant = await _authorization.ensureGrant(
       clientName: clientName,
       hostId: hostId,
@@ -164,6 +186,18 @@ class AgentSessionBridge {
       throw const McpBridgeException('authorization_denied');
     }
 
+    McpRequestContext.current?.checkActive();
+    if (_requireUnlockedVault().unlockGeneration != vault.unlockGeneration) {
+      throw const McpBridgeException('vault_locked');
+    }
+    if (_authorization.findValidGrant(
+          clientName: clientName,
+          hostId: hostId,
+          now: _now(),
+        ) !=
+        grant) {
+      throw const McpBridgeException('authorization_denied');
+    }
     final tab = await _ref
         .read(workspaceTabControllerProvider.notifier)
         .openTerminal(host);
@@ -244,6 +278,7 @@ class AgentSessionBridge {
         permit,
         generation,
       );
+      McpRequestContext.current?.checkActive();
       final sent = _ref
           .read(workspaceRuntimeRegistryProvider)
           .sendTerminalInput(sessionId, '$command\r');
@@ -277,7 +312,9 @@ class AgentSessionBridge {
     // Interrupts must not wait behind a model request or long-running exec.
     // Invalidate queued/pending submissions so a late safe result cannot run.
     if (text == '\x03') {
+      McpRequestContext.current?.checkActive();
       _requireConnectedPane(sessionId);
+      McpRequestContext.current?.checkActive();
       final sent = _ref
           .read(workspaceRuntimeRegistryProvider)
           .sendTerminalInput(sessionId, text);
@@ -309,6 +346,7 @@ class AgentSessionBridge {
         permit,
         generation,
       );
+      McpRequestContext.current?.checkActive();
       final sent = _ref
           .read(workspaceRuntimeRegistryProvider)
           .sendTerminalInput(sessionId, text);
@@ -348,6 +386,7 @@ class AgentSessionBridge {
         throw McpBridgeException('command_blocked', error.code);
       }
     }
+    McpRequestContext.current?.checkActive();
     // Model requests and confirmation dialogs are asynchronous. Never send
     // after a grant was revoked, the vault locked, or the pane closed meanwhile.
     if (!identical(_requireAuthorizedSession(clientName, sessionId), entry)) {
@@ -509,6 +548,22 @@ class AgentSessionBridge {
     required String command,
     bool rawInput = false,
   }) async {
+    final request = McpRequestContext.current;
+    final generation = entry.inputGeneration;
+    request?.validate = () {
+      final sessionId = entry.handle.sessionId;
+      if (!identical(_requireAuthorizedSession(clientName, sessionId), entry)) {
+        throw const McpBridgeException('session_not_found');
+      }
+      _requireConnectedPane(sessionId);
+      if (generation != entry.inputGeneration) {
+        throw const McpBridgeException(
+          'command_blocked',
+          'command_input_interrupted',
+        );
+      }
+    };
+    request?.checkActive();
     final assessment = _riskPolicy.assess(command);
     if (assessment.level == CommandRiskLevel.blocked) {
       throw McpBridgeException('command_blocked', assessment.matchedRule);

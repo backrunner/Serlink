@@ -3306,4 +3306,50 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get agentHardwareKeyNote =>
       'First load your hardware key into a compatible SSH agent (OpenSSH FIDO2 or smart card / PKCS#11). The agent handles device access, touch and PIN prompts.';
+
+  @override
+  String get settingsMcpStrictPrivacy => 'Strict host privacy';
+
+  @override
+  String get settingsMcpStrictPrivacyDescription =>
+      'Off by default: agents can read host addresses and other non-secret settings. When enabled, host discovery returns only display names and IDs. Credentials are never shared. Terminal output may still contain addresses.';
+
+  @override
+  String get settingsMcpPrivacyUnavailable =>
+      'Host privacy settings are unavailable. Host metadata access is blocked.';
+
+  @override
+  String get mcpApprovalReviewDetails =>
+      'Open Serlink to review the complete command.';
+
+  @override
+  String get mcpApprovalDetailsAction => 'View details';
+
+  @override
+  String get mcpApprovalNotificationsTitle => 'Approval notifications';
+
+  @override
+  String get mcpApprovalNotificationsEnabled =>
+      'Enabled · approve from system notifications';
+
+  @override
+  String get mcpApprovalNotificationsNotAsked =>
+      'Allow notifications to approve requests without switching apps';
+
+  @override
+  String get mcpApprovalNotificationsDenied =>
+      'Notifications are off · approve inside Serlink';
+
+  @override
+  String get mcpApprovalNotificationsUnavailable => 'Approve inside Serlink';
+
+  @override
+  String get mcpApprovalEnableAction => 'Enable';
+
+  @override
+  String get mcpApprovalSystemSettingsAction => 'System settings';
+
+  @override
+  String get mcpApprovalWaitHint =>
+      'Requests wait up to 60 seconds for approval. Long commands open in Serlink for review.';
 }

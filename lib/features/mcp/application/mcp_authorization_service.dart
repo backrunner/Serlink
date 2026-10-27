@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/ids/entity_id.dart';
 import '../../security/application/security_modal_service.dart';
 import '../domain/agent_grant.dart';
+import 'mcp_request_context.dart';
 
 /// Tracks in-memory [AgentGrant]s and asks the user before creating new ones.
 ///
@@ -27,6 +28,8 @@ class McpAuthorizationService {
   final DateTime Function() _now;
 
   final List<AgentGrant> _grants = [];
+  var _generation = 0;
+  var _disposed = false;
   final Map<String, Future<AgentGrant?>> _pendingGrants = {};
   final StreamController<List<AgentGrant>> _grantsChanged =
       StreamController<List<AgentGrant>>.broadcast();
@@ -85,7 +88,14 @@ class McpAuthorizationService {
       hostDisplayName: hostDisplayName,
     );
     _pendingGrants[key] = future;
-    future.whenComplete(() => _pendingGrants.remove(key));
+    unawaited(
+      future.then<void>(
+        (_) => _pendingGrants.remove(key),
+        onError: (Object _) {
+          _pendingGrants.remove(key);
+        },
+      ),
+    );
     return future;
   }
 
@@ -94,6 +104,7 @@ class McpAuthorizationService {
     required HostId hostId,
     required String hostDisplayName,
   }) async {
+    final generation = _generation;
     final decision = await _securityModalService.confirmAgentAccess(
       AgentAccessPrompt(
         clientName: clientName,
@@ -101,7 +112,10 @@ class McpAuthorizationService {
         hostId: hostId.value,
       ),
     );
-    if (decision != AgentAccessDecision.allow) {
+    McpRequestContext.current?.checkActive();
+    if (_disposed ||
+        generation != _generation ||
+        decision != AgentAccessDecision.allow) {
       return null;
     }
     final grant = AgentGrant(
@@ -119,6 +133,7 @@ class McpAuthorizationService {
   /// Closes the grant-list broadcast stream. Called by the provider on
   /// dispose; the service must not be used afterwards.
   void dispose() {
+    _disposed = true;
     unawaited(_grantsChanged.close());
   }
 
@@ -134,6 +149,7 @@ class McpAuthorizationService {
   }
 
   void revokeAll() {
+    _generation += 1;
     _grants.clear();
     _emitGrants();
   }

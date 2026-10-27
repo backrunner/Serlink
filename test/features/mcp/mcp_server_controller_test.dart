@@ -332,6 +332,11 @@ class _CapturingBridge extends AgentSessionBridge {
   Duration? lastExecTimeout;
 
   @override
+  Future<List<Map<String, Object?>>> describeHosts() async {
+    throw const McpBridgeException('vault_locked');
+  }
+
+  @override
   Future<List<HostSummary>> listHosts() {
     // Mirrors the real bridge's behavior when the vault is locked; the
     // unlock gating itself is covered in agent_session_bridge_test.dart.

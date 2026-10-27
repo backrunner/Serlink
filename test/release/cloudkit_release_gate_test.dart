@@ -112,6 +112,20 @@ void main() {
     expect(script, contains('SERLINK_MACOS_CODE_SIGN_IDENTITY'));
     expect(script, contains('xcodebuild archive'));
     expect(releaseGate, contains('ios_app_store|app_store|direct|all'));
+
+    final result = Process.runSync('bash', [
+      'tool/check_cloudkit_release_ready.sh',
+      '--distribution',
+      'app_store',
+    ]);
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    expect(
+      _plistValue(
+        'macos/Runner/Release.entitlements',
+        'com.apple.security.files.downloads.read-write',
+      ),
+      isEmpty,
+    );
   });
 
   test('macOS Direct build keeps direct distribution surface', () {

@@ -90,6 +90,15 @@ plist_requires_bool() {
   [[ "$actual" == "$expected" ]] || fail "$label requires $key=$expected, found '${actual:-missing}'"
 }
 
+plist_rejects_key() {
+  local plist="$1"
+  local key="$2"
+  local label="$3"
+  if /usr/libexec/PlistBuddy -c "Print :$key" "$plist" >/dev/null 2>&1; then
+    fail "$label must not include $key"
+  fi
+}
+
 plist_rejects_development_environment() {
   local plist="$1"
   local label="$2"
@@ -254,7 +263,7 @@ if [[ "$DISTRIBUTION" == "app_store" || "$DISTRIBUTION" == "all" ]]; then
   plist_requires_bool "macos/Runner/Release.entitlements" "com.apple.security.network.client" "true" "macOS App Store entitlements"
   plist_requires_bool "macos/Runner/Release.entitlements" "com.apple.security.network.server" "true" "macOS App Store entitlements"
   plist_requires_bool "macos/Runner/Release.entitlements" "com.apple.security.files.user-selected.read-write" "true" "macOS App Store entitlements"
-  plist_requires_bool "macos/Runner/Release.entitlements" "com.apple.security.files.downloads.read-write" "true" "macOS App Store entitlements"
+  plist_rejects_key "macos/Runner/Release.entitlements" "com.apple.security.files.downloads.read-write" "macOS App Store entitlements"
   check_script_contains "tool/build_macos_app_store.sh" "--dart-define=SERLINK_DISTRIBUTION=app_store" "macOS App Store build script"
   check_script_contains "tool/build_macos_app_store.sh" "SERLINK_MACOS_ENTITLEMENTS=Runner/Release.entitlements" "macOS App Store build script"
   check_script_contains "tool/build_macos_app_store.sh" "xcodebuild archive" "macOS App Store build script"

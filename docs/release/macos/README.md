@@ -1,18 +1,24 @@
 # macOS submission materials
 
-Prepared on 2026-10-11 for Serlink 1.0.0, macOS build 16. App Store Connect
+Updated on 2026-10-19 for Serlink 1.0.0, macOS build 17. App Store Connect
 name/subtitle/category updates are saved. Three-language version metadata, screenshots and the privately supplied App Review contact are saved. See the dated report for upload state.
 
 On 2026-10-12, build 16 was resubmitted with incoming-network entitlement
-verification steps and an App Review reply. App Store Connect shows Waiting
-for Review. See [the entitlement follow-up](network-server-review-2026-10-12.md).
+verification steps. Apple's 2026-10-18 response now requests an explanation of
+Downloads access and populated review access. Build 17 adds an isolated offline
+demo and removes the redundant Downloads entitlement. A dedicated live review
+account is supplied privately. See [the complete entitlement inventory](entitlements.md);
+build 17 has now been uploaded and selected, and the macOS version is Waiting
+for Review. See [the October 19 report](review-2026-10-19.md) for evidence.
 
 ## Files
 
 - `metadata.json`: English, Simplified Chinese, and Japanese App Store fields,
   TestFlight descriptions, and technical app information.
 - `review-notes.txt`: copyable English App Review instructions and channel limits.
-- `network-server-review-reply.txt`: English reply explaining the incoming-network entitlement; send after saving the corresponding review notes in App Store Connect.
+- `entitlements.md`: complete entitlement inventory, offline demo and private live-environment design.
+- `review-2026-10-19.md`: build 17 archive/export/upload, private review access, entitlement audit and Waiting for Review evidence.
+- `network-server-review-reply.txt`: historical October 12 reply for build 16; it does not cover the October 18 rejection. Use the current complete `review-notes.txt` for the replacement build.
 - `privacy.html`: multilingual privacy-policy page, paired with the website privacy policy.
 - `support.html`: multilingual troubleshooting and support page.
 - `encryption.md`: implementation inventory for the export questionnaire.
@@ -73,9 +79,9 @@ questionnaire; the resulting rating is determined by App Store Connect.
 | Price, territories, release method and date | US$1.99 with US base territory, worldwide except France (174 current territories), automatic release after approval; saved in App Store Connect. |
 | Encryption declaration and any jurisdiction-specific documents | The current build questionnaire was answered with standard application-level algorithms and no France distribution; missing-compliance status cleared. Implementation inventory is in `encryption.md`. |
 | Distribution rights and EULA | Confirm rights for the AGPL project and bundled dependencies before accepting App Store agreements. No rights declaration has been submitted. |
-| App Review SSH demonstration | No bundled demo server will be supplied by owner choice. Review notes explain reviewer-owned SSH access. The app itself needs no Serlink account. |
+| App Review demonstration | Hold the lock badge or Settings version label for the isolated offline demo. Dedicated live SSH/SFTP connection details belong only in private review information; do not require reviewers to supply a server. |
 | CloudKit schema | Live Production and Development schemas are identical and satisfy the contract; the exported app has Production CloudKit and push entitlements. Two-device Production sync remains unverified. |
-| Final archive/export/upload | Build 16 archive and distribution export pass, including strict signature verification. Upload state is recorded in the dated report. |
+| Final archive/export/upload | Universal build 17 archive and distribution export pass strict signature verification. Uploaded, processed and resubmitted; Waiting for Review. See the October 19 report. |
 | Direct macOS release | Use the separate Developer ID/DMG scripts; notarization, stapling and a quarantined clean-Mac check remain required. |
 
 Use `docs/macos_release.md` for the build, export, upload and direct-distribution
@@ -85,7 +91,8 @@ the gate.
 ## 中文说明
 
 已更新中、英、日搜索名称、副标题、关键词和审核说明，网站升级到 svedocs 0.2.3
-并部署。macOS 构建 16 的归档、发行导出、签名与 Production 权限均已验证。
+并部署。macOS 构建 17 的 Universal 归档、发行导出、签名与 Production 权限均已验证，
+已上传并重新提交，目前等待审核。
 完整测试通过不代替真机跨设备 CloudKit 同步。截图已在原生 macOS 引擎上使用真实生产组件和虚构数据重新捕获，
-不代表真实服务器或 CloudKit 运行结果。价格 US$1.99、全球排除法国、获批后自动发布和审核联系人已保存；按所有者要求不提供专用测试服务器，
+不代表真实服务器或 CloudKit 运行结果。价格 US$1.99、全球排除法国、获批后自动发布和审核联系人已保存；本轮补充离线演示和独立受限审核服务器，凭据仅通过私有审核信息提供，
 最终发布与加密申报状态以本次审核报告为准。

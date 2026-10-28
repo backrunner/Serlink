@@ -126,15 +126,13 @@ class FlutterSecurityModalService implements SecurityModalService {
       builder: (context) => _AgentAccessDialog(prompt: prompt),
       denied: AgentAccessDecision.deny,
       allowed: AgentAccessDecision.allow,
-      title: l10n.securityAgentAccessTitle,
-      body:
-          '${l10n.securityAgentAccessBody(prompt.clientName, prompt.hostDisplayName)}\n${l10n.securityAgentAccessWarning}',
-      // Access notifications describe the same app-lifetime grant as the UI.
-      directApproval:
-          prompt.clientName.length + prompt.hostDisplayName.length < 80 &&
-          !_notificationControls.hasMatch(
-            '${prompt.clientName}${prompt.hostDisplayName}',
-          ),
+      title: prompt.discoveryStrict != null
+          ? l10n.securityAgentDiscoveryTitle
+          : l10n.securityAgentAccessTitle,
+      body: _agentAccessDescription(l10n, prompt),
+      // Data-sharing scopes need the complete disclosure in the app. Alerts
+      // still offer Deny / View details; short command approvals remain direct.
+      directApproval: false,
     );
   }
 
@@ -542,6 +540,24 @@ class _MultilinePasteDialog extends StatelessWidget {
   }
 }
 
+String _agentAccessDescription(
+  AppLocalizations l10n,
+  AgentAccessPrompt prompt,
+) {
+  final strict = prompt.discoveryStrict;
+  if (strict != null) {
+    return '${l10n.securityAgentDiscoveryBody(prompt.clientName)}\n\n'
+        '${strict ? l10n.securityAgentDiscoveryStrict : l10n.securityAgentDiscoveryFull}\n\n'
+        '${l10n.securityAgentSharingWarning}';
+  }
+  if (prompt.existingSessionId != null) {
+    return '${l10n.securityAgentAttachBody(prompt.clientName, prompt.hostDisplayName)}\n\n'
+        '${l10n.securityAgentAttachWarning}\n\n${l10n.securityAgentSharingWarning}';
+  }
+  return '${l10n.securityAgentAccessBody(prompt.clientName, prompt.hostDisplayName)}\n\n'
+      '${l10n.securityAgentAccessWarning}\n\n${l10n.securityAgentSharingWarning}';
+}
+
 class _AgentAccessDialog extends StatelessWidget {
   const _AgentAccessDialog({required this.prompt});
 
@@ -552,7 +568,11 @@ class _AgentAccessDialog extends StatelessWidget {
     final l10n = context.l10n;
     return SerlinkDialog(
       maxWidth: _hostKeyDialogMaxWidth,
-      title: Text(l10n.securityAgentAccessTitle),
+      title: Text(
+        prompt.discoveryStrict != null
+            ? l10n.securityAgentDiscoveryTitle
+            : l10n.securityAgentAccessTitle,
+      ),
       content: SerlinkScrollView(
         child: SizedBox(
           width: _hostKeyDialogContentWidth,
@@ -560,16 +580,15 @@ class _AgentAccessDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                l10n.securityAgentAccessBody(
-                  prompt.clientName,
-                  prompt.hostDisplayName,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(l10n.securityAgentAccessHostIdLabel(prompt.hostId)),
-              const SizedBox(height: 12),
-              Text(l10n.securityAgentAccessWarning),
+              Text(_agentAccessDescription(l10n, prompt)),
+              if (prompt.hostId.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(l10n.securityAgentAccessHostIdLabel(prompt.hostId)),
+              ],
+              if (prompt.existingSessionId case final id?) ...[
+                const SizedBox(height: 8),
+                Text(l10n.securityAgentSessionIdLabel(id)),
+              ],
             ],
           ),
         ),

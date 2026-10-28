@@ -3,6 +3,7 @@
 import argparse
 import json
 import pathlib
+import plistlib
 import subprocess
 import sys
 
@@ -18,6 +19,25 @@ limits = {"name": 30, "subtitle": 30, "promotionalText": 170, "keywords": 100,
           "description": 4000, "whatsNew": 4000, "betaDescription": 4000,
           "betaWhatToTest": 4000}
 errors = []
+if args.platform == "macos":
+    manifest = plistlib.loads((root / "macos/Runner/PrivacyInfo.xcprivacy").read_bytes())
+    collected = manifest.get("NSPrivacyCollectedDataTypes", [])
+    if collected and metadata.get("proposedPrivacyLabel") == "DATA_NOT_COLLECTED":
+        errors.append("macOS privacy label contradicts collected data in the manifest")
+    aliases = {"OtherUserContent": "OTHER_USER_CONTENT", "UserID": "USER_ID",
+               "ProductInteraction": "PRODUCT_INTERACTION"}
+    purposes = {"AppFunctionality": "APP_FUNCTIONALITY", "Analytics": "ANALYTICS"}
+    declared = {entry["type"]: entry for entry in metadata.get("proposedPrivacyDetails", {}).get("collectedData", [])}
+    for entry in collected:
+        name = entry["NSPrivacyCollectedDataType"].removeprefix("NSPrivacyCollectedDataType")
+        proposed = declared.get(aliases.get(name))
+        manifest_purposes = {purposes.get(value.removeprefix("NSPrivacyCollectedDataTypePurpose"), value)
+                             for value in entry["NSPrivacyCollectedDataTypePurposes"]}
+        if (not proposed or proposed.get("linkedToUser") != entry["NSPrivacyCollectedDataTypeLinked"]
+                or set(proposed.get("purposes", [])) != manifest_purposes):
+            errors.append(f"macOS privacy proposal does not match manifest: {name}")
+if len((folder / "review-notes.txt").read_text()) > 4000:
+    errors.append("review-notes.txt exceeds 4000 characters")
 for locale, fields in metadata["localizations"].items():
     for field, limit in limits.items():
         value = fields.get(field)

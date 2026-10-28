@@ -1013,7 +1013,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get securityAgentAccessWarning =>
-      'アプリを終了するかアクセスを取り消すまで、エージェントはこのホストでコマンドを実行できます。';
+      'Serlink を終了するか許可を取り消すまで、エージェントはこのホストで新しいセッションを開き、コマンドの実行、端末出力の読み取り、リモートファイルの一覧表示とダウンロードができます。';
 
   @override
   String get securityAgentCommandTitle => 'エージェントのコマンド確認';
@@ -3102,7 +3102,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsMcpGuardDescription =>
-      '有効にすると、エージェントのコマンドを TypeSafe に送信してリスクを判定します。危険、不確実、確認失敗の場合は実行をブロックします。API キーはこのデバイスにのみ保存されます。';
+      '任意のクラウド保護は、エージェントの完全なコマンドを TypeSafe（api.typesafe.ai）に送信します。コマンドには秘密情報や個人情報が含まれる場合があります。TypeSafe はサービス規約に従ってリクエストデータを保持する場合があり、ゼロ保持は保証されません。ホスト記録、保存済み SSH 認証情報、端末画面や出力は別途添付しません。API キーはデバイスの安全なストレージに保存し、認証のため TypeSafe に送信します。保管庫の同期やバックアップには含めません。';
 
   @override
   String get settingsMcpGuardInputHint =>
@@ -3137,7 +3137,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsMcpStrictPrivacyDescription =>
-      '既定ではオフです。エージェントはアドレスなどの機密でない設定を取得できます。有効にするとホスト一覧には表示名と ID のみを返します。認証情報は共有しません。端末出力にアドレスが含まれる場合があります。';
+      '初期状態では無効です。検出の許可後、エージェントはホストのアドレスや接続設定を読み取れます。有効にすると表示名と ID のみを返します。起動コマンドと保存済み認証情報は除外されます。許可された端末出力やファイルには機密情報が含まれる場合があります。';
 
   @override
   String get settingsMcpPrivacyUnavailable =>
@@ -3191,4 +3191,54 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get mcpApprovalWaitHint => '承認は最大60秒待機します。長いコマンドは Serlink で確認します。';
+
+  @override
+  String get securityAgentDiscoveryTitle => '接続情報の共有';
+
+  @override
+  String securityAgentDiscoveryBody(String client) {
+    return '$client が保存済みホストと現在のリモート接続を検出しようとしています。';
+  }
+
+  @override
+  String get securityAgentDiscoveryStrict =>
+      '表示名、ID、接続状態のみを共有します。アドレス、ユーザー名、起動コマンドは含みません。端末内容やファイルへのアクセスは許可されません。';
+
+  @override
+  String get securityAgentDiscoveryFull =>
+      'ホストのアドレス、ユーザー名、タグ、リモートパス、経路と接続設定、および現在の接続の名前、ID、状態を共有します。起動コマンドと保存済み認証情報は含みません。端末内容やファイルへのアクセスは許可されません。';
+
+  @override
+  String get securityAgentSharingWarning =>
+      'エージェントは自身の設定とポリシーに従い、共有データを AI 提供者に送信する場合があります。端末出力やファイルには秘密情報や個人情報が含まれる場合があります。信頼できるエージェントのみ許可してください。設定 > エージェントアクセスで取り消せます。Serlink を終了すると許可は失効します。';
+
+  @override
+  String securityAgentAttachBody(String client, String host) {
+    return '$client が $host への既存の接続を読み取り、操作しようとしています。';
+  }
+
+  @override
+  String get securityAgentAttachWarning =>
+      'この接続の既存の端末バッファと今後の出力の読み取り、コマンド実行、リモートファイルの一覧表示とダウンロードを許可します。エージェントアクセスを終了しても接続は維持されます。';
+
+  @override
+  String securityAgentSessionIdLabel(String id) {
+    return '接続 ID: $id';
+  }
+
+  @override
+  String get settingsMcpDiscoveryGrant => 'ホストと接続の検出';
+
+  @override
+  String get settingsMcpExistingConnectionGrant => '既存の接続';
+
+  @override
+  String get settingsMcpGuardSharingConsent =>
+      '完全なエージェントコマンドをリスク判定のため TypeSafe に送信することに同意します。機密情報が含まれる場合があり、リクエストデータが保持される可能性を理解しています。';
+
+  @override
+  String get settingsMcpGuardConsentRequired => 'モデル保護を有効にする前にコマンド共有に同意してください。';
+
+  @override
+  String get settingsMcpGuardPrivacyPolicy => 'TypeSafe プライバシーポリシー';
 }

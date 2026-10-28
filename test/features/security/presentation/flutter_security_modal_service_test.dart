@@ -23,7 +23,45 @@ void main() {
     hostId: 'host-1',
   );
 
-  testWidgets('notification approval resolves the same dialog once', (
+  for (final scope in ['discovery', 'connection']) {
+    testWidgets(
+      '$scope consent discloses sharing and requires the full dialog',
+      (tester) async {
+        final key = GlobalKey<NavigatorState>();
+        final notifications = _Notifications();
+        await tester.pumpWidget(_TestApp(navigatorKey: key));
+        final service = FlutterSecurityModalService(
+          key: key,
+          notifications: notifications,
+        );
+        final result = service.confirmAgentAccess(
+          AgentAccessPrompt(
+            clientName: 'agent',
+            hostDisplayName: 'host',
+            hostId: scope == 'discovery' ? '' : 'host-1',
+            discoveryStrict: scope == 'discovery' ? false : null,
+            existingSessionId: scope == 'connection' ? 'session-1' : null,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.textContaining('AI provider'), findsOneWidget);
+        expect(notifications.requests.single['directApproval'], false);
+        expect(
+          find.textContaining(
+            scope == 'discovery'
+                ? 'Startup commands and stored credentials are excluded'
+                : 'existing terminal buffer',
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.text('Deny'));
+        await tester.pumpAndSettle();
+        expect(await result, AgentAccessDecision.deny);
+      },
+    );
+  }
+
+  testWidgets('access approval requires the full disclosure in the app', (
     tester,
   ) async {
     final key = GlobalKey<NavigatorState>();
@@ -37,6 +75,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Agent access request'), findsOneWidget);
     notifications.actions.single.complete('allow');
+    await tester.pumpAndSettle();
+    expect(find.text('Agent access request'), findsOneWidget);
+    await tester.tap(find.text('Allow'));
     await tester.pumpAndSettle();
     expect(await result, AgentAccessDecision.allow);
     expect(find.text('Agent access request'), findsNothing);
@@ -105,6 +146,8 @@ void main() {
     expect(notifications.requests, hasLength(2));
     notifications.actions.last.complete('allow');
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Allow'));
+    await tester.pumpAndSettle();
     expect(await third, AgentAccessDecision.allow);
   });
 
@@ -166,6 +209,32 @@ void main() {
     await tester.tap(find.text('Deny'));
     await tester.pumpAndSettle();
     expect(await result, AgentCommandDecision.deny);
+  });
+
+  testWidgets('short commands still allow one execution from notifications', (
+    tester,
+  ) async {
+    final key = GlobalKey<NavigatorState>();
+    final notifications = _Notifications();
+    await tester.pumpWidget(_TestApp(navigatorKey: key));
+    final service = FlutterSecurityModalService(
+      key: key,
+      notifications: notifications,
+    );
+    final result = service.confirmAgentCommand(
+      const AgentCommandPrompt(
+        clientName: 'agent',
+        hostDisplayName: 'host',
+        command: 'sudo ls',
+        ruleDescription: 'sudo',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(notifications.requests.single['directApproval'], true);
+    notifications.actions.single.complete('allow');
+    await tester.pumpAndSettle();
+    expect(await result, AgentCommandDecision.allowOnce);
+    expect(find.text('Agent command confirmation'), findsNothing);
   });
 
   testWidgets('certificate details scroll on a narrow enlarged viewport', (
@@ -383,7 +452,7 @@ void main() {
 
     expect(find.text('Agent access request'), findsOneWidget);
     expect(
-      find.text('claude-code wants to open a session on Bastion.'),
+      find.textContaining('claude-code wants to open a session on Bastion.'),
       findsOneWidget,
     );
     expect(find.text('Host ID: host-1'), findsOneWidget);

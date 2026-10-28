@@ -8,7 +8,7 @@
 </style>
 <nav aria-label="Language"><a href="#en">English</a><a href="#zh">简体中文</a><a href="#ja">日本語</a><a href="support.html">Support / 支持</a></nav>
 <article id="en" lang="en">
-<h1>Serlink Privacy Policy</h1><p class="date">Effective date: 30 September 2026</p>
+<h1>Serlink Privacy Policy</h1><p class="date">Updated: 29 October 2026</p>
 <p>Serlink is an SSH terminal and SFTP workspace. The app does not require a Serlink account. This policy describes the app's current data handling.</p>
 <h2>Your local workspace</h2>
 <p>Host profiles, credential material, snippets and workspace records are stored in an encrypted local vault. Device-local secrets use the operating system's secure storage. Optional biometric unlock protects a random device key; the vault passphrase is not saved by that feature. Serlink does not receive biometric templates.</p>
@@ -18,14 +18,17 @@
 <p>iCloud sync uses Apple's CloudKit private database. WebDAV sync uses an endpoint you configure. Sync uploads encrypted vault snapshots and operational object metadata; the app's vault keys are not uploaded by the sync service. Apple or your WebDAV operator may process service and connection metadata under their policies. Disabling sync stops future app sync; it does not erase existing remote copies.</p>
 <h2>Diagnostics and external agents</h2>
 <p>Serlink has no advertising or analytics SDK and does not automatically upload diagnostic logs to its developer. Diagnostic exports are local, redact sensitive connection information and omit terminal output. If you send an export to support, review the files and remove anything private first.</p>
-<p>The optional MCP endpoint permits an external agent to use explicitly authorized sessions. Model command protection is off by default. If you configure your own TypeSafe API key and enable it, Serlink sends the commands submitted by agents to TypeSafe for risk assessment; it does not include host records, SSH credentials, terminal screens or command output in these requests. The API key and protection settings stay in device-local secure storage and are not included in vault sync or backups. TypeSafe processes these requests under its own service and privacy policies. An agent you authorize may separately transmit data according to that agent's configuration and provider policies.</p>
+<p>The macOS MCP endpoint shares host and connection information only after discovery consent. Depending on your strict host privacy setting, this is limited to names, IDs and states or also includes addresses, usernames, tags, paths and connection settings. Startup commands and stored credential records are excluded. Terminal and SFTP control require separate authorization. Reading or controlling an existing connection requires consent for that connection, including its existing terminal buffer. Grants expire when Serlink quits and can be revoked in Settings &gt; Agent access. An authorized agent may send shared metadata, terminal output or remote file information to its AI provider under its own settings and policies.</p>
+<p>Model command protection is off by default. Before enabling it, you must explicitly agree to send complete agent commands to TypeSafe at api.typesafe.ai for risk assessment. Commands can contain passwords, tokens, addresses or personal information; this text is not automatically redacted. Host records, stored SSH credentials, terminal screens and command output are not attached separately. Your API key is stored in device-local secure storage and sent to TypeSafe for request authentication. The key, consent and protection settings are excluded from vault sync and backups. You can disable protection or withdraw consent in its settings; removing the key also clears consent.</p>
+<p>TypeSafe may process and retain command content, account identifiers and request usage information to provide and secure its service, bill usage and generate service telemetry. Requests are associated with your TypeSafe account. Zero data retention is not guaranteed and depends on the applicable account agreement. TypeSafe states that customer requests and responses are not used to train Jev. See TypeSafe's privacy policy and retention guidance for its processing and deletion terms. Serlink's developer does not receive these commands or your API key.</p>
+<p>Mac App Store MCP downloads are first saved in the app's private storage. Use Export in Transfers to save a completed file through the native Save panel. Direct-edition MCP downloads use a fresh folder in Downloads. These downloaded files are not vault-encrypted; deleting a transfer-history entry alone does not delete its downloaded file.</p><p><a href="https://typesafe.ai/legal/privacy-policy">TypeSafe privacy policy</a> · <a href="https://help.typesafe.ai/articles/5974925716-how-is-submitted-data-used-or-retained">Request retention</a></p>
 <h2>Control, retention and deletion</h2>
 <p>You control host records, credentials, snippets, backups, exported files, sync destinations and agent authorizations. Local records remain until you delete or reset them. Remote data and backups have separate lifetimes: use the remote-data controls or your provider to delete them, and remove exports and backups separately. Keep recovery keys safe; the developer cannot recover an unknown vault passphrase without your recovery key.</p>
 <h2>Contact and updates</h2>
 <p>For privacy questions, use the contact published on the <a href="support.html">support page</a>. This policy will be updated if the app's data handling changes.</p>
 </article>
 <article id="zh" lang="zh-Hans">
-<h1>Serlink 隐私政策</h1><p class="date">生效日期：2026 年 9 月 30 日</p>
+<h1>Serlink 隐私政策</h1><p class="date">更新日期：2026 年 10 月 29 日</p>
 <p>Serlink 是 SSH 终端与 SFTP 工作区，无需 Serlink 账号。本政策说明当前应用的数据处理方式。</p>
 <h2>本地工作区</h2>
 <p>主机、凭据、片段及工作区记录保存在本地加密保险库。设备密钥使用系统安全存储。可选的生物识别解锁保护一个随机设备密钥，不保存保险库密码；Serlink 不接收生物识别模板。</p>
@@ -35,14 +38,17 @@
 <p>iCloud 同步使用 Apple CloudKit 私有数据库；WebDAV 使用你配置的端点。同步上传加密保险库快照与必要的对象元数据，同步服务不上传保险库密钥。Apple 或 WebDAV 运营方可能按其政策处理服务及连接元数据。关闭同步会停止后续同步，不会自动删除已有远程副本。</p>
 <h2>诊断与外部代理</h2>
 <p>Serlink 无广告或分析 SDK，不会自动向开发者上传诊断日志。诊断导出保存在本地，排除终端输出并脱敏敏感连接信息。向支持人员发送前，请检查导出文件并移除私人内容。</p>
-<p>可选 MCP 端点允许外部代理使用你明确授权的会话。模型命令防护默认关闭。配置自己的 TypeSafe API key 并启用后，Serlink 会将代理提交的命令发送给 TypeSafe 判断风险；请求不会附带主机记录、SSH 凭据、终端画面或命令输出。API key 和防护设置仅保存在本机安全存储中，不参与保险库同步或备份。TypeSafe 按其服务及隐私政策处理请求。被你授权的代理还可能按其配置及服务政策发送数据。</p>
+<p>macOS 的 MCP 端点仅在你同意发现授权后共享主机与连接信息。根据严格主机隐私设置，共享范围为名称、ID 和状态，或还包括地址、用户名、标签、路径及连接设置；不包含启动命令或已存储的凭据记录。终端和 SFTP 控制需要另行授权。读取或控制已有连接需要针对该连接单独同意，授权范围包含已有终端缓冲区。你可以在“设置 &gt; 代理访问”中撤销权限；退出 Serlink 后权限失效。获授权的代理可能按其设置和政策，将共享的元数据、终端输出或远程文件信息发送给 AI 服务商。</p>
+<p>模型命令保护默认关闭。启用前，你必须明确同意将代理提交的完整命令发送至 TypeSafe（api.typesafe.ai）进行风险评估。命令可能包含密码、令牌、地址或个人信息，这些文本不会自动脱敏。请求不会另行附加主机记录、已存储的 SSH 凭据、终端画面或命令输出。API Key 保存在本机安全存储中，并发送给 TypeSafe 用于请求认证。API Key、同意记录及保护设置不参与保险库同步或备份。你可以在保护设置中关闭功能或撤回同意；移除 API Key 也会清除同意记录。</p>
+<p>TypeSafe 可能处理并留存命令内容、账号标识及请求使用信息，用于提供服务、安全防护、用量计费和服务遥测。请求会关联你的 TypeSafe 账号。零留存不受保证，具体取决于账号适用协议。TypeSafe 声明不会使用客户请求或响应训练 Jev。其处理和删除条款请参阅 TypeSafe 隐私政策与数据留存说明。Serlink 开发者不会收到这些命令或你的 API Key。</p>
+<p>Mac App Store 版的 MCP 下载先保存在应用私有存储中；你可以在传输列表中选择“导出”，通过系统保存面板保存已完成的文件。直接分发版的 MCP 下载保存在 Downloads 下的新文件夹中。下载文件不受保险库加密保护；仅删除传输记录不会删除对应的下载文件。</p><p><a href="https://typesafe.ai/legal/privacy-policy">TypeSafe privacy policy</a> · <a href="https://help.typesafe.ai/articles/5974925716-how-is-submitted-data-used-or-retained">Request retention</a></p>
 <h2>控制、保留和删除</h2>
 <p>你可以管理主机、凭据、片段、备份、导出文件、同步服务和代理授权。本地记录保留至删除或重置。远程数据、备份和导出文件各自保留，需要通过应用的远程数据控制或服务商删除远程副本，并单独删除备份及导出。请妥善保管恢复密钥；开发者无法在没有恢复密钥的情况下找回遗失的保险库密码。</p>
 <h2>联系与更新</h2>
 <p>隐私问题请使用<a href="support.html">支持页面</a>公布的联系方式。应用的数据处理方式变化时，本政策会更新。</p>
 </article>
 <article id="ja" lang="ja">
-<h1>Serlink プライバシーポリシー</h1><p class="date">発効日：2026 年 9 月 30 日</p>
+<h1>Serlink プライバシーポリシー</h1><p class="date">更新日：2026 年 10 月 29 日</p>
 <p>Serlink は SSH ターミナルと SFTP のワークスペースです。Serlink アカウントは不要です。本ポリシーは現在のアプリのデータ処理を説明します。</p>
 <h2>ローカルのワークスペース</h2>
 <p>ホスト、認証情報、スニペットとワークスペースのレコードはローカルの暗号化ボールトに保存します。デバイスの秘密情報は OS の安全なストレージを使用します。任意の生体認証解除はランダムなデバイスキーを保護し、ボールトのパスフレーズを保存しません。生体認証のテンプレートを Serlink が受け取ることはありません。</p>
@@ -52,7 +58,10 @@
 <p>iCloud 同期は Apple の CloudKit プライベートデータベース、WebDAV 同期は設定したエンドポイントを使用します。暗号化されたスナップショットと必要なオブジェクトのメタデータを送信し、同期サービスはボールトの鍵を送信しません。Apple や WebDAV 運営者はサービスと接続のメタデータを独自のポリシーで処理する場合があります。同期を無効にしても既存のリモートコピーは削除されません。</p>
 <h2>診断と外部エージェント</h2>
 <p>広告・分析 SDK は含まず、診断ログを開発者へ自動送信しません。診断の書き出しはローカルで行い、接続の機密情報を伏せ、ターミナル出力を含めません。サポートへ送る前に内容を確認し、個人情報を取り除いてください。</p>
-<p>任意の MCP エンドポイントは明示的に許可したセッションを外部エージェントに提供します。モデルによるコマンド保護は初期状態で無効です。自身の TypeSafe API キーを設定して有効にすると、エージェントが送信したコマンドを TypeSafe に送ってリスクを判定します。リクエストにホスト記録、SSH 認証情報、端末画面、コマンド出力は含めません。API キーと保護設定はデバイスの安全なストレージにのみ保存し、保管庫の同期やバックアップには含めません。TypeSafe は自身のサービスとプライバシーポリシーに基づいて処理します。許可したエージェントが自身の設定と提供者のポリシーに従って別途データを送信する場合があります。</p>
+<p>macOS の MCP エンドポイントは、検出への同意後にのみホストと接続情報を共有します。厳格なホストプライバシー設定に応じて、名前、ID、状態のみ、またはアドレス、ユーザー名、タグ、パス、接続設定も共有します。起動コマンドと保存済み認証情報は含みません。端末と SFTP の操作には別途許可が必要です。既存の接続の読み取りや操作には、その接続への個別の同意が必要で、既存の端末バッファも対象になります。設定 &gt; エージェントアクセスで取り消せ、Serlink を終了すると失効します。許可したエージェントは自身の設定とポリシーに従い、共有メタデータ、端末出力やリモートファイル情報を AI 提供者に送信する場合があります。</p>
+<p>モデルによるコマンド保護は初期状態で無効です。有効化する前に、完全なエージェントコマンドをリスク判定のため TypeSafe（api.typesafe.ai）に送信することに明示的に同意する必要があります。コマンドにはパスワード、トークン、アドレス、個人情報が含まれる場合があり、自動では伏せ字にしません。ホスト記録、保存済み SSH 認証情報、端末画面や出力は別途添付しません。API キーはデバイスの安全なストレージに保存し、認証のため TypeSafe に送信します。キー、同意と保護設定は保管庫の同期やバックアップには含めません。設定で保護を無効にするか同意を撤回でき、キーを削除すると同意も消去します。</p>
+<p>TypeSafe はサービス提供、安全確保、利用料金の計算、サービスのテレメトリーのため、コマンド内容、アカウント識別子、リクエスト利用情報を処理・保持する場合があります。リクエストは TypeSafe アカウントに関連付けられます。ゼロ保持は保証されず、適用されるアカウント契約によります。TypeSafe は顧客のリクエストと応答を Jev の学習には使用しないとしています。処理と削除条件は TypeSafe のプライバシーポリシーと保持に関する説明をご覧ください。Serlink の開発者はこれらのコマンドや API キーを受信しません。</p>
+<p>Mac App Store 版の MCP ダウンロードはアプリの専用ストレージに保存します。完了したファイルは転送一覧の「書き出す」からシステムの保存パネルで保存できます。直接配布版では Downloads 内の新しいフォルダに保存します。ダウンロードファイルは保管庫では暗号化されません。転送履歴の削除だけではファイルは削除されません。</p><p><a href="https://typesafe.ai/legal/privacy-policy">TypeSafe privacy policy</a> · <a href="https://help.typesafe.ai/articles/5974925716-how-is-submitted-data-used-or-retained">Request retention</a></p>
 <h2>管理、保存と削除</h2>
 <p>ホスト、認証情報、スニペット、バックアップ、書き出し、同期先とエージェントの許可は利用者が管理します。ローカルレコードは削除・リセットまで残ります。リモートデータ、バックアップと書き出したファイルは別途削除してください。復旧キーを安全に保管してください。復旧キーなしで失ったパスフレーズを開発者が復元することはできません。</p>
 <h2>連絡と更新</h2>

@@ -13,12 +13,14 @@ class CommandDecisionSettings {
     this.model = 'jev-1.13.0',
     this.hasApiKey = false,
     this.revision = '',
+    this.dataSharingConsent = false,
   });
 
   final bool enabled;
   final String model;
   final bool hasApiKey;
   final String revision;
+  final bool dataSharingConsent;
 }
 
 class CommandDecisionException implements Exception {
@@ -54,6 +56,7 @@ class CommandDecisionGuard {
 
   static const secretRef = SecretRef('serlink.mcp.command-decision.v1');
   static const maxCommandBytes = 8192;
+  static const dataSharingConsentVersion = 1;
   final SecretStore _secrets;
   final CommandDecisionModel _model;
   final Duration timeout;
@@ -89,6 +92,8 @@ class CommandDecisionGuard {
         model: decoded['model'] as String,
         hasApiKey: key.isNotEmpty,
         revision: decoded['revision'] as String,
+        dataSharingConsent:
+            decoded['dataSharingConsentVersion'] == dataSharingConsentVersion,
       ),
       key,
     );
@@ -102,10 +107,14 @@ class CommandDecisionGuard {
     required String model,
     String? apiKey,
     bool removeApiKey = false,
+    bool? dataSharingConsent,
   }) {
     final result = _pendingSave.then((_) async {
       final previous = await _load();
       final name = model.trim();
+      final consent =
+          !removeApiKey &&
+          (dataSharingConsent ?? previous.settings.dataSharingConsent);
       final key = removeApiKey
           ? ''
           : (apiKey?.trim().isNotEmpty == true
@@ -118,6 +127,9 @@ class CommandDecisionGuard {
           'command_guard_invalid_configuration',
         );
       }
+      if (enabled && !consent) {
+        throw const CommandDecisionException('command_guard_consent_required');
+      }
       await _secrets.write(
         secretRef,
         utf8.encode(
@@ -126,6 +138,9 @@ class CommandDecisionGuard {
             'model': name,
             'apiKey': key,
             'revision': const Uuid().v4(),
+            'dataSharingConsentVersion': consent
+                ? dataSharingConsentVersion
+                : 0,
           }),
         ),
       );
@@ -146,6 +161,9 @@ class CommandDecisionGuard {
       final config = await _readConfiguration().timeout(timeout);
       final settings = config.settings;
       if (!settings.enabled) return CommandDecisionPermit(settings.revision);
+      if (!settings.dataSharingConsent) {
+        throw const CommandDecisionException('command_guard_consent_required');
+      }
       if (!settings.hasApiKey) {
         throw const CommandDecisionException('command_guard_unavailable');
       }

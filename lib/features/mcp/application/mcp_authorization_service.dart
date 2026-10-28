@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
 
@@ -51,9 +52,11 @@ class McpAuthorizationService {
     required String clientName,
     required HostId hostId,
     required DateTime now,
+    SessionId? sessionId,
   }) {
     for (final grant in _grants) {
-      if (grant.clientName == clientName && grant.covers(hostId, now)) {
+      if (grant.clientName == clientName &&
+          grant.covers(hostId, now, sessionId: sessionId)) {
         return grant;
       }
     }
@@ -68,16 +71,57 @@ class McpAuthorizationService {
     required String clientName,
     required HostId hostId,
     required String hostDisplayName,
+    SessionId? sessionId,
   }) {
     final existing = findValidGrant(
       clientName: clientName,
       hostId: hostId,
       now: _now(),
+      sessionId: sessionId,
     );
     if (existing != null) {
       return Future.value(existing);
     }
-    final key = '$clientName|${hostId.value}';
+    return _ensureGrant(
+      clientName: clientName,
+      hostId: hostId,
+      hostDisplayName: hostDisplayName,
+      sessionId: sessionId,
+    );
+  }
+
+  Future<AgentGrant?> ensureDiscoveryGrant({
+    required String clientName,
+    required bool strict,
+  }) {
+    for (final grant in _grants) {
+      if (grant.clientName == clientName &&
+          grant.isDiscovery &&
+          grant.discoveryStrict == strict &&
+          !grant.isExpired(_now())) {
+        return Future.value(grant);
+      }
+    }
+    return _ensureGrant(clientName: clientName, discoveryStrict: strict);
+  }
+
+  bool isValid(AgentGrant grant) =>
+      !_disposed && _grants.contains(grant) && !grant.isExpired(_now());
+
+  Future<AgentGrant?> _ensureGrant({
+    required String clientName,
+    HostId? hostId,
+    String hostDisplayName = '',
+    SessionId? sessionId,
+    bool? discoveryStrict,
+  }) {
+    // JSON avoids delimiter collisions in caller-provided client names.
+    final key = jsonEncode([
+      clientName,
+      hostId?.value,
+      sessionId?.value,
+      discoveryStrict,
+    ]);
     final pending = _pendingGrants[key];
     if (pending != null) {
       return pending;
@@ -86,6 +130,8 @@ class McpAuthorizationService {
       clientName: clientName,
       hostId: hostId,
       hostDisplayName: hostDisplayName,
+      sessionId: sessionId,
+      discoveryStrict: discoveryStrict,
     );
     _pendingGrants[key] = future;
     unawaited(
@@ -101,15 +147,19 @@ class McpAuthorizationService {
 
   Future<AgentGrant?> _requestGrant({
     required String clientName,
-    required HostId hostId,
+    HostId? hostId,
     required String hostDisplayName,
+    SessionId? sessionId,
+    bool? discoveryStrict,
   }) async {
     final generation = _generation;
     final decision = await _securityModalService.confirmAgentAccess(
       AgentAccessPrompt(
         clientName: clientName,
         hostDisplayName: hostDisplayName,
-        hostId: hostId.value,
+        hostId: hostId?.value ?? '',
+        existingSessionId: sessionId?.value,
+        discoveryStrict: discoveryStrict,
       ),
     );
     McpRequestContext.current?.checkActive();
@@ -122,6 +172,8 @@ class McpAuthorizationService {
       grantId: _uuid.v4(),
       clientName: clientName,
       hostId: hostId,
+      sessionId: sessionId,
+      discoveryStrict: discoveryStrict,
       createdAt: _now(),
       expiresAt: null,
     );

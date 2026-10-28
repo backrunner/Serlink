@@ -26,7 +26,7 @@ class SerlinkMcpTool {
 /// Server-level instructions sent to the MCP client during initialization.
 /// They are the behavioral contract every agent must follow: Serlink tools
 /// are the only sanctioned way to reach the user's hosts, and credentials
-/// never leave the app.
+/// are never returned by credential APIs. Remote content can contain secrets.
 const serlinkMcpInstructions =
     "Serlink MCP server. All SSH access to the user's hosts goes through "
     'these tools — there is no other sanctioned path.\n'
@@ -71,9 +71,9 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
   'serlink_list_hosts': SerlinkMcpTool(
     name: 'serlink_list_hosts',
     description:
-        'List all non-secret SSH host configuration, including hostname/IP, '
+        'After explicit discovery consent, list SSH host configuration, including hostname/IP, '
         'username, port and connection settings. Credentials and credential '
-        'references are never returned. With strict host privacy enabled, '
+        'references and startup commands are never returned. With strict host privacy enabled, '
         'only opaque host ids and display names are returned. This policy '
         'controls host metadata, not arbitrary remote terminal output. '
         'Workflow: call this '
@@ -84,7 +84,7 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
         'app. These hosts are reachable ONLY through Serlink tools: do '
         'not try to connect to them yourself with ssh, shell commands, or '
         'sockets, and never request or read credentials — no credentials '
-        'are exposed through this server, ever.',
+        'are returned by host discovery. Remote terminal output and files may contain secrets; do not seek them.',
     inputSchema: JsonSchema.object(),
   ),
   'serlink_open_session': SerlinkMcpTool(
@@ -92,7 +92,7 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
     description:
         'Open an SSH session to a Serlink host as a visible terminal or SFTP tab '
         'in the Serlink app. The user must approve access in a Serlink '
-        'dialog or macOS notification (and unlock the vault first if it is locked). '
+        'dialog (notifications open its full disclosure), and unlock the vault if it is locked. '
         'The call waits up to 60 seconds for approval; do not ask for duplicate chat confirmation. Credentials never leave the '
         'app — never ask for passwords or private keys, and never try to '
         'read them from the user\'s files, keychain, or SSH agent. You '
@@ -122,7 +122,7 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
         'in the Serlink workspace, including user-opened connections and their '
         'lifecycle state. Returns opaque ids and display names only, without '
         'terminal contents, endpoint addresses or credentials. Requires an '
-        'unlocked vault. Listing does not grant control; use '
+        'unlocked vault and explicit discovery consent. Listing does not grant control; use '
         'serlink_attach_session for a connected, attachable session.',
     inputSchema: JsonSchema.object(),
   ),
@@ -130,8 +130,8 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
     name: 'serlink_attach_session',
     description:
         'Borrow an existing connected remote terminal pane or SFTP '
-        'connection from serlink_list_connections. Uses the same per-client '
-        'host approval as opening a session, without reconnecting or signing '
+        'connection from serlink_list_connections. Requires separate per-client, '
+        'connection-specific consent to read its existing buffer and control it, without reconnecting or signing '
         'again. Cannot take a session controlled by another MCP client. '
         'Always finish with serlink_close_session; for a borrowed session '
         'this releases MCP control while keeping the user connection open.',
@@ -163,7 +163,8 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
     name: 'serlink_sftp_download',
     description:
         'Queue a single file download through app-owned SFTP. '
-        'Saves into a fresh private directory in the local Downloads folder, '
+        'Saves into a fresh private directory: app-container storage on the App Store edition '
+        '(use Export in Transfers for a native Save panel), or Downloads in the direct edition, '
         'without overwriting existing files. Returns taskId and localPath; '
         'poll serlink_transfer_status and keep the session open until completed. '
         'A queued transfer is not a completed download. File bytes are not returned.',

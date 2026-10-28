@@ -13,7 +13,9 @@ in the submitted Mac App Store build:
    MCP clients. It is restricted to loopback and requires a per-start bearer
    token. Opening an agent-controlled SSH session additionally requires
    explicit authorization in the app. The app does not include an AI model
-   or contact an AI provider by itself.
+   and contacts TypeSafe only if the user enables optional command protection
+   after explicit command-sharing consent. Complete command text is then sent
+   for assessment using the user's API key; retention follows TypeSafe's terms.
 
 The MCP server starts automatically and can be stopped using Settings >
 MCP / Agent access > Manage > Agent server. The Mac App Store build does not
@@ -28,7 +30,10 @@ App Review Information. You can verify the MCP HTTP listener without an SSH
 server: open Settings > MCP / Agent access > Manage, use the displayed URL and
 token to send the documented MCP initialization request, and turn Agent server
 off to confirm that the listener closes. Requests without a valid token return
-HTTP 403. For SSH forwarding, connect to an SSH host you control and open
+HTTP 403. Discovery requires consent; borrowing existing sessions requires separate
+connection-specific consent. Access notifications open the full in-app
+disclosure. MCP downloads stay in the app container until native-panel export.
+For SSH forwarding, use the dedicated private review host and open
 Manage port forwarding in the connected terminal toolbar.
 
 Please continue reviewing the existing submission with this information.

@@ -37,6 +37,18 @@ with a sandboxed Mac App Store build:
 Remote SSH terminal, SFTP, WebDAV sync, CloudKit sync, and user-selected file
 import/export remain enabled.
 
+Embedded HTTP MCP access also remains enabled. Discovery requires explicit
+data-sharing consent; borrowing a connection requires a separate grant for
+that connection, including existing terminal history. MCP file downloads stage
+inside app-private storage. The Transfers action exports completed files with
+a native Save panel; programmatic Downloads permission is not needed.
+
+Optional TypeSafe command protection requires a separate versioned consent.
+Legacy enabled configurations cannot send model requests until that consent is
+renewed. The macOS privacy manifest and proposed store label disclose command
+content, account identification and request usage; see
+`docs/release/macos/privacy-declaration.md` before the next submission.
+
 ## Direct DMG distribution
 
 Use this channel for a Developer ID signed and notarized direct download:

@@ -332,7 +332,9 @@ class _CapturingBridge extends AgentSessionBridge {
   Duration? lastExecTimeout;
 
   @override
-  Future<List<Map<String, Object?>>> describeHosts() async {
+  Future<List<Map<String, Object?>>> describeHosts({
+    required String clientName,
+  }) async {
     throw const McpBridgeException('vault_locked');
   }
 

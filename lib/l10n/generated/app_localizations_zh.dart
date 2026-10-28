@@ -999,7 +999,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get securityAgentAccessWarning => '在应用退出或访问被撤销之前，代理可以在该主机上运行命令。';
+  String get securityAgentAccessWarning =>
+      '在退出 Serlink 或撤销授权前，代理可在此主机上新建会话、运行命令、读取终端输出、列出远程文件并下载文件。';
 
   @override
   String get securityAgentCommandTitle => '代理命令确认';
@@ -3057,7 +3058,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsMcpGuardDescription =>
-      '启用后，代理命令会发送给 TypeSafe 判断风险。危险、判断不明确或检查失败时都会拦截。API key 仅保存在本机。';
+      '可选的云端保护会将代理提交的完整命令发送至 TypeSafe（api.typesafe.ai）。命令可能含有密码、密钥或个人信息。TypeSafe 可能根据其服务条款留存请求数据，不保证零留存。请求不会另行附加主机记录、已存储的 SSH 凭据、终端画面或输出。API Key 保存在本机安全存储中，并发送给 TypeSafe 用于请求认证；不参与保险库同步或备份。';
 
   @override
   String get settingsMcpGuardInputHint =>
@@ -3092,7 +3093,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsMcpStrictPrivacyDescription =>
-      '默认关闭：代理可读取主机地址和其他非凭据配置。开启后，主机列表只返回显示名称和 ID。凭据始终不会共享；终端输出仍可能包含地址';
+      '默认关闭：同意发现授权后，代理可读取主机地址及其他连接设置。开启后，主机发现仅返回显示名称和 ID。启动命令和已存储的凭据均不共享；获授权访问的终端输出和文件仍可能包含敏感信息。';
 
   @override
   String get settingsMcpPrivacyUnavailable => '无法读取主机隐私设置，已阻止访问主机信息';
@@ -3145,4 +3146,54 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpApprovalWaitHint => '请求最多等待 60 秒审批；长命令需在 Serlink 中查看并确认。';
+
+  @override
+  String get securityAgentDiscoveryTitle => '共享连接信息';
+
+  @override
+  String securityAgentDiscoveryBody(String client) {
+    return '$client 请求发现你保存的主机和当前远程连接。';
+  }
+
+  @override
+  String get securityAgentDiscoveryStrict =>
+      '仅共享显示名称、ID 和连接状态，不包含地址、用户名或启动命令。此授权不允许访问终端内容或文件。';
+
+  @override
+  String get securityAgentDiscoveryFull =>
+      '共享主机地址、用户名、标签、远程路径、路由及连接设置，以及当前连接的名称、ID 和状态。不包含启动命令或已存储的凭据。此授权不允许访问终端内容或文件。';
+
+  @override
+  String get securityAgentSharingWarning =>
+      '代理可能按其设置和政策将共享数据发送给 AI 服务商。终端输出和文件可能含有密钥、密码或个人信息，请仅授权你信任的代理。你可以在“设置 > 代理访问”中撤销权限；退出 Serlink 后权限失效。';
+
+  @override
+  String securityAgentAttachBody(String client, String host) {
+    return '$client 请求读取并控制与 $host 的已有连接。';
+  }
+
+  @override
+  String get securityAgentAttachWarning =>
+      '允许后，代理可读取此连接已有的终端缓冲区及后续输出、运行命令、列出远程文件并下载文件。结束代理访问会保留你的连接。';
+
+  @override
+  String securityAgentSessionIdLabel(String id) {
+    return '连接 ID：$id';
+  }
+
+  @override
+  String get settingsMcpDiscoveryGrant => '主机与连接发现';
+
+  @override
+  String get settingsMcpExistingConnectionGrant => '已有连接';
+
+  @override
+  String get settingsMcpGuardSharingConsent =>
+      '我同意将代理提交的完整命令发送至 TypeSafe 进行风险评估，并知悉命令可能包含敏感信息且请求数据可能被留存。';
+
+  @override
+  String get settingsMcpGuardConsentRequired => '启用模型保护前，请先同意共享命令。';
+
+  @override
+  String get settingsMcpGuardPrivacyPolicy => 'TypeSafe 隐私政策';
 }

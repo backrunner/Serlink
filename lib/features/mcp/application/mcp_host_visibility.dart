@@ -48,7 +48,6 @@ class McpHostVisibility {
       'groupId': host.groupId,
       'trustState': host.trustState.name,
       'sftpDefaultDirectory': host.sftpDefaultDirectory,
-      'startupCommands': host.startupCommands,
       'jumpHostIds': [for (final id in host.jumpHostIds) id.value],
       'portForwarding': host.portForwarding.toJson(),
       'connectionSettings': host.connectionSettings.toJson(),

@@ -23,6 +23,7 @@ void main() {
     enabled: true,
     model: 'jev-1.13.0',
     apiKey: 'fixture-key',
+    dataSharingConsent: true,
   );
 
   test('disabled by default, with no paid request', () async {
@@ -33,6 +34,72 @@ void main() {
     await guard.validate(permit);
     expect(model.commands, isEmpty);
   });
+
+  test(
+    'enabling requires explicit sharing consent before any model call',
+    () async {
+      await expectLater(
+        guard.saveSettings(
+          enabled: true,
+          model: 'jev-1.13.0',
+          apiKey: 'fixture-key',
+        ),
+        throwsA(_error('command_guard_consent_required')),
+      );
+      expect((await guard.readSettings()).enabled, false);
+      expect(model.commands, isEmpty);
+    },
+  );
+
+  test('legacy enabled configuration blocks until renewed consent', () async {
+    await enable();
+    final config = jsonDecode(
+      utf8.decode((await store.read(CommandDecisionGuard.secretRef))!),
+    ) as Map<String, dynamic>;
+    config.remove('dataSharingConsentVersion');
+    await store.write(
+      CommandDecisionGuard.secretRef,
+      utf8.encode(jsonEncode(config)),
+    );
+    expect((await guard.readSettings()).dataSharingConsent, false);
+    await expectLater(
+      guard.check(command: 'ls'),
+      throwsA(_error('command_guard_consent_required')),
+    );
+    expect(model.commands, isEmpty);
+    await guard.saveSettings(
+      enabled: true,
+      model: 'jev-1.13.0',
+      dataSharingConsent: true,
+    );
+    await guard.check(command: 'ls');
+    expect(model.commands, ['ls']);
+  });
+
+  test(
+    'withdrawing consent or removing the key prevents further requests',
+    () async {
+      await enable();
+      await guard.saveSettings(
+        enabled: false,
+        model: 'jev-1.13.0',
+        dataSharingConsent: false,
+      );
+      await guard.check(command: 'ls');
+      expect(model.commands, isEmpty);
+      await expectLater(
+        guard.saveSettings(enabled: true, model: 'jev-1.13.0'),
+        throwsA(_error('command_guard_consent_required')),
+      );
+      await enable();
+      await guard.saveSettings(
+        enabled: false,
+        model: 'jev-1.13.0',
+        removeApiKey: true,
+      );
+      expect((await guard.readSettings()).dataSharingConsent, false);
+    },
+  );
 
   test('stores one device-local config, retains and removes the key', () async {
     await enable();

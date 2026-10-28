@@ -1915,7 +1915,7 @@ abstract class AppLocalizations {
   /// No description provided for @securityAgentAccessWarning.
   ///
   /// In en, this message translates to:
-  /// **'The agent can run commands on this host until the app quits or access is revoked.'**
+  /// **'Until Serlink quits or you revoke access, the agent can open new sessions on this host, run commands, read terminal output, list remote files and download files.'**
   String get securityAgentAccessWarning;
 
   /// No description provided for @securityAgentCommandTitle.
@@ -5683,7 +5683,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpGuardDescription.
   ///
   /// In en, this message translates to:
-  /// **'When enabled, agent commands are sent to TypeSafe for risk assessment. Dangerous or uncertain commands and failed checks are blocked. Your API key stays on this device.'**
+  /// **'Optional cloud protection sends complete agent commands to TypeSafe at api.typesafe.ai. Commands can contain secrets or personal data. TypeSafe may retain request data under its service terms; zero retention is not guaranteed. Host records, stored SSH credentials, terminal screens and output are not attached separately. The API key is stored in device-local secure storage and sent to TypeSafe to authenticate requests; it is excluded from vault sync and backups.'**
   String get settingsMcpGuardDescription;
 
   /// No description provided for @settingsMcpGuardInputHint.
@@ -5749,7 +5749,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpStrictPrivacyDescription.
   ///
   /// In en, this message translates to:
-  /// **'Off by default: agents can read host addresses and other non-secret settings. When enabled, host discovery returns only display names and IDs. Credentials are never shared. Terminal output may still contain addresses.'**
+  /// **'Off by default: after discovery consent, agents can read host addresses and other connection settings. When enabled, discovery returns only display names and IDs. Startup commands and stored credentials are excluded. Authorized terminal output and files may contain sensitive data.'**
   String get settingsMcpStrictPrivacyDescription;
 
   /// No description provided for @settingsMcpPrivacyUnavailable.
@@ -5853,6 +5853,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Requests wait up to 60 seconds for approval. Long commands open in Serlink for review.'**
   String get mcpApprovalWaitHint;
+
+  /// No description provided for @securityAgentDiscoveryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share connection information'**
+  String get securityAgentDiscoveryTitle;
+
+  /// No description provided for @securityAgentDiscoveryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{client} wants to discover your saved hosts and active remote connections.'**
+  String securityAgentDiscoveryBody(String client);
+
+  /// No description provided for @securityAgentDiscoveryStrict.
+  ///
+  /// In en, this message translates to:
+  /// **'Share display names, IDs and connection states only. Addresses, usernames and startup commands are excluded. This does not grant terminal or file access.'**
+  String get securityAgentDiscoveryStrict;
+
+  /// No description provided for @securityAgentDiscoveryFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Share host addresses, usernames, tags, remote paths, routing and connection settings, plus active connection names, IDs and states. Startup commands and stored credentials are excluded. This does not grant terminal or file access.'**
+  String get securityAgentDiscoveryFull;
+
+  /// No description provided for @securityAgentSharingWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent may send shared data to its AI provider under its own settings and policies. Terminal output and files may contain secrets or personal data. Allow only an agent you trust. You can revoke this permission in Settings > Agent access; it expires when Serlink quits.'**
+  String get securityAgentSharingWarning;
+
+  /// No description provided for @securityAgentAttachBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{client} wants to read and control an existing connection to {host}.'**
+  String securityAgentAttachBody(String client, String host);
+
+  /// No description provided for @securityAgentAttachWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This allows reading the existing terminal buffer and future output, running commands, listing remote files and downloading files on this connection. Closing agent access leaves your connection open.'**
+  String get securityAgentAttachWarning;
+
+  /// No description provided for @securityAgentSessionIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection ID: {id}'**
+  String securityAgentSessionIdLabel(String id);
+
+  /// No description provided for @settingsMcpDiscoveryGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Host and connection discovery'**
+  String get settingsMcpDiscoveryGrant;
+
+  /// No description provided for @settingsMcpExistingConnectionGrant.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing connection'**
+  String get settingsMcpExistingConnectionGrant;
+
+  /// No description provided for @settingsMcpGuardSharingConsent.
+  ///
+  /// In en, this message translates to:
+  /// **'I agree to send complete agent commands to TypeSafe for risk assessment. I understand that commands may contain sensitive data and that TypeSafe may retain request data.'**
+  String get settingsMcpGuardSharingConsent;
+
+  /// No description provided for @settingsMcpGuardConsentRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Agree to command sharing before enabling model protection.'**
+  String get settingsMcpGuardConsentRequired;
+
+  /// No description provided for @settingsMcpGuardPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'TypeSafe privacy policy'**
+  String get settingsMcpGuardPrivacyPolicy;
 }
 
 class _AppLocalizationsDelegate

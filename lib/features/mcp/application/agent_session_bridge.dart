@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../../../app/app_dependencies.dart';
 import '../../../core/ids/entity_id.dart';
@@ -18,11 +17,13 @@ import '../../vault/application/vault_service.dart';
 import '../../workspace/application/workspace_tab_controller.dart';
 import '../../workspace/domain/workspace_tab.dart';
 import '../data/command_risk_policy.dart';
+import '../domain/agent_grant.dart';
 import '../domain/agent_session.dart';
 import '../domain/command_risk.dart';
 import 'mcp_authorization_service.dart';
 import 'command_decision_guard.dart';
 import 'mcp_host_visibility.dart';
+import 'mcp_download_storage.dart';
 import 'mcp_request_context.dart';
 
 /// Error thrown by [AgentSessionBridge] with a machine-readable [code] such
@@ -92,7 +93,9 @@ class AgentSessionBridge {
        // ignore: prefer_initializing_formals
        _decisionGuard = decisionGuard,
        _now = now ?? DateTime.now,
-       _downloadDirectory = downloadDirectory ?? _defaultDownloadDirectory;
+       _downloadDirectory =
+           downloadDirectory ??
+           (() => mcpDownloadDirectory(ref.read(platformCapabilitiesProvider)));
 
   final Ref _ref;
   final McpAuthorizationService _authorization;
@@ -102,9 +105,6 @@ class AgentSessionBridge {
   final DateTime Function() _now;
   final Future<Directory> Function() _downloadDirectory;
   final Map<TransferTaskId, SessionId> _transfers = {};
-
-  static Future<Directory> _defaultDownloadDirectory() async =>
-      await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
 
   /// How long [openSession] waits for the SSH channel to attach.
   final Duration attachTimeout;
@@ -148,12 +148,19 @@ class AgentSessionBridge {
     return _ref.read(hostSummariesProvider(vault.unlockGeneration).future);
   }
 
-  Future<List<Map<String, Object?>>> describeHosts() async {
+  Future<List<Map<String, Object?>>> describeHosts({
+    required String clientName,
+  }) async {
     final generation = _requireUnlockedVault().unlockGeneration;
+    final grant = await _ensureDiscovery(clientName);
     final hosts = await _ref.read(hostRepositoryProvider).list();
     final strict = await _ref.read(mcpHostVisibilityProvider).readStrict();
     if (_requireUnlockedVault().unlockGeneration != generation) {
       throw const McpBridgeException('vault_locked');
+    }
+    McpRequestContext.current?.checkActive();
+    if (!_authorization.isValid(grant) || grant.discoveryStrict != strict) {
+      throw const McpBridgeException('authorization_required');
     }
     return [
       for (final host in hosts)
@@ -161,15 +168,48 @@ class AgentSessionBridge {
     ];
   }
 
+  Future<AgentGrant> _ensureDiscovery(String clientName) async {
+    final generation = _requireUnlockedVault().unlockGeneration;
+    void validate() {
+      if (_requireUnlockedVault().unlockGeneration != generation) {
+        throw const McpBridgeException('vault_locked');
+      }
+    }
+
+    final request = McpRequestContext.current;
+    request?.validate = validate;
+    request?.checkActive();
+    final strict = await _ref.read(mcpHostVisibilityProvider).readStrict();
+    validate();
+    request?.checkActive();
+    final grant = await _authorization.ensureDiscoveryGrant(
+      clientName: clientName,
+      strict: strict,
+    );
+    McpRequestContext.current?.checkActive();
+    if (_requireUnlockedVault().unlockGeneration != generation) {
+      throw const McpBridgeException('vault_locked');
+    }
+    if (grant == null) throw const McpBridgeException('authorization_denied');
+    if (!_authorization.isValid(grant)) {
+      throw const McpBridgeException('authorization_required');
+    }
+    return grant;
+  }
+
   /// Lists app-owned remote panes, without reading terminal contents or
   /// exposing endpoint/key metadata. Listing never grants control.
   Future<List<Map<String, Object?>>> listConnections(String clientName) async {
     final vault = _requireUnlockedVault();
+    final grant = await _ensureDiscovery(clientName);
     final hosts = await listHosts();
     if (_requireUnlockedVault().unlockGeneration != vault.unlockGeneration) {
       throw const McpBridgeException('vault_locked');
     }
     McpRequestContext.current?.checkActive();
+    if (!_authorization.isValid(grant)) {
+      throw const McpBridgeException('authorization_required');
+    }
     final names = {for (final host in hosts) host.id: host.displayName};
     final workspace = _ref.read(workspaceTabControllerProvider);
     _pruneStaleHandles(workspace);
@@ -276,6 +316,7 @@ class AgentSessionBridge {
       clientName: clientName,
       hostId: host.id,
       hostDisplayName: host.displayName,
+      sessionId: sessionId,
     );
     if (grant == null) throw const McpBridgeException('authorization_denied');
     request?.checkActive();
@@ -284,6 +325,7 @@ class AgentSessionBridge {
           clientName: clientName,
           hostId: host.id,
           now: _now(),
+          sessionId: sessionId,
         ) !=
         grant) {
       throw const McpBridgeException('authorization_required');
@@ -515,7 +557,7 @@ class AgentSessionBridge {
     ];
   }
 
-  /// Downloads into a fresh private directory in Downloads. Never overwrites
+  /// Downloads into a fresh private directory in the channel's storage. Never overwrites
   /// an agent-selected local path or returns remote file contents through MCP.
   Future<Map<String, Object?>> downloadSftp({
     required String clientName,
@@ -531,6 +573,7 @@ class AgentSessionBridge {
     _requireSftp(clientName, sessionId);
     final root = await _downloadDirectory();
     _requireSftp(clientName, sessionId);
+    await root.create(recursive: true);
     final directory = await root.createTemp('Serlink-');
     await LocalFileSecurity.preparePrivateDirectory(directory);
     final file = File(p.join(directory.path, name));
@@ -866,8 +909,9 @@ class AgentSessionBridge {
       clientName: clientName,
       hostId: entry.handle.hostId,
       now: _now(),
+      sessionId: entry.handle.borrowed ? sessionId : null,
     );
-    if (grant == null) {
+    if (grant == null || grant.grantId != entry.handle.grantId) {
       throw const McpBridgeException('authorization_required');
     }
     return entry;

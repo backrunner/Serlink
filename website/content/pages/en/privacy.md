@@ -3,7 +3,7 @@ title: "Privacy policy"
 description: "How the app and this website handle information."
 ---
 
-Effective date: 30 September 2026
+Updated: 29 October 2026
 
 
 Serlink is an SSH terminal and SFTP workspace. The app does not require a Serlink account. This policy describes the app's current data handling.
@@ -39,7 +39,15 @@ iCloud sync uses Apple's CloudKit private database. WebDAV sync uses an endpoint
 Serlink has no advertising or analytics SDK and does not automatically upload diagnostic logs to its developer. Diagnostic exports are local, redact sensitive connection information and omit terminal output. If you send an export to support, review the files and remove anything private first.
 
 
-The optional MCP endpoint permits an external agent to use explicitly authorized sessions. Model command protection is off by default. If you configure your own TypeSafe API key and enable it, Serlink sends the commands submitted by agents to TypeSafe for risk assessment; it does not include host records, SSH credentials, terminal screens or command output in these requests. The API key and protection settings stay in device-local secure storage and are not included in vault sync or backups. TypeSafe processes these requests under its own service and privacy policies. An agent you authorize may separately transmit data according to that agent's configuration and provider policies.
+The macOS MCP endpoint shares host and connection information only after discovery consent. Depending on your strict host privacy setting, this is limited to names, IDs and states or also includes addresses, usernames, tags, paths and connection settings. Startup commands and stored credential records are excluded. Terminal and SFTP control require separate authorization. Reading or controlling an existing connection requires consent for that connection, including its existing terminal buffer. Grants expire when Serlink quits and can be revoked in Settings > Agent access. An authorized agent may send shared metadata, terminal output or remote file information to its AI provider under its own settings and policies.
+
+Model command protection is off by default. Before enabling it, you must explicitly agree to send complete agent commands to TypeSafe at api.typesafe.ai for risk assessment. Commands can contain passwords, tokens, addresses or personal information; this text is not automatically redacted. Host records, stored SSH credentials, terminal screens and command output are not attached separately. Your API key is stored in device-local secure storage and sent to TypeSafe for request authentication. The key, consent and protection settings are excluded from vault sync and backups. You can disable protection or withdraw consent in its settings; removing the key also clears consent.
+
+TypeSafe may process and retain command content, account identifiers and request usage information to provide and secure its service, bill usage and generate service telemetry. Requests are associated with your TypeSafe account. Zero data retention is not guaranteed and depends on the applicable account agreement. TypeSafe states that customer requests and responses are not used to train Jev. See TypeSafe's privacy policy and retention guidance for its processing and deletion terms. Serlink's developer does not receive these commands or your API key.
+
+[TypeSafe privacy policy](https://typesafe.ai/legal/privacy-policy) · [Request retention](https://help.typesafe.ai/articles/5974925716-how-is-submitted-data-used-or-retained)
+
+Mac App Store MCP downloads are first saved in the app's private storage. Use Export in Transfers to save a completed file through the native Save panel. Direct-edition MCP downloads use a fresh folder in Downloads. These downloaded files are not vault-encrypted; deleting a transfer-history entry alone does not delete its downloaded file.
 
 
 

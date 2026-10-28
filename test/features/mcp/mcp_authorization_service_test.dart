@@ -14,6 +14,87 @@ void main() {
   final otherHostId = HostId('host-2');
 
   group('McpAuthorizationService', () {
+    test(
+      'discovery grants are revocable and never authorize host control',
+      () async {
+        final modal = _FakeSecurityModalService();
+        final service = McpAuthorizationService(securityModalService: modal);
+        addTearDown(service.dispose);
+        final grant = await service.ensureDiscoveryGrant(
+          clientName: 'agent',
+          strict: true,
+        );
+        expect(grant!.isDiscovery, true);
+        expect(grant.covers(hostId, DateTime.now()), false);
+        expect(
+          await service.ensureDiscoveryGrant(clientName: 'agent', strict: true),
+          grant,
+        );
+        expect(modal.accessCallCount, 1);
+        final full = await service.ensureDiscoveryGrant(
+          clientName: 'agent',
+          strict: false,
+        );
+        expect(full, isNot(grant));
+        expect(modal.lastAccessPrompt?.discoveryStrict, false);
+        expect(service.revokeGrant(grant.grantId), true);
+        expect(service.isValid(grant), false);
+        expect(service.isValid(full!), true);
+      },
+    );
+
+    test(
+      'host grants do not authorize existing connections or sibling panes',
+      () async {
+        final modal = _FakeSecurityModalService();
+        final service = McpAuthorizationService(securityModalService: modal);
+        addTearDown(service.dispose);
+        await service.ensureGrant(
+          clientName: 'agent',
+          hostId: hostId,
+          hostDisplayName: 'Host',
+        );
+        final session = SessionId('existing-pane');
+        final grant = await service.ensureGrant(
+          clientName: 'agent',
+          hostId: hostId,
+          hostDisplayName: 'Host',
+          sessionId: session,
+        );
+        expect(modal.accessCallCount, 2);
+        expect(modal.lastAccessPrompt?.existingSessionId, session.value);
+        expect(grant!.covers(hostId, DateTime.now()), false);
+        expect(grant.covers(hostId, DateTime.now(), sessionId: session), true);
+        expect(
+          grant.covers(
+            hostId,
+            DateTime.now(),
+            sessionId: SessionId('other-pane'),
+          ),
+          false,
+        );
+      },
+    );
+
+    test('cancelled discovery approval creates no late permission', () async {
+      final modal = _FakeSecurityModalService()
+        ..accessGate = Completer<AgentAccessDecision>();
+      final service = McpAuthorizationService(securityModalService: modal);
+      addTearDown(service.dispose);
+      final request = McpRequestContext();
+      final future = request.run(
+        () => service.ensureDiscoveryGrant(clientName: 'agent', strict: false),
+      );
+      final expectation = expectLater(
+        future,
+        throwsA(isA<McpApprovalException>()),
+      );
+      request.cancel();
+      modal.accessGate!.complete(AgentAccessDecision.allow);
+      await expectation;
+      expect(service.grants, isEmpty);
+    });
+
     test('a cancelled request cannot create a late grant', () async {
       final modal = _FakeSecurityModalService();
       final gate = Completer<AgentAccessDecision>();

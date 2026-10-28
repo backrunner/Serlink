@@ -359,7 +359,7 @@ class McpServerController extends Notifier<McpServerState> {
       server,
       callback: (args, extra) => guard((clientName) async {
         try {
-          return await bridge.describeHosts();
+          return await bridge.describeHosts(clientName: clientName);
         } on McpBridgeException {
           rethrow;
         } on Object {

@@ -579,7 +579,7 @@
       }
     }
   },
-  "securityAgentAccessWarning": "The agent can run commands on this host until the app quits or access is revoked.",
+  "securityAgentAccessWarning": "Until Serlink quits or you revoke access, the agent can open new sessions on this host, run commands, read terminal output, list remote files and download files.",
   "securityAgentCommandTitle": "Agent command confirmation",
   "securityAgentCommandBody": "{client} wants to run a command on {host}.",
   "@securityAgentCommandBody": {
@@ -679,7 +679,13 @@
   "agentDiscoveryEmptyMessage": "No SSH agent was found. Start a compatible agent, or enter its endpoint manually.",
   "agentDiscoveredKeysCount": "{count} keys",
   "sshAuthAgentAmbiguousMessage": "Multiple SSH agents are available. Choose a key or an agent endpoint in the credential settings.",
-  "@agentDiscoveredKeysCount": {"placeholders": {"count": {"type": "int"}}},
+  "@agentDiscoveredKeysCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "agentAuthenticationKeyLabel": "Authentication key",
   "agentAllKeysTitle": "All available keys",
   "agentAllKeysDescription": "The agent provides available keys when connecting.",
@@ -707,8 +713,12 @@
   "hostCredentialPage": "{page} / {total}",
   "@hostCredentialPage": {
     "placeholders": {
-      "page": {"type": "int"},
-      "total": {"type": "int"}
+      "page": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "hostCredentialPreviousPage": "Previous credentials",
@@ -1658,7 +1668,7 @@
   "settingsMcpGuardUnavailable": "Protection settings unavailable",
   "settingsMcpGuardConfigure": "Configure",
   "settingsMcpGuardDialogTitle": "Model command protection",
-  "settingsMcpGuardDescription": "When enabled, agent commands are sent to TypeSafe for risk assessment. Dangerous or uncertain commands and failed checks are blocked. Your API key stays on this device.",
+  "settingsMcpGuardDescription": "Optional cloud protection sends complete agent commands to TypeSafe at api.typesafe.ai. Commands can contain secrets or personal data. TypeSafe may retain request data under its service terms; zero retention is not guaranteed. Host records, stored SSH credentials, terminal screens and output are not attached separately. The API key is stored in device-local secure storage and sent to TypeSafe to authenticate requests; it is excluded from vault sync and backups.",
   "settingsMcpGuardInputHint": "Agents must submit complete commands. Partial input, history controls and bare Enter are blocked; Ctrl-C remains available.",
   "settingsMcpGuardEnable": "Enable model protection",
   "settingsMcpGuardModel": "Model",
@@ -1669,7 +1679,7 @@
   "settingsMcpGuardInvalid": "Enter a valid model name and API key before enabling protection.",
   "settingsMcpGuardSaveFailed": "Could not save protection settings. Please retry.",
   "settingsMcpStrictPrivacy": "Strict host privacy",
-  "settingsMcpStrictPrivacyDescription": "Off by default: agents can read host addresses and other non-secret settings. When enabled, host discovery returns only display names and IDs. Credentials are never shared. Terminal output may still contain addresses.",
+  "settingsMcpStrictPrivacyDescription": "Off by default: after discovery consent, agents can read host addresses and other connection settings. When enabled, discovery returns only display names and IDs. Startup commands and stored credentials are excluded. Authorized terminal output and files may contain sensitive data.",
   "settingsMcpPrivacyUnavailable": "Host privacy settings are unavailable. Host metadata access is blocked.",
   "demoBanner": "Demo mode: simulated terminal and remote files",
   "demoGuideTitle": "Demo help",
@@ -1686,5 +1696,42 @@
   "mcpApprovalNotificationsUnavailable": "Approve inside Serlink",
   "mcpApprovalEnableAction": "Enable",
   "mcpApprovalSystemSettingsAction": "System settings",
-  "mcpApprovalWaitHint": "Requests wait up to 60 seconds for approval. Long commands open in Serlink for review."
+  "mcpApprovalWaitHint": "Requests wait up to 60 seconds for approval. Long commands open in Serlink for review.",
+  "securityAgentDiscoveryTitle": "Share connection information",
+  "securityAgentDiscoveryBody": "{client} wants to discover your saved hosts and active remote connections.",
+  "securityAgentDiscoveryStrict": "Share display names, IDs and connection states only. Addresses, usernames and startup commands are excluded. This does not grant terminal or file access.",
+  "securityAgentDiscoveryFull": "Share host addresses, usernames, tags, remote paths, routing and connection settings, plus active connection names, IDs and states. Startup commands and stored credentials are excluded. This does not grant terminal or file access.",
+  "securityAgentSharingWarning": "The agent may send shared data to its AI provider under its own settings and policies. Terminal output and files may contain secrets or personal data. Allow only an agent you trust. You can revoke this permission in Settings > Agent access; it expires when Serlink quits.",
+  "securityAgentAttachBody": "{client} wants to read and control an existing connection to {host}.",
+  "securityAgentAttachWarning": "This allows reading the existing terminal buffer and future output, running commands, listing remote files and downloading files on this connection. Closing agent access leaves your connection open.",
+  "securityAgentSessionIdLabel": "Connection ID: {id}",
+  "settingsMcpDiscoveryGrant": "Host and connection discovery",
+  "settingsMcpExistingConnectionGrant": "Existing connection",
+  "settingsMcpGuardSharingConsent": "I agree to send complete agent commands to TypeSafe for risk assessment. I understand that commands may contain sensitive data and that TypeSafe may retain request data.",
+  "settingsMcpGuardConsentRequired": "Agree to command sharing before enabling model protection.",
+  "@securityAgentDiscoveryBody": {
+    "placeholders": {
+      "client": {
+        "type": "String"
+      }
+    }
+  },
+  "@securityAgentAttachBody": {
+    "placeholders": {
+      "client": {
+        "type": "String"
+      },
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "@securityAgentSessionIdLabel": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsMcpGuardPrivacyPolicy": "TypeSafe privacy policy"
 }

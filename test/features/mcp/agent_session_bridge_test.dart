@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/app/app_dependencies.dart';
 import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/features/hosts/application/host_store.dart';
+import 'package:serlink/features/hosts/application/host_repository.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/mcp/application/agent_session_bridge.dart';
 import 'package:serlink/features/mcp/application/mcp_request_context.dart';
@@ -29,13 +30,153 @@ import 'package:serlink/features/workspace/application/workspace_tab_controller.
 import 'package:serlink/features/workspace/domain/workspace_tab.dart';
 
 void main() {
+  group('MCP discovery consent', () {
+    for (final locked in [true, false]) {
+      test(
+        'vault ${locked ? 'locking' : 'generation change'} withdraws pending discovery',
+        () async {
+          final modal = _FakeSecurityModalService()
+            ..accessGate = Completer<AgentAccessDecision>();
+          final hosts = _MetadataHosts();
+          final container = _container(
+            service: _EchoSshSessionService(),
+            modal: modal,
+            hosts: hosts,
+          );
+          addTearDown(container.dispose);
+          final bridge = await _bridge(container);
+          final request = McpRequestContext();
+          final future = request.run(
+            () => bridge.describeHosts(clientName: _clientName),
+          );
+          final expectation = expectLater(
+            future,
+            throwsA(_bridgeException('vault_locked')),
+          );
+          await _drainMicrotasks();
+          final vault = container.read(
+            vaultSessionControllerProvider.notifier,
+          ) as _FakeVaultSessionController;
+          vault.setSnapshot(
+            VaultSessionState(
+              vaultState: locked ? VaultState.locked : VaultState.unlocked,
+              unlockGeneration: 2,
+            ),
+          );
+          modal.accessGate!.complete(AgentAccessDecision.allow);
+          await expectation;
+          expect(hosts.readCount, 0);
+          expect(
+            container.read(mcpAuthorizationServiceProvider).grants,
+            isEmpty,
+          );
+        },
+      );
+    }
+
+    test(
+      'denial returns no hosts or connections and never reads host records',
+      () async {
+        final modal = _FakeSecurityModalService()
+          ..accessDecision = AgentAccessDecision.deny;
+        final hosts = _MetadataHosts();
+        final container = _container(
+          service: _EchoSshSessionService(),
+          modal: modal,
+          hosts: hosts,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        await expectLater(
+          bridge.describeHosts(clientName: _clientName),
+          throwsA(_bridgeException('authorization_denied')),
+        );
+        await expectLater(
+          bridge.listConnections(_clientName),
+          throwsA(_bridgeException('authorization_denied')),
+        );
+        expect(hosts.readCount, 0);
+        expect(container.read(mcpAuthorizationServiceProvider).grants, isEmpty);
+      },
+    );
+
+    test('discovery consent is scoped to client and privacy level, excludes commands', () async {
+      final modal = _FakeSecurityModalService();
+      final container = _container(
+        service: _EchoSshSessionService(),
+        modal: modal,
+        hosts: _MetadataHosts(),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final ordinary = await bridge.describeHosts(clientName: _clientName);
+      expect(ordinary.single['hostname'], _host.hostname);
+      expect(ordinary.single.containsKey('startupCommands'), false);
+      expect(ordinary.single.containsKey('identityIds'), false);
+      expect(modal.lastAccessPrompt?.discoveryStrict, false);
+      await bridge.describeHosts(clientName: _clientName);
+      expect(modal.accessCallCount, 1);
+      await bridge.describeHosts(clientName: 'another-client');
+      expect(modal.accessCallCount, 2);
+      await container.read(mcpHostVisibilityProvider).saveStrict(true);
+      final strict = await bridge.describeHosts(clientName: _clientName);
+      expect(strict.single.keys, unorderedEquals(['id', 'displayName']));
+      expect(modal.accessCallCount, 3);
+      expect(modal.lastAccessPrompt?.discoveryStrict, true);
+    });
+
+    test('a strict grant cannot silently expand to full metadata', () async {
+      final modal = _FakeSecurityModalService();
+      final container = _container(
+        service: _EchoSshSessionService(),
+        modal: modal,
+        hosts: _MetadataHosts(),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      await container.read(mcpHostVisibilityProvider).saveStrict(true);
+      await bridge.describeHosts(clientName: _clientName);
+      await container.read(mcpHostVisibilityProvider).saveStrict(false);
+      modal.accessDecision = AgentAccessDecision.deny;
+      await expectLater(
+        bridge.describeHosts(clientName: _clientName),
+        throwsA(_bridgeException('authorization_denied')),
+      );
+      expect(modal.lastAccessPrompt?.discoveryStrict, false);
+    });
+
+    for (final change in ['revoke', 'privacy']) {
+      test('$change during a metadata read prevents a late response', () async {
+        final hosts = _MetadataHosts()..gate = Completer<List<HostConfig>>();
+        final container = _container(
+          service: _EchoSshSessionService(),
+          modal: _FakeSecurityModalService(),
+          hosts: hosts,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final future = bridge.describeHosts(clientName: _clientName);
+        final expectation = expectLater(
+          future,
+          throwsA(_bridgeException('authorization_required')),
+        );
+        await _drainMicrotasks();
+        if (change == 'revoke') {
+          container.read(mcpAuthorizationServiceProvider).revokeAll();
+        } else {
+          await container.read(mcpHostVisibilityProvider).saveStrict(true);
+        }
+        hosts.gate!.complete([_metadataHost]);
+        await expectation;
+      });
+    }
+  });
+
   group('existing workspace connections', () {
     test('hands an MCP-created connection back and attaches without another SSH login', () async {
       final service = _EchoSshSessionService();
-      final container = _container(
-        service: service,
-        modal: _FakeSecurityModalService(),
-      );
+      final modal = _FakeSecurityModalService();
+      final container = _container(service: service, modal: modal);
       addTearDown(container.dispose);
       final bridge = await _bridge(container);
       final opened = await _openSession(bridge);
@@ -50,6 +191,8 @@ void main() {
         sessionId: opened.sessionId,
       );
       expect(borrowed.borrowed, true);
+      expect(modal.accessCallCount, 2);
+      expect(modal.lastAccessPrompt?.existingSessionId, opened.sessionId.value);
       expect(service.openShellCount, 1);
       await bridge.closeSession(opened.sessionId, clientName: _clientName);
       expect(container.read(workspaceTabControllerProvider).tabs, hasLength(1));
@@ -123,7 +266,8 @@ void main() {
           sessionId: id,
         );
         expect(handle.borrowed, true);
-        expect(modal.accessCallCount, 1);
+        expect(modal.accessCallCount, 2);
+        expect(modal.lastAccessPrompt?.existingSessionId, id.value);
         expect(service.openShellCount, 1);
         await bridge.exec(
           clientName: _clientName,
@@ -750,6 +894,7 @@ void main() {
           enabled: true,
           model: 'jev-1.13.0',
           apiKey: 'fixture-key',
+          dataSharingConsent: true,
         );
         await expectLater(
           bridge.exec(
@@ -1315,6 +1460,39 @@ void main() {
 
 const _clientName = 'test-client';
 
+final _metadataHost = HostConfig(
+  id: _host.id,
+  displayName: _host.displayName,
+  hostname: _host.hostname,
+  username: _host.username,
+  port: _host.port,
+  authKinds: _host.authKinds,
+  tags: {},
+  trustState: _host.trustState,
+  identityIds: [IdentityId('private-identity')],
+  startupCommands: ['export TOKEN=private-startup-token'],
+  jumpHostIds: [],
+  createdAt: DateTime.utc(2026),
+  updatedAt: DateTime.utc(2026),
+);
+
+class _MetadataHosts implements HostRepository {
+  int readCount = 0;
+  Completer<List<HostConfig>>? gate;
+  @override
+  Future<List<HostConfig>> list() async {
+    readCount++;
+    return gate == null ? [_metadataHost] : await gate!.future;
+  }
+
+  @override
+  Future<HostConfig?> read(HostId id) async => _metadataHost;
+  @override
+  Future<void> save(HostConfig host) => throw UnimplementedError();
+  @override
+  Future<void> delete(HostId id) => throw UnimplementedError();
+}
+
 final _host = HostSummary(
   id: HostId('host-1'),
   displayName: 'Test Host',
@@ -1354,6 +1532,8 @@ ProviderContainer _container({
   required _EchoSshSessionService service,
   required _FakeSecurityModalService modal,
   bool unlocked = true,
+  HostRepository? hosts,
+  InMemorySecretStore? secrets,
   CommandDecisionGuard? decisionGuard,
   WorkspaceTabController Function()? workspaceTabControllerFactory,
   Future<Directory> Function()? downloadDirectory,
@@ -1361,6 +1541,8 @@ ProviderContainer _container({
 }) {
   return ProviderContainer(
     overrides: [
+      secretStoreProvider.overrideWithValue(secrets ?? InMemorySecretStore()),
+      if (hosts != null) hostRepositoryProvider.overrideWithValue(hosts),
       vaultSessionControllerProvider.overrideWith(
         () => _FakeVaultSessionController(
           VaultSessionState(
@@ -1460,6 +1642,8 @@ class _FakeVaultSessionController extends VaultSessionController {
   _FakeVaultSessionController(this._state);
 
   final VaultSessionState _state;
+
+  void setSnapshot(VaultSessionState snapshot) => state = AsyncData(snapshot);
 
   @override
   Future<VaultSessionState> build() async => _state;
@@ -1620,12 +1804,14 @@ class _FakeSecurityModalService implements SecurityModalService {
   AgentAccessDecision accessDecision = AgentAccessDecision.allow;
   AgentCommandDecision commandDecision = AgentCommandDecision.deny;
   var accessCallCount = 0;
+  AgentAccessPrompt? lastAccessPrompt;
   var commandCallCount = 0;
   Completer<AgentAccessDecision>? accessGate;
 
   @override
   Future<AgentAccessDecision> confirmAgentAccess(AgentAccessPrompt prompt) {
     accessCallCount += 1;
+    lastAccessPrompt = prompt;
     return accessGate?.future ?? Future.value(accessDecision);
   }
 
@@ -1697,6 +1883,7 @@ Future<CommandDecisionGuard> _enabledGuard(_DecisionModel model) async {
     enabled: true,
     model: 'jev-1.13.0',
     apiKey: 'fixture-key',
+    dataSharingConsent: true,
   );
   return guard;
 }

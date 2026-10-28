@@ -13,7 +13,9 @@ class _McpCommandGuardSection extends ConsumerWidget {
           icon: Icons.shield_outlined,
           title: l10n.settingsMcpGuardTitle,
           subtitle: settings.when(
-            data: (settings) => settings.enabled
+            data: (settings) => settings.enabled && !settings.dataSharingConsent
+                ? l10n.settingsMcpGuardConsentRequired
+                : settings.enabled
                 ? l10n.settingsMcpGuardEnabled(settings.model)
                 : l10n.settingsMcpGuardLocal,
             loading: () => l10n.settingsMcpGuardLoading,
@@ -60,6 +62,7 @@ class _McpCommandGuardDialogState
   late final _model = TextEditingController(text: widget.initial.model);
   final _apiKey = TextEditingController();
   late bool _enabled = widget.initial.enabled;
+  late bool _sharingConsent = widget.initial.dataSharingConsent;
   bool _saving = false;
   String? _error;
 
@@ -82,6 +85,27 @@ class _McpCommandGuardDialogState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(l10n.settingsMcpGuardDescription),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: SerlinkTextButton(
+                onPressed: () => unawaited(
+                  launchUrl(
+                    Uri.parse('https://typesafe.ai/legal/privacy-policy'),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+                child: Text(l10n.settingsMcpGuardPrivacyPolicy),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SerlinkCheckboxListTile(
+              key: const ValueKey('settings-mcp-guard-sharing-consent'),
+              value: _sharingConsent,
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _sharingConsent = value ?? false),
+              title: Text(l10n.settingsMcpGuardSharingConsent),
+            ),
             const SizedBox(height: 18),
             _McpCard(
               children: [
@@ -172,6 +196,10 @@ class _McpCommandGuardDialogState
 
   Future<void> _save({bool removeKey = false}) async {
     final l10n = context.l10n;
+    if (!removeKey && _enabled && !_sharingConsent) {
+      setState(() => _error = l10n.settingsMcpGuardConsentRequired);
+      return;
+    }
     if (!removeKey &&
         (!CommandDecisionGuard.isValidModel(_model.text.trim()) ||
             (_enabled &&
@@ -192,6 +220,7 @@ class _McpCommandGuardDialogState
             model: removeKey ? widget.initial.model : _model.text,
             apiKey: _apiKey.text,
             removeApiKey: removeKey,
+            dataSharingConsent: !removeKey && _sharingConsent,
           );
       if (!mounted) return;
       _apiKey.clear();

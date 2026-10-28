@@ -25,6 +25,10 @@ This document contains no live hostname, login name or password.
 `com.apple.security.files.downloads.read-write` is unnecessary: desktop
 `DocumentGateway.pickFileDownloadPath` uses `getSaveLocation`; directory
 downloads use `getDirectoryPath`. Exports and ZMODEM also use native panels.
+MCP-initiated downloads now stage in an `mcp-downloads` directory under the
+app-container Application Support directory; the user exports a completed file
+from Transfers through a native Save panel. Direct builds retain Downloads
+staging. A server token or MCP host grant never grants macOS filesystem access.
 The mobile `Documents/Downloads` staging directory is inside the mobile app
 container and does not justify macOS Downloads-folder access. Apple distinguishes
 [user-selected access from programmatic Downloads access](https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/EnablingAppSandbox.html).
@@ -84,6 +88,14 @@ records and credential references are excluded. The device-local Strict host
 privacy switch defaults off. When enabled, discovery returns only opaque host
 IDs and display names. The setting is checked on each call; unreadable settings
 block metadata access. Vault locking, grants and command protection remain.
+
+Both host and active-connection discovery require a revocable in-memory grant
+for the calling client and the requested privacy scope before returning data.
+Startup commands are excluded in both modes. Borrowing an existing connection
+requires a separate connection-specific grant describing existing terminal
+history and file access. Data-sharing access grants require the full in-app
+disclosure; notifications offer Deny/View details. Short command approvals can
+still allow one execution from an authenticated notification action.
 
 This switch controls metadata. Remote terminal output may contain addresses;
 it is not a general terminal data-loss-prevention mechanism.

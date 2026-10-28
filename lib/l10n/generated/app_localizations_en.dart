@@ -1092,7 +1092,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get securityAgentAccessWarning =>
-      'The agent can run commands on this host until the app quits or access is revoked.';
+      'Until Serlink quits or you revoke access, the agent can open new sessions on this host, run commands, read terminal output, list remote files and download files.';
 
   @override
   String get securityAgentCommandTitle => 'Agent command confirmation';
@@ -3280,7 +3280,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsMcpGuardDescription =>
-      'When enabled, agent commands are sent to TypeSafe for risk assessment. Dangerous or uncertain commands and failed checks are blocked. Your API key stays on this device.';
+      'Optional cloud protection sends complete agent commands to TypeSafe at api.typesafe.ai. Commands can contain secrets or personal data. TypeSafe may retain request data under its service terms; zero retention is not guaranteed. Host records, stored SSH credentials, terminal screens and output are not attached separately. The API key is stored in device-local secure storage and sent to TypeSafe to authenticate requests; it is excluded from vault sync and backups.';
 
   @override
   String get settingsMcpGuardInputHint =>
@@ -3318,7 +3318,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsMcpStrictPrivacyDescription =>
-      'Off by default: agents can read host addresses and other non-secret settings. When enabled, host discovery returns only display names and IDs. Credentials are never shared. Terminal output may still contain addresses.';
+      'Off by default: after discovery consent, agents can read host addresses and other connection settings. When enabled, discovery returns only display names and IDs. Startup commands and stored credentials are excluded. Authorized terminal output and files may contain sensitive data.';
 
   @override
   String get settingsMcpPrivacyUnavailable =>
@@ -3378,4 +3378,55 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mcpApprovalWaitHint =>
       'Requests wait up to 60 seconds for approval. Long commands open in Serlink for review.';
+
+  @override
+  String get securityAgentDiscoveryTitle => 'Share connection information';
+
+  @override
+  String securityAgentDiscoveryBody(String client) {
+    return '$client wants to discover your saved hosts and active remote connections.';
+  }
+
+  @override
+  String get securityAgentDiscoveryStrict =>
+      'Share display names, IDs and connection states only. Addresses, usernames and startup commands are excluded. This does not grant terminal or file access.';
+
+  @override
+  String get securityAgentDiscoveryFull =>
+      'Share host addresses, usernames, tags, remote paths, routing and connection settings, plus active connection names, IDs and states. Startup commands and stored credentials are excluded. This does not grant terminal or file access.';
+
+  @override
+  String get securityAgentSharingWarning =>
+      'The agent may send shared data to its AI provider under its own settings and policies. Terminal output and files may contain secrets or personal data. Allow only an agent you trust. You can revoke this permission in Settings > Agent access; it expires when Serlink quits.';
+
+  @override
+  String securityAgentAttachBody(String client, String host) {
+    return '$client wants to read and control an existing connection to $host.';
+  }
+
+  @override
+  String get securityAgentAttachWarning =>
+      'This allows reading the existing terminal buffer and future output, running commands, listing remote files and downloading files on this connection. Closing agent access leaves your connection open.';
+
+  @override
+  String securityAgentSessionIdLabel(String id) {
+    return 'Connection ID: $id';
+  }
+
+  @override
+  String get settingsMcpDiscoveryGrant => 'Host and connection discovery';
+
+  @override
+  String get settingsMcpExistingConnectionGrant => 'Existing connection';
+
+  @override
+  String get settingsMcpGuardSharingConsent =>
+      'I agree to send complete agent commands to TypeSafe for risk assessment. I understand that commands may contain sensitive data and that TypeSafe may retain request data.';
+
+  @override
+  String get settingsMcpGuardConsentRequired =>
+      'Agree to command sharing before enabling model protection.';
+
+  @override
+  String get settingsMcpGuardPrivacyPolicy => 'TypeSafe privacy policy';
 }

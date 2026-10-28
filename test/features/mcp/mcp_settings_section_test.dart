@@ -185,6 +185,15 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('settings-mcp-guard-save')));
     await tester.pumpAndSettle();
     expect(
+      find.text('Agree to command sharing before enabling model protection.'),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('settings-mcp-guard-sharing-consent')),
+    );
+    await tester.tap(find.byKey(const ValueKey('settings-mcp-guard-save')));
+    await tester.pumpAndSettle();
+    expect(
       find.text(
         'Enter a valid model name and API key before enabling protection.',
       ),

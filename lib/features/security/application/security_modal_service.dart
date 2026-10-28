@@ -16,11 +16,19 @@ class AgentAccessPrompt {
     required this.clientName,
     required this.hostDisplayName,
     required this.hostId,
+    this.discoveryStrict,
+    this.existingSessionId,
   });
 
   final String clientName;
   final String hostDisplayName;
   final String hostId;
+
+  /// Non-null for discovery consent; true limits it to names and IDs.
+  final bool? discoveryStrict;
+
+  /// A separate consent to read and control this existing connection.
+  final String? existingSessionId;
 }
 
 class AgentCommandPrompt {

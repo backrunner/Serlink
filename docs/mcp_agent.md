@@ -5,7 +5,7 @@ Serlink provides a standalone [Model Context Protocol](https://modelcontextproto
 Design principles:
 
 - **Credentials never leave the app.** The agent never receives passwords or private keys. Serlink opens the SSH session itself, as a normal workspace terminal tab.
-- **Configurable host privacy.** Host discovery returns non-secret configuration, including hostname/IP, username, tags, routing and connection settings. Settings > MCP / Agent access > Manage > Strict host privacy defaults off. When enabled, discovery returns only opaque host IDs and display names. Credentials and credential references are always excluded. This controls metadata; remote terminal output may still contain addresses.
+- **Configurable host privacy.** Host and connection discovery require explicit sharing consent. Host discovery returns configuration including hostname/IP, username, tags, routing and connection settings; startup commands are excluded. Settings > MCP / Agent access > Manage > Strict host privacy defaults off. When enabled, discovery returns only opaque host IDs and display names. Credentials and credential references are always excluded. This controls metadata; remote terminal output may still contain addresses.
 - **Explicit user authorization.** The first time an agent requests a session on a host, Serlink shows an approval dialog and, when permitted, an actionable macOS notification. If the vault is locked, tool calls fail with `vault_locked` until the user unlocks it in the app.
 - **Dangerous command interception.** Commands sent by the agent are screened by a risk policy (`lib/features/mcp/data/command_risk_policy.dart`). Risky commands require an in-app confirmation (Allow once / Allow for session); a small set of destructive commands (disk overwrites, `mkfs`, fork bombs) is always blocked, even by a session allowlist. Optional decision-model protection adds semantic screening before execution.
 - **Take back control anytime.** An agent session is a regular terminal tab — type in it to retake control. A badge marks agent-controlled panes; closing the tab or revoking the grant in Settings immediately ends agent access.
@@ -62,10 +62,13 @@ the same approval remains available inside Serlink; System settings opens the
 macOS notification settings, and the status refreshes when you return.
 
 The original tool call waits for a decision for up to **60 seconds**, including
-time queued behind another approval. Short requests offer Allow / Deny / View
-details; long or multiline commands require review in the app. Notification
-command approval allows **one execution** only. Host approval retains the same
-app-lifetime, revocable grant as the existing dialog. Session-level command
+time queued behind another approval. Short command requests offer Allow / Deny / View
+details; long or multiline commands require review in the app. Discovery and
+host/connection access requests always open the full in-app data-sharing
+disclosure; their notifications offer Deny / View details. Notification
+command approval allows **one execution** only. Host approval creates an
+app-lifetime, revocable grant after in-app consent. Borrowing an existing
+connection requires a separate grant for that specific connection. Session-level command
 approval remains available only in the full dialog. Notification previews follow
 macOS settings and may include host display names and short commands.
 
@@ -88,12 +91,12 @@ Vault unlocking and SSH authentication continue inside Serlink.
 
 All tools are prefixed `serlink_`:
 
-- `serlink_list_hosts` — hosts from the vault (requires unlocked vault).
+- `serlink_list_hosts` — hosts from the vault after explicit discovery consent (requires unlocked vault).
 - `serlink_open_session` — opens a terminal tab on a host, or an SFTP tab with `kind: "sftp"`; triggers the in-app approval dialog on first use per client+host.
 - `serlink_list_connections` — lists workspace remote panes and SFTP connections, including manually opened sessions. Returns ids, host display names and connection states without terminal contents or endpoint metadata; local terminals are excluded.
-- `serlink_attach_session` — borrows a connected session returned by `serlink_list_connections`, subject to the same per-client host authorization. It does not reconnect, sign again or take a session controlled by another MCP client.
+- `serlink_attach_session` — borrows a connected session returned by `serlink_list_connections`, subject to separate per-client, per-connection consent covering existing terminal history and file access. It does not reconnect, sign again or take a session controlled by another MCP client.
 - `serlink_sftp_list` — lists directory metadata in an authorized SFTP session.
-- `serlink_sftp_download` — queues a single-file download into a new private directory in the local Downloads folder. Returns `taskId` and `localPath`, never file contents, and does not overwrite existing files.
+- `serlink_sftp_download` — queues a single-file download into a new private directory: app-container Application Support on the App Store edition, or Downloads on the direct edition. In the App Store edition, use Export in Transfers to save the completed file through a native Save panel. Returns `taskId` and `localPath`, never file contents, and does not overwrite existing files.
 - `serlink_transfer_status` — reports state and byte counts for this client's SFTP download. Poll until `completed` and verify backup checksums before proceeding with an upgrade.
 - `serlink_transfer_cancel` — cancels this client's download. Partial files may remain; closing the SFTP session also cancels its transfers. Keep the session open until downloads finish.
 - `serlink_exec` — sends a command and returns the settled screen text (heuristic: output quiet for ~400 ms).
@@ -104,6 +107,8 @@ All tools are prefixed `serlink_`:
 
 ## Authorization lifecycle
 
+- Discovery grants are separate from control grants, scoped to the client and strict/full privacy level, and appear in Settings for revocation. Changing from limited to full discovery requires that scope's consent. Startup commands are never included.
+- Existing-connection grants are separate from new-session host grants and cover only the selected session ID.
 - Grants are **in-memory only**: they expire when the app quits. Revoke individual grants in **Settings → Agent access → Active grants**; agent sessions are listed there too and can be closed.
 - After the separate 60-second access approval, opening waits up to 120 seconds for the SSH channel. MCP progress distinguishes access approval from connection/authentication; SSH Agent signing may require approval in 1Password or another agent. Cancellation, expired authorization and connection failure clean up the new MCP tab, including late authentication results. Existing user tabs are not reused by MCP opens.
 - Offline diagnostics record `ssh.auth.sign.start`, `ssh.auth.sign.success` or `ssh.auth.sign.failure`, elapsed time and a safe error code. Together with `ssh.auth.summary`, these distinguish a requested signature from a completed signature. They do not prove that a password manager displayed its UI, and contain no key, signature or password material.
@@ -113,10 +118,10 @@ All tools are prefixed `serlink_`:
 
 Open **Settings → MCP / Agent access → Manage → Command protection → Configure**.
 Enter your own TypeSafe API key, choose a System One model (default `jev-1.13.0`),
-and enable model protection. It is disabled until you configure and enable it.
+explicitly agree to complete-command sharing, and enable model protection. It is disabled until you configure and enable it. Legacy enabled configurations without the current consent cannot contact the provider until consent is renewed.
 The API key, model and enablement are stored together in device-local secure
 storage, separately from vault records, sync and backups. Removing the saved key
-also disables model protection. Editing protection does not close agent sessions.
+also disables model protection and clears consent. You can disable the feature and withdraw consent from the same dialog. Editing protection does not close agent sessions.
 
 The first adapter implements [TypeSafe's System One API](https://docs.typesafe.ai/api),
 `POST https://api.typesafe.ai/v1/systemone`. The application owns the execution
@@ -124,6 +129,11 @@ gate; `CommandDecisionModel` is the adapter interface for another decision provi
 Requests contain the command text and a typed Choice question. They do not attach
 host records, credentials from the vault, terminal screens or command output.
 Secrets embedded in a command are part of its text and would be sent too.
+The API key is transmitted to TypeSafe in the authorization header, while its
+storage remains device-local. TypeSafe may retain command content, account
+identification and usage/telemetry under its terms; zero retention is not assumed.
+See [TypeSafe privacy](https://typesafe.ai/legal/privacy-policy) and
+[retention guidance](https://help.typesafe.ai/articles/5974925716-how-is-submitted-data-used-or-retained).
 
 The enforcement order is:
 

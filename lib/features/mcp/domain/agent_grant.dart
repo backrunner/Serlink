@@ -1,6 +1,7 @@
 import '../../../core/ids/entity_id.dart';
 
-/// Permission granted to an MCP client to drive SSH sessions on one host.
+/// Permission to discover metadata, open sessions on a host, or control one
+/// existing connection. Discovery grants have no host ID.
 ///
 /// A grant with a null [expiresAt] stays valid until the app quits.
 class AgentGrant {
@@ -10,6 +11,8 @@ class AgentGrant {
     required this.hostId,
     required this.createdAt,
     this.expiresAt,
+    this.sessionId,
+    this.discoveryStrict,
   });
 
   /// Unique grant identifier (uuid).
@@ -19,7 +22,15 @@ class AgentGrant {
   final String clientName;
 
   /// Host this grant is scoped to.
-  final HostId hostId;
+  final HostId? hostId;
+
+  /// Existing connections require their own grant, separate from new sessions.
+  final SessionId? sessionId;
+
+  /// Discovery grants have no host; consent is scoped to the privacy setting.
+  final bool? discoveryStrict;
+
+  bool get isDiscovery => hostId == null && discoveryStrict != null;
 
   final DateTime createdAt;
 
@@ -31,8 +42,8 @@ class AgentGrant {
     return expiry != null && !now.isBefore(expiry);
   }
 
-  bool covers(HostId id, DateTime now) {
-    return id == hostId && !isExpired(now);
+  bool covers(HostId id, DateTime now, {SessionId? sessionId}) {
+    return id == hostId && this.sessionId == sessionId && !isExpired(now);
   }
 
   @override
@@ -41,12 +52,22 @@ class AgentGrant {
         other.grantId == grantId &&
         other.clientName == clientName &&
         other.hostId == hostId &&
+        other.sessionId == sessionId &&
+        other.discoveryStrict == discoveryStrict &&
         other.createdAt == createdAt &&
         other.expiresAt == expiresAt;
   }
 
   @override
   int get hashCode {
-    return Object.hash(grantId, clientName, hostId, createdAt, expiresAt);
+    return Object.hash(
+      grantId,
+      clientName,
+      hostId,
+      createdAt,
+      expiresAt,
+      sessionId,
+      discoveryStrict,
+    );
   }
 }

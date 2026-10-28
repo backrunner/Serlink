@@ -55,13 +55,17 @@ The website source is in `website/`. Metadata points to
 Deploy and verify their public HTTPS reachability before submitting those values;
 a local build or HTML file is not a valid public App Store URL.
 
-The code currently has no developer-operated account, analytics SDK, advertising,
-tracking, in-app purchases, or subscriptions. The proposed privacy label is
-**Data Not Collected**, based on the code's local processing and user-selected
-destinations, with no developer access to user vault content. Reassess if hosted
-support, diagnostics ingestion, telemetry, or another collection service is added.
-Apple's label concerns off-device data accessible to developers or partners;
-on-device processing alone is excluded.
+The app has no developer-operated account, advertising SDK, tracking, in-app
+purchases or subscriptions. Optional TypeSafe command protection sends complete
+commands using the user's account after explicit consent. Without universal
+zero-retention terms, the macOS proposal is now **Data Linked to You**: Other
+User Content and User ID for App Functionality; Product Interaction for App
+Functionality and Analytics (provider usage/telemetry). The macOS manifest and
+`metadata.json` match this conservative proposal. See
+[the declaration rationale](privacy-declaration.md) for data flows and limits.
+The proposal has **not** been saved to App Store Connect. On-device processing
+alone is excluded from Apple's collection definition, but BYOK is not an
+exemption for retained third-party data.
 [Apple privacy definitions](https://developer.apple.com/app-store/app-privacy-details/).
 
 Suggested age-rating inputs: no advertising, messaging/social features, parental
@@ -80,6 +84,8 @@ questionnaire; the resulting rating is determined by App Store Connect.
 | Encryption declaration and any jurisdiction-specific documents | The current build questionnaire was answered with standard application-level algorithms and no France distribution; missing-compliance status cleared. Implementation inventory is in `encryption.md`. |
 | Distribution rights and EULA | Confirm rights for the AGPL project and bundled dependencies before accepting App Store agreements. No rights declaration has been submitted. |
 | App Review demonstration | Hold the lock badge or Settings version label for the isolated offline demo. Dedicated live SSH/SFTP connection details belong only in private review information; do not require reviewers to supply a server. |
+| New MCP/model-protection review access | Source remediation is local. Provision a limited TypeSafe review key and supply it privately before the next submission; do not require reviewer purchases. Current live key/access has not been verified. |
+| Updated privacy disclosure | Apply the October 29 proposal to App Store Connect and publish the matching multilingual website policy before submission. Neither external operation was performed by the code remediation. |
 | CloudKit schema | Live Production and Development schemas are identical and satisfy the contract; the exported app has Production CloudKit and push entitlements. Two-device Production sync remains unverified. |
 | Final archive/export/upload | Universal build 17 archive and distribution export pass strict signature verification. Uploaded, processed and resubmitted; Waiting for Review. See the October 19 report. |
 | Direct macOS release | Use the separate Developer ID/DMG scripts; notarization, stapling and a quarantined clean-Mac check remain required. |

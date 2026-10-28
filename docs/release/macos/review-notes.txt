@@ -1,54 +1,66 @@
 Serlink 1.0.0 — Mac App Store review instructions
 
-No Serlink account or subscription is required. Two review paths are provided:
+No Serlink account, subscription or in-app purchase is required.
 
-1. Populated offline demo (no setup required)
-On Create/Unlock Vault, hold the large lock icon for about one second. If the
-vault is open, hold the version label at the bottom of Settings. The same
-preview is available to any user; its banner clearly identifies simulation.
-Hosts, Sessions, Transfers, Snippets and Credentials contain sample content.
+1. Offline demo
+Hold the lock icon on Create/Unlock Vault for one second, or hold the version
+label in Settings. This preview is available to everyone and clearly marked
+as simulated. Explore Hosts, Sessions, Transfers, Snippets and Credentials.
 Open Review Sandbox; try help, pwd, ls, cat README.txt, mkdir and echo.
-Terminal and SFTP share an editable in-memory filesystem. SFTP supports file
-preview/edit, folders, rename, permissions and native-picker uploads/downloads.
-Demo help explains the controls. Reset demo restores examples; Exit demo
-returns to the original vault and discards demo data. Demo mode uses no real
-vault, SSH, sync service, SSH agent or MCP connection.
+Terminal and SFTP share editable in-memory files. Test preview/edit, rename,
+permissions and native-picker transfers. Exit demo discards its isolated data
+and returns to the original vault. Real SSH, sync and MCP are outside demo.
 
-2. Real SSH/SFTP review environment
-Exit demo, create a local vault with any passphrase and save its recovery key.
-In Settings > Credentials add a password credential using the private review
-username/password. Add a Host using the private connection supplement, select
-that credential and set SFTP starting folder to /workspace. Connect and compare
-the SSH fingerprint with the supplement. Run pwd, ls -la, whoami, uname -a and
-cat README.txt. Open SFTP; transfer disposable files, edit documents/notes.txt,
-and inspect Transfers. The dedicated account has no sudo/admin access, an
-isolated filesystem and restricted network access. Reviewers need no server
-of their own. WebDAV/iCloud sync are optional; iCloud uses their own Apple ID.
+2. Real SSH/SFTP
+Exit demo, create a local vault and save its recovery key. Add a password
+credential and Host using the private connection supplement; set SFTP folder
+to /workspace. Verify the supplied fingerprint. Run pwd, ls -la, whoami,
+uname -a and cat README.txt. In SFTP, transfer disposable files and edit
+documents/notes.txt. The account has no sudo, an isolated filesystem and
+restricted network. Reviewers need no SSH server of their own.
 
-Entitlements — purpose and where to verify:
-- com.apple.security.app-sandbox: sandboxed Mac App Store operation.
-- com.apple.security.files.user-selected.read-write: Open/Save/folder panels for
-  SFTP/ZMODEM transfers, backup/import/export files and diagnostics. Broad
-  com.apple.security.files.downloads.read-write is unnecessary and removed.
-- com.apple.security.network.client: outgoing SSH/SFTP, optional WebDAV/iCloud
-  sync and user-configured command-protection API. Test with the review host;
-  Settings > Sync; Settings > MCP / Agent access > Command protection.
-- com.apple.security.network.server: local SSH forwarding, dynamic SOCKS proxy,
-  and authenticated loopback MCP HTTP. In a real connected terminal, open Manage
-  port forwarding > Local: local port 18080, remote host 127.0.0.1, remote port
-  8080. Visit http://127.0.0.1:18080 to see the sample tunnel page. Stop to close
-  the listener. SOCKS can reach the same restricted destination.
-  Settings > MCP / Agent access > Manage shows the URL, token and configuration;
-  disabling Agent server closes it. MCP uses a random loopback port, a per-start
-  bearer token and separate in-app grants for SSH control. No AI model is bundled.
-- com.apple.developer.icloud-container-identifiers = iCloud.com.alkinum.serlink,
-  com.apple.developer.icloud-services = CloudKit, and distribution-generated
-  com.apple.developer.icloud-container-environment = Production: encrypted vault
-  snapshots in the user's private CloudKit database, Settings > Sync > iCloud.
-- com.apple.developer.aps-environment = production: silent CloudKit record-change
-  notifications refresh encrypted sync data; no marketing/alert notifications.
-- Signing-generated com.apple.application-identifier and
-  com.apple.developer.team-identifier identify the signed app and developer.
+3. MCP and optional cloud command protection
+Settings > MCP / Agent access > Manage displays a random loopback HTTP URL,
+per-start bearer token and client configuration. Missing tokens return 403.
+Discovery needs explicit consent before metadata is returned. Strict host
+privacy limits hosts to names/IDs; startup commands and stored credentials
+are excluded in either mode. New SSH/SFTP sessions need host authorization.
+Borrowing an existing connection needs a separate connection-specific consent
+covering the existing terminal buffer and file access. Revoke grants here.
+Access notifications open the full in-app disclosure; short command approvals
+can allow one execution. Denial, cancellation and timeout do not grant access.
 
-Local shell, OS SSH-agent auth, automatic ~/.ssh/config access and the standalone
-MCP stdio helper are disabled in the Mac App Store build.
+Use serlink_list_connections / serlink_attach_session to borrow a connected
+pane; closing agent access preserves it. Open a kind=sftp session, list files,
+download a disposable file, and poll transfer status. MCP downloads go into
+app-private storage. Use Export in Transfers for a native Save panel.
+Stopping Agent server closes the HTTP listener.
+
+Command protection is optional and off by default. In its Configure dialog,
+review the TypeSafe data disclosure and privacy-policy link. Enabling requires
+explicit consent and an API key; complete command text is sent to TypeSafe
+for assessment and can contain sensitive data. Retention depends on TypeSafe's
+terms; zero retention is not assumed. Keys are stored locally and transmitted
+only for TypeSafe authentication, excluded from vault sync/backups. Use only
+synthetic commands. The private supplement must include a limited review key
+before the next submission; reviewers must not purchase their own access.
+Without model protection, local command-risk rules still operate.
+
+Entitlements:
+- com.apple.security.app-sandbox: App Sandbox.
+- com.apple.security.files.user-selected.read-write: native panels for manual
+  transfers, exports/imports and diagnostics; MCP staging stays in-container.
+- com.apple.security.network.client: SSH/SFTP, optional WebDAV/CloudKit and
+  user-enabled TypeSafe requests.
+- com.apple.security.network.server: local SSH forwards, SOCKS and MCP HTTP.
+  On the review host, forward local port 18080 to remote 127.0.0.1:8080;
+  open http://127.0.0.1:18080, then stop the forward.
+- com.apple.developer.icloud-container-identifiers=iCloud.com.alkinum.serlink;
+  com.apple.developer.icloud-services=CloudKit; exported container-environment
+  Production: private encrypted vault sync, Settings > Sync > iCloud.
+- com.apple.developer.aps-environment=production: silent CloudKit updates.
+- com.apple.application-identifier and com.apple.developer.team-identifier:
+  distribution signing identity.
+
+Local shell, system SSH agents/hardware keys, automatic SSH-config access,
+the MCP stdio helper and direct DMG installation are disabled in this edition.

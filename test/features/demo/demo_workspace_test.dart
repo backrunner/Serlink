@@ -9,6 +9,7 @@ import 'package:serlink/features/demo/demo_file_system.dart';
 import 'package:serlink/features/demo/demo_shell.dart';
 import 'package:serlink/features/demo/demo_ssh_service.dart';
 import 'package:serlink/features/demo/demo_workspace.dart';
+import 'package:serlink/features/mcp/application/mcp_host_visibility.dart';
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
@@ -155,18 +156,27 @@ void main() {
         await first.container.read(syncDeviceRepositoryProvider).list(),
         hasLength(2),
       );
-      final bridge = first.container.read(agentSessionBridgeProvider);
-      final ordinary = await bridge.describeHosts();
+      List<Map<String, Object?>> describe(bool strict) => [
+        for (final host in hosts)
+          McpHostVisibility.describe(host, strict: strict),
+      ];
+      final ordinary = describe(
+        await first.container.read(mcpHostVisibilityProvider).readStrict(),
+      );
       expect(ordinary.first['hostname'], endsWith('.invalid'));
       expect(ordinary.first['username'], 'reviewer');
       expect(ordinary.first.containsKey('identityIds'), isFalse);
       expect(ordinary.first.containsKey('secretRecordId'), isFalse);
       await first.container.read(mcpHostVisibilityProvider).saveStrict(true);
-      final strict = await bridge.describeHosts();
+      final strict = describe(
+        await first.container.read(mcpHostVisibilityProvider).readStrict(),
+      );
       expect(strict.first.keys, unorderedEquals(['id', 'displayName']));
       await first.container.read(mcpHostVisibilityProvider).saveStrict(false);
       expect(
-        (await bridge.describeHosts()).first['hostname'],
+        (describe(
+          await first.container.read(mcpHostVisibilityProvider).readStrict(),
+        )).first['hostname'],
         endsWith('.invalid'),
       );
       await first.container.read(hostRepositoryProvider).delete(hosts.first.id);

@@ -640,7 +640,8 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
                   icon: Icons.verified_user_outlined,
                   title: grants[index].clientName,
                   subtitle:
-                      '${_mcpHostLabel(hostNames, grants[index].hostId)} · '
+                      '${grants[index].isDiscovery ? l10n.settingsMcpDiscoveryGrant : _mcpHostLabel(hostNames, grants[index].hostId!)} · '
+                      '${grants[index].sessionId == null ? '' : '${l10n.settingsMcpExistingConnectionGrant} · '}'
                       '${l10n.settingsMcpGrantExpiry}',
                   action: _SettingsTextButton(
                     key: ValueKey(

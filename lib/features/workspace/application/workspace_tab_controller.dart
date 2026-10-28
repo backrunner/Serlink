@@ -105,10 +105,14 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
   /// Opens a terminal tab for [host] and returns the tab state that will
   /// host the session (a reused failed tab or a freshly created one), so
   /// callers can act on the exact tab instead of racing [state.activeTabId].
-  Future<WorkspaceTabState?> openTerminal(HostSummary host) async {
+  Future<WorkspaceTabState?> openTerminal(
+    HostSummary host, {
+    bool reuseFailedTab = true,
+  }) async {
     final reusableTab = state.tabs
         .where(
           (tab) =>
+              reuseFailedTab &&
               tab.hostId == host.id &&
               tab.content is TerminalTabContent &&
               _canReuseFailedTerminalTab(tab),
@@ -266,7 +270,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     unawaited(_connect(tab, _nextConnectionToken(tab.id)));
   }
 
-  void openSftp(HostSummary host) {
+  WorkspaceTabState openSftp(HostSummary host) {
     final rootPath = _normalizeRemotePath(host.sftpDefaultDirectory);
     final sessionId = _newSessionId();
     final tab = _open(
@@ -282,6 +286,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       switchArea: WorkspaceArea.sessions,
     );
     unawaited(_connect(tab, _nextConnectionToken(tab.id)));
+    return tab;
   }
 
   void openSftpFromTab(WorkspaceTabId tabId) {
@@ -781,9 +786,8 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
             .removeLeaf(normalizedIndex)
             ?.reindexAfterRemoving(normalizedIndex) ??
         const TerminalPaneLeaf(0);
-    final currentActive = _activePaneIndexOf(
-      content,
-    ).clamp(0, panes.length - 1);
+    final currentActive = _activePaneIndexOf(content)
+        .clamp(0, panes.length - 1);
     final nextActivePane = currentActive == normalizedIndex
         ? normalizedIndex.clamp(0, nextPanes.length - 1)
         : currentActive > normalizedIndex

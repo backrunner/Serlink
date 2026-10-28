@@ -4,7 +4,11 @@ import 'dart:async';
 /// Zone-local storage keeps concurrent MCP calls isolated without adding
 /// transport parameters to every security dialog implementation.
 class McpRequestContext {
-  McpRequestContext({this.onWaiting, this.onApprovalFinished});
+  McpRequestContext({
+    this.onWaiting,
+    this.onApprovalFinished,
+    this.onConnecting,
+  });
 
   static final _zoneKey = Object();
   static McpRequestContext? get current =>
@@ -12,6 +16,7 @@ class McpRequestContext {
 
   final void Function()? onWaiting;
   final void Function()? onApprovalFinished;
+  final void Function()? onConnecting;
   final Completer<void> _cancelled = Completer<void>();
   String? _reason;
   void Function()? validate;

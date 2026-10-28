@@ -608,7 +608,11 @@ class _RecordingAgentSessionBridge extends AgentSessionBridge {
   final List<SessionId> closedSessions = [];
 
   @override
-  Future<void> closeSession(SessionId sessionId) async {
+  Future<void> closeSession(
+    SessionId sessionId, {
+    String? clientName,
+    bool keepConnection = false,
+  }) async {
     closedSessions.add(sessionId);
   }
 }

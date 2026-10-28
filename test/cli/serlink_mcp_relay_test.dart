@@ -438,7 +438,10 @@ void _relayTests() {
           contains('app_unavailable'),
         );
         await harness.client.ping();
-        expect((await harness.client.listTools()).tools, hasLength(7));
+        expect(
+          (await harness.client.listTools()).tools,
+          hasLength(serlinkMcpTools.length),
+        );
         final server = await _startBackend();
         await _writeDiscovery(dir, server, path: path);
         expect((await harness.client.callTool(_listHosts)).isError, isFalse);

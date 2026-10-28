@@ -581,9 +581,36 @@ class DartSsh2SessionService implements SshSessionService {
                   comment: identity.comment,
                   signer: (data) async {
                     signRequests++;
-                    final result = await identity.sign(data);
-                    signSuccesses++;
-                    return result;
+                    final timer = Stopwatch()..start();
+                    await _diagnosticLogger.record(
+                      'ssh.auth.sign.start',
+                      details: diagnostics,
+                    );
+                    try {
+                      final result = await identity.sign(data);
+                      signSuccesses++;
+                      await _diagnosticLogger.record(
+                        'ssh.auth.sign.success',
+                        details: {
+                          ...diagnostics,
+                          'elapsedMs': timer.elapsedMilliseconds,
+                        },
+                      );
+                      return result;
+                    } on Object catch (error) {
+                      await _diagnosticLogger.record(
+                        'ssh.auth.sign.failure',
+                        level: DiagnosticLogLevel.error,
+                        details: {
+                          ...diagnostics,
+                          'elapsedMs': timer.elapsedMilliseconds,
+                          'code': error is SshAgentException
+                              ? error.code
+                              : 'ssh.sign_failed',
+                        },
+                      );
+                      rethrow;
+                    }
                   },
                 ),
             ],

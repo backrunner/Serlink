@@ -347,6 +347,7 @@ class _CapturingBridge extends AgentSessionBridge {
   Future<AgentSessionHandle> openSession({
     required String clientName,
     required HostId hostId,
+    AgentSessionKind kind = AgentSessionKind.terminal,
   }) async {
     lastOpenClientName = clientName;
     throw const McpBridgeException('connect_failed', 'captured');

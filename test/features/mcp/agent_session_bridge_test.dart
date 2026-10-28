@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +16,8 @@ import 'package:serlink/features/mcp/data/command_risk_policy.dart';
 import 'package:serlink/features/mcp/domain/agent_session.dart';
 import 'package:serlink/features/security/application/security_modal_service.dart';
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
+import 'package:serlink/features/sftp/domain/sftp_entry.dart';
+import 'package:serlink/features/transfers/application/transfer_queue_controller.dart';
 import 'package:serlink/features/ssh/application/connection_profile_resolver.dart';
 import 'package:serlink/features/ssh/application/ssh_session_service.dart';
 import 'package:serlink/features/ssh/domain/connection_profile.dart';
@@ -26,6 +29,419 @@ import 'package:serlink/features/workspace/application/workspace_tab_controller.
 import 'package:serlink/features/workspace/domain/workspace_tab.dart';
 
 void main() {
+  group('existing workspace connections', () {
+    test('hands an MCP-created connection back and attaches without another SSH login', () async {
+      final service = _EchoSshSessionService();
+      final container = _container(
+        service: service,
+        modal: _FakeSecurityModalService(),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final opened = await _openSession(bridge);
+      await bridge.closeSession(
+        opened.sessionId,
+        clientName: _clientName,
+        keepConnection: true,
+      );
+      expect(bridge.sessions, isEmpty);
+      final borrowed = await bridge.attachSession(
+        clientName: _clientName,
+        sessionId: opened.sessionId,
+      );
+      expect(borrowed.borrowed, true);
+      expect(service.openShellCount, 1);
+      await bridge.closeSession(opened.sessionId, clientName: _clientName);
+      expect(container.read(workspaceTabControllerProvider).tabs, hasLength(1));
+    });
+    test('locked vault rejects connection discovery and attachment', () async {
+      final container = _container(
+        service: _EchoSshSessionService(),
+        modal: _FakeSecurityModalService(),
+        unlocked: false,
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      await expectLater(
+        bridge.listConnections(_clientName),
+        throwsA(_bridgeException('vault_locked')),
+      );
+      await expectLater(
+        bridge.attachSession(
+          clientName: _clientName,
+          sessionId: SessionId('unknown'),
+        ),
+        throwsA(_bridgeException('vault_locked')),
+      );
+    });
+
+    test('borrowing one split pane preserves both panes on release', () async {
+      final service = _EchoSshSessionService();
+      final container = _container(
+        service: service,
+        modal: _FakeSecurityModalService(),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final controller = container.read(
+        workspaceTabControllerProvider.notifier,
+      );
+      final tab = (await controller.openTerminal(_host))!;
+      await _drainMicrotasks();
+      controller.enableTerminalSplit(tab.id);
+      await _drainMicrotasks();
+      final connections = await bridge.listConnections(_clientName);
+      expect(connections, hasLength(2));
+      final id = SessionId(connections.last['sessionId'] as String);
+      await bridge.attachSession(clientName: _clientName, sessionId: id);
+      await bridge.closeSession(id, clientName: _clientName);
+      final content =
+          container.read(workspaceTabControllerProvider).tabs.single.content
+              as TerminalTabContent;
+      expect(content.panes, hasLength(2));
+      expect(service.openShellCount, 2);
+    });
+    test(
+      'lists and borrows a user connection without reconnecting or closing it',
+      () async {
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService();
+        final container = _container(service: service, modal: modal);
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final tab = (await container
+            .read(workspaceTabControllerProvider.notifier)
+            .openTerminal(_host))!;
+        await _drainMicrotasks();
+        final connections = await bridge.listConnections(_clientName);
+        expect(connections, hasLength(1));
+        expect(connections.single['attachable'], true);
+        expect(connections.single.keys, isNot(contains('screen')));
+        final id = (tab.content as TerminalTabContent).primaryPane.sessionId;
+        final handle = await bridge.attachSession(
+          clientName: _clientName,
+          sessionId: id,
+        );
+        expect(handle.borrowed, true);
+        expect(modal.accessCallCount, 1);
+        expect(service.openShellCount, 1);
+        await bridge.exec(
+          clientName: _clientName,
+          sessionId: id,
+          command: 'pwd',
+        );
+        expect(service.shells.single.writes, ['pwd\r']);
+        await expectLater(
+          bridge.closeSession(id, clientName: 'other'),
+          throwsA(_bridgeException('authorization_required')),
+        );
+        expect(bridge.sessions, hasLength(1));
+        await bridge.closeSession(id, clientName: _clientName);
+        expect(bridge.sessions, isEmpty);
+        expect(
+          container.read(workspaceTabControllerProvider).tabs.single.id,
+          tab.id,
+        );
+        expect(
+          (await bridge.listConnections(_clientName)).single['attachable'],
+          true,
+        );
+      },
+    );
+
+    test('borrowed SFTP remains connected on release', () async {
+      final service = _EchoSshSessionService();
+      final container = _container(
+        service: service,
+        modal: _FakeSecurityModalService(),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final tab = container
+          .read(workspaceTabControllerProvider.notifier)
+          .openSftp(_host);
+      await _drainMicrotasks();
+      final id = (tab.content as SftpTabContent).sessionId;
+      final handle = await bridge.attachSession(
+        clientName: _clientName,
+        sessionId: id,
+      );
+      expect(handle.kind, AgentSessionKind.sftp);
+      await bridge.closeSession(id, clientName: _clientName);
+      expect(service.sftp.closed, false);
+      expect(container.read(workspaceTabControllerProvider).tabs, hasLength(1));
+    });
+
+    test('cannot steal an MCP session or attach an unknown session', () async {
+      final container = _container(
+        service: _EchoSshSessionService(),
+        modal: _FakeSecurityModalService(),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final handle = await _openSession(bridge);
+      await expectLater(
+        bridge.attachSession(clientName: 'other', sessionId: handle.sessionId),
+        throwsA(_bridgeException('session_in_use')),
+      );
+      await expectLater(
+        bridge.attachSession(
+          clientName: _clientName,
+          sessionId: SessionId('missing'),
+        ),
+        throwsA(_bridgeException('session_not_found')),
+      );
+      expect(bridge.sessionsFor('other'), isEmpty);
+    });
+
+    for (final action in ['deny', 'close', 'cancel']) {
+      test('attachment handles $action while approval is pending', () async {
+        final modal = _FakeSecurityModalService()
+          ..accessGate = Completer<AgentAccessDecision>();
+        final container = _container(
+          service: _EchoSshSessionService(),
+          modal: modal,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final tab = (await container
+            .read(workspaceTabControllerProvider.notifier)
+            .openTerminal(_host))!;
+        await _drainMicrotasks();
+        final id = (tab.content as TerminalTabContent).primaryPane.sessionId;
+        final request = McpRequestContext();
+        final future = request.run(
+          () => bridge.attachSession(clientName: _clientName, sessionId: id),
+        );
+        final expectation = expectLater(
+          future,
+          throwsA(
+            action == 'cancel'
+                ? isA<McpApprovalException>()
+                : _bridgeException(
+                    action == 'deny'
+                        ? 'authorization_denied'
+                        : 'session_not_attached',
+                  ),
+          ),
+        );
+        await _drainMicrotasks();
+        if (action == 'close') {
+          container
+              .read(workspaceTabControllerProvider.notifier)
+              .closeTab(tab.id);
+        }
+        if (action == 'cancel') request.cancel();
+        modal.accessGate!.complete(
+          action == 'deny'
+              ? AgentAccessDecision.deny
+              : AgentAccessDecision.allow,
+        );
+        await expectation;
+        expect(bridge.sessions, isEmpty);
+        if (action != 'close') {
+          expect(
+            container.read(workspaceTabControllerProvider).tabs,
+            hasLength(1),
+          );
+        }
+      });
+    }
+  });
+
+  group('opening connection lifetime', () {
+    for (final outcome in ['cancel', 'timeout', 'revoke']) {
+      test(
+        '$outcome removes the pending tab and rejects late authentication',
+        () async {
+          final service = _EchoSshSessionService()
+            ..shellGate = Completer<void>();
+          final container = _container(
+            service: service,
+            modal: _FakeSecurityModalService(),
+            attachTimeout: const Duration(milliseconds: 150),
+          );
+          addTearDown(container.dispose);
+          final bridge = await _bridge(container);
+          final request = McpRequestContext();
+          final future = request.run(() => _openSession(bridge));
+          final expectation = expectLater(
+            future,
+            throwsA(
+              outcome == 'cancel'
+                  ? isA<McpApprovalException>()
+                  : _bridgeException(
+                      outcome == 'timeout'
+                          ? 'connect_timeout'
+                          : 'authorization_required',
+                    ),
+            ),
+          );
+          await _drainMicrotasks();
+          expect(
+            container.read(workspaceTabControllerProvider).tabs,
+            hasLength(1),
+          );
+          if (outcome == 'cancel') request.cancel();
+          if (outcome == 'revoke') {
+            container.read(mcpAuthorizationServiceProvider).revokeAll();
+            service.shellGate!.complete();
+          }
+          await expectation;
+          expect(container.read(workspaceTabControllerProvider).tabs, isEmpty);
+          expect(bridge.sessions, isEmpty);
+          if (!service.shellGate!.isCompleted) service.shellGate!.complete();
+          await _drainMicrotasks();
+          expect(container.read(workspaceTabControllerProvider).tabs, isEmpty);
+        },
+      );
+    }
+  });
+  group('MCP SFTP downloads', () {
+    test(
+      'uses visible authorized tab and downloads to a fresh local directory',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'mcp-download-test-',
+        );
+        addTearDown(() => root.delete(recursive: true));
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: _FakeSecurityModalService(),
+          downloadDirectory: () async => root,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await bridge.openSession(
+          clientName: _clientName,
+          hostId: _host.id,
+          kind: AgentSessionKind.sftp,
+        );
+        expect(
+          container.read(workspaceTabControllerProvider).tabs.single.content,
+          isA<SftpTabContent>(),
+        );
+        expect(
+          (await bridge.listSftp(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            path: '/backup',
+          )).single['size'],
+          3,
+        );
+        final first = await bridge.downloadSftp(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          remotePath: '/backup/mail.tar.gz',
+        );
+        await _drainMicrotasks();
+        final status = bridge.transferStatus(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          taskId: TransferTaskId(first['taskId'] as String),
+        );
+        expect(status['state'], 'completed');
+        expect(status['transferredBytes'], 3);
+        expect(await File(first['localPath'] as String).readAsBytes(), [
+          1,
+          2,
+          3,
+        ]);
+        final second = await bridge.downloadSftp(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          remotePath: '/backup/mail.tar.gz',
+        );
+        expect(second['localPath'], isNot(first['localPath']));
+        await _drainMicrotasks();
+        await bridge.closeSession(handle.sessionId);
+        await _drainMicrotasks();
+        expect(bridge.sessions, isEmpty);
+        expect(service.sftp.closed, isTrue);
+      },
+    );
+
+    test(
+      'rejects other clients, terminal sessions, and invalid remote paths',
+      () async {
+        final container = _container(
+          service: _EchoSshSessionService(),
+          modal: _FakeSecurityModalService(),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await bridge.openSession(
+          clientName: _clientName,
+          hostId: _host.id,
+          kind: AgentSessionKind.sftp,
+        );
+        await expectLater(
+          bridge.listSftp(
+            clientName: 'another-client',
+            sessionId: handle.sessionId,
+            path: '/',
+          ),
+          throwsA(_bridgeException('authorization_required')),
+        );
+        await expectLater(
+          bridge.downloadSftp(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            remotePath: 'relative/file',
+          ),
+          throwsA(_bridgeException('invalid_remote_path')),
+        );
+        final terminal = await _openSession(bridge);
+        await expectLater(
+          bridge.listSftp(
+            clientName: _clientName,
+            sessionId: terminal.sessionId,
+            path: '/',
+          ),
+          throwsA(_bridgeException('not_sftp_session')),
+        );
+      },
+    );
+
+    test(
+      'revocation during local destination lookup prevents download',
+      () async {
+        final root = await Directory.systemTemp.createTemp('mcp-revoke-test-');
+        addTearDown(() => root.delete(recursive: true));
+        final destination = Completer<Directory>();
+        final container = _container(
+          service: _EchoSshSessionService(),
+          modal: _FakeSecurityModalService(),
+          downloadDirectory: () => destination.future,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await bridge.openSession(
+          clientName: _clientName,
+          hostId: _host.id,
+          kind: AgentSessionKind.sftp,
+        );
+        final download = bridge.downloadSftp(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          remotePath: '/backup/mail.tar.gz',
+        );
+        final expectation = expectLater(
+          download,
+          throwsA(_bridgeException('authorization_required')),
+        );
+        bridge.revokeGrant(handle.grantId);
+        destination.complete(root);
+        await expectation;
+        expect(await root.list().toList(), isEmpty);
+        expect(
+          container.read(transferQueueControllerProvider).state.tasks,
+          isEmpty,
+        );
+      },
+    );
+  });
   group('model command protection', () {
     test(
       'blocks semantically dangerous commands missed by local rules',
@@ -737,7 +1153,7 @@ void main() {
     });
 
     test(
-      'openSession reuses a failed terminal tab for the same host',
+      'failed MCP open leaves no orphan tab before a later explicit retry',
       () async {
         final service = _EchoSshSessionService()
           ..shellFailures.add(StateError('boom'));
@@ -752,11 +1168,7 @@ void main() {
           bridge.openSession(clientName: _clientName, hostId: _host.id),
           throwsA(_bridgeException('connect_failed')),
         );
-        final failedTab = container
-            .read(workspaceTabControllerProvider)
-            .tabs
-            .single;
-        expect(failedTab.lifecycle, SessionLifecycleState.failed);
+        expect(container.read(workspaceTabControllerProvider).tabs, isEmpty);
 
         final handle = await bridge.openSession(
           clientName: _clientName,
@@ -766,7 +1178,6 @@ void main() {
         expect(handle.state, AgentSessionState.connected);
         final tabs = container.read(workspaceTabControllerProvider).tabs;
         expect(tabs, hasLength(1));
-        expect(tabs.single.id, failedTab.id);
         expect(service.openShellCount, 2);
       },
     );
@@ -945,6 +1356,8 @@ ProviderContainer _container({
   bool unlocked = true,
   CommandDecisionGuard? decisionGuard,
   WorkspaceTabController Function()? workspaceTabControllerFactory,
+  Future<Directory> Function()? downloadDirectory,
+  Duration attachTimeout = const Duration(seconds: 5),
 }) {
   return ProviderContainer(
     overrides: [
@@ -981,8 +1394,9 @@ ProviderContainer _container({
           authorization: ref.watch(mcpAuthorizationServiceProvider),
           riskPolicy: CommandRiskPolicy(),
           decisionGuard: decisionGuard,
+          downloadDirectory: downloadDirectory,
           securityModalService: modal,
-          attachTimeout: const Duration(seconds: 5),
+          attachTimeout: attachTimeout,
           attachPollInterval: const Duration(milliseconds: 10),
           settleQuietPeriod: const Duration(milliseconds: 50),
           settlePollInterval: const Duration(milliseconds: 10),
@@ -1011,7 +1425,10 @@ Future<void> _drainMicrotasks() async {
 /// host and activates it, simulating a foreign tab the bridge could adopt.
 class _ForeignTabWorkspaceController extends WorkspaceTabController {
   @override
-  Future<WorkspaceTabState?> openTerminal(HostSummary host) async {
+  Future<WorkspaceTabState?> openTerminal(
+    HostSummary host, {
+    bool reuseFailedTab = true,
+  }) async {
     final now = DateTime.utc(2026);
     final tab = WorkspaceTabState(
       id: WorkspaceTabId('foreign-tab'),
@@ -1049,13 +1466,16 @@ class _FakeVaultSessionController extends VaultSessionController {
 }
 
 class _EchoSshSessionService implements SshSessionService {
+  final sftp = _MemorySftpConnection();
   final List<_EchoShellSession> shells = [];
   final List<Object> shellFailures = [];
   var openShellCount = 0;
+  Completer<void>? shellGate;
 
   @override
   Future<SshShellSession> openShell(ConnectionProfileSnapshot profile) async {
     openShellCount += 1;
+    await shellGate?.future;
     if (shellFailures.isNotEmpty) {
       throw shellFailures.removeAt(0);
     }
@@ -1065,9 +1485,8 @@ class _EchoSshSessionService implements SshSessionService {
   }
 
   @override
-  Future<SftpConnection> openSftp(ConnectionProfileSnapshot profile) {
-    throw UnimplementedError();
-  }
+  Future<SftpConnection> openSftp(ConnectionProfileSnapshot profile) async =>
+      sftp;
 
   @override
   Future<void> testConnection(ConnectionProfileSnapshot profile) async {}
@@ -1118,6 +1537,46 @@ class _EchoSshSessionService implements SshSessionService {
   Future<void> stopDynamicForward({required SessionId sessionId}) async {}
 }
 
+class _MemorySftpConnection implements SftpConnection {
+  final _done = Completer<void>();
+  bool closed = false;
+  @override
+  Future<void> get done => _done.future;
+  @override
+  Future<List<SftpEntry>> list(String path) async => [
+    SftpEntry(
+      name: 'mail.tar.gz',
+      path: '$path/mail.tar.gz',
+      type: SftpEntryType.file,
+      size: 3,
+    ),
+  ];
+  @override
+  Stream<TransferProgress> download({
+    required TransferTaskId taskId,
+    required TransferItemKind itemKind,
+    required String remotePath,
+    required String localPath,
+  }) async* {
+    await File(localPath).writeAsBytes([1, 2, 3]);
+    yield TransferProgress(
+      taskId: taskId,
+      state: TransferState.completed,
+      transferredBytes: 3,
+      totalBytes: 3,
+    );
+  }
+
+  @override
+  Future<void> close() async {
+    closed = true;
+    if (!_done.isCompleted) _done.complete();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 /// Fake shell that echoes written bytes back on stdout, so input sent by the
 /// bridge appears on the terminal screen like a real shell echo would.
 class _EchoShellSession implements SshShellSession {
@@ -1162,11 +1621,12 @@ class _FakeSecurityModalService implements SecurityModalService {
   AgentCommandDecision commandDecision = AgentCommandDecision.deny;
   var accessCallCount = 0;
   var commandCallCount = 0;
+  Completer<AgentAccessDecision>? accessGate;
 
   @override
   Future<AgentAccessDecision> confirmAgentAccess(AgentAccessPrompt prompt) {
     accessCallCount += 1;
-    return Future.value(accessDecision);
+    return accessGate?.future ?? Future.value(accessDecision);
   }
 
   @override

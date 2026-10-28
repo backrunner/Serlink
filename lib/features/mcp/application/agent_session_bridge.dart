@@ -1,13 +1,19 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../../app/app_dependencies.dart';
 import '../../../core/ids/entity_id.dart';
 import '../../../core/logging/offline_diagnostic_logger.dart';
+import '../../../core/security/local_file_security.dart';
 import '../../hosts/application/host_store.dart';
 import '../../hosts/domain/host.dart';
 import '../../security/application/security_modal_service.dart';
+import '../../sftp/application/sftp_connection.dart';
+import '../../transfers/application/transfer_queue_controller.dart';
 import '../../vault/application/vault_service.dart';
 import '../../workspace/application/workspace_tab_controller.dart';
 import '../../workspace/domain/workspace_tab.dart';
@@ -66,12 +72,13 @@ class AgentSessionBridge {
     required CommandRiskPolicy riskPolicy,
     required SecurityModalService securityModalService,
     CommandDecisionGuard? decisionGuard,
-    this.attachTimeout = const Duration(seconds: 45),
+    this.attachTimeout = const Duration(minutes: 2),
     this.attachPollInterval = const Duration(milliseconds: 200),
     this.settleQuietPeriod = const Duration(milliseconds: 400),
     this.settlePollInterval = const Duration(milliseconds: 150),
     this.execOutputLines = 100,
     DateTime Function()? now,
+    Future<Directory> Function()? downloadDirectory,
     // Named parameters cannot be initializing formals for private fields.
     // ignore: prefer_initializing_formals
   }) : _ref = ref,
@@ -84,7 +91,8 @@ class AgentSessionBridge {
        // Named parameters cannot initialize private fields directly.
        // ignore: prefer_initializing_formals
        _decisionGuard = decisionGuard,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _downloadDirectory = downloadDirectory ?? _defaultDownloadDirectory;
 
   final Ref _ref;
   final McpAuthorizationService _authorization;
@@ -92,6 +100,11 @@ class AgentSessionBridge {
   final SecurityModalService _securityModalService;
   final CommandDecisionGuard? _decisionGuard;
   final DateTime Function() _now;
+  final Future<Directory> Function() _downloadDirectory;
+  final Map<TransferTaskId, SessionId> _transfers = {};
+
+  static Future<Directory> _defaultDownloadDirectory() async =>
+      await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
 
   /// How long [openSession] waits for the SSH channel to attach.
   final Duration attachTimeout;
@@ -148,6 +161,169 @@ class AgentSessionBridge {
     ];
   }
 
+  /// Lists app-owned remote panes, without reading terminal contents or
+  /// exposing endpoint/key metadata. Listing never grants control.
+  Future<List<Map<String, Object?>>> listConnections(String clientName) async {
+    final vault = _requireUnlockedVault();
+    final hosts = await listHosts();
+    if (_requireUnlockedVault().unlockGeneration != vault.unlockGeneration) {
+      throw const McpBridgeException('vault_locked');
+    }
+    McpRequestContext.current?.checkActive();
+    final names = {for (final host in hosts) host.id: host.displayName};
+    final workspace = _ref.read(workspaceTabControllerProvider);
+    _pruneStaleHandles(workspace);
+    return [
+      for (final tab in workspace.tabs)
+        for (final connection in _connectionsIn(tab))
+          {
+            'sessionId': connection.sessionId.value,
+            'tabId': tab.id.value,
+            'hostId': connection.hostId.value,
+            'displayName': names[connection.hostId] ?? 'Unknown host',
+            'kind': connection.kind.name,
+            'state': connection.state.name,
+            'controlledByThisClient':
+                _sessions[connection.sessionId]?.handle.clientName ==
+                clientName,
+            'attachable':
+                connection.state == SessionLifecycleState.connected &&
+                !_sessions.containsKey(connection.sessionId),
+          },
+    ];
+  }
+
+  Iterable<
+    ({
+      SessionId sessionId,
+      HostId hostId,
+      AgentSessionKind kind,
+      SessionLifecycleState state,
+    })
+  >
+  _connectionsIn(WorkspaceTabState tab) sync* {
+    final content = tab.content;
+    if (content is SftpTabContent) {
+      final hostId = tab.hostId;
+      if (hostId != null) {
+        yield (
+          sessionId: content.sessionId,
+          hostId: hostId,
+          kind: AgentSessionKind.sftp,
+          state: tab.lifecycle,
+        );
+      }
+      return;
+    }
+    final panes = switch (content) {
+      TerminalTabContent(:final panes) => panes,
+      LocalTerminalTabContent(:final panes) => panes,
+      _ => const <TerminalPaneState>[],
+    };
+    for (final pane in panes) {
+      if (pane.endpoint?.isLocal ?? content is LocalTerminalTabContent) {
+        continue;
+      }
+      final hostId = pane.endpoint?.hostId ?? tab.hostId;
+      if (hostId == null) continue;
+      yield (
+        sessionId: pane.sessionId,
+        hostId: hostId,
+        kind: AgentSessionKind.terminal,
+        state: pane.lifecycle,
+      );
+    }
+  }
+
+  /// Borrows an existing connected pane after the same per-host approval
+  /// used by openSession. No SSH authentication or new tab is involved.
+  Future<AgentSessionHandle> attachSession({
+    required String clientName,
+    required SessionId sessionId,
+  }) async {
+    final vault = _requireUnlockedVault();
+    final workspace = _ref.read(workspaceTabControllerProvider);
+    _pruneStaleHandles(workspace);
+    if (_sessions.containsKey(sessionId)) {
+      throw const McpBridgeException('session_in_use');
+    }
+    final matches = [
+      for (final tab in workspace.tabs)
+        for (final connection in _connectionsIn(tab))
+          if (connection.sessionId == sessionId) (tab, connection),
+    ];
+    if (matches.isEmpty) throw const McpBridgeException('session_not_found');
+    final (tab, connection) = matches.single;
+    if (connection.state != SessionLifecycleState.connected) {
+      throw const McpBridgeException('session_not_attached');
+    }
+    final hosts = await listHosts();
+    final host = hosts
+        .where((host) => host.id == connection.hostId)
+        .firstOrNull;
+    if (host == null) throw const McpBridgeException('host_not_found');
+    void validate() {
+      if (_requireUnlockedVault().unlockGeneration != vault.unlockGeneration) {
+        throw const McpBridgeException('vault_locked');
+      }
+    }
+
+    final request = McpRequestContext.current;
+    request?.validate = validate;
+    request?.checkActive();
+    validate();
+    final grant = await _authorization.ensureGrant(
+      clientName: clientName,
+      hostId: host.id,
+      hostDisplayName: host.displayName,
+    );
+    if (grant == null) throw const McpBridgeException('authorization_denied');
+    request?.checkActive();
+    validate();
+    if (_authorization.findValidGrant(
+          clientName: clientName,
+          hostId: host.id,
+          now: _now(),
+        ) !=
+        grant) {
+      throw const McpBridgeException('authorization_required');
+    }
+    if (_sessions.containsKey(sessionId)) {
+      throw const McpBridgeException('session_in_use');
+    }
+    final current = _ref
+        .read(workspaceTabControllerProvider)
+        .tabs
+        .where((candidate) => candidate.id == tab.id)
+        .firstOrNull;
+    if (current == null || !_connectionsIn(current).contains(connection)) {
+      throw const McpBridgeException('session_not_attached');
+    }
+    final registry = _ref.read(workspaceRuntimeRegistryProvider);
+    if (connection.kind == AgentSessionKind.terminal
+        ? !registry.hasAttachedTerminal(sessionId)
+        : registry.sftpFor(sessionId) == null) {
+      throw const McpBridgeException('session_not_attached');
+    }
+    final handle = AgentSessionHandle(
+      sessionId: sessionId,
+      hostId: host.id,
+      grantId: grant.grantId,
+      clientName: clientName,
+      state: AgentSessionState.connected,
+      openedAt: _now(),
+      kind: connection.kind,
+      borrowed: true,
+    );
+    _sessions[sessionId] = _AgentSessionEntry(
+      handle: handle,
+      tabId: tab.id,
+      hostDisplayName: host.displayName,
+    );
+    _emitSessions();
+    return handle;
+  }
+
   /// Opens an SSH terminal tab for [hostId] on behalf of [clientName].
   ///
   /// Throws [McpBridgeException] with codes `vault_locked`, `host_not_found`,
@@ -155,6 +331,7 @@ class AgentSessionBridge {
   Future<AgentSessionHandle> openSession({
     required String clientName,
     required HostId hostId,
+    AgentSessionKind kind = AgentSessionKind.terminal,
   }) async {
     final vault = _requireUnlockedVault();
     final hosts = await _ref.read(
@@ -198,28 +375,75 @@ class AgentSessionBridge {
         grant) {
       throw const McpBridgeException('authorization_denied');
     }
-    final tab = await _ref
-        .read(workspaceTabControllerProvider.notifier)
-        .openTerminal(host);
+    final controller = _ref.read(workspaceTabControllerProvider.notifier);
+    final tab = kind == AgentSessionKind.sftp
+        ? controller.openSftp(host)
+        : await controller.openTerminal(host, reuseFailedTab: false);
     final content = tab?.content;
-    if (tab == null || tab.hostId != hostId || content is! TerminalTabContent) {
+    final sessionId = switch (content) {
+      TerminalTabContent(:final primaryPane)
+          when kind == AgentSessionKind.terminal =>
+        primaryPane.sessionId,
+      SftpTabContent(:final sessionId) when kind == AgentSessionKind.sftp =>
+        sessionId,
+      _ => null,
+    };
+    if (tab == null || tab.hostId != hostId || sessionId == null) {
       throw const McpBridgeException(
         'connect_failed',
-        'workspace did not open a terminal tab for the granted host',
+        'workspace did not open the requested tab for the granted host',
       );
     }
     final tabId = tab.id;
-    final sessionId = content.primaryPane.sessionId;
     final logger = _ref.read(offlineDiagnosticLoggerProvider);
     final details = {'sessionId': sessionId.value, 'hostId': hostId.value};
     await logger.record('mcp.session.open.start', details: details);
     try {
-      await _waitForAttach(tabId, sessionId);
-    } on McpBridgeException catch (error) {
+      McpRequestContext.current?.onConnecting?.call();
+      await _waitForAttach(
+        tabId,
+        sessionId,
+        kind: kind,
+        validate: () {
+          if (_requireUnlockedVault().unlockGeneration !=
+              vault.unlockGeneration) {
+            throw const McpBridgeException('vault_locked');
+          }
+          if (_authorization.findValidGrant(
+                clientName: clientName,
+                hostId: hostId,
+                now: _now(),
+              ) !=
+              grant) {
+            throw const McpBridgeException('authorization_required');
+          }
+        },
+      );
+      McpRequestContext.current?.checkActive();
+      if (_requireUnlockedVault().unlockGeneration != vault.unlockGeneration) {
+        throw const McpBridgeException('vault_locked');
+      }
+      if (_authorization.findValidGrant(
+            clientName: clientName,
+            hostId: hostId,
+            now: _now(),
+          ) !=
+          grant) {
+        throw const McpBridgeException('authorization_required');
+      }
+    } on Object catch (error) {
+      _closeWorkspaceSession(tabId, sessionId);
       await logger.record(
         'mcp.session.open.failure',
         level: DiagnosticLogLevel.error,
-        details: {...details, 'code': error.code},
+        details: {
+          ...details,
+          'code': switch (error) {
+            McpBridgeException(:final code) => code,
+            McpApprovalException(:final code) => code,
+            _ => 'connect_failed',
+          },
+        },
       );
       rethrow;
     }
@@ -232,6 +456,7 @@ class AgentSessionBridge {
       clientName: clientName,
       state: AgentSessionState.connected,
       openedAt: _now(),
+      kind: kind,
     );
     _sessions[sessionId] = _AgentSessionEntry(
       handle: handle,
@@ -240,6 +465,123 @@ class AgentSessionBridge {
     );
     _emitSessions();
     return handle;
+  }
+
+  SftpConnection _requireSftp(String clientName, SessionId sessionId) {
+    final entry = _requireAuthorizedSession(clientName, sessionId);
+    if (entry.handle.kind != AgentSessionKind.sftp) {
+      throw const McpBridgeException('not_sftp_session');
+    }
+    final tab = _ref
+        .read(workspaceTabControllerProvider)
+        .tabs
+        .where((tab) => tab.id == entry.tabId)
+        .firstOrNull;
+    final connection = _ref
+        .read(workspaceRuntimeRegistryProvider)
+        .sftpFor(sessionId);
+    if (tab?.lifecycle != SessionLifecycleState.connected ||
+        connection == null) {
+      throw const McpBridgeException('session_not_attached');
+    }
+    McpRequestContext.current?.checkActive();
+    return connection;
+  }
+
+  static void _validateRemotePath(String path) {
+    if (!p.posix.isAbsolute(path) ||
+        path.contains(RegExp(r'[\x00-\x1f\x7f]'))) {
+      throw const McpBridgeException('invalid_remote_path');
+    }
+  }
+
+  Future<List<Map<String, Object?>>> listSftp({
+    required String clientName,
+    required SessionId sessionId,
+    required String path,
+  }) async {
+    _validateRemotePath(path);
+    final entries = await _requireSftp(clientName, sessionId).list(path);
+    _requireSftp(clientName, sessionId);
+    return [
+      for (final entry in entries)
+        {
+          'name': entry.name,
+          'path': entry.path,
+          'type': entry.type.name,
+          'size': entry.size,
+          'modifiedAt': entry.modifiedAt?.toUtc().toIso8601String(),
+        },
+    ];
+  }
+
+  /// Downloads into a fresh private directory in Downloads. Never overwrites
+  /// an agent-selected local path or returns remote file contents through MCP.
+  Future<Map<String, Object?>> downloadSftp({
+    required String clientName,
+    required SessionId sessionId,
+    required String remotePath,
+  }) async {
+    _validateRemotePath(remotePath);
+    final name = p.posix.basename(remotePath);
+    if (name == '.' || name == '..' || name == '/' || name.contains('\\')) {
+      throw const McpBridgeException('invalid_remote_path');
+    }
+    final entry = _requireAuthorizedSession(clientName, sessionId);
+    _requireSftp(clientName, sessionId);
+    final root = await _downloadDirectory();
+    _requireSftp(clientName, sessionId);
+    final directory = await root.createTemp('Serlink-');
+    await LocalFileSecurity.preparePrivateDirectory(directory);
+    final file = File(p.join(directory.path, name));
+    await LocalFileSecurity.restrictFile(file);
+    final connection = _requireSftp(clientName, sessionId);
+    final taskId = _ref
+        .read(transferQueueControllerProvider)
+        .enqueueDownload(
+          connection: connection,
+          sourceHostId: entry.handle.hostId,
+          sourceMachineName: entry.hostDisplayName,
+          remotePath: remotePath,
+          localPath: file.path,
+        );
+    _transfers[taskId] = sessionId;
+    return {'taskId': taskId.value, 'localPath': file.path};
+  }
+
+  Map<String, Object?> transferStatus({
+    required String clientName,
+    required SessionId sessionId,
+    required TransferTaskId taskId,
+  }) {
+    _requireAuthorizedSession(clientName, sessionId);
+    if (_transfers[taskId] != sessionId) {
+      throw const McpBridgeException('transfer_not_found');
+    }
+    final task = _ref.read(transferQueueControllerProvider).state.byId(taskId);
+    if (task == null) throw const McpBridgeException('transfer_not_found');
+    return {
+      'taskId': task.id.value,
+      'state': task.state.name,
+      'localPath': task.localPath,
+      'remotePath': task.remotePath,
+      'transferredBytes': task.transferredBytes,
+      'totalBytes': task.totalBytes,
+      if (task.failure != null) 'error': task.failure!.code,
+    };
+  }
+
+  Future<void> cancelTransfer({
+    required String clientName,
+    required SessionId sessionId,
+    required TransferTaskId taskId,
+  }) async {
+    transferStatus(
+      clientName: clientName,
+      sessionId: sessionId,
+      taskId: taskId,
+    );
+    await _ref.read(transferQueueControllerProvider).cancel(taskId);
   }
 
   /// Sends [command] to the session and returns the settled screen text.
@@ -405,15 +747,38 @@ class AgentSessionBridge {
   /// handle. Unknown session ids are a no-op so agents can safely retry
   /// cleanup. When the tab hosts other panes, only the agent pane is closed
   /// so user-owned sibling panes survive.
-  Future<void> closeSession(SessionId sessionId) async {
+  Future<void> closeSession(
+    SessionId sessionId, {
+    String? clientName,
+    bool keepConnection = false,
+  }) async {
+    final existing = _sessions[sessionId];
+    if (existing != null &&
+        clientName != null &&
+        existing.handle.clientName != clientName) {
+      throw const McpBridgeException('authorization_required');
+    }
+    for (final taskId
+        in _transfers.entries
+            .where((entry) => entry.value == sessionId)
+            .map((entry) => entry.key)
+            .toList()) {
+      await _ref.read(transferQueueControllerProvider).cancel(taskId);
+      _transfers.remove(taskId);
+    }
     final entry = _sessions.remove(sessionId);
     if (entry == null) {
       return;
     }
     _emitSessions();
+    if (entry.handle.borrowed || keepConnection) return;
+    _closeWorkspaceSession(entry.tabId, sessionId);
+  }
+
+  void _closeWorkspaceSession(WorkspaceTabId tabId, SessionId sessionId) {
     final workspace = _ref.read(workspaceTabControllerProvider);
     for (final tab in workspace.tabs) {
-      if (tab.id != entry.tabId) {
+      if (tab.id != tabId) {
         continue;
       }
       final content = tab.content;
@@ -422,14 +787,15 @@ class AgentSessionBridge {
           if (content.panes[index].sessionId == sessionId) {
             _ref
                 .read(workspaceTabControllerProvider.notifier)
-                .closeTerminalPane(entry.tabId, index);
+                .closeTerminalPane(tabId, index);
             return;
           }
         }
       }
-      break;
+      if (!_workspaceHasSession(workspace, tabId, sessionId)) return;
+      _ref.read(workspaceTabControllerProvider.notifier).closeTab(tabId);
+      return;
     }
-    _ref.read(workspaceTabControllerProvider.notifier).closeTab(entry.tabId);
   }
 
   /// Drops handles whose workspace tab or pane no longer exists (e.g. the
@@ -463,10 +829,8 @@ class AgentSessionBridge {
         continue;
       }
       final content = tab.content;
-      if (content is! TerminalTabContent) {
-        return false;
-      }
-      return content.panes.any((pane) => pane.sessionId == sessionId);
+      if (content is SftpTabContent) return content.sessionId == sessionId;
+      return _connectionsIn(tab).any((c) => c.sessionId == sessionId);
     }
     return false;
   }
@@ -494,6 +858,9 @@ class AgentSessionBridge {
     if (entry == null) {
       throw const McpBridgeException('session_not_found');
     }
+    if (entry.handle.clientName != clientName) {
+      throw const McpBridgeException('authorization_required');
+    }
     _requireUnlockedVault();
     final grant = _authorization.findValidGrant(
       clientName: clientName,
@@ -513,10 +880,12 @@ class AgentSessionBridge {
   void _requireConnectedPane(SessionId sessionId) {
     for (final tab in _ref.read(workspaceTabControllerProvider).tabs) {
       final content = tab.content;
-      if (content is! TerminalTabContent) {
-        continue;
-      }
-      for (final pane in content.panes) {
+      final panes = switch (content) {
+        TerminalTabContent(:final panes) => panes,
+        LocalTerminalTabContent(:final panes) => panes,
+        _ => const <TerminalPaneState>[],
+      };
+      for (final pane in panes) {
         if (pane.sessionId == sessionId) {
           if (pane.lifecycle != SessionLifecycleState.connected) {
             throw const McpBridgeException(
@@ -610,11 +979,20 @@ class AgentSessionBridge {
     }
   }
 
-  Future<void> _waitForAttach(WorkspaceTabId tabId, SessionId sessionId) async {
+  Future<void> _waitForAttach(
+    WorkspaceTabId tabId,
+    SessionId sessionId, {
+    AgentSessionKind kind = AgentSessionKind.terminal,
+    void Function()? validate,
+  }) async {
     final registry = _ref.read(workspaceRuntimeRegistryProvider);
     final deadline = _now().add(attachTimeout);
     while (true) {
-      if (registry.hasAttachedTerminal(sessionId)) {
+      McpRequestContext.current?.checkActive();
+      validate?.call();
+      if (kind == AgentSessionKind.sftp
+          ? registry.sftpFor(sessionId) != null
+          : registry.hasAttachedTerminal(sessionId)) {
         return;
       }
       final failure = _paneFailure(tabId, sessionId);
@@ -635,6 +1013,15 @@ class AgentSessionBridge {
         continue;
       }
       final content = tab.content;
+      if (content is SftpTabContent && content.sessionId == sessionId) {
+        if (tab.lifecycle == SessionLifecycleState.failed) {
+          return tab.failure?.message ?? 'connection failed';
+        }
+        if (tab.lifecycle == SessionLifecycleState.disconnected) {
+          return 'connection closed before the SFTP session attached';
+        }
+        return null;
+      }
       if (content is! TerminalTabContent) {
         return 'workspace tab is no longer a terminal';
       }

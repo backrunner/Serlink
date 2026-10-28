@@ -2,6 +2,8 @@ import '../../../core/ids/entity_id.dart';
 
 enum AgentSessionState { connecting, connected, disconnected, failed, closed }
 
+enum AgentSessionKind { terminal, sftp }
+
 /// Handle for an SSH session opened on behalf of an MCP client grant.
 class AgentSessionHandle {
   const AgentSessionHandle({
@@ -11,6 +13,8 @@ class AgentSessionHandle {
     required this.clientName,
     required this.state,
     required this.openedAt,
+    this.kind = AgentSessionKind.terminal,
+    this.borrowed = false,
   });
 
   final SessionId sessionId;
@@ -19,6 +23,10 @@ class AgentSessionHandle {
   final String clientName;
   final AgentSessionState state;
   final DateTime openedAt;
+  final AgentSessionKind kind;
+
+  /// An existing user connection: releasing the handle leaves its tab open.
+  final bool borrowed;
 
   AgentSessionHandle copyWith({AgentSessionState? state}) {
     return AgentSessionHandle(
@@ -28,6 +36,8 @@ class AgentSessionHandle {
       clientName: clientName,
       state: state ?? this.state,
       openedAt: openedAt,
+      kind: kind,
+      borrowed: borrowed,
     );
   }
 
@@ -39,6 +49,8 @@ class AgentSessionHandle {
         other.grantId == grantId &&
         other.clientName == clientName &&
         other.state == state &&
+        other.kind == kind &&
+        other.borrowed == borrowed &&
         other.openedAt == openedAt;
   }
 
@@ -51,6 +63,8 @@ class AgentSessionHandle {
       clientName,
       state,
       openedAt,
+      kind,
+      borrowed,
     );
   }
 }

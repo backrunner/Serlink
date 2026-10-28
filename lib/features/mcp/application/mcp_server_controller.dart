@@ -12,6 +12,7 @@ import '../../../core/ids/entity_id.dart';
 import '../../../core/security/local_file_security.dart';
 import '../data/mcp_server_transport.dart';
 import '../domain/mcp_contract.dart';
+import '../domain/agent_session.dart';
 import 'agent_session_bridge.dart';
 import 'mcp_request_context.dart';
 
@@ -275,6 +276,8 @@ class McpServerController extends Notifier<McpServerState> {
           'unknown';
       var progress = 0;
       Timer? progressTimer;
+      var waitingMessage =
+          'Waiting for approval in Serlink (up to 60 seconds).';
       void sendWaiting() {
         final token = extra.meta?['progressToken'];
         if (token == null || extra.signal.aborted) return;
@@ -286,8 +289,7 @@ class McpServerController extends Notifier<McpServerState> {
                   params: {
                     'progressToken': token,
                     'progress': ++progress,
-                    'message':
-                        'Waiting for approval in Serlink (up to 60 seconds).',
+                    'message': waitingMessage,
                   },
                 ),
               )
@@ -301,6 +303,18 @@ class McpServerController extends Notifier<McpServerState> {
           progressTimer = null;
         },
         onWaiting: () {
+          waitingMessage =
+              'Waiting for approval in Serlink (up to 60 seconds).';
+          sendWaiting();
+          progressTimer ??= Timer.periodic(
+            const Duration(seconds: 10),
+            (_) => sendWaiting(),
+          );
+        },
+        onConnecting: () {
+          waitingMessage =
+              'Connecting in Serlink; SSH Agent authentication may '
+              'require approval in your password manager (up to 120 seconds).';
           sendWaiting();
           progressTimer ??= Timer.periodic(
             const Duration(seconds: 10),
@@ -360,13 +374,18 @@ class McpServerController extends Notifier<McpServerState> {
         final handle = await bridge.openSession(
           clientName: clientName,
           hostId: HostId(args['hostId'] as String),
+          kind: AgentSessionKind.values.byName(
+            args['kind'] as String? ?? 'terminal',
+          ),
         );
         var screen = '';
         try {
-          screen = await bridge.readScreen(
-            clientName: clientName,
-            sessionId: handle.sessionId,
-          );
+          if (handle.kind == AgentSessionKind.terminal) {
+            screen = await bridge.readScreen(
+              clientName: clientName,
+              sessionId: handle.sessionId,
+            );
+          }
         } on McpBridgeException {
           // Initial screen read is best-effort.
         }
@@ -374,8 +393,76 @@ class McpServerController extends Notifier<McpServerState> {
           'sessionId': handle.sessionId.value,
           'hostId': handle.hostId.value,
           'state': handle.state.name,
+          'kind': handle.kind.name,
+          'borrowed': handle.borrowed,
           'screen': screen,
         };
+      }, extra),
+    );
+
+    serlinkMcpTools['serlink_list_connections']!.register(
+      server,
+      callback: (args, extra) => guard(bridge.listConnections, extra),
+    );
+    serlinkMcpTools['serlink_attach_session']!.register(
+      server,
+      callback: (args, extra) => guard((clientName) async {
+        final handle = await bridge.attachSession(
+          clientName: clientName,
+          sessionId: SessionId(args['sessionId'] as String),
+        );
+        return {
+          'sessionId': handle.sessionId.value,
+          'hostId': handle.hostId.value,
+          'state': handle.state.name,
+          'kind': handle.kind.name,
+          'borrowed': handle.borrowed,
+        };
+      }, extra),
+    );
+
+    serlinkMcpTools['serlink_sftp_list']!.register(
+      server,
+      callback: (args, extra) => guard(
+        (clientName) => bridge.listSftp(
+          clientName: clientName,
+          sessionId: SessionId(args['sessionId'] as String),
+          path: args['path'] as String,
+        ),
+        extra,
+      ),
+    );
+    serlinkMcpTools['serlink_sftp_download']!.register(
+      server,
+      callback: (args, extra) => guard(
+        (clientName) => bridge.downloadSftp(
+          clientName: clientName,
+          sessionId: SessionId(args['sessionId'] as String),
+          remotePath: args['remotePath'] as String,
+        ),
+        extra,
+      ),
+    );
+    serlinkMcpTools['serlink_transfer_status']!.register(
+      server,
+      callback: (args, extra) => guard(
+        (clientName) async => bridge.transferStatus(
+          clientName: clientName,
+          sessionId: SessionId(args['sessionId'] as String),
+          taskId: TransferTaskId(args['taskId'] as String),
+        ),
+        extra,
+      ),
+    );
+    serlinkMcpTools['serlink_transfer_cancel']!.register(
+      server,
+      callback: (args, extra) => guard((clientName) async {
+        await bridge.cancelTransfer(
+          clientName: clientName,
+          sessionId: SessionId(args['sessionId'] as String),
+          taskId: TransferTaskId(args['taskId'] as String),
+        );
+        return {'ok': true};
       }, extra),
     );
 
@@ -425,7 +512,11 @@ class McpServerController extends Notifier<McpServerState> {
     serlinkMcpTools['serlink_close_session']!.register(
       server,
       callback: (args, extra) => guard((clientName) async {
-        await bridge.closeSession(SessionId(args['sessionId'] as String));
+        await bridge.closeSession(
+          SessionId(args['sessionId'] as String),
+          clientName: clientName,
+          keepConnection: args['keepConnection'] as bool? ?? false,
+        );
         return {'ok': true};
       }, extra),
     );
@@ -434,11 +525,13 @@ class McpServerController extends Notifier<McpServerState> {
       server,
       callback: (args, extra) => guard((clientName) async {
         return [
-          for (final handle in bridge.sessions)
+          for (final handle in bridge.sessionsFor(clientName))
             {
               'sessionId': handle.sessionId.value,
               'hostId': handle.hostId.value,
               'state': handle.state.name,
+              'kind': handle.kind.name,
+              'borrowed': handle.borrowed,
               'clientName': handle.clientName,
               'openedAt': handle.openedAt.toUtc().toIso8601String(),
             },

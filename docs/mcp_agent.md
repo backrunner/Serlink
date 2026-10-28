@@ -89,15 +89,24 @@ Vault unlocking and SSH authentication continue inside Serlink.
 All tools are prefixed `serlink_`:
 
 - `serlink_list_hosts` — hosts from the vault (requires unlocked vault).
-- `serlink_open_session` — opens a terminal tab on a host; triggers the in-app approval dialog on first use per client+host.
+- `serlink_open_session` — opens a terminal tab on a host, or an SFTP tab with `kind: "sftp"`; triggers the in-app approval dialog on first use per client+host.
+- `serlink_list_connections` — lists workspace remote panes and SFTP connections, including manually opened sessions. Returns ids, host display names and connection states without terminal contents or endpoint metadata; local terminals are excluded.
+- `serlink_attach_session` — borrows a connected session returned by `serlink_list_connections`, subject to the same per-client host authorization. It does not reconnect, sign again or take a session controlled by another MCP client.
+- `serlink_sftp_list` — lists directory metadata in an authorized SFTP session.
+- `serlink_sftp_download` — queues a single-file download into a new private directory in the local Downloads folder. Returns `taskId` and `localPath`, never file contents, and does not overwrite existing files.
+- `serlink_transfer_status` — reports state and byte counts for this client's SFTP download. Poll until `completed` and verify backup checksums before proceeding with an upgrade.
+- `serlink_transfer_cancel` — cancels this client's download. Partial files may remain; closing the SFTP session also cancels its transfers. Keep the session open until downloads finish.
 - `serlink_exec` — sends a command and returns the settled screen text (heuristic: output quiet for ~400 ms).
 - `serlink_read_screen` — last N buffer lines.
 - `serlink_send_input` — raw input for interactive programs in local-rule mode. With model protection, only complete submitted commands or Ctrl-C are accepted.
-- `serlink_close_session`, `serlink_list_sessions`.
+- `serlink_close_session` — closes an MCP-created session, or releases a borrowed session while preserving the user's connection. Set `keepConnection: true` to hand an MCP-created connection back to the user without closing it.
+- `serlink_list_sessions` — lists only sessions controlled by the calling MCP client, including a `borrowed` flag.
 
 ## Authorization lifecycle
 
 - Grants are **in-memory only**: they expire when the app quits. Revoke individual grants in **Settings → Agent access → Active grants**; agent sessions are listed there too and can be closed.
+- After the separate 60-second access approval, opening waits up to 120 seconds for the SSH channel. MCP progress distinguishes access approval from connection/authentication; SSH Agent signing may require approval in 1Password or another agent. Cancellation, expired authorization and connection failure clean up the new MCP tab, including late authentication results. Existing user tabs are not reused by MCP opens.
+- Offline diagnostics record `ssh.auth.sign.start`, `ssh.auth.sign.success` or `ssh.auth.sign.failure`, elapsed time and a safe error code. Together with `ssh.auth.summary`, these distinguish a requested signature from a completed signature. They do not prove that a password manager displayed its UI, and contain no key, signature or password material.
 - Error codes surfaced to the agent: `vault_locked`, `authorization_denied`, `authorization_required`, `command_blocked`, `command_denied`, `approval_timeout`, `request_cancelled`, `session_not_found`, `connect_timeout`. The stdio helper also returns `app_unavailable` for discovery/launch failures and `app_connection_lost` for failed in-flight calls.
 
 ## Decision-model command protection

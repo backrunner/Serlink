@@ -33,7 +33,13 @@ const serlinkMcpInstructions =
     'Workflow: discover hosts with serlink_list_hosts, open a terminal '
     'inside the Serlink app with serlink_open_session, drive it with '
     'serlink_exec, serlink_send_input, and serlink_read_screen, then '
-    'always finish with serlink_close_session.\n'
+    'always finish with serlink_close_session. For file transfers open a '
+    'session with kind=sftp, use serlink_sftp_list and serlink_sftp_download, '
+    'and poll serlink_transfer_status until completed before closing. '
+    'Downloads stay on the user\'s computer; do not read downloaded credentials.\n'
+    'To reuse an existing connection, call serlink_list_connections then '
+    'serlink_attach_session. Closing a borrowed session only releases MCP '
+    'control and leaves the user\'s connection open.\n'
     'Rules you must follow:\n'
     '- NEVER connect to any host yourself: no ssh/scp/sftp, no shell '
     'commands, no sockets, no port scanning. You have no credentials and '
@@ -84,7 +90,7 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
   'serlink_open_session': SerlinkMcpTool(
     name: 'serlink_open_session',
     description:
-        'Open an SSH session to a Serlink host as a visible terminal tab '
+        'Open an SSH session to a Serlink host as a visible terminal or SFTP tab '
         'in the Serlink app. The user must approve access in a Serlink '
         'dialog or macOS notification (and unlock the vault first if it is locked). '
         'The call waits up to 60 seconds for approval; do not ask for duplicate chat confirmation. Credentials never leave the '
@@ -92,14 +98,114 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
         'read them from the user\'s files, keychain, or SSH agent. You '
         'drive the resulting terminal with serlink_exec, '
         'serlink_read_screen, and serlink_send_input. The user can take '
-        'back control at any time by typing in the tab.',
+        'back control at any time by typing in the tab. After access approval, '
+        'connection and SSH Agent signing may take up to 120 seconds. '
+        'Signing approval happens in the password manager; no signature is '
+        'guaranteed and failures must not be automatically retried.',
     inputSchema: JsonSchema.object(
       properties: {
         'hostId': JsonSchema.string(
           description: 'Host id from serlink_list_hosts.',
         ),
+        'kind': JsonSchema.string(
+          description: 'Session kind: terminal (default) or sftp.',
+          enumValues: ['terminal', 'sftp'],
+        ),
       },
       required: ['hostId'],
+    ),
+  ),
+  'serlink_list_connections': SerlinkMcpTool(
+    name: 'serlink_list_connections',
+    description:
+        'List existing remote terminal panes and SFTP connections '
+        'in the Serlink workspace, including user-opened connections and their '
+        'lifecycle state. Returns opaque ids and display names only, without '
+        'terminal contents, endpoint addresses or credentials. Requires an '
+        'unlocked vault. Listing does not grant control; use '
+        'serlink_attach_session for a connected, attachable session.',
+    inputSchema: JsonSchema.object(),
+  ),
+  'serlink_attach_session': SerlinkMcpTool(
+    name: 'serlink_attach_session',
+    description:
+        'Borrow an existing connected remote terminal pane or SFTP '
+        'connection from serlink_list_connections. Uses the same per-client '
+        'host approval as opening a session, without reconnecting or signing '
+        'again. Cannot take a session controlled by another MCP client. '
+        'Always finish with serlink_close_session; for a borrowed session '
+        'this releases MCP control while keeping the user connection open.',
+    inputSchema: JsonSchema.object(
+      properties: {
+        'sessionId': JsonSchema.string(
+          description: 'Existing connection session id.',
+        ),
+      },
+      required: ['sessionId'],
+    ),
+  ),
+  'serlink_sftp_list': SerlinkMcpTool(
+    name: 'serlink_sftp_list',
+    description:
+        'List remote directory metadata in an authorized SFTP session. '
+        'Open one with serlink_open_session kind=sftp. Does not return file contents.',
+    inputSchema: JsonSchema.object(
+      properties: {
+        'sessionId': JsonSchema.string(description: 'SFTP session id.'),
+        'path': JsonSchema.string(
+          description: 'Absolute remote directory path.',
+        ),
+      },
+      required: ['sessionId', 'path'],
+    ),
+  ),
+  'serlink_sftp_download': SerlinkMcpTool(
+    name: 'serlink_sftp_download',
+    description:
+        'Queue a single file download through app-owned SFTP. '
+        'Saves into a fresh private directory in the local Downloads folder, '
+        'without overwriting existing files. Returns taskId and localPath; '
+        'poll serlink_transfer_status and keep the session open until completed. '
+        'A queued transfer is not a completed download. File bytes are not returned.',
+    inputSchema: JsonSchema.object(
+      properties: {
+        'sessionId': JsonSchema.string(description: 'SFTP session id.'),
+        'remotePath': JsonSchema.string(
+          description: 'Absolute remote file path.',
+        ),
+      },
+      required: ['sessionId', 'remotePath'],
+    ),
+  ),
+  'serlink_transfer_status': SerlinkMcpTool(
+    name: 'serlink_transfer_status',
+    description:
+        'Read state and byte counts for a download queued by this '
+        'client and SFTP session. A completed state confirms the transfer finished; '
+        'verify backup checksums separately before migrating.',
+    inputSchema: JsonSchema.object(
+      properties: {
+        'sessionId': JsonSchema.string(description: 'SFTP session id.'),
+        'taskId': JsonSchema.string(
+          description: 'Task id from serlink_sftp_download.',
+        ),
+      },
+      required: ['sessionId', 'taskId'],
+    ),
+  ),
+  'serlink_transfer_cancel': SerlinkMcpTool(
+    name: 'serlink_transfer_cancel',
+    description:
+        'Cancel a download queued by this client and SFTP session. '
+        'Partial local files may remain. Closing the session also cancels its transfers.',
+    inputSchema: JsonSchema.object(
+      properties: {
+        'sessionId': JsonSchema.string(description: 'SFTP session id.'),
+        'taskId': JsonSchema.string(
+          description: 'Task id from serlink_sftp_download.',
+        ),
+      },
+      required: ['sessionId', 'taskId'],
     ),
   ),
   'serlink_exec': SerlinkMcpTool(
@@ -168,11 +274,17 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
   'serlink_close_session': SerlinkMcpTool(
     name: 'serlink_close_session',
     description:
-        'Close a Serlink session opened with serlink_open_session. This '
-        'closes the terminal tab in the Serlink app. Always close sessions '
+        'Release a session owned by this MCP client. Sessions opened by MCP '
+        'are closed in the app; borrowed sessions from serlink_attach_session '
+        'remain connected and only MCP control is released. Set keepConnection '
+        'to true to also hand an MCP-created connection back to the user. '
+        'Always release sessions '
         'when you are done with them.',
     inputSchema: JsonSchema.object(
       properties: {
+        'keepConnection': JsonSchema.boolean(
+          description: 'Release MCP control without closing the connection (default false).',
+        ),
         'sessionId': JsonSchema.string(
           description: 'Session id from serlink_open_session.',
         ),
@@ -183,8 +295,9 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
   'serlink_list_sessions': SerlinkMcpTool(
     name: 'serlink_list_sessions',
     description:
-        'List the Serlink sessions currently open for MCP clients, with '
-        'their state. Use serlink_close_session for any session you no '
+        'List the sessions controlled by this MCP client, with their state '
+        'and borrowed flag. For all workspace connections use '
+        'serlink_list_connections. Use serlink_close_session for any session you no '
         'longer need.',
     inputSchema: JsonSchema.object(),
   ),

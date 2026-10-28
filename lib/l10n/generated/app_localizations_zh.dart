@@ -1267,6 +1267,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get agentAllKeysDescription => '连接时使用 Agent 提供的可用密钥。';
 
   @override
+  String get agentSearchKeysHint => '搜索名称或指纹';
+
+  @override
+  String get agentNoMatchingKeysMessage => '没有匹配的密钥。';
+
+  @override
   String get agentChooseKeyAction => '选择密钥';
 
   @override

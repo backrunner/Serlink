@@ -388,6 +388,8 @@
   "agentAuthenticationKeyLabel": "認証に使う鍵",
   "agentAllKeysTitle": "利用可能なすべての鍵",
   "agentAllKeysDescription": "接続時に Agent が提供する鍵を使用します。",
+  "agentSearchKeysHint": "名前またはフィンガープリントを検索",
+  "agentNoMatchingKeysMessage": "一致する鍵がありません。",
   "agentChooseKeyAction": "鍵を選択",
   "agentChangeKeyAction": "鍵を変更",
   "agentKeyOptionsTooltip": "その他の鍵の操作",

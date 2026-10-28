@@ -1368,6 +1368,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'The agent provides available keys when connecting.';
 
   @override
+  String get agentSearchKeysHint => 'Search name or fingerprint';
+
+  @override
+  String get agentNoMatchingKeysMessage => 'No matching keys.';
+
+  @override
   String get agentChooseKeyAction => 'Choose key';
 
   @override

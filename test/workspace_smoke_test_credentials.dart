@@ -146,7 +146,7 @@ void _credentialPaginationTests() {
 
   for (final width in [800.0, 1200.0]) {
     testWidgets(
-      'saved agent key card retains fingerprint and secondary actions at width $width',
+      'saved agent key dropdown aligns fields and retains secondary actions at width $width',
       (tester) async {
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = const Size(1200, 900);
@@ -216,11 +216,29 @@ void _credentialPaginationTests() {
           find.byKey(const ValueKey('agent-public-key-field')),
           findsNothing,
         );
-        final name = tester.widget<Text>(
-          find.byKey(const ValueKey('agent-selected-key-name')),
+        expect(find.text(label), findsOneWidget);
+        final providerField = find.byKey(
+          const ValueKey('agent-discover-endpoint-button'),
         );
-        expect(name.data, label);
-        expect(name.overflow, TextOverflow.ellipsis);
+        final keyField = find.byKey(const ValueKey('agent-select-key-button'));
+        expect(
+          tester.getSize(providerField).height,
+          tester.getSize(keyField).height,
+        );
+        expect(
+          tester.getRect(providerField).left,
+          tester.getRect(keyField).left,
+        );
+        expect(
+          tester.getRect(providerField).right,
+          tester.getRect(keyField).right,
+        );
+        expect(
+          tester
+              .getCenter(find.byKey(const ValueKey('agent-provider-icon')))
+              .dx,
+          tester.getCenter(find.byKey(const ValueKey('agent-key-icon'))).dx,
+        );
         final rect = tester.getRect(card);
         expect(rect.left, greaterThanOrEqualTo(0));
         expect(rect.right, lessThanOrEqualTo(width));
@@ -264,15 +282,15 @@ void _credentialPaginationTests() {
           find.byKey(const ValueKey('agent-selected-key-fingerprint')),
           findsNothing,
         );
-        final allKeysName = tester.getRect(
-          find.byKey(const ValueKey('agent-selected-key-name')),
-        );
-        final chooseKey = tester.getRect(
-          find.byKey(const ValueKey('agent-select-key-button')),
+        expect(
+          tester.getSize(providerField).height,
+          tester.getSize(keyField).height,
         );
         expect(
-          (allKeysName.center.dy - chooseKey.center.dy).abs(),
-          lessThan(2),
+          tester
+              .getCenter(find.byKey(const ValueKey('agent-provider-icon')))
+              .dx,
+          tester.getCenter(find.byKey(const ValueKey('agent-key-icon'))).dx,
         );
         await tester.tap(find.byKey(const ValueKey('credential-save-button')));
         await tester.pumpAndSettle();
@@ -481,6 +499,7 @@ void _credentialPaginationTests() {
       final hosts = _MemoryHostRepository();
       final identities = _MemoryIdentityRepository(const []);
       String? requestedEndpoint;
+      var keyRequests = 0;
       const publicKey = 'ssh-ed25519 AAAA chosen-key';
       await _pumpLockedVaultApp(
         tester,
@@ -499,6 +518,7 @@ void _credentialPaginationTests() {
         ],
         agentIdentityLoader: (endpoint) async {
           requestedEndpoint = endpoint;
+          keyRequests++;
           return const [
             SshAgentIdentityChoice(
               label: 'Other key',
@@ -529,24 +549,57 @@ void _credentialPaginationTests() {
       await tester.tap(find.text('Agent'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(
-        find.byKey(const ValueKey('agent-select-key-button')),
+        find.byKey(const ValueKey('agent-discover-endpoint-button')),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('agent-select-key-button')));
-      await tester.pumpAndSettle();
-      expect(
-        find.descendant(
-          of: find.byType(SerlinkDialog).last,
-          matching: find.text('Choose SSH agent'),
-        ),
-        findsOneWidget,
+      await tester.tap(
+        find.byKey(const ValueKey('agent-discover-endpoint-button')),
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('/found/provider.sock'));
       await tester.pumpAndSettle();
+      final dialogs = find.byType(SerlinkDialog).evaluate().length;
+      final picker = find.byKey(const ValueKey('agent-select-key-button'));
+      await tester.ensureVisible(picker);
+      await tester.pumpAndSettle();
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      expect(find.byType(SerlinkDialog), findsNWidgets(dialogs));
       expect(requestedEndpoint, '/found/provider.sock');
       expect(find.text('Other key'), findsOneWidget);
       expect(find.text('SHA256:chosen'), findsOneWidget);
       expect(find.text(publicKey), findsNothing);
+      final search = find
+          .byWidgetPredicate(
+            (widget) => widget is EditableText && !widget.readOnly,
+          )
+          .last;
+      await tester.enterText(search, '  CHOSEN  ');
+      await tester.pumpAndSettle();
+      expect(find.text('Other key'), findsNothing);
+      expect(find.text('Chosen key'), findsOneWidget);
+      await tester.enterText(search, 'no-matching-key');
+      await tester.pumpAndSettle();
+      expect(find.text('No matching keys.'), findsOneWidget);
+      await tester.enterText(search, 'SHA256:chosen');
+      await tester.pumpAndSettle();
+      expect(find.text('Chosen key'), findsOneWidget);
+      expect(keyRequests, 1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.text('Search name or fingerprint'), findsNothing);
+      // Reopening refreshes the agent; choosing all keys clears the old key.
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      expect(keyRequests, 2);
+      await tester.tap(find.text('All available keys'));
+      await tester.pumpAndSettle();
+      expect(find.text('All available keys'), findsOneWidget);
+      expect(find.text('SHA256:chosen'), findsNothing);
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Chosen key'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Chosen key'), findsOneWidget);
@@ -564,6 +617,48 @@ void _credentialPaginationTests() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('agent key dropdown recovers from unavailable and empty agents', (
+    tester,
+  ) async {
+    final pending = Completer<List<SshAgentIdentityChoice>>();
+    var requests = 0;
+    await _pumpLockedVaultApp(
+      tester,
+      agentIdentityLoader: (_) {
+        requests++;
+        return requests == 1 ? pending.future : Future.value(const []);
+      },
+    );
+    await _submitVaultPassphrase(tester, 'correct horse battery staple');
+    await _tapAddHost(tester);
+    await tester.ensureVisible(find.text('Agent'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Agent'));
+    await tester.pumpAndSettle();
+    final picker = find.byKey(const ValueKey('agent-select-key-button'));
+    await tester.ensureVisible(picker);
+    await tester.pumpAndSettle();
+    await tester.tap(picker);
+    await tester.pump();
+    expect(requests, 1);
+    pending.completeError(StateError('Agent unavailable'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('SSH agent is not available.'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    await tester.tap(picker);
+    await tester.pumpAndSettle();
+    expect(requests, 2);
+    expect(
+      find.textContaining('SSH agent has no loaded identities.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('All available keys').last);
+    await tester.pumpAndSettle();
+    expect(find.text('All available keys'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final (label, kind) in [
     ('SSH Agent', IdentityKind.sshAgent),

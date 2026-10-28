@@ -1284,6 +1284,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get agentAllKeysDescription => '接続時に Agent が提供する鍵を使用します。';
 
   @override
+  String get agentSearchKeysHint => '名前またはフィンガープリントを検索';
+
+  @override
+  String get agentNoMatchingKeysMessage => '一致する鍵がありません。';
+
+  @override
   String get agentChooseKeyAction => '鍵を選択';
 
   @override

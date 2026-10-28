@@ -683,6 +683,8 @@
   "agentAuthenticationKeyLabel": "Authentication key",
   "agentAllKeysTitle": "All available keys",
   "agentAllKeysDescription": "The agent provides available keys when connecting.",
+  "agentSearchKeysHint": "Search name or fingerprint",
+  "agentNoMatchingKeysMessage": "No matching keys.",
   "agentChooseKeyAction": "Choose key",
   "agentChangeKeyAction": "Change key",
   "agentKeyOptionsTooltip": "More key options",

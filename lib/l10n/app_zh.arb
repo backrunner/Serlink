@@ -388,6 +388,8 @@
   "agentAuthenticationKeyLabel": "认证密钥",
   "agentAllKeysTitle": "全部可用密钥",
   "agentAllKeysDescription": "连接时使用 Agent 提供的可用密钥。",
+  "agentSearchKeysHint": "搜索名称或指纹",
+  "agentNoMatchingKeysMessage": "没有匹配的密钥。",
   "agentChooseKeyAction": "选择密钥",
   "agentChangeKeyAction": "更换密钥",
   "agentKeyOptionsTooltip": "更多密钥选项",

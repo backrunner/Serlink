@@ -1174,113 +1174,7 @@ class _AgentFieldsState extends ConsumerState<_AgentFields> {
     if (mounted && refresh) await _findEndpoint();
   }
 
-  Future<void> _selectAgentKey() async {
-    if (_importing) return;
-    if (widget.socketController.text.trim().isEmpty) {
-      await _findEndpoint();
-      if (!mounted || widget.socketController.text.trim().isEmpty) return;
-    }
-    setState(() => _importing = true);
-    final endpoint = widget.socketController.text.trim();
-    final choices = ref.read(sshAgentIdentityLoaderProvider)(
-      endpoint.isEmpty ? null : endpoint,
-    );
-    unawaited(choices.then<void>((_) {}, onError: (Object _, StackTrace _) {}));
-    final selected = await showSerlinkDialog<SshAgentIdentityChoice>(
-      context: context,
-      builder: (dialogContext) => SerlinkDialog(
-        maxWidth: _adaptiveDialogWidth(dialogContext, _dialogWidthMedium),
-        title: Text(dialogContext.l10n.agentSelectKeyAction),
-        content: SizedBox(
-          width: 560,
-          height: 320,
-          child: FutureBuilder<List<SshAgentIdentityChoice>>(
-            future: choices,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return SerlinkAlert.danger(
-                  message: context.l10n.sshAuthAgentUnavailableMessage,
-                  compact: true,
-                );
-              }
-              if (!snapshot.hasData) {
-                return const Center(child: SerlinkLoadingIndicator());
-              }
-              final keys = snapshot.data!;
-              if (keys.isEmpty) {
-                return SerlinkAlert.info(
-                  message: context.l10n.sshAuthAgentEmptyMessage,
-                  compact: true,
-                );
-              }
-              return SerlinkScrollView(
-                child: Column(
-                  children: [
-                    for (final key in keys)
-                      ListRow(
-                        onTap: () => Navigator.of(dialogContext).pop(key),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.key_outlined, size: 20),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SerlinkTooltip(
-                                    message: key.label,
-                                    child: Text(
-                                      key.label,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Text(
-                                    key.fingerprint,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall,
-                                  ),
-                                  if (key.socketPath case final endpoint?)
-                                    SerlinkTooltip(
-                                      message: endpoint,
-                                      child: Text(
-                                        endpoint,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color:
-                                                  context.tokens.textSecondary,
-                                            ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          SerlinkTextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(dialogContext.l10n.cancelAction),
-          ),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    setState(() => _importing = false);
-    if (selected == null) return;
+  void _selectAgentKey(SshAgentIdentityChoice selected) {
     widget.publicKeyController.text = selected.publicKey;
     if (selected.socketPath case final endpoint?) {
       widget.socketController.text = endpoint;
@@ -1348,14 +1242,6 @@ class _AgentFieldsState extends ConsumerState<_AgentFields> {
         ? (_selectedFingerprint ?? sshAgentPublicKeyFingerprint(publicKey))
         : null;
     final subtitle = fingerprint ?? l10n.agentPublicKeyHint;
-    final selectButton = SerlinkOutlinedButton.icon(
-      key: const ValueKey('agent-select-key-button'),
-      onPressed: _importing ? null : _selectAgentKey,
-      icon: const Icon(Icons.key_outlined, size: 16),
-      label: Text(
-        selected ? l10n.agentChangeKeyAction : l10n.agentChooseKeyAction,
-      ),
-    );
     final options = SerlinkMenuButton(
       key: const ValueKey('agent-key-options-button'),
       tooltip: l10n.agentKeyOptionsTooltip,
@@ -1383,108 +1269,53 @@ class _AgentFieldsState extends ConsumerState<_AgentFields> {
       ],
     );
     return Column(
+      key: const ValueKey('agent-selected-key-summary'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          l10n.agentAuthenticationKeyLabel,
-          style: Theme.of(context).textTheme.labelLarge,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.agentAuthenticationKeyLabel,
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ),
+            options,
+          ],
         ),
-        const SizedBox(height: 8),
-        Container(
-          key: const ValueKey('agent-selected-key-summary'),
-          padding: EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: selected ? 12 : 4,
-          ),
-          decoration: BoxDecoration(
-            color: t.surfaceSunken,
-            borderRadius: SerlinkRadii.control,
-            border: Border.all(color: t.borderSubtle),
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 420;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: selected ? 36 : 20,
-                        height: selected ? 36 : 20,
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? t.accentPrimary.withValues(alpha: 0.12)
-                              : t.surfaceSunken,
-                          borderRadius: SerlinkRadii.control,
-                        ),
-                        child: Icon(
-                          selected ? Icons.key_rounded : Icons.layers_outlined,
-                          size: 18,
-                          color: selected ? t.accentPrimary : t.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SerlinkTooltip(
-                              message: title,
-                              child: Text(
-                                title,
-                                key: const ValueKey('agent-selected-key-name'),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            if (selected) ...[
-                              const SizedBox(height: 4),
-                              SerlinkTooltip(
-                                message: subtitle,
-                                child: Text(
-                                  subtitle,
-                                  key: const ValueKey(
-                                    'agent-selected-key-fingerprint',
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: t.textSecondary,
-                                        fontFamily: fingerprint == null
-                                            ? null
-                                            : 'monospace',
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      if (!compact) ...[selectButton, const SizedBox(width: 4)],
-                      if (compact && !selected)
-                        SerlinkIconButton(
-                          key: const ValueKey('agent-select-key-button'),
-                          onPressed: _importing ? null : _selectAgentKey,
-                          icon: const Icon(Icons.key_outlined, size: 18),
-                          tooltip: l10n.agentChooseKeyAction,
-                        ),
-                      options,
-                    ],
-                  ),
-                  if (compact && selected) ...[
-                    const SizedBox(height: 12),
-                    selectButton,
-                  ],
-                ],
-              );
-            },
+        const SizedBox(height: 6),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: widget.socketController,
+          builder: (context, endpoint, _) => _AgentKeySelect(
+            key: ValueKey(endpoint.text.trim()),
+            endpoint: endpoint.text.trim(),
+            publicKey: publicKey,
+            title: title,
+            fingerprint: fingerprint,
+            enabled: !_importing,
+            onSelected: _selectAgentKey,
+            onClear: _clearSelection,
           ),
         ),
+        if (selected) ...[
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 42, end: 12),
+            child: SerlinkTooltip(
+              message: subtitle,
+              child: Text(
+                subtitle,
+                key: const ValueKey('agent-selected-key-fingerprint'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: t.textSecondary,
+                  fontFamily: fingerprint == null ? null : 'monospace',
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1581,45 +1412,54 @@ class _AgentFieldsState extends ConsumerState<_AgentFields> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SerlinkOutlinedButton(
+                FTextField(
                   key: const ValueKey('agent-discover-endpoint-button'),
-                  onPressed: _importing ? null : _findEndpoint,
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.key_outlined,
-                        size: 17,
-                        color: context.tokens.textSecondary,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          provider == null
-                              ? label
-                              : '$label · ${l10n.agentDiscoveredKeysCount(provider.identities.length)}',
-                          key: const ValueKey('agent-selected-provider-name'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      if (_findingEndpoint)
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: SerlinkLoadingIndicator(),
-                        )
-                      else
-                        const Icon(Icons.expand_more, size: 18),
-                    ],
+                  control: FTextFieldControl.lifted(
+                    value: TextEditingValue(
+                      text: provider == null
+                          ? label
+                          : '$label · ${l10n.agentDiscoveredKeysCount(provider.identities.length)}',
+                    ),
+                    onChange: (_) {},
+                  ),
+                  size: FTextFieldSizeVariant.lg,
+                  readOnly: true,
+                  enableInteractiveSelection: false,
+                  enabled: !_importing,
+                  onTap: _findEndpoint,
+                  onTapAlwaysCalled: true,
+                  onSubmit: (_) => _findEndpoint(),
+                  prefixBuilder: (context, _, _) => _agentFieldIcon(
+                    context,
+                    Icons.key_outlined,
+                    key: const ValueKey('agent-provider-icon'),
+                  ),
+                  suffixBuilder: (context, _, _) => Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 12),
+                    child: _findingEndpoint
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: SerlinkLoadingIndicator(),
+                          )
+                        : Icon(
+                            Icons.expand_more,
+                            size: 18,
+                            color: context.tokens.textSecondary,
+                          ),
                   ),
                 ),
                 if (endpoint.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  _endpointText(
-                    context,
-                    endpoint,
-                    textKey: const ValueKey('agent-selected-provider-path'),
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      start: 42,
+                      end: 12,
+                    ),
+                    child: _endpointText(
+                      context,
+                      endpoint,
+                      textKey: const ValueKey('agent-selected-provider-path'),
+                    ),
                   ),
                 ],
               ],
@@ -1667,6 +1507,181 @@ class _AgentFieldsState extends ConsumerState<_AgentFields> {
           const SizedBox(height: 12),
           SerlinkAlert.danger(message: _error!, compact: true),
         ],
+      ],
+    );
+  }
+}
+
+Widget _agentFieldIcon(BuildContext context, IconData icon, {Key? key}) =>
+    Padding(
+      padding: const EdgeInsetsDirectional.only(start: 12, end: 10),
+      child: SizedBox.square(
+        dimension: 20,
+        child: Icon(
+          key: key,
+          icon,
+          size: 18,
+          color: context.tokens.textSecondary,
+        ),
+      ),
+    );
+
+class _AgentKeySelect extends ConsumerStatefulWidget {
+  const _AgentKeySelect({
+    super.key,
+    required this.endpoint,
+    required this.publicKey,
+    required this.title,
+    required this.fingerprint,
+    required this.enabled,
+    required this.onSelected,
+    required this.onClear,
+  });
+
+  final String endpoint;
+  final String publicKey;
+  final String title;
+  final String? fingerprint;
+  final bool enabled;
+  final ValueChanged<SshAgentIdentityChoice> onSelected;
+  final VoidCallback onClear;
+
+  @override
+  ConsumerState<_AgentKeySelect> createState() => _AgentKeySelectState();
+}
+
+class _AgentKeySelectState extends ConsumerState<_AgentKeySelect> {
+  Future<List<SshAgentIdentityChoice>>? _request;
+  Map<String, SshAgentIdentityChoice> _choices = const {};
+
+  String _choiceValue(String publicKey, String endpoint) =>
+      '$endpoint\n$publicKey';
+
+  Future<Iterable<String>> _filter(String query) async {
+    final request = _request ??= ref.read(sshAgentIdentityLoaderProvider)(
+      widget.endpoint.isEmpty ? null : widget.endpoint,
+    );
+    final choices = await request;
+    if (!mounted) return const [];
+    _choices = {
+      for (final choice in choices)
+        _choiceValue(choice.publicKey, choice.socketPath ?? widget.endpoint):
+            choice,
+    };
+    final normalized = query.trim().toLowerCase();
+    return [
+      if (normalized.isEmpty ||
+          context.l10n.agentAllKeysTitle.toLowerCase().contains(normalized))
+        '',
+      for (final MapEntry(key: value, value: choice) in _choices.entries)
+        if ('${choice.label} ${choice.fingerprint} ${choice.socketPath ?? ''}'
+            .toLowerCase()
+            .contains(normalized))
+          value,
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return FSelect<String>.searchBuilder(
+      key: const ValueKey('agent-select-key-button'),
+      control: FSelectControl.lifted(
+        value: widget.publicKey.isEmpty
+            ? ''
+            : _choiceValue(widget.publicKey, widget.endpoint),
+        onChange: (value) {
+          if (value == null) return;
+          if (value.isEmpty) {
+            widget.onClear();
+          } else {
+            widget.onSelected(_choices[value]!);
+          }
+        },
+      ),
+      popoverControl: FPopoverControl.managed(
+        // Refresh on the next open, while reusing one request during search.
+        onChange: (shown) {
+          if (!shown) _request = null;
+        },
+      ),
+      enabled: widget.enabled,
+      size: FTextFieldSizeVariant.lg,
+      format: (_) => widget.title,
+      builder: (context, _, _, child) => SerlinkTooltip(
+        message: [widget.title, ?widget.fingerprint].join('\n'),
+        child: child,
+      ),
+      prefixBuilder: (context, _, _) => _agentFieldIcon(
+        context,
+        widget.publicKey.isEmpty ? Icons.layers_outlined : Icons.key_outlined,
+        key: const ValueKey('agent-key-icon'),
+      ),
+      suffixBuilder: (context, _, _) => Padding(
+        padding: const EdgeInsetsDirectional.only(end: 12),
+        child: Icon(
+          Icons.expand_more,
+          size: 18,
+          color: context.tokens.textSecondary,
+        ),
+      ),
+      searchFieldProperties: FSelectSearchFieldProperties(
+        hint: l10n.agentSearchKeysHint,
+        autocorrect: false,
+        enableSuggestions: false,
+      ),
+      contentConstraints: const FAutoWidthPortalConstraints(maxHeight: 320),
+      filter: _filter,
+      contentErrorBuilder: (context, _, _) => Padding(
+        padding: const EdgeInsets.all(12),
+        child: Text(l10n.sshAuthAgentUnavailableMessage),
+      ),
+      contentEmptyBuilder: (context, _) => Padding(
+        padding: const EdgeInsets.all(12),
+        child: Text(l10n.agentNoMatchingKeysMessage),
+      ),
+      contentBuilder: (context, query, values) => [
+        for (final value in values)
+          if (value.isEmpty)
+            FSelectItem<String>(
+              value: '',
+              prefix: const SizedBox.square(
+                dimension: 20,
+                child: Icon(Icons.layers_outlined, size: 18),
+              ),
+              title: Text(l10n.agentAllKeysTitle),
+              subtitle: _choices.isEmpty
+                  ? Text(l10n.sshAuthAgentEmptyMessage)
+                  : null,
+            )
+          else if (_choices[value] case final choice?)
+            FSelectItem<String>(
+              value: value,
+              prefix: const SizedBox.square(
+                dimension: 20,
+                child: Icon(Icons.key_outlined, size: 18),
+              ),
+              title: SerlinkTooltip(
+                message: [
+                  choice.label,
+                  choice.fingerprint,
+                  ?choice.socketPath,
+                ].join('\n'),
+                child: Text(
+                  choice.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              subtitle: SerlinkTooltip(
+                message: choice.fingerprint,
+                child: Text(
+                  choice.fingerprint,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
       ],
     );
   }

@@ -2428,6 +2428,18 @@ abstract class AppLocalizations {
   /// **'The agent provides available keys when connecting.'**
   String get agentAllKeysDescription;
 
+  /// No description provided for @agentSearchKeysHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search name or fingerprint'**
+  String get agentSearchKeysHint;
+
+  /// No description provided for @agentNoMatchingKeysMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching keys.'**
+  String get agentNoMatchingKeysMessage;
+
   /// No description provided for @agentChooseKeyAction.
   ///
   /// In en, this message translates to:

@@ -3434,15 +3434,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsMcpBypassTitle => 'Bypass command approval';
 
   @override
-  String get settingsMcpBypassEnabled => 'Ordinary commands run automatically';
-
-  @override
-  String get settingsMcpBypassDisabled =>
-      'Standard mode · Confirm every command';
-
-  @override
   String get settingsMcpBypassDescription =>
-      'Bypass skips approval for ordinary commands. Deletion, destructive changes and opaque scripts still require approval each time; disk destruction remains blocked. Host access, vault unlock and enabled model protection still apply. This setting stays on this device.';
+      'Run ordinary commands automatically; confirm high-risk commands each time.';
 
   @override
   String get settingsMcpBypassUnavailable =>

@@ -23,9 +23,7 @@ class _McpCommandApprovalSectionState
           title: l10n.settingsMcpBypassTitle,
           subtitle: settings.hasError
               ? l10n.settingsMcpBypassUnavailable
-              : settings.value?.bypass == true
-              ? l10n.settingsMcpBypassEnabled
-              : l10n.settingsMcpBypassDisabled,
+              : l10n.settingsMcpBypassDescription,
           action: _SettingsSwitch(
             key: const ValueKey('settings-mcp-command-bypass'),
             semanticsLabel: l10n.settingsMcpBypassTitle,
@@ -51,12 +49,6 @@ class _McpCommandApprovalSectionState
                     }
                   },
           ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          l10n.settingsMcpBypassDescription,
-          style: Theme.of(context).textTheme.bodySmall
-              ?.copyWith(color: context.tokens.textSecondary),
         ),
       ],
     );

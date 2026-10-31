@@ -22,6 +22,7 @@ import '../domain/agent_session.dart';
 import '../domain/command_risk.dart';
 import 'mcp_authorization_service.dart';
 import 'command_decision_guard.dart';
+import 'mcp_command_approval.dart';
 import 'mcp_host_visibility.dart';
 import 'mcp_download_storage.dart';
 import 'mcp_request_context.dart';
@@ -50,11 +51,25 @@ class _AgentSessionEntry {
   final WorkspaceTabId tabId;
   final String hostDisplayName;
 
-  /// Risk-rule ids the user approved with "allow for session".
-  final Set<String> allowedRuleIds = {};
   Future<void> inputQueue = Future<void>.value();
   bool hasUnsubmittedInput = false;
   int inputGeneration = 0;
+}
+
+class _CommandPermit {
+  const _CommandPermit(
+    this.approval,
+    this.model,
+    this.vaultGeneration,
+    this.approvalGeneration,
+    this.modelGeneration,
+  );
+
+  final McpCommandApprovalSettings approval;
+  final CommandDecisionPermit? model;
+  final int vaultGeneration;
+  final int approvalGeneration;
+  final int? modelGeneration;
 }
 
 /// Coordinates MCP agent requests with app-owned SSH terminal sessions:
@@ -71,6 +86,7 @@ class AgentSessionBridge {
     required Ref ref,
     required McpAuthorizationService authorization,
     required CommandRiskPolicy riskPolicy,
+    required McpCommandApproval commandApproval,
     required SecurityModalService securityModalService,
     CommandDecisionGuard? decisionGuard,
     this.attachTimeout = const Duration(minutes: 2),
@@ -88,6 +104,8 @@ class AgentSessionBridge {
        // ignore: prefer_initializing_formals
        _riskPolicy = riskPolicy,
        // ignore: prefer_initializing_formals
+       _commandApproval = commandApproval,
+       // ignore: prefer_initializing_formals
        _securityModalService = securityModalService,
        // Named parameters cannot initialize private fields directly.
        // ignore: prefer_initializing_formals
@@ -100,6 +118,7 @@ class AgentSessionBridge {
   final Ref _ref;
   final McpAuthorizationService _authorization;
   final CommandRiskPolicy _riskPolicy;
+  final McpCommandApproval _commandApproval;
   final SecurityModalService _securityModalService;
   final CommandDecisionGuard? _decisionGuard;
   final DateTime Function() _now;
@@ -656,14 +675,8 @@ class AgentSessionBridge {
         entry: entry,
         command: command,
       );
-      await _validateBeforeSend(
-        clientName,
-        sessionId,
-        entry,
-        permit,
-        generation,
-      );
-      McpRequestContext.current?.checkActive();
+      await _validateBeforeSend(permit);
+      _validateExecutionState(clientName, sessionId, entry, permit, generation);
       final sent = _ref
           .read(workspaceRuntimeRegistryProvider)
           .sendTerminalInput(sessionId, '$command\r');
@@ -685,7 +698,7 @@ class AgentSessionBridge {
     return _readScreenText(sessionId, lines: lines);
   }
 
-  /// With model protection, accept whole submitted commands or Ctrl-C only.
+  /// Accept whole submitted commands or Ctrl-C only, in both approval modes.
   /// Partial keystrokes, history/editing controls and bare Enter cannot be
   /// reliably assessed as commands in arbitrary shells or interactive programs.
   Future<void> sendInput({
@@ -724,14 +737,8 @@ class AgentSessionBridge {
         command: text,
         rawInput: true,
       );
-      await _validateBeforeSend(
-        clientName,
-        sessionId,
-        entry,
-        permit,
-        generation,
-      );
-      McpRequestContext.current?.checkActive();
+      await _validateBeforeSend(permit);
+      _validateExecutionState(clientName, sessionId, entry, permit, generation);
       final sent = _ref
           .read(workspaceRuntimeRegistryProvider)
           .sendTerminalInput(sessionId, text);
@@ -757,23 +764,36 @@ class AgentSessionBridge {
     return result;
   }
 
-  Future<void> _validateBeforeSend(
+  Future<void> _validateBeforeSend(_CommandPermit permit) async {
+    try {
+      if (permit.model != null) {
+        await _decisionGuard!.validate(permit.model!);
+      }
+      await _commandApproval.validate(permit.approval);
+    } on CommandDecisionException catch (error) {
+      throw McpBridgeException('command_blocked', error.code);
+    }
+  }
+
+  // Keep this synchronous and adjacent to sendTerminalInput: neither policy
+  // changes nor Ctrl-C can slip between the final check and the terminal write.
+  void _validateExecutionState(
     String clientName,
     SessionId sessionId,
     _AgentSessionEntry entry,
-    CommandDecisionPermit? permit,
+    _CommandPermit permit,
     int generation,
-  ) async {
-    if (permit != null) {
-      try {
-        await _decisionGuard!.validate(permit);
-      } on CommandDecisionException catch (error) {
-        throw McpBridgeException('command_blocked', error.code);
-      }
-    }
+  ) {
+    _validatePolicyGenerations(
+      permit.approvalGeneration,
+      permit.modelGeneration,
+    );
     McpRequestContext.current?.checkActive();
     // Model requests and confirmation dialogs are asynchronous. Never send
     // after a grant was revoked, the vault locked, or the pane closed meanwhile.
+    if (_requireUnlockedVault().unlockGeneration != permit.vaultGeneration) {
+      throw const McpBridgeException('vault_locked');
+    }
     if (!identical(_requireAuthorizedSession(clientName, sessionId), entry)) {
       throw const McpBridgeException('session_not_found');
     }
@@ -782,6 +802,24 @@ class AgentSessionBridge {
       throw const McpBridgeException(
         'command_blocked',
         'command_input_interrupted',
+      );
+    }
+  }
+
+  void _validatePolicyGenerations(
+    int approvalGeneration,
+    int? modelGeneration,
+  ) {
+    if (_commandApproval.generation != approvalGeneration) {
+      throw const McpBridgeException(
+        'command_blocked',
+        'command_approval_changed',
+      );
+    }
+    if (_decisionGuard?.generation != modelGeneration) {
+      throw const McpBridgeException(
+        'command_blocked',
+        'command_guard_changed',
       );
     }
   }
@@ -955,7 +993,7 @@ class AgentSessionBridge {
     return vault;
   }
 
-  Future<CommandDecisionPermit?> _enforceRiskPolicy({
+  Future<_CommandPermit> _enforceRiskPolicy({
     required String clientName,
     required _AgentSessionEntry entry,
     required String command,
@@ -963,7 +1001,14 @@ class AgentSessionBridge {
   }) async {
     final request = McpRequestContext.current;
     final generation = entry.inputGeneration;
+    final vaultGeneration = _requireUnlockedVault().unlockGeneration;
+    final approvalGeneration = _commandApproval.generation;
+    final modelGeneration = _decisionGuard?.generation;
     request?.validate = () {
+      _validatePolicyGenerations(approvalGeneration, modelGeneration);
+      if (_requireUnlockedVault().unlockGeneration != vaultGeneration) {
+        throw const McpBridgeException('vault_locked');
+      }
       final sessionId = entry.handle.sessionId;
       if (!identical(_requireAuthorizedSession(clientName, sessionId), entry)) {
         throw const McpBridgeException('session_not_found');
@@ -977,13 +1022,23 @@ class AgentSessionBridge {
       }
     };
     request?.checkActive();
+    try {
+      McpCommandApproval.validateInput(command, rawInput: rawInput);
+    } on CommandDecisionException catch (error) {
+      throw McpBridgeException('command_blocked', error.code);
+    }
     final assessment = _riskPolicy.assess(command);
     if (assessment.level == CommandRiskLevel.blocked) {
       throw McpBridgeException('command_blocked', assessment.matchedRule);
     }
-    CommandDecisionPermit? permit;
+    late final McpCommandApprovalSettings approval;
+    CommandDecisionPermit? modelPermit;
     try {
-      permit = await _decisionGuard?.check(
+      if (entry.hasUnsubmittedInput) {
+        throw const CommandDecisionException('command_input_reset_required');
+      }
+      approval = await _commandApproval.read();
+      modelPermit = await _decisionGuard?.check(
         command: command,
         rawInput: rawInput,
         hasUnsubmittedInput: entry.hasUnsubmittedInput,
@@ -991,36 +1046,31 @@ class AgentSessionBridge {
     } on CommandDecisionException catch (error) {
       throw McpBridgeException('command_blocked', error.code);
     }
-    // In legacy mode, non-submitting input retains its interactive behavior.
-    if (rawInput && !command.contains('\n') && !command.contains('\r')) {
+    request?.checkActive();
+    final permit = _CommandPermit(
+      approval,
+      modelPermit,
+      vaultGeneration,
+      approvalGeneration,
+      modelGeneration,
+    );
+    if (approval.bypass && assessment.level == CommandRiskLevel.safe) {
       return permit;
     }
-    switch (assessment.level) {
-      case CommandRiskLevel.safe:
-        return permit;
-      case CommandRiskLevel.blocked:
-        throw McpBridgeException('command_blocked', assessment.matchedRule);
-      case CommandRiskLevel.needsConfirm:
-        final rule = assessment.matchedRule ?? 'unknown_rule';
-        if (entry.allowedRuleIds.contains(rule)) return permit;
-        final decision = await _securityModalService.confirmAgentCommand(
-          AgentCommandPrompt(
-            clientName: clientName,
-            hostDisplayName: entry.hostDisplayName,
-            command: command,
-            ruleDescription: rule,
-          ),
-        );
-        switch (decision) {
-          case AgentCommandDecision.deny:
-            throw McpBridgeException('command_denied', rule);
-          case AgentCommandDecision.allowOnce:
-            return permit;
-          case AgentCommandDecision.allowSession:
-            entry.allowedRuleIds.add(rule);
-            return permit;
-        }
+    final rule = assessment.matchedRule ?? 'standard_approval';
+    final decision = await _securityModalService.confirmAgentCommand(
+      AgentCommandPrompt(
+        clientName: clientName,
+        hostDisplayName: entry.hostDisplayName,
+        command: command,
+        ruleDescription: rule,
+        allowSession: false,
+      ),
+    );
+    if (decision != AgentCommandDecision.allowOnce) {
+      throw McpBridgeException('command_denied', rule);
     }
+    return permit;
   }
 
   Future<void> _waitForAttach(

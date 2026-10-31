@@ -978,5 +978,10 @@
   "settingsMcpExistingConnectionGrant": "已有连接",
   "settingsMcpGuardSharingConsent": "我同意将代理提交的完整命令发送至 TypeSafe 进行风险评估，并知悉命令可能包含敏感信息且请求数据可能被留存。",
   "settingsMcpGuardConsentRequired": "启用模型保护前，请先同意共享命令。",
-  "settingsMcpGuardPrivacyPolicy": "TypeSafe 隐私政策"
+  "settingsMcpGuardPrivacyPolicy": "TypeSafe 隐私政策",
+  "settingsMcpBypassTitle": "Bypass 命令审批",
+  "settingsMcpBypassEnabled": "普通命令自动执行",
+  "settingsMcpBypassDisabled": "标准模式 · 逐条确认命令",
+  "settingsMcpBypassDescription": "Bypass 跳过普通命令的审批，删除、破坏性修改及无法直接判断的脚本仍须逐次确认；磁盘破坏操作仍会被阻止。主机授权、保险库解锁及已启用的模型保护继续生效。此设置仅保存在本机",
+  "settingsMcpBypassUnavailable": "无法读取或保存命令审批设置"
 }

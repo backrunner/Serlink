@@ -1733,5 +1733,10 @@
       }
     }
   },
-  "settingsMcpGuardPrivacyPolicy": "TypeSafe privacy policy"
+  "settingsMcpGuardPrivacyPolicy": "TypeSafe privacy policy",
+  "settingsMcpBypassTitle": "Bypass command approval",
+  "settingsMcpBypassEnabled": "Ordinary commands run automatically",
+  "settingsMcpBypassDisabled": "Standard mode · Confirm every command",
+  "settingsMcpBypassDescription": "Bypass skips approval for ordinary commands. Deletion, destructive changes and opaque scripts still require approval each time; disk destruction remains blocked. Host access, vault unlock and enabled model protection still apply. This setting stays on this device.",
+  "settingsMcpBypassUnavailable": "Command approval settings could not be loaded or saved"
 }

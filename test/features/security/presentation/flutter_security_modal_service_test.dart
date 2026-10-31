@@ -519,7 +519,9 @@ void main() {
     );
   });
 
-  testWidgets('agent command dialog allows for session', (tester) async {
+  testWidgets('mandatory command approval does not offer session bypass', (
+    tester,
+  ) async {
     final navigatorKey = GlobalKey<NavigatorState>();
     await tester.pumpWidget(_TestApp(navigatorKey: navigatorKey));
 
@@ -530,16 +532,18 @@ void main() {
         hostDisplayName: 'Bastion',
         command: 'rm -rf /var/tmp/build',
         ruleDescription: 'recursive force delete',
+        allowSession: false,
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Allow for Session'));
+    expect(find.text('Allow for Session'), findsNothing);
+    await tester.tap(find.text('Allow Once'));
     await tester.pumpAndSettle();
 
     await expectLater(
       decisionFuture,
-      completion(AgentCommandDecision.allowSession),
+      completion(AgentCommandDecision.allowOnce),
     );
   });
 }

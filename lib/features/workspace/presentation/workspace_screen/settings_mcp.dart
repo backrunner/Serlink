@@ -174,6 +174,8 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
             const _McpHostPrivacySection(),
             const SizedBox(height: 12),
             const _McpCommandGuardSection(),
+            const SizedBox(height: 12),
+            const _McpCommandApprovalSection(),
             const SizedBox(height: 18),
             _buildConfigGroup(l10n, serverState, url, showStdioTab),
             if (showStdioTab) ...[

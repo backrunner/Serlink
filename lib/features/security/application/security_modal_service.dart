@@ -37,12 +37,14 @@ class AgentCommandPrompt {
     required this.hostDisplayName,
     required this.command,
     required this.ruleDescription,
+    this.allowSession = true,
   });
 
   final String clientName;
   final String hostDisplayName;
   final String command;
   final String ruleDescription;
+  final bool allowSession;
 }
 
 class ExportPreview {

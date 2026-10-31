@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../features/mcp/application/mcp_host_visibility.dart';
+import '../features/mcp/application/mcp_command_approval.dart';
 
 import 'dart:io';
 
@@ -4003,6 +4004,15 @@ final commandRiskPolicyProvider = Provider<CommandRiskPolicy>((ref) {
   return CommandRiskPolicy();
 });
 
+final mcpCommandApprovalProvider = Provider<McpCommandApproval>((ref) {
+  return McpCommandApproval(ref.watch(secretStoreProvider));
+});
+
+final mcpCommandApprovalSettingsProvider =
+    FutureProvider<McpCommandApprovalSettings>((ref) {
+      return ref.watch(mcpCommandApprovalProvider).read();
+    });
+
 final mcpHostVisibilityProvider = Provider<McpHostVisibility>((ref) {
   return McpHostVisibility(ref.watch(secretStoreProvider));
 });
@@ -4030,6 +4040,7 @@ final agentSessionBridgeProvider = Provider<AgentSessionBridge>((ref) {
     ref: ref,
     authorization: ref.watch(mcpAuthorizationServiceProvider),
     riskPolicy: ref.watch(commandRiskPolicyProvider),
+    commandApproval: ref.watch(mcpCommandApprovalProvider),
     decisionGuard: ref.watch(commandDecisionGuardProvider),
     securityModalService: ref.watch(securityModalServiceProvider),
   );

@@ -61,6 +61,10 @@ class CommandDecisionGuard {
   final CommandDecisionModel _model;
   final Duration timeout;
   Future<void> _pendingSave = Future<void>.value();
+  int _generation = 0;
+
+  /// Lets the final synchronous send gate detect edits during other awaits.
+  int get generation => _generation;
 
   Future<CommandDecisionSettings> readSettings() async =>
       (await _readConfiguration()).settings;
@@ -109,6 +113,7 @@ class CommandDecisionGuard {
     bool removeApiKey = false,
     bool? dataSharingConsent,
   }) {
+    _generation += 1;
     final result = _pendingSave.then((_) async {
       final previous = await _load();
       final name = model.trim();
@@ -172,7 +177,7 @@ class CommandDecisionGuard {
       }
       // Control/history editing and partial submissions cannot be reconstructed
       // reliably in arbitrary shells and TUIs. Require whole checked commands.
-      if (command.contains(RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')) ||
+      if (command.contains(RegExp(r'[\x00-\x09\x0b\x0c\x0e-\x1f\x7f]')) ||
           (rawInput && !command.endsWith('\n') && !command.endsWith('\r'))) {
         throw const CommandDecisionException('command_input_requires_exec');
       }

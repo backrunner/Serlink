@@ -5931,6 +5931,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'TypeSafe privacy policy'**
   String get settingsMcpGuardPrivacyPolicy;
+
+  /// No description provided for @settingsMcpBypassTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bypass command approval'**
+  String get settingsMcpBypassTitle;
+
+  /// No description provided for @settingsMcpBypassEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Ordinary commands run automatically'**
+  String get settingsMcpBypassEnabled;
+
+  /// No description provided for @settingsMcpBypassDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard mode · Confirm every command'**
+  String get settingsMcpBypassDisabled;
+
+  /// No description provided for @settingsMcpBypassDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Bypass skips approval for ordinary commands. Deletion, destructive changes and opaque scripts still require approval each time; disk destruction remains blocked. Host access, vault unlock and enabled model protection still apply. This setting stays on this device.'**
+  String get settingsMcpBypassDescription;
+
+  /// No description provided for @settingsMcpBypassUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Command approval settings could not be loaded or saved'**
+  String get settingsMcpBypassUnavailable;
 }
 
 class _AppLocalizationsDelegate

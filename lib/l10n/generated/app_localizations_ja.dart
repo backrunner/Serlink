@@ -3241,4 +3241,20 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsMcpGuardPrivacyPolicy => 'TypeSafe プライバシーポリシー';
+
+  @override
+  String get settingsMcpBypassTitle => 'コマンド承認をバイパス';
+
+  @override
+  String get settingsMcpBypassEnabled => '通常のコマンドを自動実行';
+
+  @override
+  String get settingsMcpBypassDisabled => '標準モード · コマンドごとに確認';
+
+  @override
+  String get settingsMcpBypassDescription =>
+      'バイパスは通常のコマンドの承認を省略します。削除、破壊的な変更、内容を判断できないスクリプトは毎回承認が必要です。ディスクを破壊する操作は引き続きブロックされます。ホストへのアクセス承認、保管庫のロック解除、有効なモデル保護は引き続き適用されます。この設定はこの端末にのみ保存されます。';
+
+  @override
+  String get settingsMcpBypassUnavailable => 'コマンド承認設定を読み込みまたは保存できません';
 }

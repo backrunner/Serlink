@@ -3196,4 +3196,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsMcpGuardPrivacyPolicy => 'TypeSafe 隐私政策';
+
+  @override
+  String get settingsMcpBypassTitle => 'Bypass 命令审批';
+
+  @override
+  String get settingsMcpBypassEnabled => '普通命令自动执行';
+
+  @override
+  String get settingsMcpBypassDisabled => '标准模式 · 逐条确认命令';
+
+  @override
+  String get settingsMcpBypassDescription =>
+      'Bypass 跳过普通命令的审批，删除、破坏性修改及无法直接判断的脚本仍须逐次确认；磁盘破坏操作仍会被阻止。主机授权、保险库解锁及已启用的模型保护继续生效。此设置仅保存在本机';
+
+  @override
+  String get settingsMcpBypassUnavailable => '无法读取或保存命令审批设置';
 }

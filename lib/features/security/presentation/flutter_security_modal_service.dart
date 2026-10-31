@@ -645,7 +645,10 @@ class _AgentCommandDialog extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Text(l10n.securityAgentCommandRuleLabel(prompt.ruleDescription)),
+              if (prompt.ruleDescription != 'standard_approval')
+                Text(
+                  l10n.securityAgentCommandRuleLabel(prompt.ruleDescription),
+                ),
               const SizedBox(height: 12),
               Container(
                 key: const ValueKey('agent-command-code-block'),
@@ -679,11 +682,12 @@ class _AgentCommandDialog extends StatelessWidget {
               Navigator.of(context).pop(AgentCommandDecision.allowOnce),
           child: Text(l10n.securityAgentAllowOnceAction),
         ),
-        SerlinkFilledButton(
-          onPressed: () =>
-              Navigator.of(context).pop(AgentCommandDecision.allowSession),
-          child: Text(l10n.securityAgentAllowSessionAction),
-        ),
+        if (prompt.allowSession)
+          SerlinkFilledButton(
+            onPressed: () =>
+                Navigator.of(context).pop(AgentCommandDecision.allowSession),
+            child: Text(l10n.securityAgentAllowSessionAction),
+          ),
       ],
     );
   }

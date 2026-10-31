@@ -264,6 +264,7 @@ ProviderContainer _container({
             securityModalService: _FakeSecurityModalService(),
           ),
           riskPolicy: CommandRiskPolicy(),
+          commandApproval: ref.watch(mcpCommandApprovalProvider),
           securityModalService: _FakeSecurityModalService(),
         );
         harness?.bridge = bridge;
@@ -324,6 +325,7 @@ class _CapturingBridge extends AgentSessionBridge {
     required super.ref,
     required super.authorization,
     required super.riskPolicy,
+    required super.commandApproval,
     required super.securityModalService,
   });
 

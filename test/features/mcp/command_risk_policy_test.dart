@@ -23,6 +23,7 @@ void main() {
       'mkfs.ext4 /dev/sda1': 'mkfs',
       'sudo mkfs.xfs -f /dev/nvme0n1p1': 'mkfs',
       ':(){ :|:& };:': 'fork_bomb',
+      ':(){\n :|:&\n };:': 'fork_bomb',
     };
 
     cases.forEach((command, ruleId) {
@@ -42,6 +43,10 @@ void main() {
       'rm -r -f node_modules': 'rm_recursive_force',
       'rm -Rf /var/tmp/x': 'rm_recursive_force',
       'rm --recursive --force dist': 'rm_recursive_force',
+      'rm file.txt': 'file_delete',
+      'rm -f file.txt': 'file_delete',
+      'rm -r build/': 'file_delete',
+      'rm -r -i build/': 'file_delete',
       'shutdown now': 'system_power',
       'shutdown -h +5': 'system_power',
       'reboot': 'system_power',
@@ -97,10 +102,6 @@ void main() {
       'git push origin main',
       'systemctl status nginx',
       'systemctl restart nginx',
-      'rm file.txt',
-      'rm -f file.txt',
-      'rm -r build/',
-      'rm -r -i build/',
       'curl example.com -o file',
       'wget https://example.com/file.tar.gz',
       'chmod 755 script.sh',
@@ -108,7 +109,7 @@ void main() {
       'chmod -R 755 ./public',
       'chown -R user:user /home/user/app',
       'kill -9 1234',
-      'killall node',
+      'killall worker',
       'iptables -L',
       'crontab -l',
       'crontab -e',
@@ -130,6 +131,54 @@ void main() {
   });
 
   group('normalization', () {
+    for (final command in [
+      '/bin/rm -- report.csv',
+      'sudo env rm report.csv',
+      'printf files | xargs -0 rm',
+      'ls; rm report.csv',
+      'pwd\nrm report.csv',
+      'find . -type f -delete',
+      'find . -exec unlink {} +',
+      'rmdir empty',
+      'shred secrets.txt',
+      'git clean -fdx',
+      'git -C /srv/app reset --hard HEAD',
+      'git -C /srv/app push --force origin main',
+      'systemctl --no-block stop sshd',
+      'chmod 755 ./public; chmod -R 777 /etc',
+      'git branch -D important-work',
+      'git tag -d release',
+      'rsync -a --delete source/ destination/',
+      'docker system prune -af',
+      'kubectl delete namespace production',
+      'mysql -e "DROP DATABASE production"',
+      'psql -c "DELETE FROM users"',
+      'redis-cli FLUSHALL',
+      'terraform destroy',
+      'truncate -s 0 report.csv',
+      'printf empty > report.csv',
+      'sed -i s/old/new/g config',
+      'bash -c "cleanup"',
+      'python3 -c "cleanup()"',
+      "r''m report.csv",
+      r'r\m report.csv',
+      r'$CLEANUP report.csv',
+      r'echo $(cleanup)',
+      './cleanup',
+      'pwd\n./cleanup',
+      'pwsh -Command Remove-Item report.csv',
+    ]) {
+      test('bypass still requires review of $command', () {
+        expect(policy.assess(command).level, CommandRiskLevel.needsConfirm);
+        expect(
+          CommandRiskPolicy(additionalSafePatterns: [RegExp('.*')])
+              .assess(command)
+              .level,
+          CommandRiskLevel.needsConfirm,
+        );
+      });
+    }
+
     test('trims and collapses whitespace before matching', () {
       final assessment = policy.assess('  rm   -rf    /tmp/x  ');
       expect(assessment.level, CommandRiskLevel.needsConfirm);
@@ -157,13 +206,13 @@ void main() {
         CommandRiskLevel.blocked,
       );
     });
-    test('marks matching commands safe before other rules', () {
+    test('a deletion allowlist cannot waive mandatory confirmation', () {
       final relaxed = CommandRiskPolicy(
         additionalSafePatterns: [RegExp(r'^rm -rf /tmp/build-cache')],
       );
       final assessment = relaxed.assess('rm -rf /tmp/build-cache/out');
-      expect(assessment.level, CommandRiskLevel.safe);
-      expect(assessment.matchedRule, isNull);
+      expect(assessment.level, CommandRiskLevel.needsConfirm);
+      expect(assessment.matchedRule, 'rm_recursive_force');
     });
 
     test('does not weaken blocked rules for non-matching commands', () {

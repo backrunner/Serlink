@@ -7,7 +7,7 @@ Design principles:
 - **Credentials never leave the app.** The agent never receives passwords or private keys. Serlink opens the SSH session itself, as a normal workspace terminal tab.
 - **Configurable host privacy.** Host and connection discovery require explicit sharing consent. Host discovery returns configuration including hostname/IP, username, tags, routing and connection settings; startup commands are excluded. Settings > MCP / Agent access > Manage > Strict host privacy defaults off. When enabled, discovery returns only opaque host IDs and display names. Credentials and credential references are always excluded. This controls metadata; remote terminal output may still contain addresses.
 - **Explicit user authorization.** The first time an agent requests a session on a host, Serlink shows an approval dialog and, when permitted, an actionable macOS notification. If the vault is locked, tool calls fail with `vault_locked` until the user unlocks it in the app.
-- **Dangerous command interception.** Commands sent by the agent are screened by a risk policy (`lib/features/mcp/data/command_risk_policy.dart`). Risky commands require an in-app confirmation (Allow once / Allow for session); a small set of destructive commands (disk overwrites, `mkfs`, fork bombs) is always blocked, even by a session allowlist. Optional decision-model protection adds semantic screening before execution.
+- **Dangerous command interception.** Commands sent by the agent are screened by a risk policy (`lib/features/mcp/data/command_risk_policy.dart`). Standard mode confirms every command. User-enabled Bypass skips ordinary command approval, but deletion and other risky commands require fresh approval for every execution. A small set of destructive commands (disk overwrites, `mkfs`, fork bombs) remains blocked. Optional decision-model protection adds semantic screening before execution.
 - **Take back control anytime.** An agent session is a regular terminal tab — type in it to retake control. A badge marks agent-controlled panes; closing the tab or revoking the grant in Settings immediately ends agent access.
 - **Quiet capability checks.** Starting the stdio server, initializing MCP, sending heartbeats, and listing tools do not connect to or launch the desktop app. A valid Serlink tool call connects to the running app or launches it on demand. The standalone process does not access the vault or SSH credentials itself.
 
@@ -68,8 +68,7 @@ host/connection access requests always open the full in-app data-sharing
 disclosure; their notifications offer Deny / View details. Notification
 command approval allows **one execution** only. Host approval creates an
 app-lifetime, revocable grant after in-app consent. Borrowing an existing
-connection requires a separate grant for that specific connection. Session-level command
-approval remains available only in the full dialog. Notification previews follow
+connection requires a separate grant for that specific connection. Command approvals allow one execution only; there is no session-wide approval for risky commands. Notification previews follow
 macOS settings and may include host display names and short commands.
 
 Only one approval is presented at a time. The first decision wins across the
@@ -101,7 +100,7 @@ All tools are prefixed `serlink_`:
 - `serlink_transfer_cancel` — cancels this client's download. Partial files may remain; closing the SFTP session also cancels its transfers. Keep the session open until downloads finish.
 - `serlink_exec` — sends a command and returns the settled screen text (heuristic: output quiet for ~400 ms).
 - `serlink_read_screen` — last N buffer lines.
-- `serlink_send_input` — raw input for interactive programs in local-rule mode. With model protection, only complete submitted commands or Ctrl-C are accepted.
+- `serlink_send_input` — complete submitted commands or Ctrl-C only, in both approval modes. Partial keystrokes and bare Enter are rejected.
 - `serlink_close_session` — closes an MCP-created session, or releases a borrowed session while preserving the user's connection. Set `keepConnection: true` to hand an MCP-created connection back to the user without closing it.
 - `serlink_list_sessions` — lists only sessions controlled by the calling MCP client, including a `borrowed` flag.
 
@@ -113,6 +112,33 @@ All tools are prefixed `serlink_`:
 - After the separate 60-second access approval, opening waits up to 120 seconds for the SSH channel. MCP progress distinguishes access approval from connection/authentication; SSH Agent signing may require approval in 1Password or another agent. Cancellation, expired authorization and connection failure clean up the new MCP tab, including late authentication results. Existing user tabs are not reused by MCP opens.
 - Offline diagnostics record `ssh.auth.sign.start`, `ssh.auth.sign.success` or `ssh.auth.sign.failure`, elapsed time and a safe error code. Together with `ssh.auth.summary`, these distinguish a requested signature from a completed signature. They do not prove that a password manager displayed its UI, and contain no key, signature or password material.
 - Error codes surfaced to the agent: `vault_locked`, `authorization_denied`, `authorization_required`, `command_blocked`, `command_denied`, `approval_timeout`, `request_cancelled`, `session_not_found`, `connect_timeout`. The stdio helper also returns `app_unavailable` for discovery/launch failures and `app_connection_lost` for failed in-flight calls.
+
+## Command approval modes
+
+Open **Settings → MCP / Agent access → Manage → Bypass command approval**.
+The switch defaults off: **Standard** mode requires a fresh approval for every
+command. Enable **Bypass** to automatically run ordinary commands after host
+access is authorized. The switch is device-local, survives app restarts, and
+is excluded from vault sync and backups. MCP clients cannot change it.
+
+Both modes keep mandatory confirmation for deletion (`rm`, `rmdir`, `unlink`,
+`find -delete`), destructive Git/container/database cleanup, file overwrites,
+system shutdown, and opaque shell/script evaluation. Session allowlists cannot
+waive these confirmations. Existing disk-destruction and fork-bomb hard blocks
+remain non-overridable. Enabled model protection still applies and may reject a
+command before approval. Bypass does not skip discovery consent, first-host
+access approval, vault unlock, or host-key trust.
+
+Use whole commands with `serlink_exec`, or complete newline-terminated commands
+with `serlink_send_input`. Partial input, Tab completion, editing/history controls and bare Enter
+are rejected in both modes, even when model protection is disabled, so commands
+cannot be split across calls to evade screening. Ctrl-C remains available.
+Changing modes invalidates pending executions; denial, timeout, cancellation,
+grant revocation and disconnected sessions send no command bytes.
+
+Local checks are conservative text rules, not a shell sandbox. They can flag
+quoted prose and cannot establish the effects of aliases, remote executables,
+or arbitrary terminal state. Keep the visible terminal under user supervision.
 
 ## Decision-model command protection
 
@@ -138,14 +164,15 @@ See [TypeSafe privacy](https://typesafe.ai/legal/privacy-policy) and
 The enforcement order is:
 
 1. Local hard blocks reject the command without contacting the model.
-2. When enabled, the model evaluates every remaining command, including commands
-   covered by a previous local-rule session approval. Only a validated `safe`
+2. When enabled, the model evaluates every remaining command, including ordinary commands
+   in Bypass mode. Only a validated `safe`
    Choice with safe probability ≥ 0.98, dangerous probability ≤ 0.01 and confidence
    ≥ 0.90 passes. Dangerous, uncertain, malformed, oversized and unavailable
    results fail closed. These thresholds are conservative defaults, not a claim
    of measured shell-command detection accuracy.
-3. Local rules that require confirmation still require it; a model result cannot
-   loosen those rules. Grant, vault, pane and configuration revision are rechecked
+3. Standard mode confirms every command; Bypass confirms every locally flagged
+   command. A model result cannot waive confirmation. Grant, vault, pane and
+   configuration revisions are rechecked
    after every asynchronous model/confirmation wait before sending any input.
 
 HTTP calls have bounded deadlines and response sizes, no automatic retries,
@@ -153,18 +180,19 @@ no redirects and no command/result caching. Provider error bodies and commands
 are not included in errors or diagnostic logs. Concurrent input in a single
 session is serialized so assessed commands cannot be interleaved.
 
-Use `serlink_exec` for complete commands. While model protection is enabled,
-`serlink_send_input` rejects partial input, editing/history control sequences,
+Use `serlink_exec` for complete commands. In both approval modes,
+`serlink_send_input` rejects partial input, Tab completion, editing/history control sequences,
 standalone Enter and text with an unsubmitted suffix. Complete submitted commands
 are checked as a whole. Ctrl-C bypasses the input queue and invalidates pending submissions, so a late
 safe judgment cannot execute after an interruption. It can interrupt a program or clear
-input typed before protection was enabled. If `command_input_reset_required`
+input left in the terminal. If `command_input_reset_required`
 is returned, send Ctrl-C, then submit a new complete command. Interactive TUI/REPL
 keystrokes may be refused; do not split or disguise commands to bypass a refusal.
 
 Rejections use the existing `command_blocked` code with a bounded detail such as
 `command_model_blocked`, `command_model_uncertain`, `command_guard_unavailable`,
-`command_guard_changed`, `command_input_requires_exec` or
+`command_guard_changed`, `command_approval_changed`,
+`command_approval_unavailable`, `command_input_requires_exec` or
 `command_input_reset_required` or `command_input_interrupted`. The same gate protects both HTTP clients and the
 stdio helper. Manual typing in the visible user-owned terminal remains outside
 MCP screening. Local rules and model judgments are layered checks, not a shell
@@ -207,5 +235,5 @@ transport, channel, forwarding, and workspace failures.
 - `serlink_exec` detects "command finished" by output quiescence, not by shell exit status; long-running or streaming commands need an explicit `timeoutMs`. Shell-integration markers (OSC 133) are a possible future upgrade.
 - The exec result is screen text (last N lines), not a byte-exact stream capture.
 - Agent sessions do not use tmux/screen remote persistence; a dropped connection ends the session.
-- `notifications/cancelled` from the MCP client is not propagated through the stdio relay in v1.
+- `notifications/cancelled` withdraws pending approvals through both transports; cancellation cannot undo commands already sent.
 - Direct HTTP configurations require the desktop app to be running. Independent startup and on-demand app launch are provided by the stdio configuration in direct macOS builds.

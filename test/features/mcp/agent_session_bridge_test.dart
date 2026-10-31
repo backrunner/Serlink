@@ -9,10 +9,12 @@ import 'package:serlink/features/hosts/application/host_store.dart';
 import 'package:serlink/features/hosts/application/host_repository.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/mcp/application/agent_session_bridge.dart';
+import 'package:serlink/features/mcp/application/mcp_command_approval.dart';
 import 'package:serlink/features/mcp/application/mcp_request_context.dart';
 import 'package:serlink/features/mcp/application/command_decision_guard.dart';
 import 'package:serlink/features/mcp/domain/command_decision.dart';
 import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
+import 'package:serlink/platform/secret_store.dart';
 import 'package:serlink/features/mcp/data/command_risk_policy.dart';
 import 'package:serlink/features/mcp/domain/agent_session.dart';
 import 'package:serlink/features/security/application/security_modal_service.dart';
@@ -30,6 +32,286 @@ import 'package:serlink/features/workspace/application/workspace_tab_controller.
 import 'package:serlink/features/workspace/domain/workspace_tab.dart';
 
 void main() {
+  group('command approval modes', () {
+    for (final changeModel in [false, true]) {
+      test(
+        'configuration change during final storage read sends no bytes (model=$changeModel)',
+        () async {
+          final secrets = _PausingApprovalStore();
+          final guard = CommandDecisionGuard(
+            secrets: InMemorySecretStore(),
+            model: _DecisionModel(),
+          );
+          final service = _EchoSshSessionService();
+          final container = _container(
+            service: service,
+            modal: _FakeSecurityModalService(),
+            secrets: secrets,
+            decisionGuard: guard,
+          );
+          addTearDown(container.dispose);
+          final bridge = await _bridge(container);
+          final handle = await _openSession(bridge);
+          final result = bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'pwd',
+          );
+          final rejection = expectLater(
+            result,
+            throwsA(_bridgeException('command_blocked')),
+          );
+          await secrets.started.future;
+          if (changeModel) {
+            await guard.saveSettings(
+              enabled: true,
+              model: 'jev-latest',
+              apiKey: 'fixture-key',
+              dataSharingConsent: true,
+            );
+          } else {
+            await container.read(mcpCommandApprovalProvider).saveBypass(false);
+          }
+          secrets.resume.complete();
+          await rejection;
+          expect(service.shells.single.writes, isEmpty);
+        },
+      );
+    }
+    for (final bypass in [false, true]) {
+      test(
+        'ordinary command ${bypass ? 'bypasses' : 'waits for'} approval',
+        () async {
+          final service = _EchoSshSessionService();
+          final modal = _FakeSecurityModalService()
+            ..commandGate = Completer<AgentCommandDecision>();
+          final container = _container(
+            service: service,
+            modal: modal,
+            bypass: bypass,
+          );
+          addTearDown(container.dispose);
+          final bridge = await _bridge(container);
+          final handle = await _openSession(bridge);
+          final result = bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'pwd',
+          );
+          if (!bypass) {
+            await modal.commandStarted.future;
+            expect(service.shells.single.writes, isEmpty);
+            expect(modal.lastCommandPrompt!.allowSession, isFalse);
+            modal.commandGate!.complete(AgentCommandDecision.allowOnce);
+          }
+          await result;
+          expect(modal.accessCallCount, 1);
+          expect(modal.commandCallCount, bypass ? 0 : 1);
+          expect(service.shells.single.writes, ['pwd\r']);
+        },
+      );
+    }
+
+    for (final command in [
+      'rm report.csv',
+      'find . -delete',
+      'git reset --hard HEAD',
+      'pwd\nrm report.csv',
+    ]) {
+      for (final raw in [false, true]) {
+        test('bypass waits for approval of $command (raw=$raw)', () async {
+          final service = _EchoSshSessionService();
+          final modal = _FakeSecurityModalService()
+            ..commandGate = Completer<AgentCommandDecision>();
+          final container = _container(service: service, modal: modal);
+          addTearDown(container.dispose);
+          final bridge = await _bridge(container);
+          final handle = await _openSession(bridge);
+          final Future<Object?> result = raw
+              ? bridge.sendInput(
+                  clientName: _clientName,
+                  sessionId: handle.sessionId,
+                  text: '$command\r',
+                )
+              : bridge.exec(
+                  clientName: _clientName,
+                  sessionId: handle.sessionId,
+                  command: command,
+                );
+          await modal.commandStarted.future;
+          expect(service.shells.single.writes, isEmpty);
+          expect(modal.lastCommandPrompt!.allowSession, isFalse);
+          modal.commandGate!.complete(AgentCommandDecision.allowOnce);
+          await result;
+          expect(service.shells.single.writes, ['$command\r']);
+          modal.commandGate = null;
+          modal.commandDecision = AgentCommandDecision.deny;
+          await expectLater(
+            bridge.exec(
+              clientName: _clientName,
+              sessionId: handle.sessionId,
+              command: command,
+            ),
+            throwsA(_bridgeException('command_denied')),
+          );
+          expect(modal.commandCallCount, 2);
+          expect(service.shells.single.writes, ['$command\r']);
+        });
+      }
+    }
+
+    for (final change in [
+      'mode',
+      'vault',
+      'reunlock',
+      'revoke',
+      'close',
+      'cancel',
+      'timeout',
+      'interrupt',
+    ]) {
+      test('$change during approval cannot send a command', () async {
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService()
+          ..commandGate = Completer<AgentCommandDecision>();
+        final container = _container(service: service, modal: modal);
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        final context = McpRequestContext();
+        final result = context.run(
+          () => bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'rm report.csv',
+          ),
+        );
+        final expectedCode = switch (change) {
+          'revoke' => 'authorization_required',
+          'close' => 'session_not_found',
+          'vault' || 'reunlock' => 'vault_locked',
+          _ => 'command_blocked',
+        };
+        final expectation = expectLater(
+          result,
+          throwsA(
+            change == 'cancel' || change == 'timeout'
+                ? isA<McpApprovalException>()
+                : _bridgeException(expectedCode),
+          ),
+        );
+        await modal.commandStarted.future;
+        switch (change) {
+          case 'mode':
+            await container.read(mcpCommandApprovalProvider).saveBypass(false);
+          case 'revoke':
+            bridge.revokeGrant(handle.grantId);
+          case 'vault':
+          case 'reunlock':
+            final vault = container.read(
+              vaultSessionControllerProvider.notifier,
+            ) as _FakeVaultSessionController;
+            vault.setSnapshot(
+              VaultSessionState(
+                vaultState: change == 'vault'
+                    ? VaultState.locked
+                    : VaultState.unlocked,
+                unlockGeneration: 2,
+              ),
+            );
+          case 'close':
+            await bridge.closeSession(handle.sessionId);
+          case 'cancel':
+            context.cancel();
+          case 'timeout':
+            modal.commandGate!.completeError(
+              const McpApprovalException('approval_timeout'),
+            );
+          case 'interrupt':
+            await bridge.sendInput(
+              clientName: _clientName,
+              sessionId: handle.sessionId,
+              text: '\x03',
+            );
+        }
+        if (change != 'timeout') {
+          modal.commandGate!.complete(AgentCommandDecision.allowOnce);
+        }
+        await expectation;
+        expect(
+          service.shells.single.writes,
+          change == 'interrupt' ? ['\x03'] : isEmpty,
+        );
+      });
+    }
+
+    test(
+      'legacy session-wide decision cannot approve a dangerous command',
+      () async {
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService()
+          ..commandDecision = AgentCommandDecision.allowSession;
+        final container = _container(service: service, modal: modal);
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        await expectLater(
+          bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'rm report.csv',
+          ),
+          throwsA(_bridgeException('command_denied')),
+        );
+        expect(service.shells.single.writes, isEmpty);
+      },
+    );
+
+    test(
+      'bypass cannot submit fragments, history or standalone Enter',
+      () async {
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: _FakeSecurityModalService(),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        for (final text in [
+          'r',
+          'm report.csv',
+          '\r',
+          '\x1b[A\r',
+          'ls\nrm ',
+          '\x04',
+          'r\t report.csv\r',
+        ]) {
+          await expectLater(
+            bridge.sendInput(
+              clientName: _clientName,
+              sessionId: handle.sessionId,
+              text: text,
+            ),
+            throwsA(_bridgeException('command_blocked')),
+          );
+        }
+        expect(service.shells.single.writes, isEmpty);
+        await bridge.sendInput(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          text: '\x03',
+        );
+        await bridge.sendInput(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          text: 'pwd\r',
+        );
+        expect(service.shells.single.writes, ['\x03', 'pwd\r']);
+      },
+    );
+  });
+
   group('MCP discovery consent', () {
     for (final locked in [true, false]) {
       test(
@@ -743,40 +1025,37 @@ void main() {
       expect(service.shells.single.writes, isEmpty);
     });
 
-    test(
-      'session-wide rule approval cannot bypass a new model judgment',
-      () async {
-        final model = _DecisionModel();
-        final service = _EchoSshSessionService();
-        final modal = _FakeSecurityModalService()
-          ..commandDecision = AgentCommandDecision.allowSession;
-        final container = _container(
-          service: service,
-          modal: modal,
-          decisionGuard: await _enabledGuard(model),
-        );
-        addTearDown(container.dispose);
-        final bridge = await _bridge(container);
-        final handle = await _openSession(bridge);
-        await bridge.exec(
+    test('a previous approval cannot bypass a new model judgment', () async {
+      final model = _DecisionModel();
+      final service = _EchoSshSessionService();
+      final modal = _FakeSecurityModalService()
+        ..commandDecision = AgentCommandDecision.allowOnce;
+      final container = _container(
+        service: service,
+        modal: modal,
+        decisionGuard: await _enabledGuard(model),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final handle = await _openSession(bridge);
+      await bridge.exec(
+        clientName: _clientName,
+        sessionId: handle.sessionId,
+        command: 'rm -rf /tmp/a',
+      );
+      model.decision = CommandDecision.dangerous;
+      await expectLater(
+        bridge.exec(
           clientName: _clientName,
           sessionId: handle.sessionId,
-          command: 'rm -rf /tmp/a',
-        );
-        model.decision = CommandDecision.dangerous;
-        await expectLater(
-          bridge.exec(
-            clientName: _clientName,
-            sessionId: handle.sessionId,
-            command: 'rm -rf /srv/data',
-          ),
-          throwsA(_bridgeException('command_blocked')),
-        );
-        expect(model.commands, hasLength(2));
-        expect(modal.commandCallCount, 1);
-        expect(service.shells.single.writes, ['rm -rf /tmp/a\r']);
-      },
-    );
+          command: 'rm -rf /srv/data',
+        ),
+        throwsA(_bridgeException('command_blocked')),
+      );
+      expect(model.commands, hasLength(2));
+      expect(modal.commandCallCount, 1);
+      expect(service.shells.single.writes, ['rm -rf /tmp/a\r']);
+    });
 
     for (final failure in ['revoked', 'closed', 'changed']) {
       test(
@@ -865,57 +1144,6 @@ void main() {
         );
         expect(model.commands, ['ls\r']);
         expect(service.shells.single.writes, ['\x03', 'ls\r']);
-      },
-    );
-
-    test(
-      'enabling protection requires clearing previously unsubmitted input',
-      () async {
-        final model = _DecisionModel();
-        final guard = CommandDecisionGuard(
-          secrets: InMemorySecretStore(),
-          model: model,
-        );
-        final service = _EchoSshSessionService();
-        final container = _container(
-          service: service,
-          modal: _FakeSecurityModalService(),
-          decisionGuard: guard,
-        );
-        addTearDown(container.dispose);
-        final bridge = await _bridge(container);
-        final handle = await _openSession(bridge);
-        await bridge.sendInput(
-          clientName: _clientName,
-          sessionId: handle.sessionId,
-          text: 'prefix ',
-        );
-        await guard.saveSettings(
-          enabled: true,
-          model: 'jev-1.13.0',
-          apiKey: 'fixture-key',
-          dataSharingConsent: true,
-        );
-        await expectLater(
-          bridge.exec(
-            clientName: _clientName,
-            sessionId: handle.sessionId,
-            command: 'ls',
-          ),
-          throwsA(_bridgeException('command_blocked')),
-        );
-        expect(service.shells.single.writes, ['prefix ']);
-        await bridge.sendInput(
-          clientName: _clientName,
-          sessionId: handle.sessionId,
-          text: '\x03',
-        );
-        await bridge.exec(
-          clientName: _clientName,
-          sessionId: handle.sessionId,
-          command: 'ls',
-        );
-        expect(service.shells.single.writes, ['prefix ', '\x03', 'ls\r']);
       },
     );
 
@@ -1124,10 +1352,10 @@ void main() {
       expect(modal.commandCallCount, 1);
     });
 
-    test('allowSession adds the rule to the session allowlist', () async {
+    test('dangerous commands always require a fresh confirmation', () async {
       final service = _EchoSshSessionService();
       final modal = _FakeSecurityModalService()
-        ..commandDecision = AgentCommandDecision.allowSession;
+        ..commandDecision = AgentCommandDecision.allowOnce;
       final container = _container(service: service, modal: modal);
       addTearDown(container.dispose);
       final bridge = await _bridge(container);
@@ -1144,7 +1372,7 @@ void main() {
         command: 'rm -rf /tmp/b',
       );
 
-      expect(modal.commandCallCount, 1);
+      expect(modal.commandCallCount, 2);
       expect(service.shells.single.writes, hasLength(2));
     });
 
@@ -1211,32 +1439,38 @@ void main() {
       },
     );
 
-    test('sendInput sends raw text and policies newline input', () async {
-      final service = _EchoSshSessionService();
-      final modal = _FakeSecurityModalService();
-      final container = _container(service: service, modal: modal);
-      addTearDown(container.dispose);
-      final bridge = await _bridge(container);
-      final handle = await _openSession(bridge);
+    test(
+      'sendInput rejects fragments and screens submitted commands',
+      () async {
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService();
+        final container = _container(service: service, modal: modal);
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
 
-      await bridge.sendInput(
-        clientName: _clientName,
-        sessionId: handle.sessionId,
-        text: 'y',
-      );
-      expect(service.shells.single.writes, ['y']);
-      expect(modal.commandCallCount, 0);
+        await expectLater(
+          bridge.sendInput(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            text: 'y',
+          ),
+          throwsA(_bridgeException('command_blocked')),
+        );
+        expect(service.shells.single.writes, isEmpty);
+        expect(modal.commandCallCount, 0);
 
-      await expectLater(
-        bridge.sendInput(
-          clientName: _clientName,
-          sessionId: handle.sessionId,
-          text: 'rm -rf /tmp/junk\n',
-        ),
-        throwsA(_bridgeException('command_denied')),
-      );
-      expect(service.shells.single.writes, ['y']);
-    });
+        await expectLater(
+          bridge.sendInput(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            text: 'rm -rf /tmp/junk\n',
+          ),
+          throwsA(_bridgeException('command_denied')),
+        );
+        expect(service.shells.single.writes, isEmpty);
+      },
+    );
 
     test('closeSession closes the tab and forgets the handle', () async {
       final container = _container(
@@ -1458,6 +1692,25 @@ void main() {
   });
 }
 
+class _PausingApprovalStore extends InMemorySecretStore {
+  final started = Completer<void>();
+  final resume = Completer<void>();
+  int reads = 0;
+
+  @override
+  Future<List<int>?> read(
+    SecretRef ref, {
+    SecretProtection protection = SecretProtection.deviceLocal,
+  }) async {
+    final snapshot = await super.read(ref, protection: protection);
+    if (ref == McpCommandApproval.storageKey && ++reads == 2) {
+      started.complete();
+      await resume.future;
+    }
+    return snapshot;
+  }
+}
+
 const _clientName = 'test-client';
 
 final _metadataHost = HostConfig(
@@ -1535,6 +1788,7 @@ ProviderContainer _container({
   HostRepository? hosts,
   InMemorySecretStore? secrets,
   CommandDecisionGuard? decisionGuard,
+  bool bypass = true,
   WorkspaceTabController Function()? workspaceTabControllerFactory,
   Future<Directory> Function()? downloadDirectory,
   Duration attachTimeout = const Duration(seconds: 5),
@@ -1570,11 +1824,17 @@ ProviderContainer _container({
         _FakeTerminalDisplaySettingsRepository(),
       ),
       securityModalServiceProvider.overrideWithValue(modal),
+      mcpCommandApprovalProvider.overrideWith((ref) {
+        final approval = McpCommandApproval(ref.watch(secretStoreProvider));
+        if (bypass) unawaited(approval.saveBypass(true));
+        return approval;
+      }),
       agentSessionBridgeProvider.overrideWith((ref) {
         final bridge = AgentSessionBridge(
           ref: ref,
           authorization: ref.watch(mcpAuthorizationServiceProvider),
           riskPolicy: CommandRiskPolicy(),
+          commandApproval: ref.watch(mcpCommandApprovalProvider),
           decisionGuard: decisionGuard,
           downloadDirectory: downloadDirectory,
           securityModalService: modal,
@@ -1807,6 +2067,9 @@ class _FakeSecurityModalService implements SecurityModalService {
   AgentAccessPrompt? lastAccessPrompt;
   var commandCallCount = 0;
   Completer<AgentAccessDecision>? accessGate;
+  Completer<AgentCommandDecision>? commandGate;
+  final commandStarted = Completer<void>();
+  AgentCommandPrompt? lastCommandPrompt;
 
   @override
   Future<AgentAccessDecision> confirmAgentAccess(AgentAccessPrompt prompt) {
@@ -1818,7 +2081,9 @@ class _FakeSecurityModalService implements SecurityModalService {
   @override
   Future<AgentCommandDecision> confirmAgentCommand(AgentCommandPrompt prompt) {
     commandCallCount += 1;
-    return Future.value(commandDecision);
+    lastCommandPrompt = prompt;
+    if (!commandStarted.isCompleted) commandStarted.complete();
+    return commandGate?.future ?? Future.value(commandDecision);
   }
 
   @override

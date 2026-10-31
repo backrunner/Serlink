@@ -1,5 +1,68 @@
 part of '../workspace_screen.dart';
 
+class _McpCommandApprovalSection extends ConsumerStatefulWidget {
+  const _McpCommandApprovalSection();
+
+  @override
+  ConsumerState<_McpCommandApprovalSection> createState() =>
+      _McpCommandApprovalSectionState();
+}
+
+class _McpCommandApprovalSectionState
+    extends ConsumerState<_McpCommandApprovalSection> {
+  bool _saving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final settings = ref.watch(mcpCommandApprovalSettingsProvider);
+    return _McpCard(
+      children: [
+        _McpListItem(
+          icon: Icons.fast_forward_outlined,
+          title: l10n.settingsMcpBypassTitle,
+          subtitle: settings.hasError
+              ? l10n.settingsMcpBypassUnavailable
+              : settings.value?.bypass == true
+              ? l10n.settingsMcpBypassEnabled
+              : l10n.settingsMcpBypassDisabled,
+          action: _SettingsSwitch(
+            key: const ValueKey('settings-mcp-command-bypass'),
+            semanticsLabel: l10n.settingsMcpBypassTitle,
+            value: settings.value?.bypass ?? false,
+            onChanged: _saving || !settings.hasValue || settings.hasError
+                ? null
+                : (value) async {
+                    setState(() => _saving = true);
+                    try {
+                      await ref
+                          .read(mcpCommandApprovalProvider)
+                          .saveBypass(value);
+                      ref.invalidate(mcpCommandApprovalSettingsProvider);
+                    } on Object {
+                      if (context.mounted) {
+                        _showSnackBar(
+                          context,
+                          l10n.settingsMcpBypassUnavailable,
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _saving = false);
+                    }
+                  },
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          l10n.settingsMcpBypassDescription,
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: context.tokens.textSecondary),
+        ),
+      ],
+    );
+  }
+}
+
 class _McpCommandGuardSection extends ConsumerWidget {
   const _McpCommandGuardSection();
 

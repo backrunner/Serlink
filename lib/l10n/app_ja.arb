@@ -978,5 +978,10 @@
   "settingsMcpExistingConnectionGrant": "既存の接続",
   "settingsMcpGuardSharingConsent": "完全なエージェントコマンドをリスク判定のため TypeSafe に送信することに同意します。機密情報が含まれる場合があり、リクエストデータが保持される可能性を理解しています。",
   "settingsMcpGuardConsentRequired": "モデル保護を有効にする前にコマンド共有に同意してください。",
-  "settingsMcpGuardPrivacyPolicy": "TypeSafe プライバシーポリシー"
+  "settingsMcpGuardPrivacyPolicy": "TypeSafe プライバシーポリシー",
+  "settingsMcpBypassTitle": "コマンド承認をバイパス",
+  "settingsMcpBypassEnabled": "通常のコマンドを自動実行",
+  "settingsMcpBypassDisabled": "標準モード · コマンドごとに確認",
+  "settingsMcpBypassDescription": "バイパスは通常のコマンドの承認を省略します。削除、破壊的な変更、内容を判断できないスクリプトは毎回承認が必要です。ディスクを破壊する操作は引き続きブロックされます。ホストへのアクセス承認、保管庫のロック解除、有効なモデル保護は引き続き適用されます。この設定はこの端末にのみ保存されます。",
+  "settingsMcpBypassUnavailable": "コマンド承認設定を読み込みまたは保存できません"
 }

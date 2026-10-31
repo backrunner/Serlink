@@ -30,6 +30,34 @@ import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
 void main() {
+  testWidgets('bypass setting persists without replacing active bridge', (
+    tester,
+  ) async {
+    _useLargeSurface(tester);
+    final container = await _pumpSerlinkApp(
+      tester,
+      serverController: _FakeMcpServerController(),
+    );
+    await _openMcpManager(tester);
+    final policy = container.read(mcpCommandApprovalProvider);
+    final bridge = container.read(agentSessionBridgeProvider);
+    expect((await policy.read()).bypass, isFalse);
+    final toggle = find.byKey(const ValueKey('settings-mcp-command-bypass'));
+    await tester.ensureVisible(toggle);
+    await tester.pumpAndSettle();
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect((await policy.read()).bypass, isTrue);
+    expect(
+      identical(container.read(agentSessionBridgeProvider), bridge),
+      isTrue,
+    );
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+    expect((await policy.read()).bypass, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final scenario in [
     (size: const Size(1000, 760), scale: 1.0, dark: false),
     (size: const Size(1000, 760), scale: 1.0, dark: true),
@@ -332,6 +360,7 @@ void main() {
         ref: ref,
         authorization: ref.watch(mcpAuthorizationServiceProvider),
         riskPolicy: CommandRiskPolicy(),
+        commandApproval: ref.watch(mcpCommandApprovalProvider),
         securityModalService: _FakeSecurityModalService(),
       ),
       agentSessionsStream: Stream.value([handle]),
@@ -611,6 +640,7 @@ class _RecordingAgentSessionBridge extends AgentSessionBridge {
     required super.ref,
     required super.authorization,
     required super.riskPolicy,
+    required super.commandApproval,
     required super.securityModalService,
   });
 

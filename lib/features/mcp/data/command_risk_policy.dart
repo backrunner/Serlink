@@ -5,49 +5,40 @@ import '../domain/command_risk.dart';
 /// This is deliberately NOT a full shell parser. Commands are normalized
 /// (trimmed, whitespace collapsed) and matched against an ordered list of
 /// rules; the first matching rule wins. It does not resolve variables,
-/// aliases, quotes, command substitution, or escaping tricks, so it must be
+/// aliases, command substitution, or arbitrary shell semantics, so it must be
 /// treated as a safety net layered on top of user confirmation, not as a
 /// sandbox.
 ///
-/// Rule order: blocked rules first, then [additionalSafePatterns] (session
-/// allowlist), then needsConfirm rules. Anything unmatched is safe.
+/// Rule order: blocked rules first, then mandatory confirmation rules. An
+/// allowlist cannot waive confirmation for a dangerous command. Anything
+/// unmatched is safe for bypass mode, not proven harmless in a remote shell.
 class CommandRiskPolicy {
   CommandRiskPolicy({List<RegExp> additionalSafePatterns = const []})
     : additionalSafePatterns = List.unmodifiable(additionalSafePatterns);
 
-  /// Per-session allowlist: commands matching any of these are assessed
-  /// [CommandRiskLevel.safe] only after hard blocking rules are checked.
+  /// Retained for callers with legacy allowlists. Patterns no longer waive
+  /// risk rules; unmatched commands already qualify for bypass without them.
   final List<RegExp> additionalSafePatterns;
 
   CommandRiskAssessment assess(String command) {
-    final normalized = command.trim().replaceAll(RegExp(r'\s+'), ' ');
+    // Join quoted fragments as a conservative matching view (r''m, 'rm',
+    // "/bin/rm"). This may flag quoted prose; it never changes sent bytes.
+    final normalized = command
+        .trim()
+        .replaceAll(RegExp(r'''['"]'''), '')
+        .replaceAll(RegExp(r'[^\S\r\n]+'), ' ');
     if (normalized.isEmpty) {
       return CommandRiskAssessment(
         level: CommandRiskLevel.safe,
         command: command,
       );
     }
-    for (final rule in _rules.where(
-      (rule) => rule.level == CommandRiskLevel.blocked,
-    )) {
-      if (rule.matches(normalized)) {
-        return CommandRiskAssessment(
-          level: rule.level,
-          matchedRule: rule.id,
-          command: command,
-        );
-      }
-    }
-    for (final pattern in additionalSafePatterns) {
-      if (pattern.hasMatch(normalized)) {
-        return CommandRiskAssessment(
-          level: CommandRiskLevel.safe,
-          command: command,
-        );
-      }
-    }
+    // Preserve statement boundaries for script detection, while retaining a
+    // whitespace-only view for multiline destructive constructs (fork bombs).
+    final flattened = normalized.replaceAll(RegExp(r'[\r\n]+'), ' ');
+    final statements = normalized.replaceAll(RegExp(r'[\r\n]+'), ';');
     for (final rule in _rules) {
-      if (rule.matches(normalized)) {
+      if (rule.matches(flattened) || rule.matches(statements)) {
         return CommandRiskAssessment(
           level: rule.level,
           matchedRule: rule.id,
@@ -71,8 +62,13 @@ class _Rule {
 
   bool matches(String command) => _matcher(command);
 
-  static _Rule regex(String id, CommandRiskLevel level, String pattern) {
-    final regex = RegExp(pattern);
+  static _Rule regex(
+    String id,
+    CommandRiskLevel level,
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
+    final regex = RegExp(pattern, caseSensitive: caseSensitive);
     return _Rule(id, level, regex.hasMatch);
   }
 }
@@ -104,6 +100,25 @@ final List<_Rule> _rules = [
     CommandRiskLevel.needsConfirm,
     _isRmRecursiveForce,
   ),
+  // Every deletion needs a fresh decision, including non-recursive deletion
+  // and commands embedded in wrappers, pipelines or compound shell input.
+  _Rule.regex(
+    'file_delete',
+    CommandRiskLevel.needsConfirm,
+    r'\b(rm|rmdir|unlink|shred|srm|del|delete|erase|rd|Remove-Item|Clear-RecycleBin)\b|\bfind\b[^;|]*\s-delete\b',
+    caseSensitive: false,
+  ),
+  _Rule.regex(
+    'destructive_cleanup',
+    CommandRiskLevel.needsConfirm,
+    r'\b(git\s+([^;|&]*\s)?(clean|reset|restore|checkout)\b|git\b[^;|&]*\b(branch|tag)\b[^;|&]*\s-[a-zA-Z]*d\b|(?:docker|podman)\b[^;|&]*\b(rm|rmi|prune)\b|destroy|flushall|flushdb|(?:drop|truncate)\s+(?:table|database|schema)\b)',
+    caseSensitive: false,
+  ),
+  _Rule.regex(
+    'file_overwrite',
+    CommandRiskLevel.needsConfirm,
+    r'\b(truncate|wipefs|blkdiscard|fdisk|sfdisk|parted|mv|cp|tee)\b|\bsed\b[^;|&]*\s(?:-[a-zA-Z]*i|--in-place)\b',
+  ),
   _Rule.regex(
     'system_power',
     CommandRiskLevel.needsConfirm,
@@ -133,7 +148,7 @@ final List<_Rule> _rules = [
   _Rule.regex(
     'git_push_force',
     CommandRiskLevel.needsConfirm,
-    r'\bgit\s+push\b[^|;&]*(--force\b|-f\b|--force-with-lease\b)',
+    r'\bgit\s+[^|;&]*\bpush\b[^|;&]*(--force\b|-f\b|--force-with-lease\b)',
   ),
   _Rule.regex(
     'overwrite_shell_config',
@@ -153,12 +168,24 @@ final List<_Rule> _rules = [
   _Rule.regex(
     'systemctl_destructive',
     CommandRiskLevel.needsConfirm,
-    r'\bsystemctl\s+(stop|disable|mask)\b',
+    r'\bsystemctl\s+[^|;&]*\b(stop|disable|mask)\b',
   ),
   _Rule.regex(
     'crontab_remove',
     CommandRiskLevel.needsConfirm,
     r'\bcrontab\s+-[\w-]*r\b',
+  ),
+  // Opaque evaluation cannot inherit bypass permission: quoted/escaped
+  // executable names, variables, substitutions and scripts may hide deletion.
+  _Rule.regex(
+    'dynamic_execution',
+    CommandRiskLevel.needsConfirm,
+    r'[$`\\]|(?:^|[\s;&|()])(?:[^\s;&|()]*/)?(?:eval|exec|source|sh|bash|zsh|dash|ksh|fish|python\d*(?:\.\d+)?|perl|ruby|node|nodejs|php|lua|osascript|powershell|pwsh|cmd)\b|(?:^|[;&|]\s*)\.(?:/|\s)|(?:^|[;&|]\s*)[\w./-]+\.(sh|py|pl|rb|js|ps1|bat|cmd)\b',
+  ),
+  _Rule.regex(
+    'output_redirection',
+    CommandRiskLevel.needsConfirm,
+    r'(^|[^>])>(?![>&])\s*(?!/dev/null(?:\s|$))[^\s&]',
   ),
 ];
 
@@ -190,11 +217,12 @@ bool _isRmRecursiveForce(String command) {
 }
 
 bool _isRecursivePermChangeOnSystemDir(String command) {
-  final match = RegExp(r'\b(?:chmod|chown)\s+([^|;&]*)').firstMatch(command);
-  if (match == null) {
-    return false;
-  }
-  final args = match.group(1)!;
+  return RegExp(r'\b(?:chmod|chown)\s+([^|;&]*)')
+      .allMatches(command)
+      .any((match) => _hasRecursiveSystemPermissions(match.group(1)!));
+}
+
+bool _hasRecursiveSystemPermissions(String args) {
   if (!RegExp(r'(^|\s)-[\w-]*R[\w-]*(\s|$)').hasMatch(args)) {
     return false;
   }

@@ -59,7 +59,11 @@ const serlinkMcpInstructions =
     '- command_blocked / command_denied means the risk policy rejected '
     'the command — do not rephrase, split, encode, or otherwise disguise '
     'it to get it through.\n'
-    '- With model command protection enabled, submit complete commands with '
+    '- Standard mode requires approval for every command. User-enabled bypass '
+    'runs ordinary commands automatically, but risky commands still require '
+    'approval each time and hard blocks remain. Bypass never grants host access '
+    'or disables model protection. Only the user can change this in Serlink.\n'
+    '- In either mode, submit complete commands with '
     'serlink_exec. serlink_send_input accepts complete submitted commands or '
     'Ctrl-C only; partial input, editing/history controls and bare Enter are '
     'blocked. If command_input_reset_required is reported, send Ctrl-C before '
@@ -213,9 +217,11 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
     name: 'serlink_exec',
     description:
         'Run a shell command in an open Serlink session and return the '
-        'terminal screen after the output settles. Risky commands require '
-        'user confirmation in the Serlink app; destructive commands are '
-        'blocked outright. Optional model protection also blocks dangerous or '
+        'terminal screen after the output settles. Standard mode confirms every '
+        'command. User-enabled bypass skips ordinary command approvals, but '
+        'deletion and other risky commands require fresh approval each time. '
+        'Disk destruction and fork bombs remain blocked outright. '
+        'Optional model protection also blocks dangerous or '
         'uncertain judgments and failed checks before any input is sent. The result is the last screen lines (including '
         'the echoed command), not a byte-exact output capture.',
     inputSchema: JsonSchema.object(
@@ -254,11 +260,9 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
   'serlink_send_input': SerlinkMcpTool(
     name: 'serlink_send_input',
     description:
-        'Send raw keystrokes to an open Serlink session, for interactive '
-        'programs (e.g. answering a prompt or pressing keys in a TUI). '
-        'Text containing newlines submits commands and is checked against '
-        'the same risk policy as serlink_exec. When model protection is enabled, '
-        'only complete submitted commands or Ctrl-C are accepted; partial input, '
+        'Send complete submitted commands or Ctrl-C to an open Serlink session. '
+        'Both standard and bypass modes enforce the same input and risk checks '
+        'as serlink_exec; partial input, '
         'editing/history controls and bare Enter are blocked.',
     inputSchema: JsonSchema.object(
       properties: {
@@ -266,7 +270,8 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
           description: 'Session id from serlink_open_session.',
         ),
         'text': JsonSchema.string(
-          description: 'Raw input text, e.g. "y\\n" or arrow-key escapes.',
+          description:
+              'A complete command ending in a newline, or Ctrl-C (U+0003).',
         ),
       },
       required: ['sessionId', 'text'],

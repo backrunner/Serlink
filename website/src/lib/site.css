@@ -147,9 +147,17 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 .sd-prose blockquote p { margin: 0; }
 .sd-prose hr { border: 0; border-top: 1px solid var(--sl-line); margin: 32px 0; }
 .sd-prose :not(pre) > code { background: var(--sl-soft); padding: 2px 5px; border-radius: 4px; font-size: .9em; }
-.sd-code { border: 1px solid var(--sl-line); border-radius: 9px; margin: 24px 0; background: var(--sl-panel); }
-.sd-code-header { background: var(--sl-soft); border-bottom: 1px solid var(--sl-line); padding: 9px 14px; display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--sl-muted); }
-.sd-code pre { padding: 18px; margin: 0; overflow: auto; font-size: 12px; line-height: 1.8; background: transparent !important; }
+.sd-code { border: 1px solid var(--sl-line); border-radius: 9px; margin: 24px 0; background: var(--sl-panel); font-size: 12px; line-height: 1.8; tab-size: 2; overflow: hidden; }
+.sd-code-header { background: var(--sl-soft); border-bottom: 1px solid var(--sl-line); padding: 9px 14px; display: flex; align-items: center; gap: 10px; font-size: 11px; font-family: var(--font-sans); color: var(--sl-muted); white-space: normal; }
+/* Svedocs renders the frame as <pre>, with a scrollable <code> and one span per line. */
+.sd-code code { display: block; padding: 14px 0; font-size: inherit; line-height: inherit; color: inherit; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+.sd-code .line { display: flex; width: max-content; min-width: 100%; padding: 0 18px; min-height: 1.8em; }
+.sd-code .sd-line-no { flex: 0 0 2em; margin-right: 14px; padding-right: 12px; border-right: 1px solid var(--sl-line); text-align: right; color: var(--sl-muted); font-variant-numeric: tabular-nums; user-select: none; }
+.sd-code .sd-line-content { flex: 1; min-width: 0; }
+.sd-code .sd-line-content:empty::before { content: '\00a0'; }
+.sd-code[data-no-line-numbers='true'] .sd-line-no { display: none; }
+.sd-code.shiki, .sd-code.shiki span[style*='--shiki-light:'] { color: var(--shiki-light); }
+:root[data-theme='dark'] .sd-code.shiki, :root[data-theme='dark'] .sd-code.shiki span[style*='--shiki-dark:'] { color: var(--shiki-dark); }
 .sd-code-copy { border: 1px solid var(--sl-line); border-radius: 4px; padding: 3px 7px; margin-left: auto; font-size: 10px; background: var(--sl-panel); }
 .sd-code-copy svg { width: 13px; height: 13px; }
 .sd-prose table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 24px 0; }

@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  },
   "scripts": {
     "dev": "svedocs dev",
     "build": "svedocs build",
@@ -16,11 +19,11 @@
     "test:support": "node --experimental-strip-types --test tests/support-intake.test.ts"
   },
   "dependencies": {
-    "@sveltejs/adapter-static": "3.0.10",
-    "@sveltejs/kit": "2.70.3",
+    "@sveltejs/adapter-static": "4.0.1",
+    "@sveltejs/kit": "3.1.1",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@tailwindcss/vite": "4.3.3",
-    "svedocs": "0.2.3",
+    "svedocs": "0.3.0",
     "svelte": "5.57.1",
     "tailwindcss": "4.3.3",
     "vite": "8.3.1"
@@ -28,7 +31,7 @@
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@types/node": "26.6.3",
-    "svedocs-cli": "0.2.3",
+    "svedocs-cli": "0.3.0",
     "svelte-check": "4.7.6",
     "typescript": "^6.0.3",
     "wrangler": "4.149.0"

@@ -1,6 +1,6 @@
 # Serlink official website
 
-A custom product website and usage guide built with **svedocs 0.2.3** and Svelte 5.
+A custom product website and usage guide built with **svedocs 0.3.0**, SvelteKit 3 and Svelte 5.
 The canonical domain is **https://serlink.alkinum.com**. Support uses
 the OnFire support form. The domain and support integration are configuration;
 a local build does not establish live hosting, ticket creation or reply delivery.
@@ -13,8 +13,8 @@ for hosts, terminals, SFTP, vault recovery, sync and macOS MCP access.
 ## Develop and validate
 
 Use Node 24 LTS or newer and the package manager pinned in `package.json`.
-TypeScript is constrained to 6.x. Package versions were verified against the
-registry on 2026-10-11; use the checked-in lockfile for reproducible installs.
+TypeScript is constrained to 6.x. The svedocs and SvelteKit versions were checked
+against the registry on 2026-11-02; use the checked-in lockfile for reproducible installs.
 
 ```sh
 cd website
@@ -38,6 +38,19 @@ against the Cloudflare local static-assets server at port 4189; they cover deskt
 three languages, search scoping and keyboard operation, theme persistence,
 language switching with translated fragments, code copying, 404 navigation and
 static discovery endpoints. Screenshots are saved under ignored `test-results/`.
+Code-block tests cover line layout, syntax colors and contrast in both themes,
+mobile horizontal scrolling, exact keyboard copying and rendering without JavaScript.
+The page-style audit discovers every route from the built sitemap and checks both
+themes at desktop and 320px widths, including prose bounds, code line layout,
+table borders, list markers and document anchor offsets. Full-page screenshots
+are saved under `.svedocs/style-review/local/`. After deployment, run the same
+read-only audit against production:
+
+```sh
+SERLINK_TEST_BASE_URL=https://serlink.alkinum.com pnpm exec playwright test tests/page-styles.spec.ts
+```
+
+Production audit screenshots go under `.svedocs/style-review/live/`.
 The homepage demo tests cover command input and history, independent host
 sessions, file previews, simulated transfers, snippets, reset, narrow layouts,
 both themes and the screenshot fallback when JavaScript is disabled.
@@ -45,7 +58,7 @@ both themes and the screenshot fallback when JavaScript is disabled.
 ## Structure
 
 - `svedocs.config.ts`: typed site metadata, i18n, navigation, SEO and local search.
-- `vite.config.ts`: replacement theme registrations.
+- `vite.config.ts`: replacement theme registrations, Svelte preprocessing and static adapter.
 - `src/lib/Landing.svelte`: custom homepage composed through the `DocsApp` landing slot.
 - `src/lib/demo/`: browser-only workspace demo, sample command/file data and
   localized interaction labels. Commands read a fixed set of sample records;

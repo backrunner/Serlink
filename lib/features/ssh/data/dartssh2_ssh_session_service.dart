@@ -25,7 +25,7 @@ typedef SshSocketFactory = Future<SSHSocket> Function(
   Duration? timeout,
 });
 
-class DartSsh2SessionService implements SshSessionService {
+class DartSsh2SessionService implements SshSessionService, SshCommandService {
   static const _probeTimeout = Duration(seconds: 5);
 
   DartSsh2SessionService({
@@ -114,6 +114,19 @@ class DartSsh2SessionService implements SshSessionService {
       ),
     );
     return shell;
+  }
+
+  @override
+  Future<SshCommandProcess> openCommand({
+    required SessionId sessionId,
+    String? cwd,
+  }) async {
+    final client = _activeClient(sessionId);
+    String quote(String value) => "'${value.replaceAll("'", "'\\''")}'";
+    final command = cwd == null
+        ? 'exec sh -s'
+        : 'cd -- ${quote(cwd)} && exec sh -s';
+    return _DartSsh2CommandProcess(await client.execute(command));
   }
 
   @override
@@ -1285,4 +1298,32 @@ Future<void> _pipeRemoteForward(
   } finally {
     await socket?.close();
   }
+}
+
+class _DartSsh2CommandProcess implements SshCommandProcess {
+  _DartSsh2CommandProcess(this._session);
+  final SSHSession _session;
+  @override
+  Stream<List<int>> get stdout => _session.stdout;
+  @override
+  Stream<List<int>> get stderr => _session.stderr;
+  @override
+  Future<void> get done => _session.done;
+  @override
+  int? get exitCode => _session.exitCode;
+  @override
+  String? get exitSignal => _session.exitSignal?.signalName;
+  @override
+  Future<void> write(List<int> bytes) async {
+    // The channel handles SSH window flow control. Flushing the shared socket
+    // here races with window-adjust/PTY packets while IOSink is stream-bound.
+    _session.write(Uint8List.fromList(bytes));
+  }
+
+  @override
+  Future<void> closeInput() => _session.stdin.close();
+  @override
+  Future<void> interrupt() async => _session.kill(SSHSignal.INT);
+  @override
+  Future<void> close() async => _session.close();
 }

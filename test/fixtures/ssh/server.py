@@ -9,6 +9,7 @@ import getpass
 import json
 import pathlib
 import socket
+import shlex
 
 import asyncssh
 
@@ -17,6 +18,7 @@ async def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=pathlib.Path)
     parser.add_argument("--openssh", help="Optional absolute path to a local sshd executable")
+    parser.add_argument("--command-jobs", action="store_true", help="Allow managed scripts in the disposable workspace only")
     args = parser.parse_args()
     root = args.directory.resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -80,7 +82,55 @@ async def main():
         def connection_requested(self, dest_host, dest_port, orig_host, orig_port):
             return dest_host == "127.0.0.1" and dest_port in ports.values()
 
+    async def command_job(process):
+        parts = shlex.split(process.command or "")
+        cwd = root / "workspace"
+        if parts != ["exec", "sh", "-s"]:
+            if len(parts) != 7 or parts[:2] != ["cd", "--"] or parts[3:] != ["&&", "exec", "sh", "-s"]:
+                process.exit(126)
+                return
+            cwd = pathlib.Path(parts[2]).resolve()
+            if not cwd.is_relative_to(root / "workspace"):
+                process.exit(126)
+                return
+        child = await asyncio.create_subprocess_exec(
+            "/bin/sh", "-s", cwd=cwd, stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        async def feed():
+            try:
+                async for text in process.stdin:
+                    child.stdin.write(text.encode())
+                    await child.stdin.drain()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            finally:
+                child.stdin.close()
+        async def output(reader, writer):
+            import codecs
+            decoder = codecs.getincrementaldecoder("utf-8")("replace")
+            while data := await reader.read(32768):
+                writer.write(decoder.decode(data))
+            writer.write(decoder.decode(b"", final=True))
+        tasks = [asyncio.create_task(feed()), asyncio.create_task(output(child.stdout, process.stdout)),
+                 asyncio.create_task(output(child.stderr, process.stderr))]
+        try:
+            code = await child.wait()
+            await asyncio.gather(*tasks)
+            process.exit(code)
+        finally:
+            for task in tasks:
+                task.cancel()
+            if child.returncode is None:
+                child.terminate()
+                await child.wait()
+
     async def shell(process):
+        if process.command is not None:
+            if args.command_jobs:
+                await command_job(process)
+            else:
+                process.exit(126)
+            return
         process.stdout.write("fixture-ready\r\n")
         try:
             while True:
@@ -129,7 +179,8 @@ async def main():
         )
         servers.append(server)
         ports[name] = server.get_port()
-    settings = {"ports": ports, "fingerprint": host_key.get_fingerprint()}
+    settings = {"ports": ports, "fingerprint": host_key.get_fingerprint(),
+                "commandJobs": args.command_jobs, "workspace": str(root / "workspace")}
     (root / "fixture.json").write_text(json.dumps(settings))
     print(json.dumps(settings), flush=True)
     try:

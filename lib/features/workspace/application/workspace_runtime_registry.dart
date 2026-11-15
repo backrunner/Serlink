@@ -19,6 +19,11 @@ class WorkspaceRuntimeRegistry {
   final TerminalTargetPlatform terminalPlatform;
   final MultilinePasteConfirmation? confirmMultilinePaste;
   final TerminalZModemTransferHandler? zmodemTransferHandler;
+  Future<void> Function(SessionId, String)? outputObserver;
+  final _inputEvents =
+      StreamController<({SessionId sessionId, String text})>.broadcast();
+  Stream<({SessionId sessionId, String text})> get terminalInputs =>
+      _inputEvents.stream;
   final Map<SessionId, Terminal> _terminals = {};
   final Map<SessionId, TerminalAdapter> _terminalAdapters = {};
   final Map<SessionId, SftpConnection> _sftpConnections = {};
@@ -75,6 +80,12 @@ class WorkspaceRuntimeRegistry {
       session: session,
       confirmMultilinePaste: confirmMultilinePaste,
       zmodemTransferHandler: zmodemTransferHandler,
+      onText: (text) => outputObserver?.call(sessionId, text),
+      onInput: (text) {
+        if (!_inputEvents.isClosed) {
+          _inputEvents.add((sessionId: sessionId, text: text));
+        }
+      },
     );
     adapter.attach();
     _terminalAdapters[sessionId] = adapter;
@@ -107,5 +118,6 @@ class WorkspaceRuntimeRegistry {
       await closeSession(sessionId);
     }
     _terminals.clear();
+    await _inputEvents.close();
   }
 }

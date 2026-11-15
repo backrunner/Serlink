@@ -11,6 +11,8 @@ import 'package:serlink/features/ssh/domain/connection_profile.dart';
 import 'package:serlink/features/terminal/application/terminal_adapter.dart';
 import 'package:serlink/features/terminal/application/terminal_zmodem_transfer.dart';
 import 'package:xterm/xterm.dart';
+import 'package:serlink/features/mcp/application/mcp_command_job.dart';
+import 'package:serlink/features/mcp/data/command_output_store.dart';
 
 void main() {
   final root = Platform.environment['SERLINK_SSH_FIXTURE'];
@@ -19,9 +21,9 @@ void main() {
     () {
       late Map<String, dynamic> fixture;
       setUpAll(() {
-        fixture =
-            jsonDecode(File('$root/fixture.json').readAsStringSync())
-                as Map<String, dynamic>;
+        fixture = jsonDecode(
+          File('$root/fixture.json').readAsStringSync(),
+        ) as Map<String, dynamic>;
       });
 
       ConnectionProfileSnapshot profile(
@@ -101,6 +103,64 @@ void main() {
           );
         }
       }
+
+      test('managed SSH channel streams a long script, preserves all pages and reports real exit status', () async {
+        if (fixture['commandJobs'] != true) return;
+        final ssh = service();
+        final config = profile('gcm');
+        final shell = await ssh.openShell(config);
+        final adapter = TerminalAdapter(terminal: Terminal(), session: shell)
+          ..attach();
+        addTearDown(adapter.close);
+        final cwd = '${fixture['workspace']}/job-it\'s-中文-dir';
+        await Directory(cwd).create();
+        final process = await ssh.openCommand(
+          sessionId: config.sessionId,
+          cwd: cwd,
+        );
+        final output = await CommandOutputStore.create();
+        final source =
+            '#${'x' * (3 * 1024 * 1024)}\npwd\nprintf "first-中文🙂\n"\nprintf "stderr-marker\n" >&2\nsleep 0.6\n'
+            'i=0; while [ "\$i" -lt 12000 ]; do printf "row-%05d\n" "\$i"; i=\$((i+1)); done\nprintf "tail-marker\n"\nexit 7\n';
+        final job = McpCommandJob(
+          id: 'real-ssh',
+          sessionId: config.sessionId,
+          process: process,
+          output: output,
+          commandBytes: utf8.encode(source).length,
+          cwd: cwd,
+          display: (_) {},
+        );
+        addTearDown(job.dispose);
+        job.start(source, validateInput: () {});
+        expect(
+          (await job.read(wait: const Duration(milliseconds: 100)))['finished'],
+          isFalse,
+        );
+        var cursor = 0;
+        final all = StringBuffer();
+        final deadline = DateTime.now().add(const Duration(seconds: 20));
+        Map<String, Object?> page;
+        do {
+          if (DateTime.now().isAfter(deadline)) fail('SSH job did not finish');
+          page = await job.read(
+            cursor: cursor,
+            maxChars: 16381,
+            wait: const Duration(milliseconds: 100),
+          );
+          all.write(page['output']);
+          cursor = page['nextCursor'] as int;
+        } while (page['finished'] != true || page['hasMore'] == true);
+        expect(page['exitCode'], 7);
+        expect(page['outputTruncated'], isFalse);
+        expect(all.toString(), contains(cwd));
+        expect(all.toString(), contains('first-中文🙂'));
+        expect(all.toString(), contains('stderr-marker'));
+        expect(all.toString(), contains('row-00000'));
+        expect(all.toString(), contains('row-11999'));
+        expect(all.toString(), contains('tail-marker'));
+        expect(await ssh.probeShell(sessionId: config.sessionId), isTrue);
+      });
 
       test('private key and keyboard interactive authentication', () async {
         for (final methods in <List<SshAuthMethod>>[

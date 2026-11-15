@@ -21,11 +21,15 @@ class TerminalAdapter {
     required SshShellSession session,
     MultilinePasteConfirmation? confirmMultilinePaste,
     TerminalZModemTransferHandler? zmodemTransferHandler,
+    void Function(String)? onInput,
+    Future<void>? Function(String)? onText,
   }) : this._(
          terminal,
          session,
          TerminalPasteGuard(confirmMultilinePaste: confirmMultilinePaste),
          zmodemTransferHandler,
+         onInput,
+         onText,
        );
 
   TerminalAdapter._(
@@ -33,14 +37,18 @@ class TerminalAdapter {
     this._session,
     this._pasteGuard,
     this._zmodemTransferHandler,
+    this._onInput,
+    this._onText,
   );
 
+  final void Function(String)? _onInput;
+  final Future<void>? Function(String)? _onText;
   final Terminal _terminal;
   final SshShellSession _session;
   final TerminalPasteGuard _pasteGuard;
   final TerminalZModemTransferHandler? _zmodemTransferHandler;
-  StreamSubscription<String>? _stdoutSubscription;
-  StreamSubscription<String>? _stderrSubscription;
+  StreamSubscription<void>? _stdoutSubscription;
+  StreamSubscription<void>? _stderrSubscription;
   ZModemMux? _zmodemMux;
   _SshShellSessionSink? _zmodemStdin;
   final StringBuffer _pendingTerminalWrite = StringBuffer();
@@ -81,15 +89,17 @@ class TerminalAdapter {
       // dartssh2 returns Stream<Uint8List> at runtime. Calling transform on
       // that covariant stream rejects Utf8Decoder's List<int> input type.
       // Binding the decoder accepts both List<int> and Uint8List streams.
-      _stdoutSubscription = const Utf8Decoder(
-        allowMalformed: true,
-      ).bind(_session.stdout).listen(_writeTextToTerminal);
+      _stdoutSubscription = const Utf8Decoder(allowMalformed: true)
+          .bind(_session.stdout)
+          .asyncMap<void>(_captureText)
+          .listen((_) {});
     } else {
       _attachZModemMux();
     }
-    _stderrSubscription = const Utf8Decoder(
-      allowMalformed: true,
-    ).bind(_session.stderr).listen(_writeTextToTerminal);
+    _stderrSubscription = const Utf8Decoder(allowMalformed: true)
+        .bind(_session.stderr)
+        .asyncMap<void>(_captureText)
+        .listen((_) {});
     _syncPreAttachedTerminalSize();
   }
 
@@ -135,7 +145,9 @@ class TerminalAdapter {
     _zmodemStdin = stdin;
     _zmodemMux =
         ZModemMux(stdin: stdin, stdout: _session.stdout.map(_asUint8List))
-          ..onTerminalInput = _writeTextToTerminal
+          ..onTerminalInput = (text) {
+            unawaited(_captureText(text));
+          }
           ..onFileOffer = _handleZModemFileOffer
           ..onFileRequest = _handleZModemFileRequest;
   }
@@ -244,6 +256,7 @@ class TerminalAdapter {
   }
 
   void _writeInput(String data) {
+    _onInput?.call(data);
     final mux = _zmodemMux;
     if (mux == null) {
       unawaited(_session.write(utf8.encode(data)));
@@ -300,6 +313,19 @@ class TerminalAdapter {
 
   void _writeZModemStatus(String message) {
     _writeTextToTerminal('\r\n$message\r\n');
+  }
+
+  Future<void>? _captureText(String text) {
+    // Keep the original synchronous rendering/batching path. When capture is
+    // active, asyncMap applies SSH backpressure until encrypted storage commits.
+    Future<void>? retained;
+    try {
+      retained = _onText?.call(text);
+    } on Object {
+      /* Observer owns its error state. */
+    }
+    _writeTextToTerminal(text);
+    return retained?.catchError((Object _) {});
   }
 
   void _writeTextToTerminal(String text) {

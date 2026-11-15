@@ -33,3 +33,9 @@ typed SSH byte streams through xterm with/without ZMODEM; Unicode, stderr, burst
 output, window changes, exit, connection loss/reconnect; production SFTP service.
 This does not exercise the OS SSH agent, hardware keys, real ZMODEM transfers,
 or every server/algorithm combination.
+
+Managed command-channel coverage is opt-in and confined to this disposable
+workspace. Start the fixture with `--command-jobs` to test `sh -s` source streaming,
+long UTF-8 output and a real nonzero exit status over the existing SSH connection.
+This mode runs only the test suite's scripts inside the fixture workspace; it
+never loads user SSH configuration or vault credentials.

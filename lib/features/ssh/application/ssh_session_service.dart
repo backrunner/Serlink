@@ -100,3 +100,24 @@ abstract interface class SshSessionService {
   });
   Future<void> stopDynamicForward({required SessionId sessionId});
 }
+
+/// A separate non-PTY process on an already authenticated terminal connection.
+/// The script is streamed to stdin, avoiding terminal line and exec argv limits.
+abstract interface class SshCommandService {
+  Future<SshCommandProcess> openCommand({
+    required SessionId sessionId,
+    String? cwd,
+  });
+}
+
+abstract interface class SshCommandProcess {
+  Stream<List<int>> get stdout;
+  Stream<List<int>> get stderr;
+  Future<void> get done;
+  int? get exitCode;
+  String? get exitSignal;
+  Future<void> write(List<int> bytes);
+  Future<void> closeInput();
+  Future<void> interrupt();
+  Future<void> close();
+}

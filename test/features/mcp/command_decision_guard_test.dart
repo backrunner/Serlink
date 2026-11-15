@@ -26,6 +26,156 @@ void main() {
     dataSharingConsent: true,
   );
 
+  test(
+    'existing settings without a provider keep Jev and its consent',
+    () async {
+      await enable();
+      final record = jsonDecode(
+        utf8.decode((await store.read(CommandDecisionGuard.secretRef))!),
+      ) as Map;
+      record.remove('provider');
+      record.remove('accountId');
+      record.remove('endpoint');
+      await store.write(
+        CommandDecisionGuard.secretRef,
+        utf8.encode(jsonEncode(record)),
+      );
+      final settings = await guard.readSettings();
+      expect(settings.connection.provider, CommandDecisionProvider.typesafe);
+      expect(settings.dataSharingConsent, isTrue);
+      await guard.check(command: 'ls');
+      expect(model.keys, ['fixture-key']);
+    },
+  );
+
+  test('switching recipient never reuses a previous key or consent', () async {
+    await enable();
+    await expectLater(
+      guard.saveSettings(
+        enabled: true,
+        model: 'gemini-decision-1',
+        connection: const CommandDecisionConnection(
+          provider: CommandDecisionProvider.gemini,
+        ),
+      ),
+      throwsA(_error('command_guard_invalid_configuration')),
+    );
+    await expectLater(
+      guard.saveSettings(
+        enabled: true,
+        model: 'gemini-decision-1',
+        apiKey: 'new-key',
+        connection: const CommandDecisionConnection(
+          provider: CommandDecisionProvider.gemini,
+        ),
+      ),
+      throwsA(_error('command_guard_consent_required')),
+    );
+    await guard.saveSettings(
+      enabled: false,
+      model: 'gemini-decision-1',
+      connection: const CommandDecisionConnection(
+        provider: CommandDecisionProvider.gemini,
+      ),
+    );
+    final settings = await guard.readSettings();
+    expect(settings.hasApiKey, isFalse);
+    expect(settings.dataSharingConsent, isFalse);
+  });
+
+  test(
+    'self-hosted protection needs consent but can omit an API key',
+    () async {
+      const local = CommandDecisionConnection(
+        provider: CommandDecisionProvider.local,
+        endpoint: 'http://127.0.0.1:8000/v1/systemone',
+      );
+      await enable();
+      final oldPermit = await guard.check(command: 'ls');
+      await expectLater(
+        guard.saveSettings(enabled: true, model: 'clef', connection: local),
+        throwsA(_error('command_guard_consent_required')),
+      );
+      await guard.saveSettings(
+        enabled: true,
+        model: 'clef',
+        connection: local,
+        dataSharingConsent: true,
+      );
+      expect((await guard.readSettings()).hasApiKey, isFalse);
+      await expectLater(
+        guard.validate(oldPermit),
+        throwsA(_error('command_guard_changed')),
+      );
+      await guard.check(command: 'pwd');
+      expect(model.keys.last, '');
+      expect(model.connections.last.endpoint, local.endpoint);
+      await expectLater(
+        guard.saveSettings(
+          enabled: true,
+          model: 'clef',
+          connection: const CommandDecisionConnection(
+            provider: CommandDecisionProvider.local,
+            endpoint: 'http://127.0.0.1:9000/v1/systemone',
+          ),
+        ),
+        throwsA(_error('command_guard_consent_required')),
+      );
+    },
+  );
+
+  for (final provider in ['unknown', 123]) {
+    test('unknown provider $provider fails closed', () async {
+      await enable();
+      final record = jsonDecode(
+        utf8.decode((await store.read(CommandDecisionGuard.secretRef))!),
+      ) as Map;
+      record['provider'] = provider;
+      await store.write(
+        CommandDecisionGuard.secretRef,
+        utf8.encode(jsonEncode(record)),
+      );
+      await expectLater(
+        guard.check(command: 'ls'),
+        throwsA(_error('command_guard_unavailable')),
+      );
+      expect(model.commands, isEmpty);
+    });
+  }
+
+  test(
+    'older Jev-only readers never receive a different provider API key',
+    () async {
+      await guard.saveSettings(
+        enabled: true,
+        model: 'gemini-decision-1',
+        apiKey: 'google-fixture-key',
+        connection: const CommandDecisionConnection(
+          provider: CommandDecisionProvider.gemini,
+        ),
+        dataSharingConsent: true,
+      );
+      final record = jsonDecode(
+        utf8.decode((await store.read(CommandDecisionGuard.secretRef))!),
+      ) as Map;
+      expect(record['apiKey'], isEmpty);
+      expect(record['providerApiKey'], 'google-fixture-key');
+      expect((await guard.readSettings()).hasApiKey, isTrue);
+      await guard.check(command: 'pwd');
+      expect(model.keys, ['google-fixture-key']);
+    },
+  );
+
+  test(
+    'long commands reach the model intact within the 4 MiB budget',
+    () async {
+      await enable();
+      final source = "echo '${'x' * 150000}'";
+      await guard.check(command: source);
+      expect(model.commands.single, source);
+    },
+  );
+
   test('disabled by default, with no paid request', () async {
     final settings = await guard.readSettings();
     expect(settings.enabled, isFalse);
@@ -216,7 +366,9 @@ void main() {
         throwsA(_error('command_input_reset_required')),
       );
       await expectLater(
-        guard.check(command: '中' * 3000),
+        guard.check(
+          command: '中' * (CommandDecisionGuard.maxCommandBytes ~/ 3 + 1),
+        ),
         throwsA(_error('command_guard_input_too_large')),
       );
       expect(model.commands, isEmpty);
@@ -236,13 +388,16 @@ class _Model implements CommandDecisionModel {
   final List<String> commands = [];
   final List<String> keys = [];
   final List<String> models = [];
+  final List<CommandDecisionConnection> connections = [];
   @override
   Future<CommandDecision> assess({
     required String command,
     required String model,
     required String apiKey,
+    CommandDecisionConnection connection = const CommandDecisionConnection(),
   }) async {
     commands.add(command);
+    connections.add(connection);
     keys.add(apiKey);
     models.add(model);
     if (failure != null) throw failure!;

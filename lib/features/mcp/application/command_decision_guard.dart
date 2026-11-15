@@ -14,8 +14,10 @@ class CommandDecisionSettings {
     this.hasApiKey = false,
     this.revision = '',
     this.dataSharingConsent = false,
+    this.connection = const CommandDecisionConnection(),
   });
 
+  final CommandDecisionConnection connection;
   final bool enabled;
   final String model;
   final bool hasApiKey;
@@ -47,7 +49,7 @@ class CommandDecisionGuard {
   CommandDecisionGuard({
     required SecretStore secrets,
     required CommandDecisionModel model,
-    this.timeout = const Duration(seconds: 10),
+    this.timeout = const Duration(seconds: 35),
   }) : // Named parameters cannot initialize private fields directly.
        // ignore: prefer_initializing_formals
        _secrets = secrets,
@@ -55,7 +57,7 @@ class CommandDecisionGuard {
        _model = model;
 
   static const secretRef = SecretRef('serlink.mcp.command-decision.v1');
-  static const maxCommandBytes = 8192;
+  static const maxCommandBytes = 4 * 1024 * 1024;
   static const dataSharingConsentVersion = 1;
   final SecretStore _secrets;
   final CommandDecisionModel _model;
@@ -89,10 +91,34 @@ class CommandDecisionGuard {
         (decoded['revision'] as String).isEmpty) {
       throw const CommandDecisionException('command_guard_unavailable');
     }
-    final key = decoded['apiKey'] as String;
+    final providerName = decoded['provider'] ?? 'typesafe';
+    final providers = CommandDecisionProvider.values.where(
+      (p) => p.name == providerName,
+    );
+    if (providers.length != 1 ||
+        (decoded['accountId'] != null && decoded['accountId'] is! String) ||
+        (decoded['endpoint'] != null && decoded['endpoint'] is! String)) {
+      throw const CommandDecisionException('command_guard_unavailable');
+    }
+    final connection = CommandDecisionConnection(
+      provider: providers.single,
+      accountId: decoded['accountId'] as String? ?? '',
+      endpoint: decoded['endpoint'] as String? ?? '',
+    );
+    if (!connection.isValid(enabled: decoded['enabled'] as bool)) {
+      throw const CommandDecisionException('command_guard_unavailable');
+    }
+    final rawKey = connection.provider == CommandDecisionProvider.typesafe
+        ? decoded['apiKey']
+        : decoded['providerApiKey'] ?? '';
+    if (rawKey is! String) {
+      throw const CommandDecisionException('command_guard_unavailable');
+    }
+    final key = rawKey;
     return _Configuration(
       CommandDecisionSettings(
         enabled: decoded['enabled'] as bool,
+        connection: connection,
         model: decoded['model'] as String,
         hasApiKey: key.isNotEmpty,
         revision: decoded['revision'] as String,
@@ -104,7 +130,7 @@ class CommandDecisionGuard {
   }
 
   static bool isValidModel(String model) =>
-      RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$').hasMatch(model);
+      const CommandDecisionConnection().isValidModel(model);
 
   Future<void> saveSettings({
     required bool enabled,
@@ -112,22 +138,27 @@ class CommandDecisionGuard {
     String? apiKey,
     bool removeApiKey = false,
     bool? dataSharingConsent,
+    CommandDecisionConnection? connection,
   }) {
     _generation += 1;
     final result = _pendingSave.then((_) async {
       final previous = await _load();
       final name = model.trim();
+      final target = connection ?? previous.settings.connection;
+      final sameRecipient = target.sameRecipient(previous.settings.connection);
       final consent =
           !removeApiKey &&
-          (dataSharingConsent ?? previous.settings.dataSharingConsent);
+          (dataSharingConsent ??
+              (sameRecipient && previous.settings.dataSharingConsent));
       final key = removeApiKey
           ? ''
           : (apiKey?.trim().isNotEmpty == true
                 ? apiKey!.trim()
-                : previous.apiKey);
-      if (!isValidModel(name) ||
+                : (sameRecipient ? previous.apiKey : ''));
+      if (!target.isValid(enabled: enabled) ||
+          !target.isValidModel(name) ||
           (key.length > 4096 || key.contains(RegExp(r'[\r\n]'))) ||
-          (enabled && key.isEmpty)) {
+          (enabled && target.provider.requiresApiKey && key.isEmpty)) {
         throw const CommandDecisionException(
           'command_guard_invalid_configuration',
         );
@@ -140,8 +171,16 @@ class CommandDecisionGuard {
         utf8.encode(
           jsonEncode({
             'enabled': enabled,
+            'provider': target.provider.name,
+            'accountId': target.accountId,
+            'endpoint': target.endpoint,
             'model': name,
-            'apiKey': key,
+            // Old Jev-only apps see no key for another provider and fail closed.
+            'apiKey': target.provider == CommandDecisionProvider.typesafe
+                ? key
+                : '',
+            if (target.provider != CommandDecisionProvider.typesafe)
+              'providerApiKey': key,
             'revision': const Uuid().v4(),
             'dataSharingConsentVersion': consent
                 ? dataSharingConsentVersion
@@ -161,6 +200,7 @@ class CommandDecisionGuard {
     required String command,
     bool rawInput = false,
     bool hasUnsubmittedInput = false,
+    bool script = false,
   }) async {
     try {
       final config = await _readConfiguration().timeout(timeout);
@@ -169,7 +209,7 @@ class CommandDecisionGuard {
       if (!settings.dataSharingConsent) {
         throw const CommandDecisionException('command_guard_consent_required');
       }
-      if (!settings.hasApiKey) {
+      if (settings.connection.provider.requiresApiKey && !settings.hasApiKey) {
         throw const CommandDecisionException('command_guard_unavailable');
       }
       if (hasUnsubmittedInput) {
@@ -177,7 +217,13 @@ class CommandDecisionGuard {
       }
       // Control/history editing and partial submissions cannot be reconstructed
       // reliably in arbitrary shells and TUIs. Require whole checked commands.
-      if (command.contains(RegExp(r'[\x00-\x09\x0b\x0c\x0e-\x1f\x7f]')) ||
+      if (command.contains(
+            RegExp(
+              script
+                  ? r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]'
+                  : r'[\x00-\x09\x0b\x0c\x0e-\x1f\x7f]',
+            ),
+          ) ||
           (rawInput && !command.endsWith('\n') && !command.endsWith('\r'))) {
         throw const CommandDecisionException('command_input_requires_exec');
       }
@@ -193,6 +239,7 @@ class CommandDecisionGuard {
             command: command,
             model: settings.model,
             apiKey: config.apiKey,
+            connection: settings.connection,
           )
           .timeout(timeout);
       if (decision != CommandDecision.safe) {

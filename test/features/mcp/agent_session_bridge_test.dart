@@ -2164,6 +2164,7 @@ class _DecisionModel implements CommandDecisionModel {
     required String command,
     required String model,
     required String apiKey,
+    CommandDecisionConnection connection = const CommandDecisionConnection(),
   }) async {
     commands.add(command);
     if (failure != null) throw failure!;

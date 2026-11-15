@@ -1,9 +1,6 @@
 import '../../../core/ids/entity_id.dart';
 
-/// Permission to discover metadata, open sessions on a host, or control one
-/// existing connection. Discovery grants have no host ID.
-///
-/// A grant with a null [expiresAt] stays valid until the app quits.
+/// Client-wide remembered consent, or a narrowly scoped transient grant.
 class AgentGrant {
   const AgentGrant({
     required this.grantId,
@@ -13,6 +10,7 @@ class AgentGrant {
     this.expiresAt,
     this.sessionId,
     this.discoveryStrict,
+    this.clientWide = false,
   });
 
   /// Unique grant identifier (uuid).
@@ -24,17 +22,20 @@ class AgentGrant {
   /// Host this grant is scoped to.
   final HostId? hostId;
 
-  /// Existing connections require their own grant, separate from new sessions.
+  /// Restricts legacy scoped grants to one existing connection.
   final SessionId? sessionId;
 
   /// Discovery grants have no host; consent is scoped to the privacy setting.
   final bool? discoveryStrict;
 
+  /// Remembered client consent covers discovery and all host connections.
+  final bool clientWide;
+
   bool get isDiscovery => hostId == null && discoveryStrict != null;
 
   final DateTime createdAt;
 
-  /// Expiry instant; null means the grant lives until app quit.
+  /// Expiry instant; null means no time limit. Client-wide consent is persisted.
   final DateTime? expiresAt;
 
   bool isExpired(DateTime now) {
@@ -43,7 +44,8 @@ class AgentGrant {
   }
 
   bool covers(HostId id, DateTime now, {SessionId? sessionId}) {
-    return id == hostId && this.sessionId == sessionId && !isExpired(now);
+    return !isExpired(now) &&
+        (clientWide || (id == hostId && this.sessionId == sessionId));
   }
 
   @override
@@ -54,6 +56,7 @@ class AgentGrant {
         other.hostId == hostId &&
         other.sessionId == sessionId &&
         other.discoveryStrict == discoveryStrict &&
+        other.clientWide == clientWide &&
         other.createdAt == createdAt &&
         other.expiresAt == expiresAt;
   }
@@ -68,6 +71,7 @@ class AgentGrant {
       expiresAt,
       sessionId,
       discoveryStrict,
+      clientWide,
     );
   }
 }

@@ -14,7 +14,9 @@ class McpServerTransport {
          host: '127.0.0.1',
          port: 0,
          path: '/mcp',
-         eventStore: InMemoryEventStore(),
+         // Output cursors/job IDs provide explicit recovery. The SDK's default
+         // event store retains every replay message forever, duplicating large
+         // output pages in memory after the encrypted capture has been freed.
          authenticator: (request) {
            // Plain string compare is acceptable on a loopback-only server
            // with a random per-run token.

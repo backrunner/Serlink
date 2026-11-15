@@ -9,7 +9,7 @@ enum CertificateTrustDecision { cancel, trustAndSave }
 
 enum AgentAccessDecision { deny, allow }
 
-enum AgentCommandDecision { deny, allowOnce, allowSession }
+enum AgentCommandDecision { deny, allowOnce, allowSession, allowTask }
 
 class AgentAccessPrompt {
   const AgentAccessPrompt({
@@ -18,6 +18,7 @@ class AgentAccessPrompt {
     required this.hostId,
     this.discoveryStrict,
     this.existingSessionId,
+    this.rememberClient = false,
   });
 
   final String clientName;
@@ -29,6 +30,7 @@ class AgentAccessPrompt {
 
   /// A separate consent to read and control this existing connection.
   final String? existingSessionId;
+  final bool rememberClient;
 }
 
 class AgentCommandPrompt {
@@ -38,6 +40,10 @@ class AgentCommandPrompt {
     required this.command,
     required this.ruleDescription,
     this.allowSession = true,
+    this.sessionCommandPrefix,
+    this.isolatedShell = false,
+    this.workingDirectory,
+    this.taskDirectory,
   });
 
   final String clientName;
@@ -45,6 +51,31 @@ class AgentCommandPrompt {
   final String command;
   final String ruleDescription;
   final bool allowSession;
+
+  /// Exact argv prefix (or exact argv) displayed before a session grant.
+  final String? sessionCommandPrefix;
+  final bool isolatedShell;
+  final String? workingDirectory;
+
+  /// Non-null only for recognizable operations in an explicit isolated cwd.
+  /// The UI must disclose file replacement and remote symlink limitations.
+  final String? taskDirectory;
+}
+
+class AgentUploadPrompt {
+  const AgentUploadPrompt({
+    required this.clientName,
+    required this.hostDisplayName,
+    required this.localPath,
+    required this.remotePath,
+    required this.sizeBytes,
+  });
+
+  final String clientName;
+  final String hostDisplayName;
+  final String localPath;
+  final String remotePath;
+  final int sizeBytes;
 }
 
 class ExportPreview {
@@ -69,4 +100,5 @@ abstract interface class SecurityModalService {
   Future<bool> confirmMultilinePaste(String preview);
   Future<AgentAccessDecision> confirmAgentAccess(AgentAccessPrompt prompt);
   Future<AgentCommandDecision> confirmAgentCommand(AgentCommandPrompt prompt);
+  Future<AgentAccessDecision> confirmAgentUpload(AgentUploadPrompt prompt);
 }

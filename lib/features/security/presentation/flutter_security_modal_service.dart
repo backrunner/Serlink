@@ -126,7 +126,9 @@ class FlutterSecurityModalService implements SecurityModalService {
       builder: (context) => _AgentAccessDialog(prompt: prompt),
       denied: AgentAccessDecision.deny,
       allowed: AgentAccessDecision.allow,
-      title: prompt.discoveryStrict != null
+      title: prompt.rememberClient
+          ? l10n.securityAgentClientAccessTitle
+          : prompt.discoveryStrict != null
           ? l10n.securityAgentDiscoveryTitle
           : l10n.securityAgentAccessTitle,
       body: _agentAccessDescription(l10n, prompt),
@@ -158,6 +160,27 @@ class FlutterSecurityModalService implements SecurityModalService {
       body:
           '${l10n.securityAgentCommandBody(prompt.clientName, prompt.hostDisplayName)}\n${direct ? prompt.command : l10n.mcpApprovalReviewDetails}',
       directApproval: direct,
+    );
+  }
+
+  @override
+  Future<AgentAccessDecision> confirmAgentUpload(
+    AgentUploadPrompt prompt,
+  ) async {
+    final context = _key.currentContext;
+    if (context == null) return AgentAccessDecision.deny;
+    final l10n = context.l10n;
+    return _confirmAgent(
+      context: context,
+      builder: (context) => _AgentUploadDialog(prompt: prompt),
+      denied: AgentAccessDecision.deny,
+      allowed: AgentAccessDecision.allow,
+      title: l10n.securityAgentUploadTitle,
+      body: l10n.securityAgentUploadBody(
+        prompt.clientName,
+        prompt.hostDisplayName,
+      ),
+      directApproval: false,
     );
   }
 
@@ -544,6 +567,12 @@ String _agentAccessDescription(
   AppLocalizations l10n,
   AgentAccessPrompt prompt,
 ) {
+  if (prompt.rememberClient) {
+    return '${l10n.securityAgentClientAccessBody(prompt.clientName)}\n\n'
+        '${l10n.securityAgentClientAccessScope}\n\n'
+        '${l10n.securityAgentClientAccessRemember}\n\n'
+        '${l10n.securityAgentSharingWarning}';
+  }
   final strict = prompt.discoveryStrict;
   if (strict != null) {
     return '${l10n.securityAgentDiscoveryBody(prompt.clientName)}\n\n'
@@ -569,7 +598,9 @@ class _AgentAccessDialog extends StatelessWidget {
     return SerlinkDialog(
       maxWidth: _hostKeyDialogMaxWidth,
       title: Text(
-        prompt.discoveryStrict != null
+        prompt.rememberClient
+            ? l10n.securityAgentClientAccessTitle
+            : prompt.discoveryStrict != null
             ? l10n.securityAgentDiscoveryTitle
             : l10n.securityAgentAccessTitle,
       ),
@@ -600,22 +631,109 @@ class _AgentAccessDialog extends StatelessWidget {
         ),
         SerlinkFilledButton(
           onPressed: () => Navigator.of(context).pop(AgentAccessDecision.allow),
-          child: Text(l10n.allowAction),
+          child: Text(
+            prompt.rememberClient
+                ? l10n.securityAgentRememberAction
+                : l10n.allowAction,
+          ),
         ),
       ],
     );
   }
 }
 
-class _AgentCommandDialog extends StatelessWidget {
+class _AgentUploadDialog extends StatelessWidget {
+  const _AgentUploadDialog({required this.prompt});
+
+  final AgentUploadPrompt prompt;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return SerlinkDialog(
+      maxWidth: _hostKeyDialogMaxWidth,
+      title: Text(l10n.securityAgentUploadTitle),
+      content: SerlinkScrollView(
+        child: SizedBox(
+          width: _hostKeyDialogContentWidth,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.securityAgentUploadBody(
+                  prompt.clientName,
+                  prompt.hostDisplayName,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(l10n.securityAgentUploadSource),
+              SelectableText(
+                prompt.localPath,
+                textDirection: TextDirection.ltr,
+              ),
+              const SizedBox(height: 8),
+              Text(l10n.securityAgentUploadDestination),
+              SelectableText(
+                prompt.remotePath,
+                textDirection: TextDirection.ltr,
+              ),
+              const SizedBox(height: 8),
+              Text(l10n.securityAgentUploadSize(prompt.sizeBytes)),
+              const SizedBox(height: 12),
+              Text(l10n.securityAgentUploadWarning),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        SerlinkTextButton(
+          onPressed: () => Navigator.of(context).pop(AgentAccessDecision.deny),
+          child: Text(l10n.denyAction),
+        ),
+        SerlinkFilledButton(
+          onPressed: () => Navigator.of(context).pop(AgentAccessDecision.allow),
+          child: Text(l10n.uploadAction),
+        ),
+      ],
+    );
+  }
+}
+
+class _AgentCommandDialog extends StatefulWidget {
   const _AgentCommandDialog({required this.prompt});
 
   final AgentCommandPrompt prompt;
 
   @override
+  State<_AgentCommandDialog> createState() => _AgentCommandDialogState();
+}
+
+class _AgentCommandDialogState extends State<_AgentCommandDialog> {
+  static const _pageSize = 16384;
+  int _page = 0;
+  AgentCommandPrompt get prompt => widget.prompt;
+
+  @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final codeController = ShellCodeController(text: prompt.command);
+    var start = (_page * _pageSize).clamp(0, prompt.command.length);
+    var end = (start + _pageSize).clamp(0, prompt.command.length);
+    if (start > 0 &&
+        start < prompt.command.length &&
+        prompt.command.codeUnitAt(start) >= 0xdc00 &&
+        prompt.command.codeUnitAt(start) <= 0xdfff) {
+      start--;
+    }
+    if (end > start &&
+        end < prompt.command.length &&
+        prompt.command.codeUnitAt(end - 1) >= 0xd800 &&
+        prompt.command.codeUnitAt(end - 1) <= 0xdbff) {
+      end--;
+    }
+    final codeController = ShellCodeController(
+      text: prompt.command.substring(start, end),
+    );
     final code = codeController.buildTextSpan(
       context: context,
       style: TextStyle(
@@ -644,6 +762,14 @@ class _AgentCommandDialog extends StatelessWidget {
                   prompt.hostDisplayName,
                 ),
               ),
+              if (prompt.isolatedShell) ...[
+                const SizedBox(height: 8),
+                Text(
+                  l10n.securityAgentCommandJobContext(
+                    prompt.workingDirectory ?? '~',
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               if (prompt.ruleDescription != 'standard_approval')
                 Text(
@@ -668,6 +794,53 @@ class _AgentCommandDialog extends StatelessWidget {
                   ),
                 ),
               ),
+              if (prompt.command.length > _pageSize) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    SerlinkIconButton(
+                      key: const ValueKey('agent-command-previous-page'),
+                      onPressed: _page == 0
+                          ? null
+                          : () => setState(() => _page--),
+                      tooltip: MaterialLocalizations.of(context)
+                          .previousPageTooltip,
+                      icon: const Icon(Icons.chevron_left),
+                    ),
+                    Text(
+                      '${_page + 1} / ${(prompt.command.length / _pageSize).ceil()}',
+                    ),
+                    SerlinkIconButton(
+                      key: const ValueKey('agent-command-next-page'),
+                      onPressed:
+                          (_page + 1) * _pageSize >= prompt.command.length
+                          ? null
+                          : () => setState(() => _page++),
+                      tooltip: MaterialLocalizations.of(context)
+                          .nextPageTooltip,
+                      icon: const Icon(Icons.chevron_right),
+                    ),
+                  ],
+                ),
+              ],
+              if (prompt.allowSession &&
+                  prompt.sessionCommandPrefix != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  l10n.securityAgentSessionScope(prompt.sessionCommandPrefix!),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: context.tokens.textSecondary),
+                ),
+              ],
+              if (prompt.taskDirectory != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  l10n.securityAgentTaskScope(prompt.taskDirectory!),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: context.tokens.textSecondary),
+                ),
+              ],
             ],
           ),
         ),
@@ -675,19 +848,29 @@ class _AgentCommandDialog extends StatelessWidget {
       actions: [
         SerlinkTextButton(
           onPressed: () => Navigator.of(context).pop(AgentCommandDecision.deny),
+          key: const ValueKey('agent-command-deny'),
           child: Text(l10n.denyAction),
         ),
-        SerlinkTextButton(
-          onPressed: () =>
-              Navigator.of(context).pop(AgentCommandDecision.allowOnce),
-          child: Text(l10n.securityAgentAllowOnceAction),
-        ),
         if (prompt.allowSession)
-          SerlinkFilledButton(
+          SerlinkOutlinedButton(
+            key: const ValueKey('agent-command-allow-session'),
             onPressed: () =>
                 Navigator.of(context).pop(AgentCommandDecision.allowSession),
             child: Text(l10n.securityAgentAllowSessionAction),
           ),
+        if (prompt.taskDirectory != null)
+          SerlinkOutlinedButton(
+            key: const ValueKey('agent-command-allow-task'),
+            onPressed: () =>
+                Navigator.of(context).pop(AgentCommandDecision.allowTask),
+            child: Text(l10n.securityAgentAllowTaskAction),
+          ),
+        SerlinkFilledButton(
+          key: const ValueKey('agent-command-allow-once'),
+          onPressed: () =>
+              Navigator.of(context).pop(AgentCommandDecision.allowOnce),
+          child: Text(l10n.securityAgentAllowOnceAction),
+        ),
       ],
     );
   }

@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
+
+import 'package:uuid/uuid.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -17,9 +20,14 @@ import '../../vault/application/vault_service.dart';
 import '../../workspace/application/workspace_tab_controller.dart';
 import '../../workspace/domain/workspace_tab.dart';
 import '../data/command_risk_policy.dart';
+import '../data/command_output_store.dart';
+import '../../ssh/application/ssh_session_service.dart';
+import 'mcp_command_job.dart';
 import '../domain/agent_grant.dart';
 import '../domain/agent_session.dart';
 import '../domain/command_risk.dart';
+import '../domain/command_approval_scope.dart';
+import '../domain/command_task_scope.dart';
 import 'mcp_authorization_service.dart';
 import 'command_decision_guard.dart';
 import 'mcp_command_approval.dart';
@@ -54,6 +62,18 @@ class _AgentSessionEntry {
   Future<void> inputQueue = Future<void>.value();
   bool hasUnsubmittedInput = false;
   int inputGeneration = 0;
+  final commandScopes = <CommandApprovalScope>[];
+  CommandTaskScope? taskScope;
+  ({
+    String approvalRevision,
+    String? modelRevision,
+    int vaultGeneration,
+    int approvalGeneration,
+    int? modelGeneration,
+    bool isolatedShell,
+    String? cwd,
+  })?
+  commandScopeContext;
 }
 
 class _CommandPermit {
@@ -115,6 +135,29 @@ class AgentSessionBridge {
            downloadDirectory ??
            (() => mcpDownloadDirectory(ref.read(platformCapabilitiesProvider)));
 
+  bool _observingOutputLifecycle = false;
+  void _observeOutputLifecycle() {
+    if (_observingOutputLifecycle) return;
+    _observingOutputLifecycle = true;
+    _ref.listen(vaultSessionControllerProvider, (previous, next) {
+      final value = next.value;
+      if (value == null ||
+          value.vaultState != VaultState.unlocked ||
+          previous?.value?.unlockGeneration != value.unlockGeneration) {
+        cancelAllCommandJobs();
+      }
+    });
+    _grantChanges = _authorization.watchGrants.listen((_) {
+      for (final entry in _sessions.values) {
+        if (!_authorization.grants.any(
+          (grant) => grant.grantId == entry.handle.grantId,
+        )) {
+          _discardCommandJobs(entry.handle.sessionId);
+        }
+      }
+    });
+  }
+
   final Ref _ref;
   final McpAuthorizationService _authorization;
   final CommandRiskPolicy _riskPolicy;
@@ -124,6 +167,17 @@ class AgentSessionBridge {
   final DateTime Function() _now;
   final Future<Directory> Function() _downloadDirectory;
   final Map<TransferTaskId, SessionId> _transfers = {};
+  final _commandJobs = <String, McpCommandJob>{};
+  final _terminalCaptures = <SessionId, CommandOutputStore>{};
+  final _captureStarts = <SessionId, Future<CommandOutputStore>>{};
+  final _captureErrors = <SessionId>{};
+  final _captureChanges = <SessionId, Completer<void>>{};
+  StreamSubscription<Object?>? _grantChanges;
+  StreamSubscription<Object?>? _terminalInputs;
+  int _pendingCommandJobs = 0;
+  int _outputEpoch = 0;
+  void Function()? _removeOutputObserver;
+  bool _disposed = false;
 
   /// How long [openSession] waits for the SSH channel to attach.
   final Duration attachTimeout;
@@ -172,13 +226,18 @@ class AgentSessionBridge {
   }) async {
     final generation = _requireUnlockedVault().unlockGeneration;
     final grant = await _ensureDiscovery(clientName);
+    final initialStrict = await _ref
+        .read(mcpHostVisibilityProvider)
+        .readStrict();
     final hosts = await _ref.read(hostRepositoryProvider).list();
     final strict = await _ref.read(mcpHostVisibilityProvider).readStrict();
     if (_requireUnlockedVault().unlockGeneration != generation) {
       throw const McpBridgeException('vault_locked');
     }
     McpRequestContext.current?.checkActive();
-    if (!_authorization.isValid(grant) || grant.discoveryStrict != strict) {
+    if (initialStrict != strict ||
+        !_authorization.isValid(grant) ||
+        (!grant.clientWide && grant.discoveryStrict != strict)) {
       throw const McpBridgeException('authorization_required');
     }
     return [
@@ -294,8 +353,8 @@ class AgentSessionBridge {
     }
   }
 
-  /// Borrows an existing connected pane after the same per-host approval
-  /// used by openSession. No SSH authentication or new tab is involved.
+  /// Borrows an existing connected pane using remembered client consent.
+  /// No SSH authentication or new tab is involved.
   Future<AgentSessionHandle> attachSession({
     required String clientName,
     required SessionId sessionId,
@@ -528,7 +587,11 @@ class AgentSessionBridge {
     return handle;
   }
 
-  SftpConnection _requireSftp(String clientName, SessionId sessionId) {
+  SftpConnection _requireSftp(
+    String clientName,
+    SessionId sessionId, {
+    bool checkRequest = true,
+  }) {
     final entry = _requireAuthorizedSession(clientName, sessionId);
     if (entry.handle.kind != AgentSessionKind.sftp) {
       throw const McpBridgeException('not_sftp_session');
@@ -545,7 +608,7 @@ class AgentSessionBridge {
         connection == null) {
       throw const McpBridgeException('session_not_attached');
     }
-    McpRequestContext.current?.checkActive();
+    if (checkRequest) McpRequestContext.current?.checkActive();
     return connection;
   }
 
@@ -609,6 +672,102 @@ class AgentSessionBridge {
         );
     _transfers[taskId] = sessionId;
     return {'taskId': taskId.value, 'localPath': file.path};
+  }
+
+  /// Uploads one app-readable local file after explicit, per-transfer consent.
+  /// The dialog discloses both paths and replacement of an existing target.
+  Future<Map<String, Object?>> uploadSftp({
+    required String clientName,
+    required SessionId sessionId,
+    required String localPath,
+    required String remotePath,
+  }) async {
+    _validateRemotePath(remotePath);
+    if (p.posix.basename(remotePath) == '/' ||
+        remotePath.endsWith('/') ||
+        ['.', '..'].contains(p.posix.basename(remotePath))) {
+      throw const McpBridgeException('invalid_remote_path');
+    }
+    if (!p.isAbsolute(localPath) ||
+        localPath.contains(RegExp(r'[\x00-\x1f\x7f]'))) {
+      throw const McpBridgeException('invalid_local_path');
+    }
+    final entry = _requireAuthorizedSession(clientName, sessionId);
+    final vaultGeneration = _requireUnlockedVault().unlockGeneration;
+    final connection = _requireSftp(clientName, sessionId);
+    void validate() {
+      if (_requireUnlockedVault().unlockGeneration != vaultGeneration) {
+        throw const McpBridgeException('authorization_required');
+      }
+      if (!identical(
+        _requireSftp(clientName, sessionId, checkRequest: false),
+        connection,
+      )) {
+        throw const McpBridgeException('session_not_attached');
+      }
+    }
+
+    final request = McpRequestContext.current;
+    request?.validate = validate;
+    late final String sourcePath;
+    late final FileStat sourceStat;
+    try {
+      sourcePath = await File(localPath).resolveSymbolicLinks();
+      sourceStat = await File(sourcePath).stat();
+      if (sourceStat.type != FileSystemEntityType.file) {
+        throw const McpBridgeException('local_file_required');
+      }
+    } on FileSystemException {
+      throw const McpBridgeException('local_file_unavailable');
+    }
+    validate();
+    final decision = await _securityModalService.confirmAgentUpload(
+      AgentUploadPrompt(
+        clientName: clientName,
+        hostDisplayName: entry.hostDisplayName,
+        localPath: sourcePath,
+        remotePath: remotePath,
+        sizeBytes: sourceStat.size,
+      ),
+    );
+    request?.checkActive();
+    validate();
+    if (decision != AgentAccessDecision.allow) {
+      throw const McpBridgeException('upload_denied');
+    }
+    // Recheck the disclosed source after the user has reviewed the request.
+    late final String currentPath;
+    late final FileStat current;
+    try {
+      currentPath = await File(localPath).resolveSymbolicLinks();
+      current = await File(sourcePath).stat();
+    } on FileSystemException {
+      throw const McpBridgeException('local_file_changed');
+    }
+    if (currentPath != sourcePath ||
+        current.type != FileSystemEntityType.file ||
+        current.size != sourceStat.size ||
+        current.modified != sourceStat.modified ||
+        current.changed != sourceStat.changed) {
+      throw const McpBridgeException('local_file_changed');
+    }
+    validate();
+    request?.checkActive();
+    final taskId = _ref
+        .read(transferQueueControllerProvider)
+        .enqueueUpload(
+          connection: connection,
+          sourceHostId: entry.handle.hostId,
+          sourceMachineName: entry.hostDisplayName,
+          localPath: sourcePath,
+          remotePath: remotePath,
+        );
+    _transfers[taskId] = sessionId;
+    return {
+      'taskId': taskId.value,
+      'localPath': sourcePath,
+      'remotePath': remotePath,
+    };
   }
 
   Map<String, Object?> transferStatus({
@@ -687,6 +846,408 @@ class AgentSessionBridge {
       await _waitForOutputSettled(sessionId, timeout: timeout);
       return _readScreenText(sessionId, lines: execOutputLines);
     });
+  }
+
+  Future<CommandOutputStore> _captureOutput(
+    String clientName,
+    SessionId sessionId,
+  ) async {
+    _requireAuthorizedSession(clientName, sessionId);
+    _observeOutputLifecycle();
+    final existing = _terminalCaptures[sessionId];
+    if (existing != null) return existing;
+    final pending = _captureStarts[sessionId];
+    if (pending != null) return pending;
+    final epoch = _outputEpoch;
+    final start = () async {
+      final capture = await CommandOutputStore.create();
+      try {
+        _requireAuthorizedSession(clientName, sessionId);
+        if (_disposed || epoch != _outputEpoch) {
+          throw const McpBridgeException('session_not_found');
+        }
+        _terminalCaptures[sessionId] = capture;
+        final registry = _ref.read(workspaceRuntimeRegistryProvider);
+        final observer = _captureTerminalText;
+        registry.outputObserver = observer;
+        _removeOutputObserver = () {
+          if (registry.outputObserver == observer) {
+            registry.outputObserver = null;
+          }
+        };
+        return capture;
+      } on Object {
+        await capture.dispose();
+        rethrow;
+      }
+    }();
+    _captureStarts[sessionId] = start;
+    try {
+      return await start;
+    } finally {
+      _captureStarts.remove(sessionId);
+    }
+  }
+
+  Future<void> _captureTerminalText(SessionId sessionId, String text) async {
+    final capture = _terminalCaptures[sessionId];
+    if (capture == null || _captureErrors.contains(sessionId)) return;
+    try {
+      await capture.append(text);
+    } on Object {
+      _captureErrors.add(sessionId);
+    }
+    final changed = _captureChanges.remove(sessionId);
+    if (changed != null && !changed.isCompleted) changed.complete();
+  }
+
+  Future<Map<String, Object?>> execWithOutput({
+    required String clientName,
+    required SessionId sessionId,
+    required String command,
+    Duration timeout = const Duration(seconds: 10),
+    int maxChars = CommandOutputStore.pageSize,
+  }) async {
+    final capture = await _captureOutput(clientName, sessionId);
+    final cursor = capture.length;
+    final screen = await exec(
+      clientName: clientName,
+      sessionId: sessionId,
+      command: command,
+      timeout: timeout,
+    );
+    final page = await readOutput(
+      clientName: clientName,
+      sessionId: sessionId,
+      cursor: cursor,
+      maxChars: maxChars,
+    );
+    return {
+      ...page,
+      'screen': screen,
+      'mode': 'terminal',
+      'completionKnown': false,
+      'note': 'Quiet output is not proof of completion. Continue reading with nextCursor; use mode=job for exit status.',
+    };
+  }
+
+  Future<Map<String, Object?>> readOutput({
+    required String clientName,
+    required SessionId sessionId,
+    int cursor = 0,
+    int maxChars = CommandOutputStore.pageSize,
+    Duration wait = Duration.zero,
+  }) async {
+    final capture = await _captureOutput(clientName, sessionId);
+    McpRequestContext.current?.checkActive();
+    if (cursor == capture.length && wait > Duration.zero) {
+      final changed = _captureChanges.putIfAbsent(
+        sessionId,
+        Completer<void>.new,
+      );
+      await Future.any<void>([
+        changed.future,
+        Future<void>.delayed(
+          Duration(milliseconds: wait.inMilliseconds.clamp(0, 30000)),
+        ),
+        if (McpRequestContext.current != null)
+          McpRequestContext.current!.cancelled,
+      ]);
+    }
+    McpRequestContext.current?.checkActive();
+    try {
+      final page = await capture.read(cursor: cursor, maxChars: maxChars);
+      _requireAuthorizedSession(clientName, sessionId);
+      if (!identical(_terminalCaptures[sessionId], capture)) {
+        throw const McpBridgeException('session_not_found');
+      }
+      return {
+        'sessionId': sessionId.value,
+        'output': page.text,
+        'cursor': page.cursor,
+        'nextCursor': page.nextCursor,
+        'totalChars': capture.length,
+        'hasMore': page.nextCursor < capture.length,
+        'outputTruncated':
+            capture.truncated || _captureErrors.contains(sessionId),
+        'outputLimitBytes': capture.maxBytes,
+        'completionKnown': false,
+        if (_captureErrors.contains(sessionId))
+          'error': 'command_output_unavailable',
+      };
+    } on FormatException {
+      throw const McpBridgeException('invalid_output_cursor');
+    }
+  }
+
+  /// A managed script uses a fresh sh process on the same authenticated SSH
+  /// connection. It does not inherit the interactive terminal's cwd/environment.
+  Future<Map<String, Object?>> startCommand({
+    required String clientName,
+    required SessionId sessionId,
+    required String command,
+    String? cwd,
+    Duration wait = const Duration(seconds: 1),
+    int maxChars = CommandOutputStore.pageSize,
+  }) async {
+    final entry = _requireAuthorizedSession(clientName, sessionId);
+    final generation = entry.inputGeneration;
+    final epoch = _outputEpoch;
+    _observeOutputLifecycle();
+    if (cwd != null &&
+        (cwd.length > 4096 ||
+            cwd.contains(RegExp(r'[\x00-\x1f\x7f]')) ||
+            cwd.isEmpty)) {
+      throw const McpBridgeException('invalid_working_directory');
+    }
+    return _serializeInput(entry, () async {
+      _requireAuthorizedSession(clientName, sessionId);
+      _requireConnectedPane(sessionId);
+      final service = _ref.read(sshSessionServiceProvider);
+      if (service is! SshCommandService) {
+        throw const McpBridgeException('command_jobs_unavailable');
+      }
+      if (_commandJobs.length + _pendingCommandJobs >= 16) {
+        throw const McpBridgeException(
+          'command_job_limit',
+          'release completed jobs before starting more',
+        );
+      }
+      _pendingCommandJobs++;
+      CommandOutputStore? output;
+      SshCommandProcess? process;
+      McpCommandJob? job;
+      try {
+        final permit = await _enforceRiskPolicy(
+          clientName: clientName,
+          entry: entry,
+          command: command,
+          isolatedShell: true,
+          cwd: cwd,
+        );
+        output = await CommandOutputStore.create();
+        await _validateBeforeSend(permit);
+        _validateExecutionState(
+          clientName,
+          sessionId,
+          entry,
+          permit,
+          generation,
+        );
+        final opening = (service as SshCommandService).openCommand(
+          sessionId: sessionId,
+          cwd: cwd,
+        );
+        try {
+          process = await opening.timeout(const Duration(seconds: 15));
+        } on Object {
+          unawaited(
+            opening.then(
+              (lateProcess) => lateProcess.close(),
+              onError: (Object _) {},
+            ),
+          );
+          rethrow;
+        }
+        await _validateBeforeSend(permit);
+        _validateExecutionState(
+          clientName,
+          sessionId,
+          entry,
+          permit,
+          generation,
+        );
+        if (_disposed || epoch != _outputEpoch) {
+          throw const McpBridgeException('command_start_cancelled');
+        }
+        final registry = _ref.read(workspaceRuntimeRegistryProvider);
+        _terminalInputs ??= registry.terminalInputs.listen((event) {
+          if (event.text == '\x03') {
+            for (final active in _commandJobs.values.where(
+              (job) => job.sessionId == event.sessionId,
+            )) {
+              unawaited(active.cancel());
+            }
+          }
+        });
+        job = McpCommandJob(
+          id: const Uuid().v4(),
+          sessionId: sessionId,
+          process: process,
+          output: output,
+          commandBytes: utf8.encode(command).length,
+          cwd: cwd,
+          display: (text) => registry.writeTerminal(sessionId, text),
+        );
+        _commandJobs[job.id] = job;
+        final preview = command.length <= 2048
+            ? command
+            : '${command.substring(0, 1024)}\n…\n${command.substring(command.length - 512)}';
+        registry.writeTerminal(
+          sessionId,
+          '\r\n[Serlink command ${job.id}]\r\n${preview.replaceAll(RegExp(r'(?<!\r)\n'), '\r\n')}\r\n',
+        );
+        job.start(
+          command,
+          validateInput: () {
+            if (_disposed ||
+                epoch != _outputEpoch ||
+                _requireUnlockedVault().unlockGeneration !=
+                    permit.vaultGeneration ||
+                !identical(
+                  _requireAuthorizedSession(clientName, sessionId),
+                  entry,
+                )) {
+              throw const McpBridgeException('authorization_required');
+            }
+            McpRequestContext.current?.checkActive();
+          },
+        );
+        return await commandStatus(
+          clientName: clientName,
+          sessionId: sessionId,
+          commandId: job.id,
+          maxChars: maxChars,
+          wait: wait,
+        );
+      } on Object catch (error) {
+        if (job != null) {
+          _commandJobs.remove(job.id);
+          await job.dispose();
+        } else {
+          await process?.close();
+          await output?.dispose();
+        }
+        if (error is McpBridgeException || error is McpApprovalException) {
+          rethrow;
+        }
+        throw const McpBridgeException('command_start_failed');
+      } finally {
+        _pendingCommandJobs--;
+      }
+    });
+  }
+
+  List<Map<String, Object?>> listCommands({
+    required String clientName,
+    required SessionId sessionId,
+  }) {
+    _requireAuthorizedSession(clientName, sessionId);
+    return [
+      for (final job in _commandJobs.values.where(
+        (job) => job.sessionId == sessionId,
+      ))
+        {
+          'commandId': job.id,
+          'state': job.state,
+          'finished': job.finished,
+          'exitCode': job.exitCode,
+          'cwd': job.cwd,
+          'commandBytes': job.commandBytes,
+          'totalChars': job.output.length,
+          'outputTruncated': job.output.truncated,
+          'startedAt': job.startedAt.toIso8601String(),
+        },
+    ];
+  }
+
+  Future<Map<String, Object?>> commandStatus({
+    required String clientName,
+    required SessionId sessionId,
+    required String commandId,
+    int cursor = 0,
+    int maxChars = CommandOutputStore.pageSize,
+    Duration wait = Duration.zero,
+    bool commandSource = false,
+  }) async {
+    _requireAuthorizedSession(clientName, sessionId);
+    final job = _commandJobs[commandId];
+    if (job == null || job.sessionId != sessionId) {
+      throw const McpBridgeException('command_not_found');
+    }
+    McpRequestContext.current?.checkActive();
+    try {
+      final result = await Future.any([
+        job.read(
+          cursor: cursor,
+          maxChars: maxChars,
+          commandSource: commandSource,
+          wait: Duration(milliseconds: wait.inMilliseconds.clamp(0, 30000)),
+        ),
+        if (McpRequestContext.current != null)
+          McpRequestContext.current!.cancelled.then<Map<String, Object?>>((_) {
+            McpRequestContext.current!.checkActive();
+            throw const McpApprovalException('request_cancelled');
+          }),
+      ]);
+      McpRequestContext.current?.checkActive();
+      _requireAuthorizedSession(clientName, sessionId);
+      if (!identical(_commandJobs[commandId], job)) {
+        throw const McpBridgeException('command_not_found');
+      }
+      return result;
+    } on FormatException {
+      throw const McpBridgeException('invalid_output_cursor');
+    }
+  }
+
+  Future<Map<String, Object?>> cancelCommand({
+    required String clientName,
+    required SessionId sessionId,
+    required String commandId,
+  }) async {
+    _requireAuthorizedSession(clientName, sessionId);
+    final job = _commandJobs[commandId];
+    if (job == null || job.sessionId != sessionId) {
+      throw const McpBridgeException('command_not_found');
+    }
+    await job.cancel();
+    return commandStatus(
+      clientName: clientName,
+      sessionId: sessionId,
+      commandId: commandId,
+    );
+  }
+
+  Future<void> releaseCommand({
+    required String clientName,
+    required SessionId sessionId,
+    required String commandId,
+  }) async {
+    _requireAuthorizedSession(clientName, sessionId);
+    final job = _commandJobs[commandId];
+    if (job == null || job.sessionId != sessionId) {
+      throw const McpBridgeException('command_not_found');
+    }
+    if (!job.finished) throw const McpBridgeException('command_still_running');
+    _commandJobs.remove(commandId);
+    await job.dispose();
+  }
+
+  void _discardCommandJobs(SessionId sessionId) {
+    final capture = _terminalCaptures.remove(sessionId);
+    if (capture != null) unawaited(capture.dispose().catchError((Object _) {}));
+    _captureErrors.remove(sessionId);
+    final changed = _captureChanges.remove(sessionId);
+    if (changed != null && !changed.isCompleted) changed.complete();
+    final jobs = _commandJobs.values
+        .where((job) => job.sessionId == sessionId)
+        .toList();
+    for (final job in jobs) {
+      _commandJobs.remove(job.id);
+      unawaited(job.dispose().catchError((Object _) {}));
+    }
+  }
+
+  void cancelAllCommandJobs() {
+    _outputEpoch++;
+    for (final sessionId in _terminalCaptures.keys.toList()) {
+      _discardCommandJobs(sessionId);
+    }
+    for (final job in _commandJobs.values.toList()) {
+      _commandJobs.remove(job.id);
+      unawaited(job.dispose().catchError((Object _) {}));
+    }
   }
 
   Future<String> readScreen({
@@ -847,6 +1408,7 @@ class AgentSessionBridge {
       await _ref.read(transferQueueControllerProvider).cancel(taskId);
       _transfers.remove(taskId);
     }
+    _discardCommandJobs(sessionId);
     final entry = _sessions.remove(sessionId);
     if (entry == null) {
       return;
@@ -895,6 +1457,7 @@ class AgentSessionBridge {
           entry.key,
     ];
     for (final sessionId in stale) {
+      _discardCommandJobs(sessionId);
       _sessions.remove(sessionId);
     }
     return stale.isNotEmpty;
@@ -919,13 +1482,19 @@ class AgentSessionBridge {
   /// Closes the session-list broadcast stream. Called by the provider on
   /// dispose; the bridge must not be used afterwards.
   void dispose() {
+    _disposed = true;
+    _removeOutputObserver?.call();
+    _removeOutputObserver = null;
+    cancelAllCommandJobs();
+    unawaited(_grantChanges?.cancel());
+    unawaited(_terminalInputs?.cancel());
     unawaited(_sessionsChanged.close());
   }
 
   /// Revokes a grant; in-flight sessions stay open but their next call fails
   /// with `authorization_required`.
-  void revokeGrant(String grantId) {
-    _authorization.revokeGrant(grantId);
+  Future<void> revokeGrant(String grantId) async {
+    await _authorization.revokeGrant(grantId);
   }
 
   _AgentSessionEntry _requireAuthorizedSession(
@@ -998,6 +1567,8 @@ class AgentSessionBridge {
     required _AgentSessionEntry entry,
     required String command,
     bool rawInput = false,
+    bool isolatedShell = false,
+    String? cwd,
   }) async {
     final request = McpRequestContext.current;
     final generation = entry.inputGeneration;
@@ -1023,9 +1594,16 @@ class AgentSessionBridge {
     };
     request?.checkActive();
     try {
-      McpCommandApproval.validateInput(command, rawInput: rawInput);
+      McpCommandApproval.validateInput(
+        command,
+        rawInput: rawInput,
+        script: isolatedShell,
+      );
     } on CommandDecisionException catch (error) {
       throw McpBridgeException('command_blocked', error.code);
+    }
+    if (!isolatedShell && utf8.encode(command).length > 8192) {
+      throw const McpBridgeException('command_requires_job_mode');
     }
     final assessment = _riskPolicy.assess(command);
     if (assessment.level == CommandRiskLevel.blocked) {
@@ -1042,6 +1620,7 @@ class AgentSessionBridge {
         command: command,
         rawInput: rawInput,
         hasUnsubmittedInput: entry.hasUnsubmittedInput,
+        script: isolatedShell,
       );
     } on CommandDecisionException catch (error) {
       throw McpBridgeException('command_blocked', error.code);
@@ -1054,9 +1633,44 @@ class AgentSessionBridge {
       approvalGeneration,
       modelGeneration,
     );
-    if (approval.bypass && assessment.level == CommandRiskLevel.safe) {
+    final scopeContext = (
+      approvalRevision: approval.revision,
+      modelRevision: modelPermit?.revision,
+      vaultGeneration: vaultGeneration,
+      approvalGeneration: approvalGeneration,
+      modelGeneration: modelGeneration,
+      isolatedShell: isolatedShell,
+      cwd: cwd,
+    );
+    if (entry.commandScopeContext != scopeContext) {
+      entry.commandScopes.clear();
+      entry.taskScope = null;
+      entry.commandScopeContext = scopeContext;
+    }
+    // Session grants waive only ordinary approval. Hard blocks, fresh model
+    // judgments and dangerous-command confirmation always run first.
+    final ordinary = assessment.level == CommandRiskLevel.safe;
+    // A project grant may cover known ordinary file writes, never deletion,
+    // opaque evaluation, system changes, or any hard block. The model already
+    // assessed this exact source above, even when a task grant is remembered.
+    final taskEligible =
+        ordinary ||
+        {
+          'file_overwrite',
+          'output_redirection',
+        }.contains(assessment.matchedRule);
+    final task = isolatedShell && taskEligible
+        ? CommandTaskScope.fromCommand(command, cwd)
+        : null;
+    if (task != null && entry.taskScope?.directory == task.directory) {
       return permit;
     }
+    if (ordinary &&
+        (approval.bypass ||
+            entry.commandScopes.any((scope) => scope.matches(command)))) {
+      return permit;
+    }
+    final scope = ordinary ? CommandApprovalScope.fromCommand(command) : null;
     final rule = assessment.matchedRule ?? 'standard_approval';
     final decision = await _securityModalService.confirmAgentCommand(
       AgentCommandPrompt(
@@ -1064,10 +1678,30 @@ class AgentSessionBridge {
         hostDisplayName: entry.hostDisplayName,
         command: command,
         ruleDescription: rule,
-        allowSession: false,
+        allowSession: scope != null,
+        sessionCommandPrefix: scope?.label,
+        isolatedShell: isolatedShell,
+        workingDirectory: cwd,
+        taskDirectory: task?.directory,
       ),
     );
-    if (decision != AgentCommandDecision.allowOnce) {
+    if ((decision == AgentCommandDecision.allowSession && scope != null) ||
+        (decision == AgentCommandDecision.allowTask && task != null)) {
+      // A cancelled/stale approval must not seed a future session permission.
+      await _validateBeforeSend(permit);
+      _validateExecutionState(
+        clientName,
+        entry.handle.sessionId,
+        entry,
+        permit,
+        generation,
+      );
+      if (decision == AgentCommandDecision.allowTask) {
+        entry.taskScope = task;
+      } else {
+        entry.commandScopes.add(scope!);
+      }
+    } else if (decision != AgentCommandDecision.allowOnce) {
       throw McpBridgeException('command_denied', rule);
     }
     return permit;

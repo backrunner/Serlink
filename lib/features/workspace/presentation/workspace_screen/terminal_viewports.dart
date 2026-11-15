@@ -148,16 +148,19 @@ _TerminalPaneDropPlacement _terminalPaneDropPlacementForOffset(
       : _TerminalPaneDropPlacement.bottom;
 }
 
-/// Small corner chip marking a pane whose session is driven by an approved
-/// MCP agent. The close icon ends the agent session (which closes the tab).
+/// Marks a pane controlled by an MCP client. SFTP shows the client name and
+/// releases control without closing the connection; terminals keep a corner chip.
 class _AgentPaneBadge extends ConsumerWidget {
-  const _AgentPaneBadge({required this.sessionId});
+  const _AgentPaneBadge({required this.sessionId, this.sftp = false});
 
   final SessionId sessionId;
+  final bool sftp;
 
   Future<void> _closeAgentSession(WidgetRef ref) async {
     try {
-      await ref.read(agentSessionBridgeProvider).closeSession(sessionId);
+      await ref
+          .read(agentSessionBridgeProvider)
+          .closeSession(sessionId, keepConnection: sftp);
     } on Object {
       // The session may already be gone; the badge disappears on refresh.
     }
@@ -173,55 +176,71 @@ class _AgentPaneBadge extends ConsumerWidget {
         break;
       }
     }
-    if (handle == null) {
+    if (handle == null ||
+        (sftp && handle.state != AgentSessionState.connected)) {
       return const SizedBox.shrink();
     }
     final l10n = context.l10n;
     final t = context.tokens;
-    return Positioned(
-      key: const ValueKey('agent-pane-badge'),
-      top: 6,
-      right: 6,
-      child: SerlinkTooltip(
-        message: l10n.agentPaneBadgeTooltip(handle.clientName),
-        child: Container(
-          padding: const EdgeInsets.only(left: 8, right: 2),
-          decoration: BoxDecoration(
-            color: t.surfaceRaised.withValues(alpha: 0.92),
-            borderRadius: SerlinkRadii.control,
-            border: Border.all(color: t.accentPrimary.withValues(alpha: 0.5)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.smart_toy_outlined, size: 12, color: t.accentPrimary),
-              const SizedBox(width: 4),
-              Text(
-                l10n.hostAuthAgentSegment,
+    final badge = SerlinkTooltip(
+      message: l10n.agentPaneBadgeTooltip(handle.clientName),
+      child: Container(
+        padding: const EdgeInsets.only(left: 8, right: 2),
+        decoration: BoxDecoration(
+          color: t.surfaceRaised.withValues(alpha: 0.92),
+          borderRadius: SerlinkRadii.control,
+          border: Border.all(color: t.accentPrimary.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.smart_toy_outlined, size: 12, color: t.accentPrimary),
+            const SizedBox(width: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                sftp
+                    ? '${l10n.hostAuthAgentSegment} · ${handle.clientName}'
+                    : l10n.hostAuthAgentSegment,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: t.textPrimary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              SerlinkIconButton(
-                key: const ValueKey('agent-pane-badge-close'),
-                tooltip: l10n.agentPaneBadgeCloseTooltip,
-                constraints: const BoxConstraints.tightFor(
-                  width: 20,
-                  height: 20,
-                ),
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                iconSize: 12,
-                color: t.textSecondary,
-                onPressed: () => unawaited(_closeAgentSession(ref)),
-                icon: const Icon(Icons.close),
+            ),
+            SerlinkIconButton(
+              key: ValueKey(
+                sftp ? 'sftp-agent-badge-release' : 'agent-pane-badge-close',
               ),
-            ],
-          ),
+              tooltip: sftp
+                  ? l10n.agentSftpReleaseTooltip
+                  : l10n.agentPaneBadgeCloseTooltip,
+              constraints: const BoxConstraints.tightFor(width: 20, height: 20),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              iconSize: 12,
+              color: t.textSecondary,
+              onPressed: () => unawaited(_closeAgentSession(ref)),
+              icon: const Icon(Icons.close),
+            ),
+          ],
         ),
       ),
     );
+    return sftp
+        ? Padding(
+            key: const ValueKey('sftp-agent-badge'),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Align(alignment: Alignment.centerRight, child: badge),
+          )
+        : Positioned(
+            key: const ValueKey('agent-pane-badge'),
+            top: 6,
+            right: 6,
+            child: badge,
+          );
   }
 }
 
@@ -952,10 +971,8 @@ class _TerminalPaneRecoveryOverlay extends StatelessWidget {
                   Text(
                     message,
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: t.textPrimary,
-                      height: 1.25,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: t.textPrimary, height: 1.25),
                   ),
                   const SizedBox(height: 12),
                   Wrap(

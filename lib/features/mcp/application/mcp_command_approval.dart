@@ -69,9 +69,19 @@ class McpCommandApproval {
 
   /// A terminal accepts edits/history as well as text. Never automatically
   /// submit input that was assessed separately from the bytes preceding it.
-  static void validateInput(String command, {required bool rawInput}) {
+  static void validateInput(
+    String command, {
+    required bool rawInput,
+    bool script = false,
+  }) {
     if (command.trim().isEmpty ||
-        command.contains(RegExp(r'[\x00-\x09\x0b\x0c\x0e-\x1f\x7f]')) ||
+        command.contains(
+          RegExp(
+            script
+                ? r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]'
+                : r'[\x00-\x09\x0b\x0c\x0e-\x1f\x7f]',
+          ),
+        ) ||
         (rawInput && !command.endsWith('\n') && !command.endsWith('\r'))) {
       throw const CommandDecisionException('command_input_requires_exec');
     }

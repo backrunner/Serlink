@@ -12,6 +12,8 @@ import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/core/logging/offline_diagnostic_logger.dart';
 import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/mcp/application/agent_session_bridge.dart';
+import 'package:serlink/features/mcp/application/agent_config_installer.dart';
+import 'package:serlink/features/mcp/application/agent_skill_installer.dart';
 import 'package:serlink/features/mcp/application/mcp_authorization_service.dart';
 import 'package:serlink/features/mcp/application/mcp_server_controller.dart';
 import 'package:serlink/features/mcp/data/command_risk_policy.dart';
@@ -23,6 +25,73 @@ import 'package:serlink/platform/platform_capabilities.dart';
 
 void main() {
   group('McpServerController', () {
+    test(
+      'startup discovers agents and installs or updates global skills',
+      () async {
+        final home = Directory.systemTemp.createTempSync(
+          'serlink-startup-skills-',
+        );
+        addTearDown(() => home.deleteSync(recursive: true));
+        Directory('${home.path}/.claude').createSync();
+        var content = 'skill v1';
+        final scoped = _container(
+          agentHome: home,
+          skillContent: () async => content,
+        );
+        addTearDown(scoped.dispose);
+        final controller = scoped.read(mcpServerControllerProvider.notifier);
+        await controller.start();
+        final skill = File('${home.path}/.claude/skills/serlink-mcp/SKILL.md');
+        expect(skill.readAsStringSync(), 'skill v1');
+        expect(
+          scoped.read(mcpServerControllerProvider).agentSkills.single.target.id,
+          'claude-code',
+        );
+        expect(File('${home.path}/.claude.json').existsSync(), isFalse);
+        await controller.stop();
+        content = 'skill v2';
+        Directory('${home.path}/.codex').createSync();
+        await controller.start();
+        expect(skill.readAsStringSync(), 'skill v2');
+        expect(
+          File('${home.path}/.agents/skills/serlink-mcp/SKILL.md')
+              .readAsStringSync(),
+          'skill v2',
+        );
+        expect(
+          scoped.read(mcpServerControllerProvider).agentSkills,
+          hasLength(2),
+        );
+        await controller.stop();
+      },
+    );
+
+    test(
+      'App Store startup neither detects agents nor writes global skills',
+      () async {
+        final home = Directory.systemTemp.createTempSync(
+          'serlink-sandbox-skills-',
+        );
+        addTearDown(() => home.deleteSync(recursive: true));
+        Directory('${home.path}/.claude').createSync();
+        final container = _container(
+          agentHome: home,
+          distribution: SerlinkDistribution.appStore,
+        );
+        addTearDown(container.dispose);
+        final controller = container.read(mcpServerControllerProvider.notifier);
+        await controller.start();
+        await controller.refreshAgentSkills(synchronize: true);
+        expect(container.read(mcpServerControllerProvider).running, isTrue);
+        expect(
+          container.read(mcpServerControllerProvider).agentSkills,
+          isEmpty,
+        );
+        expect(Directory('${home.path}/.claude/skills').existsSync(), isFalse);
+        await controller.stop();
+      },
+    );
+
     test('tool callbacks resolve the per-session client name', () async {
       final harness = _Harness();
       final container = _container(harness: harness);
@@ -87,6 +156,34 @@ void main() {
       },
     );
 
+    test('SFTP upload forwards both paths and the owning client', () async {
+      final harness = _Harness();
+      final container = _container(harness: harness);
+      addTearDown(container.dispose);
+      await container.read(mcpServerControllerProvider.notifier).start();
+      final state = container.read(mcpServerControllerProvider);
+      final client = await _connectClient(state.port!, state.token!);
+      addTearDown(client.close);
+      final result = await client.callTool(
+        const CallToolRequest(
+          name: 'serlink_sftp_upload',
+          arguments: {
+            'sessionId': 'sftp-1',
+            'localPath': '/tmp/package.zip',
+            'remotePath': '/srv/package.zip',
+          },
+        ),
+      );
+      expect(result.isError, isNot(true));
+      expect(harness.bridge!.lastUpload, {
+        'clientName': 'test-client',
+        'sessionId': 'sftp-1',
+        'localPath': '/tmp/package.zip',
+        'remotePath': '/srv/package.zip',
+      });
+      expect((result.content.single as TextContent).text, contains('upload-1'));
+    });
+
     test('serlink_list_hosts surfaces vault_locked through the tool', () async {
       final container = _container(harness: _Harness());
       addTearDown(container.dispose);
@@ -138,6 +235,92 @@ void main() {
         harness.bridge!.lastExecTimeout,
         const Duration(milliseconds: 120000),
       );
+    });
+
+    test('job mode carries a multi-megabyte script and exposes paginated lifecycle tools', () async {
+      final harness = _Harness();
+      final container = _container(harness: harness);
+      addTearDown(container.dispose);
+      final controller = container.read(mcpServerControllerProvider.notifier);
+      await controller.start();
+      final state = container.read(mcpServerControllerProvider);
+      final client = await _connectClient(state.port!, state.token!);
+      addTearDown(client.close);
+      final script = '#${'x' * (3 * 1024 * 1024)}\necho done\n';
+      final result = await client.callTool(
+        CallToolRequest(
+          name: 'serlink_exec',
+          arguments: {
+            'sessionId': 's1',
+            'command': script,
+            'mode': 'job',
+            'cwd': '/srv/app',
+            'timeoutMs': 900000,
+          },
+        ),
+      );
+      expect(result.isError, isNot(true));
+      expect(harness.bridge!.lastScript, script);
+      expect(harness.bridge!.lastCwd, '/srv/app');
+      expect(harness.bridge!.lastExecTimeout, const Duration(seconds: 30));
+      final payload =
+          jsonDecode((result.content.single as TextContent).text) as Map;
+      expect(payload['commandId'], 'job-1');
+      expect(payload['finished'], isFalse);
+      final status = await client.callTool(
+        CallToolRequest(
+          name: 'serlink_command_status',
+          arguments: {
+            'sessionId': 's1',
+            'commandId': 'job-1',
+            'cursor': 123,
+            'waitMs': 900000,
+          },
+        ),
+      );
+      expect(status.isError, isNot(true));
+      expect(harness.bridge!.lastCursor, 123);
+      expect(harness.bridge!.lastExecTimeout, const Duration(seconds: 30));
+      final statusPayload =
+          jsonDecode((status.content.single as TextContent).text) as Map;
+      expect(statusPayload['exitCode'], 7);
+      await client.callTool(
+        CallToolRequest(
+          name: 'serlink_command_cancel',
+          arguments: {'sessionId': 's1', 'commandId': 'job-1'},
+        ),
+      );
+      expect(harness.bridge!.cancelled, isTrue);
+      await client.callTool(
+        CallToolRequest(
+          name: 'serlink_command_release',
+          arguments: {'sessionId': 's1', 'commandId': 'job-1'},
+        ),
+      );
+      expect(harness.bridge!.released, isTrue);
+    });
+
+    test('long terminal input requests job transport without sending partial bytes', () async {
+      final harness = _Harness();
+      final container = _container(harness: harness);
+      addTearDown(container.dispose);
+      final controller = container.read(mcpServerControllerProvider.notifier);
+      await controller.start();
+      final state = container.read(mcpServerControllerProvider);
+      final client = await _connectClient(state.port!, state.token!);
+      addTearDown(client.close);
+      final result = await client.callTool(
+        CallToolRequest(
+          name: 'serlink_exec',
+          arguments: {'sessionId': 's1', 'command': 'x' * 9000},
+        ),
+      );
+      expect(result.isError, isTrue);
+      expect(
+        (result.content.single as TextContent).text,
+        contains('command_requires_job_mode'),
+      );
+      expect(harness.bridge!.lastExecTimeout, isNull);
     });
 
     test('concurrent starts bind a single server', () async {
@@ -237,13 +420,36 @@ ProviderContainer _container({
   McpServerTransportFactory? transportFactory,
   Future<File> Function()? discoveryFile,
   _Harness? harness,
+  Directory? agentHome,
+  SerlinkDistribution distribution = SerlinkDistribution.direct,
+  Future<String> Function()? skillContent,
 }) {
+  final configHome =
+      agentHome ??
+      Directory.systemTemp.createTempSync('serlink-server-agents-');
+  if (agentHome == null) {
+    addTearDown(() => configHome.deleteSync(recursive: true));
+  }
   return ProviderContainer(
     overrides: [
       platformCapabilitiesProvider.overrideWithValue(
-        const PlatformCapabilities(
+        PlatformCapabilities(
           operatingSystem: 'macos',
           targetPlatform: TargetPlatform.macOS,
+          distribution: distribution,
+        ),
+      ),
+      agentConfigInstallerProvider.overrideWithValue(
+        AgentConfigInstaller(homeDirectory: configHome.path),
+      ),
+      agentSkillInstallerProvider.overrideWith(
+        (ref) => AgentSkillInstaller(
+          configInstaller: ref.watch(agentConfigInstallerProvider),
+          loadContent:
+              skillContent ??
+              () =>
+                  File('assets/agent_skills/serlink-mcp/SKILL.md')
+                      .readAsString(),
         ),
       ),
       appPackageInfoProvider.overrideWith((ref) async {
@@ -355,6 +561,106 @@ class _CapturingBridge extends AgentSessionBridge {
   }) async {
     lastOpenClientName = clientName;
     throw const McpBridgeException('connect_failed', 'captured');
+  }
+
+  String? lastScript;
+  String? lastCwd;
+  int? lastCursor;
+  bool cancelled = false;
+  bool released = false;
+  Map<String, String>? lastUpload;
+
+  @override
+  Future<Map<String, Object?>> uploadSftp({
+    required String clientName,
+    required SessionId sessionId,
+    required String localPath,
+    required String remotePath,
+  }) async {
+    lastUpload = {
+      'clientName': clientName,
+      'sessionId': sessionId.value,
+      'localPath': localPath,
+      'remotePath': remotePath,
+    };
+    return {
+      'taskId': 'upload-1',
+      'localPath': localPath,
+      'remotePath': remotePath,
+    };
+  }
+
+  @override
+  Future<Map<String, Object?>> startCommand({
+    required String clientName,
+    required SessionId sessionId,
+    required String command,
+    String? cwd,
+    Duration wait = const Duration(seconds: 1),
+    int maxChars = 65536,
+  }) async {
+    lastScript = command;
+    lastCwd = cwd;
+    lastExecTimeout = wait;
+    return {
+      'commandId': 'job-1',
+      'finished': false,
+      'state': 'running',
+      'output': '',
+      'nextCursor': 0,
+    };
+  }
+
+  @override
+  Future<Map<String, Object?>> commandStatus({
+    required String clientName,
+    required SessionId sessionId,
+    required String commandId,
+    int cursor = 0,
+    int maxChars = 65536,
+    Duration wait = Duration.zero,
+    bool commandSource = false,
+  }) async {
+    lastCursor = cursor;
+    lastExecTimeout = wait;
+    return {
+      'commandId': commandId,
+      'finished': true,
+      'exitCode': 7,
+      'output': 'last page',
+      'nextCursor': cursor + 9,
+    };
+  }
+
+  @override
+  Future<Map<String, Object?>> cancelCommand({
+    required String clientName,
+    required SessionId sessionId,
+    required String commandId,
+  }) async {
+    cancelled = true;
+    return {'cancelRequested': true};
+  }
+
+  @override
+  Future<void> releaseCommand({
+    required String clientName,
+    required SessionId sessionId,
+    required String commandId,
+  }) async {
+    released = true;
+  }
+
+  @override
+  Future<Map<String, Object?>> execWithOutput({
+    required String clientName,
+    required SessionId sessionId,
+    required String command,
+    Duration timeout = const Duration(seconds: 10),
+    int maxChars = 65536,
+  }) async {
+    lastExecTimeout = timeout;
+    return {'output': 'fixture output', 'nextCursor': 14, 'hasMore': false};
   }
 
   @override

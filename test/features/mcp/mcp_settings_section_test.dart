@@ -4,6 +4,8 @@ import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:serlink/features/mcp/domain/command_decision.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +16,7 @@ import 'package:serlink/core/ids/entity_id.dart';
 import 'package:serlink/database/serlink_database.dart';
 import 'package:serlink/design_system/design_system.dart';
 import 'package:serlink/features/mcp/application/agent_config_installer.dart';
+import 'package:serlink/features/mcp/application/agent_skill_installer.dart';
 import 'package:serlink/features/mcp/application/agent_session_bridge.dart';
 import 'package:serlink/features/mcp/application/mcp_server_controller.dart';
 import 'package:serlink/features/mcp/data/command_risk_policy.dart';
@@ -222,9 +225,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('settings-mcp-guard-save')));
     await tester.pumpAndSettle();
     expect(
-      find.text(
-        'Enter a valid model name and API key before enabling protection.',
-      ),
+      find.text('Check the model, connection settings and required API key.'),
       findsOneWidget,
     );
     await tester.enterText(
@@ -267,6 +268,231 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('privacy stays behind a small entry and opens provider details', (
+    tester,
+  ) async {
+    _useLargeSurface(tester);
+    await _pumpSerlinkApp(tester, serverController: _FakeMcpServerController());
+    await _openMcpManager(tester);
+    await tester.tap(
+      find.byKey(const ValueKey('settings-mcp-guard-configure')),
+    );
+    await tester.pumpAndSettle();
+    final l10n = tester.element(find.byType(SerlinkDialog).last).l10n;
+    expect(find.text(l10n.settingsMcpGuardDescription), findsNothing);
+    expect(find.text(l10n.settingsMcpGuardInputHint), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('settings-mcp-guard-privacy')));
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.settingsMcpGuardDescription), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-mcp-guard-provider-terms')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text(l10n.closeAction).last);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('settings-mcp-guard-save')),
+      findsOneWidget,
+    );
+    expect(find.text(l10n.settingsMcpGuardDescription), findsNothing);
+  });
+
+  for (final scenario in [
+    (
+      size: const Size(1000, 850),
+      scale: 1.0,
+      dark: true,
+      locale: 'zh',
+      provider: CommandDecisionProvider.typesafe,
+    ),
+    (
+      size: const Size(1000, 850),
+      scale: 1.0,
+      dark: false,
+      locale: 'zh',
+      provider: CommandDecisionProvider.gemini,
+    ),
+    (
+      size: const Size(960, 600),
+      scale: 1.5,
+      dark: true,
+      locale: 'en',
+      provider: CommandDecisionProvider.cloudflare,
+    ),
+    (
+      size: const Size(960, 700),
+      scale: 1.3,
+      dark: false,
+      locale: 'ja',
+      provider: CommandDecisionProvider.local,
+    ),
+  ]) {
+    testWidgets(
+      'command protection stays bounded at both scroll edges $scenario',
+      (tester) async {
+        _useLargeSurface(tester);
+        tester.platformDispatcher.localesTestValue = [Locale(scenario.locale)];
+        tester.platformDispatcher.platformBrightnessTestValue = scenario.dark
+            ? Brightness.dark
+            : Brightness.light;
+        tester.platformDispatcher.textScaleFactorTestValue = scenario.scale;
+        addTearDown(tester.platformDispatcher.clearLocalesTestValue);
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final container = await _pumpSerlinkApp(
+          tester,
+          serverController: _FakeMcpServerController(),
+        );
+        await _openMcpManager(tester);
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('settings-mcp-guard-configure')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('settings-mcp-guard-configure')),
+        );
+        await tester.pumpAndSettle();
+        final select = find.byKey(
+          const ValueKey('settings-mcp-guard-provider'),
+        );
+        if (scenario.provider != CommandDecisionProvider.typesafe) {
+          await tester.tap(select);
+          await tester.pumpAndSettle();
+          final label = tester
+              .widget<SerlinkSelect<CommandDecisionProvider>>(select)
+              .items
+              .firstWhere((item) => item.value == scenario.provider)
+              .label;
+          await tester.tap(find.text(label).last);
+          await tester.pumpAndSettle();
+        }
+        expect(
+          tester
+              .widget<SerlinkTextField>(
+                find.byKey(const ValueKey('settings-mcp-guard-model')),
+              )
+              .controller!
+              .text,
+          scenario.provider.defaultModel,
+        );
+        if (scenario.provider == CommandDecisionProvider.cloudflare) {
+          await tester.enterText(
+            find.byKey(const ValueKey('settings-mcp-guard-account')),
+            'a' * 32,
+          );
+        }
+        if (scenario.provider.requiresApiKey) {
+          await tester.enterText(
+            find.byKey(const ValueKey('settings-mcp-guard-api-key')),
+            'fixture-new-provider-key',
+          );
+        }
+        await tester.tap(
+          find.byKey(const ValueKey('settings-mcp-guard-enable')),
+        );
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('settings-mcp-guard-sharing-consent')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('settings-mcp-guard-sharing-consent')),
+        );
+        await tester.pumpAndSettle();
+        tester.view.physicalSize = scenario.size;
+        await tester.pumpAndSettle();
+        final dialog = find.byType(SerlinkDialog).last;
+        final l10n = tester.element(dialog).l10n;
+        final title = find.text(l10n.settingsMcpGuardDialogTitle);
+        final save = find.byKey(const ValueKey('settings-mcp-guard-save'));
+        final titleBounds = tester.getRect(title);
+        final saveBounds = tester.getRect(save);
+        expect(save.hitTestable(), findsOneWidget);
+        expect(saveBounds.bottom, lessThanOrEqualTo(scenario.size.height));
+        final viewport = find.byKey(
+          const ValueKey('settings-mcp-guard-scroll'),
+        );
+        final scrollable = find
+            .descendant(of: viewport, matching: find.byType(Scrollable))
+            .first;
+        final position = tester.state<ScrollableState>(scrollable).position;
+        for (final bottom in [true, false]) {
+          position.jumpTo(bottom ? position.maxScrollExtent : 0);
+          await tester.pumpAndSettle();
+          final extent = position.maxScrollExtent;
+          for (var i = 0; i < 4; i++) {
+            tester.binding.handlePointerEvent(
+              PointerScrollEvent(
+                position: tester.getCenter(viewport),
+                scrollDelta: Offset(0, bottom ? 100 : -100),
+              ),
+            );
+            await tester.pumpAndSettle();
+            await tester.drag(viewport, Offset(0, bottom ? -80 : 80));
+            await tester.pump(const Duration(milliseconds: 16));
+            expect(position.pixels, bottom ? extent : 0);
+            expect(position.maxScrollExtent, extent);
+            expect(tester.getRect(title), titleBounds);
+            expect(tester.getRect(save), saveBounds);
+            await tester.pumpAndSettle();
+          }
+        }
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        final settings = await container
+            .read(commandDecisionGuardProvider)
+            .readSettings();
+        expect(settings.enabled, isTrue);
+        expect(settings.connection.provider, scenario.provider);
+        expect(settings.hasApiKey, scenario.provider.requiresApiKey);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'changing provider clears typed credentials and sharing consent',
+    (tester) async {
+      _useLargeSurface(tester);
+      await _pumpSerlinkApp(
+        tester,
+        serverController: _FakeMcpServerController(),
+      );
+      await _openMcpManager(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('settings-mcp-guard-configure')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('settings-mcp-guard-api-key')),
+        'private-old-provider-key',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('settings-mcp-guard-sharing-consent')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('settings-mcp-guard-provider')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Google · Gemini Decision').last);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<SerlinkTextField>(
+              find.byKey(const ValueKey('settings-mcp-guard-api-key')),
+            )
+            .controller!
+            .text,
+        isEmpty,
+      );
+      expect(
+        tester
+            .widget<SerlinkCheckboxListTile>(
+              find.byKey(const ValueKey('settings-mcp-guard-sharing-consent')),
+            )
+            .value,
+        isFalse,
+      );
+    },
+  );
 
   testWidgets('MCP manager dialog renders status, toggle, and config', (
     tester,
@@ -330,9 +556,9 @@ void main() {
     await _openMcpManager(tester);
 
     await _pumpUntilFound(tester, find.text('claude'));
-    expect(find.text('Active grants'), findsOneWidget);
-    expect(find.textContaining('host-1'), findsWidgets);
-    expect(find.textContaining('until app quits'), findsOneWidget);
+    expect(find.text('Allowed agents'), findsOneWidget);
+    expect(find.textContaining('All hosts and connections'), findsWidgets);
+    expect(find.textContaining('Remembered on this device'), findsOneWidget);
 
     await tester.tap(
       find.byKey(ValueKey('settings-mcp-grant-revoke-${grant!.grantId}')),
@@ -465,8 +691,92 @@ void main() {
     expect(written, isNotNull);
     final servers = written!['mcpServers']! as Map<String, Object?>;
     expect((servers['serlink']! as Map)['type'], 'stdio');
-    expect(find.text('Installed'), findsOneWidget);
+    await _drainAgentWrites(
+      tester,
+      () => find.text('Installed').evaluate().length == 2,
+    );
+    expect(find.text('Installed'), findsNWidgets(2));
+    expect(
+      File('${configHome.path}/.claude/skills/serlink-mcp/SKILL.md')
+          .readAsStringSync(),
+      contains('serlink_sftp_upload'),
+    );
   });
+
+  for (final initial in ['missing', 'outdated', 'customized']) {
+    testWidgets(
+      'global skill $initial can be installed or updated without a stdio helper',
+      (tester) async {
+        _useLargeSurface(tester);
+        _stubMcpStdioHelperFileExists(installed: false);
+        final home = Directory.systemTemp.createTempSync('serlink-skill-ui-');
+        Directory('${home.path}/.claude').createSync();
+        final skill = File('${home.path}/.claude/skills/serlink-mcp/SKILL.md');
+        if (initial != 'missing') {
+          await tester.runAsync(() async {
+            final configs = AgentConfigInstaller(homeDirectory: home.path);
+            final target = configs.knownTargets.first;
+            await AgentSkillInstaller(
+              configInstaller: configs,
+              loadContent: () async => 'old bundled content',
+            ).install(target);
+            if (initial == 'customized') {
+              await skill.writeAsString('custom instructions');
+            }
+          });
+        }
+        final container = await _pumpSerlinkApp(
+          tester,
+          serverController: _FakeMcpServerController(),
+          agentConfigHome: home,
+        );
+        await _openMcpManager(tester);
+        expect(
+          container.read(mcpServerControllerProvider).agentSkills,
+          hasLength(1),
+          reason:
+              'loading=${container.read(mcpServerControllerProvider).agentSkillsLoading}',
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('settings-mcp-install-toggle')),
+        );
+        await tester.pumpAndSettle();
+        final button = find.byKey(
+          const ValueKey('settings-mcp-skill-claude-code'),
+        );
+        expect(button, findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('settings-mcp-install-claude-code')),
+          findsNothing,
+        );
+        expect(
+          find.text(
+            initial == 'missing'
+                ? 'Install'
+                : initial == 'outdated'
+                ? 'Update'
+                : 'Replace skill',
+          ),
+          findsOneWidget,
+        );
+        await tester.ensureVisible(button);
+        await tester.tap(button);
+        await _drainAgentWrites(
+          tester,
+          () => find.text('Installed').evaluate().isNotEmpty,
+        );
+        expect(skill.readAsStringSync(), contains('serlink_sftp_upload'));
+        expect(File('${home.path}/.claude.json').existsSync(), isFalse);
+        if (initial == 'customized') {
+          final backup = skill.parent.listSync().whereType<File>().singleWhere(
+            (f) => f.path.contains('.serlink-backup-'),
+          );
+          expect(backup.readAsStringSync(), 'custom instructions');
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('MCP settings section is hidden without the capability', (
     tester,
@@ -524,6 +834,31 @@ Future<void> _openMcpManager(WidgetTester tester) async {
     tester,
     find.byKey(const ValueKey('settings-mcp-scroll')),
   );
+  final container = ProviderScope.containerOf(
+    tester.element(find.byType(SerlinkApp)),
+  );
+  for (var attempt = 0; attempt < 100; attempt++) {
+    await tester.pump(const Duration(milliseconds: 10));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    if (!container.read(mcpServerControllerProvider).agentSkillsLoading) break;
+  }
+  await tester.pumpAndSettle();
+}
+
+Future<void> _drainAgentWrites(
+  WidgetTester tester,
+  bool Function() done,
+) async {
+  for (var attempt = 0; attempt < 100; attempt++) {
+    await tester.pump(const Duration(milliseconds: 20));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    if (done()) return;
+  }
+  fail('Timed out waiting for global skill writes');
 }
 
 Future<ProviderContainer> _pumpSerlinkApp(
@@ -553,6 +888,15 @@ Future<ProviderContainer> _pumpSerlinkApp(
         platformCapabilitiesProvider.overrideWithValue(capabilities),
         agentConfigInstallerProvider.overrideWithValue(
           AgentConfigInstaller(homeDirectory: configHome.path),
+        ),
+        agentSkillInstallerProvider.overrideWith(
+          (ref) => AgentSkillInstaller(
+            configInstaller: ref.watch(agentConfigInstallerProvider),
+            loadContent: () => rootBundle.loadString(
+              'assets/agent_skills/serlink-mcp/SKILL.md',
+              cache: false,
+            ),
+          ),
         ),
         vaultCryptoConfigProvider.overrideWithValue(
           const VaultCryptoConfig.testing(),
@@ -663,6 +1007,11 @@ class _FakeSecurityModalService implements SecurityModalService {
   Future<AgentAccessDecision> confirmAgentAccess(AgentAccessPrompt prompt) {
     return Future.value(accessDecision);
   }
+
+  @override
+  Future<AgentAccessDecision> confirmAgentUpload(
+    AgentUploadPrompt prompt,
+  ) async => AgentAccessDecision.deny;
 
   @override
   Future<AgentCommandDecision> confirmAgentCommand(AgentCommandPrompt prompt) {

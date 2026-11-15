@@ -451,7 +451,7 @@ class AppLocalizationsJa extends AppLocalizations {
       'stdio ヘルパーは Serlink のリリースビルドに同梱されており、このインストールでは利用できません。';
 
   @override
-  String get settingsMcpGrantsTitle => '有効な許可';
+  String get settingsMcpGrantsTitle => '許可済みエージェント';
 
   @override
   String get settingsMcpGrantsEmpty => '現在アクセス権を持つエージェントはありません。';
@@ -1032,7 +1032,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get securityAgentAllowOnceAction => '今回のみ許可';
 
   @override
-  String get securityAgentAllowSessionAction => 'セッション中許可';
+  String get securityAgentAllowSessionAction => '同種をセッション中許可';
 
   @override
   String get hostEditTitle => 'ホストを編集';
@@ -3102,32 +3102,32 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsMcpGuardDescription =>
-      '任意のクラウド保護は、エージェントの完全なコマンドを TypeSafe（api.typesafe.ai）に送信します。コマンドには秘密情報や個人情報が含まれる場合があります。TypeSafe はサービス規約に従ってリクエストデータを保持する場合があり、ゼロ保持は保証されません。ホスト記録、保存済み SSH 認証情報、端末画面や出力は別途添付しません。API キーはデバイスの安全なストレージに保存し、認証のため TypeSafe に送信します。保管庫の同期やバックアップには含めません。';
+      '完全なコマンドを選択したプロバイダーに送信します。秘密情報や個人情報を含む場合があり、保存はその利用規約に従います。ホスト記録、保存済み SSH 認証情報、端末出力は添付しません。API キーはデバイスの安全なストレージに保存して認証のみに使用し、保管庫の同期やバックアップには含めません。';
 
   @override
   String get settingsMcpGuardInputHint =>
       'エージェントは完全なコマンドを送信する必要があります。分割入力、履歴操作、Enter のみの入力はブロックされます。Ctrl-C での中断は引き続き利用できます。';
 
   @override
-  String get settingsMcpGuardEnable => 'モデル保護を有効にする';
+  String get settingsMcpGuardEnable => '保護を有効にする';
 
   @override
   String get settingsMcpGuardModel => 'モデル';
 
   @override
-  String get settingsMcpGuardApiKey => 'TypeSafe API キー';
+  String get settingsMcpGuardApiKey => 'API キー / トークン';
 
   @override
   String get settingsMcpGuardKeySaved => '保存済み。空欄で現在のキーを保持';
 
   @override
-  String get settingsMcpGuardKeyHint => 'TypeSafe API キーを入力';
+  String get settingsMcpGuardKeyHint => 'このプロバイダーのキーを入力';
 
   @override
   String get settingsMcpGuardRemoveKey => 'キーを削除してモデル保護を無効にする';
 
   @override
-  String get settingsMcpGuardInvalid => '保護を有効にする前に、有効なモデル名と API キーを入力してください。';
+  String get settingsMcpGuardInvalid => 'モデル、接続設定、必須の API キーを確認してください。';
 
   @override
   String get settingsMcpGuardSaveFailed => '保護設定を保存できませんでした。再試行してください。';
@@ -3233,14 +3233,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsMcpExistingConnectionGrant => '既存の接続';
 
   @override
-  String get settingsMcpGuardSharingConsent =>
-      '完全なエージェントコマンドをリスク判定のため TypeSafe に送信することに同意します。機密情報が含まれる場合があり、リクエストデータが保持される可能性を理解しています。';
+  String get settingsMcpGuardSharingConsent => 'リスク判定のため完全なコマンドの送信を許可';
 
   @override
   String get settingsMcpGuardConsentRequired => 'モデル保護を有効にする前にコマンド共有に同意してください。';
 
   @override
-  String get settingsMcpGuardPrivacyPolicy => 'TypeSafe プライバシーポリシー';
+  String get settingsMcpGuardPrivacyPolicy => 'データとプライバシー';
 
   @override
   String get settingsMcpBypassTitle => 'コマンド承認をバイパス';
@@ -3250,4 +3249,132 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsMcpBypassUnavailable => 'コマンド承認設定を読み込みまたは保存できません';
+
+  @override
+  String get settingsMcpGuardSummary => 'ローカルルールに加え、エージェントの完全なコマンドを判定します。';
+
+  @override
+  String get settingsMcpGuardProvider => 'プロバイダー';
+
+  @override
+  String get settingsMcpGuardLocalProvider => 'ローカル / セルフホスト';
+
+  @override
+  String get settingsMcpGuardAccountId => 'Cloudflare アカウント ID';
+
+  @override
+  String get settingsMcpGuardEndpoint => '推論 API の URL';
+
+  @override
+  String get settingsMcpGuardOptionalKey => 'API キー（任意）';
+
+  @override
+  String get settingsMcpGuardLocalHint => 'System One API。HTTP は暗号化されません。';
+
+  @override
+  String get settingsMcpGuardLocalDescription =>
+      '完全なコマンドを指定した URL に送信します。信頼できるサービスを使用してください。データの保存はその運営者が管理します。ホスト記録、保存済み SSH 認証情報、端末出力は添付しません。設定とキーはこのデバイスにのみ保存し、保管庫の同期やバックアップには含めません。';
+
+  @override
+  String get settingsMcpGuardProviderTerms => 'プロバイダーの規約を見る';
+
+  @override
+  String securityAgentSessionScope(String prefix) {
+    return 'このセッションの対象：$prefix';
+  }
+
+  @override
+  String get securityAgentAllowTaskAction => 'プロジェクトの作業を許可';
+
+  @override
+  String securityAgentTaskScope(String directory) {
+    return 'この接続とセッションで、$directory 内の認識可能な照会、ファイルの作成・上書きを許可します。削除、隠しパス、任意のスクリプトは引き続き確認が必要です。信頼できるプロジェクトでのみ使用してください。リモートのシンボリックリンクはこのディレクトリの外を指す場合があります。';
+  }
+
+  @override
+  String securityAgentCommandJobContext(String directory) {
+    return '独立した sh プロセス · 作業ディレクトリ：$directory';
+  }
+
+  @override
+  String get securityAgentUploadTitle => 'エージェントのアップロード要求';
+
+  @override
+  String securityAgentUploadBody(String clientName, String hostName) {
+    return '$clientName がローカルファイルを $hostName にアップロードしようとしています。';
+  }
+
+  @override
+  String get securityAgentUploadSource => 'ローカルの送信元';
+
+  @override
+  String get securityAgentUploadDestination => 'リモートの送信先';
+
+  @override
+  String securityAgentUploadSize(int bytes) {
+    return 'サイズ：$bytes バイト';
+  }
+
+  @override
+  String get securityAgentUploadWarning =>
+      'ファイルをリモートホストに送信し、送信先に既存のファイルがある場合は上書きします。共有する意図のあるファイルのみ許可してください。';
+
+  @override
+  String get settingsMcpAgentsScanning => 'インストール済みエージェントを確認中…';
+
+  @override
+  String get settingsMcpGlobalSkillTitle => 'グローバルスキル';
+
+  @override
+  String get settingsMcpGlobalSkillsHint =>
+      'MCP 起動時に Serlink スキルをグローバルにインストール・更新します。カスタマイズ済みの内容は保持し、手動で置き換える前にバックアップします。表示されない場合はエージェントを再起動してください。';
+
+  @override
+  String get settingsMcpSkillNotInstalled => '未インストール';
+
+  @override
+  String get settingsMcpSkillOutdated => '更新あり';
+
+  @override
+  String get settingsMcpSkillConflict => 'カスタマイズ済みスキルを保持';
+
+  @override
+  String get settingsMcpSkillUnavailable => 'スキルにアクセスできません';
+
+  @override
+  String get settingsMcpSkillReplace => 'スキルを置換';
+
+  @override
+  String settingsMcpSkillInstalled(String agent) {
+    return '$agent にグローバルスキルをインストールしました';
+  }
+
+  @override
+  String get securityAgentClientAccessTitle => 'エージェントのアクセスを記憶';
+
+  @override
+  String securityAgentClientAccessBody(String client) {
+    return 'このデバイスで $client に Serlink の使用を許可しますか？';
+  }
+
+  @override
+  String get securityAgentClientAccessScope =>
+      '現在のプライバシー設定でのホスト検出、端末・SFTP セッションの開始、すべてのホストの既存接続の操作と端末履歴の読み取りを許可します。コマンドとアップロードの承認は引き続き適用されます。';
+
+  @override
+  String get securityAgentClientAccessRemember =>
+      '同じクライアント名のアクセスをこのデバイスに記憶し、アプリ再起動後も維持します。「設定 → エージェントアクセス」でいつでも取り消せます。';
+
+  @override
+  String get securityAgentRememberAction => '許可して記憶';
+
+  @override
+  String get settingsMcpRememberedClient => 'すべてのホストと接続 · このデバイスに記憶';
+
+  @override
+  String get settingsMcpAuthorizationUnavailable =>
+      'エージェントのアクセスを保存できませんでした。再試行してください。';
+
+  @override
+  String get agentSftpReleaseTooltip => 'エージェントの制御を解除し、SFTP 接続を維持';
 }

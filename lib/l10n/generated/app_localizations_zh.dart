@@ -446,7 +446,7 @@ class AppLocalizationsZh extends AppLocalizations {
       'stdio 助手仅随 Serlink 发布版本提供，当前安装中不可用。';
 
   @override
-  String get settingsMcpGrantsTitle => '活动授权';
+  String get settingsMcpGrantsTitle => '已允许的代理';
 
   @override
   String get settingsMcpGrantsEmpty => '当前没有代理拥有访问权限。';
@@ -1019,7 +1019,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get securityAgentAllowOnceAction => '仅允许一次';
 
   @override
-  String get securityAgentAllowSessionAction => '会话期间允许';
+  String get securityAgentAllowSessionAction => '本会话允许同类';
 
   @override
   String get hostEditTitle => '编辑主机';
@@ -3058,32 +3058,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsMcpGuardDescription =>
-      '可选的云端保护会将代理提交的完整命令发送至 TypeSafe（api.typesafe.ai）。命令可能含有密码、密钥或个人信息。TypeSafe 可能根据其服务条款留存请求数据，不保证零留存。请求不会另行附加主机记录、已存储的 SSH 凭据、终端画面或输出。API Key 保存在本机安全存储中，并发送给 TypeSafe 用于请求认证；不参与保险库同步或备份。';
+      '完整命令会发送给所选供应商，可能包含密钥或个人信息；数据留存遵循其服务条款。请求不另附主机记录、已存储的 SSH 凭据或终端输出。API key 仅保存在本机安全存储中，用于请求认证，不参与保险库同步或备份。';
 
   @override
   String get settingsMcpGuardInputHint =>
       '代理须提交完整命令。分段输入、历史控制和单独回车将被拦截，仍可使用 Ctrl-C 中断。';
 
   @override
-  String get settingsMcpGuardEnable => '启用模型防护';
+  String get settingsMcpGuardEnable => '启用防护';
 
   @override
   String get settingsMcpGuardModel => '模型';
 
   @override
-  String get settingsMcpGuardApiKey => 'TypeSafe API key';
+  String get settingsMcpGuardApiKey => 'API key / 令牌';
 
   @override
   String get settingsMcpGuardKeySaved => '已保存密钥，留空则保留';
 
   @override
-  String get settingsMcpGuardKeyHint => '输入 TypeSafe API key';
+  String get settingsMcpGuardKeyHint => '输入此供应商的密钥';
 
   @override
   String get settingsMcpGuardRemoveKey => '移除密钥并关闭模型防护';
 
   @override
-  String get settingsMcpGuardInvalid => '启用防护前，请填写有效的模型名称和 API key。';
+  String get settingsMcpGuardInvalid => '请检查模型、连接配置及必填的 API key。';
 
   @override
   String get settingsMcpGuardSaveFailed => '无法保存防护设置，请重试。';
@@ -3188,14 +3188,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsMcpExistingConnectionGrant => '已有连接';
 
   @override
-  String get settingsMcpGuardSharingConsent =>
-      '我同意将代理提交的完整命令发送至 TypeSafe 进行风险评估，并知悉命令可能包含敏感信息且请求数据可能被留存。';
+  String get settingsMcpGuardSharingConsent => '允许发送完整命令进行风险评估';
 
   @override
   String get settingsMcpGuardConsentRequired => '启用模型保护前，请先同意共享命令。';
 
   @override
-  String get settingsMcpGuardPrivacyPolicy => 'TypeSafe 隐私政策';
+  String get settingsMcpGuardPrivacyPolicy => '数据与隐私';
 
   @override
   String get settingsMcpBypassTitle => 'Bypass 命令审批';
@@ -3205,4 +3204,131 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsMcpBypassUnavailable => '无法读取或保存命令审批设置';
+
+  @override
+  String get settingsMcpGuardSummary => '在本地规则之外，额外检查代理提交的完整命令。';
+
+  @override
+  String get settingsMcpGuardProvider => '供应商';
+
+  @override
+  String get settingsMcpGuardLocalProvider => '本地 / 自托管';
+
+  @override
+  String get settingsMcpGuardAccountId => 'Cloudflare 账户 ID';
+
+  @override
+  String get settingsMcpGuardEndpoint => '推理接口地址';
+
+  @override
+  String get settingsMcpGuardOptionalKey => 'API key（可选）';
+
+  @override
+  String get settingsMcpGuardLocalHint => 'System One 接口。HTTP 未加密。';
+
+  @override
+  String get settingsMcpGuardLocalDescription =>
+      '完整命令会发送至所填地址，请使用可信服务；数据留存由该服务管理。不另附主机记录、已存储的 SSH 凭据或终端输出。配置与密钥仅保存在本机，不参与保险库同步或备份。';
+
+  @override
+  String get settingsMcpGuardProviderTerms => '查看供应商条款';
+
+  @override
+  String securityAgentSessionScope(String prefix) {
+    return '本会话匹配：$prefix';
+  }
+
+  @override
+  String get securityAgentAllowTaskAction => '允许项目任务';
+
+  @override
+  String securityAgentTaskScope(String directory) {
+    return '允许当前连接和会话在 $directory 内执行可识别的查询、新建或覆盖文件。删除、隐藏路径和任意脚本仍需审核。仅用于可信项目：远端符号链接可能指向目录外。';
+  }
+
+  @override
+  String securityAgentCommandJobContext(String directory) {
+    return '独立 sh 进程 · 工作目录：$directory';
+  }
+
+  @override
+  String get securityAgentUploadTitle => '代理上传请求';
+
+  @override
+  String securityAgentUploadBody(String clientName, String hostName) {
+    return '$clientName 希望将本地文件上传到 $hostName。';
+  }
+
+  @override
+  String get securityAgentUploadSource => '本地来源';
+
+  @override
+  String get securityAgentUploadDestination => '远端目标';
+
+  @override
+  String securityAgentUploadSize(int bytes) {
+    return '大小：$bytes 字节';
+  }
+
+  @override
+  String get securityAgentUploadWarning =>
+      '此操作会将文件发送到远端主机，并覆盖目标路径中已有的文件。请仅批准您打算共享的文件。';
+
+  @override
+  String get settingsMcpAgentsScanning => '正在检测已安装的 agent…';
+
+  @override
+  String get settingsMcpGlobalSkillTitle => '全局技能';
+
+  @override
+  String get settingsMcpGlobalSkillsHint =>
+      'MCP 启动时会在全局安装并更新 Serlink 技能。自定义内容会保留，手动替换前会备份。若技能未出现，请重启 agent。';
+
+  @override
+  String get settingsMcpSkillNotInstalled => '未安装';
+
+  @override
+  String get settingsMcpSkillOutdated => '可更新';
+
+  @override
+  String get settingsMcpSkillConflict => '已保留自定义技能';
+
+  @override
+  String get settingsMcpSkillUnavailable => '无法访问技能';
+
+  @override
+  String get settingsMcpSkillReplace => '替换技能';
+
+  @override
+  String settingsMcpSkillInstalled(String agent) {
+    return '已为 $agent 安装全局技能';
+  }
+
+  @override
+  String get securityAgentClientAccessTitle => '记住代理访问权限';
+
+  @override
+  String securityAgentClientAccessBody(String client) {
+    return '允许 $client 在本机使用 Serlink？';
+  }
+
+  @override
+  String get securityAgentClientAccessScope =>
+      '允许按当前隐私设置发现主机、打开终端和 SFTP 会话，以及控制所有主机的已有连接并读取其终端历史。命令和上传操作仍按各自规则确认。';
+
+  @override
+  String get securityAgentClientAccessRemember =>
+      '此权限按客户端名称在本机记住，重启应用后仍有效。可随时在“设置 → 代理访问”中撤销。';
+
+  @override
+  String get securityAgentRememberAction => '允许并记住';
+
+  @override
+  String get settingsMcpRememberedClient => '所有主机和连接 · 已在本机记住';
+
+  @override
+  String get settingsMcpAuthorizationUnavailable => '无法保存代理访问权限，请重试。';
+
+  @override
+  String get agentSftpReleaseTooltip => '释放代理控制并保持此 SFTP 连接';
 }

@@ -4,56 +4,128 @@ import 'dart:convert';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/ids/entity_id.dart';
+import '../../../platform/secret_store.dart';
 import '../../security/application/security_modal_service.dart';
 import '../domain/agent_grant.dart';
 import 'mcp_request_context.dart';
 
-/// Tracks in-memory [AgentGrant]s and asks the user before creating new ones.
-///
-/// Grants are intentionally not persisted: every MCP client must be approved
-/// again after the app restarts.
+/// Device-local, revocable client consent, shared by discovery and connections.
+/// Session handles and command permits remain transient and separately checked.
 class McpAuthorizationService {
   McpAuthorizationService({
     required SecurityModalService securityModalService,
+    this.secretStore,
     Uuid uuid = const Uuid(),
     DateTime Function()? now,
-    // Named parameters cannot be initializing formals for private fields.
+    // Named parameters cannot initialize private fields directly.
     // ignore: prefer_initializing_formals
   }) : _securityModalService = securityModalService,
        // ignore: prefer_initializing_formals
        _uuid = uuid,
        _now = now ?? DateTime.now;
 
+  static const storageKey = SecretRef('serlink.mcp.client-access.v1');
+  final SecretStore? secretStore;
   final SecurityModalService _securityModalService;
   final Uuid _uuid;
   final DateTime Function() _now;
-
   final List<AgentGrant> _grants = [];
-  var _generation = 0;
-  var _disposed = false;
   final Map<String, Future<AgentGrant?>> _pendingGrants = {};
-  final StreamController<List<AgentGrant>> _grantsChanged =
-      StreamController<List<AgentGrant>>.broadcast();
+  final _grantsChanged = StreamController<List<AgentGrant>>.broadcast();
+  int _generation = 0;
+  bool _disposed = false;
+  bool _loaded = false;
+  Future<void>? _initialization;
+  Future<void> _persistence = Future<void>.value();
 
-  /// All currently stored grants, including expired ones.
   List<AgentGrant> get grants => List.unmodifiable(_grants);
-
-  /// Emits the current grant list on every mutation. New listeners only see
-  /// later mutations; read [grants] for the initial snapshot.
   Stream<List<AgentGrant>> get watchGrants => _grantsChanged.stream;
 
   void _emitGrants() {
-    _grantsChanged.add(grants);
+    if (!_disposed) _grantsChanged.add(grants);
   }
 
-  /// Returns the stored grant for (clientName, hostId) when it is still valid
-  /// at [now].
+  Future<void> initialize() {
+    if (_loaded || _disposed) return Future<void>.value();
+    return _initialization ??= _restore();
+  }
+
+  Future<void> _restore() async {
+    final generation = _generation;
+    try {
+      final bytes = await secretStore?.read(storageKey);
+      final restored = <AgentGrant>[];
+      if (bytes != null) {
+        final decoded = jsonDecode(utf8.decode(bytes));
+        if (decoded is! Map || decoded['clients'] is! List) {
+          throw const FormatException('Invalid client consent');
+        }
+        final names = <String>{};
+        for (final record in decoded['clients'] as List) {
+          if (record is! Map ||
+              record['clientName'] is! String ||
+              (record['clientName'] as String).trim().isEmpty ||
+              record['grantId'] is! String ||
+              (record['grantId'] as String).isEmpty ||
+              record['createdAt'] is! String ||
+              !names.add(record['clientName'] as String)) {
+            throw const FormatException('Invalid client consent record');
+          }
+          restored.add(
+            AgentGrant(
+              grantId: record['grantId'] as String,
+              clientName: record['clientName'] as String,
+              hostId: null,
+              clientWide: true,
+              createdAt: DateTime.parse(record['createdAt'] as String),
+            ),
+          );
+        }
+      }
+      if (!_disposed && generation == _generation) {
+        _grants.addAll(restored);
+        _loaded = true;
+        if (restored.isNotEmpty) _emitGrants();
+      }
+    } on Object {
+      throw const McpApprovalException('authorization_unavailable');
+    } finally {
+      _initialization = null;
+    }
+  }
+
+  Future<void> _save() {
+    final result = _persistence.then((_) async {
+      await secretStore?.write(
+        storageKey,
+        utf8.encode(
+          jsonEncode({
+            'clients': [
+              for (final grant in _grants)
+                if (grant.clientWide)
+                  {
+                    'grantId': grant.grantId,
+                    'clientName': grant.clientName,
+                    'createdAt': grant.createdAt.toUtc().toIso8601String(),
+                  },
+            ],
+          }),
+        ),
+      );
+    });
+    _persistence = result.then<void>((_) {}, onError: (Object _) {});
+    return result.catchError((Object _) {
+      throw const McpApprovalException('authorization_unavailable');
+    });
+  }
+
   AgentGrant? findValidGrant({
     required String clientName,
     required HostId hostId,
     required DateTime now,
     SessionId? sessionId,
   }) {
+    if (_disposed) return null;
     for (final grant in _grants) {
       if (grant.clientName == clientName &&
           grant.covers(hostId, now, sessionId: sessionId)) {
@@ -63,69 +135,35 @@ class McpAuthorizationService {
     return null;
   }
 
-  /// Returns an existing valid grant, or asks the user to approve a new one.
-  ///
-  /// Concurrent calls for the same (clientName, hostId) share one in-flight
-  /// confirmation so the user only ever sees a single dialog.
   Future<AgentGrant?> ensureGrant({
     required String clientName,
     required HostId hostId,
     required String hostDisplayName,
     SessionId? sessionId,
-  }) {
-    final existing = findValidGrant(
-      clientName: clientName,
-      hostId: hostId,
-      now: _now(),
-      sessionId: sessionId,
-    );
-    if (existing != null) {
-      return Future.value(existing);
-    }
-    return _ensureGrant(
-      clientName: clientName,
-      hostId: hostId,
-      hostDisplayName: hostDisplayName,
-      sessionId: sessionId,
-    );
-  }
+  }) => _ensureClient(
+    clientName: clientName,
+    hostId: hostId,
+    hostDisplayName: hostDisplayName,
+    sessionId: sessionId,
+  );
 
   Future<AgentGrant?> ensureDiscoveryGrant({
     required String clientName,
     required bool strict,
-  }) {
-    for (final grant in _grants) {
-      if (grant.clientName == clientName &&
-          grant.isDiscovery &&
-          grant.discoveryStrict == strict &&
-          !grant.isExpired(_now())) {
-        return Future.value(grant);
-      }
-    }
-    return _ensureGrant(clientName: clientName, discoveryStrict: strict);
-  }
+  }) => _ensureClient(clientName: clientName, discoveryStrict: strict);
 
   bool isValid(AgentGrant grant) =>
       !_disposed && _grants.contains(grant) && !grant.isExpired(_now());
 
-  Future<AgentGrant?> _ensureGrant({
+  Future<AgentGrant?> _ensureClient({
     required String clientName,
     HostId? hostId,
     String hostDisplayName = '',
     SessionId? sessionId,
     bool? discoveryStrict,
   }) {
-    // JSON avoids delimiter collisions in caller-provided client names.
-    final key = jsonEncode([
-      clientName,
-      hostId?.value,
-      sessionId?.value,
-      discoveryStrict,
-    ]);
-    final pending = _pendingGrants[key];
-    if (pending != null) {
-      return pending;
-    }
+    final pending = _pendingGrants[clientName];
+    if (pending != null) return pending;
     final future = _requestGrant(
       clientName: clientName,
       hostId: hostId,
@@ -133,12 +171,12 @@ class McpAuthorizationService {
       sessionId: sessionId,
       discoveryStrict: discoveryStrict,
     );
-    _pendingGrants[key] = future;
+    _pendingGrants[clientName] = future;
     unawaited(
       future.then<void>(
-        (_) => _pendingGrants.remove(key),
+        (_) => _pendingGrants.remove(clientName),
         onError: (Object _) {
-          _pendingGrants.remove(key);
+          _pendingGrants.remove(clientName);
         },
       ),
     );
@@ -153,6 +191,16 @@ class McpAuthorizationService {
     bool? discoveryStrict,
   }) async {
     final generation = _generation;
+    await initialize();
+    McpRequestContext.current?.checkActive();
+    if (_disposed || generation != _generation) return null;
+    for (final grant in _grants) {
+      if (grant.clientName == clientName &&
+          grant.clientWide &&
+          isValid(grant)) {
+        return grant;
+      }
+    }
     final decision = await _securityModalService.confirmAgentAccess(
       AgentAccessPrompt(
         clientName: clientName,
@@ -160,6 +208,7 @@ class McpAuthorizationService {
         hostId: hostId?.value ?? '',
         existingSessionId: sessionId?.value,
         discoveryStrict: discoveryStrict,
+        rememberClient: true,
       ),
     );
     McpRequestContext.current?.checkActive();
@@ -171,38 +220,63 @@ class McpAuthorizationService {
     final grant = AgentGrant(
       grantId: _uuid.v4(),
       clientName: clientName,
-      hostId: hostId,
-      sessionId: sessionId,
-      discoveryStrict: discoveryStrict,
-      createdAt: _now(),
-      expiresAt: null,
+      hostId: null,
+      clientWide: true,
+      createdAt: _now().toUtc(),
     );
     _grants.add(grant);
+    try {
+      await _save();
+      McpRequestContext.current?.checkActive();
+      if (_disposed || generation != _generation) {
+        _grants.remove(grant);
+        await _save();
+        return null;
+      }
+    } on Object {
+      _grants.remove(grant);
+      // Undo a consent write if the request expired while storage was pending.
+      try {
+        await _save();
+      } on Object {
+        /* The original failure remains visible. */
+      }
+      rethrow;
+    }
     _emitGrants();
     return grant;
   }
 
-  /// Closes the grant-list broadcast stream. Called by the provider on
-  /// dispose; the service must not be used afterwards.
-  void dispose() {
-    _disposed = true;
-    unawaited(_grantsChanged.close());
-  }
-
-  /// Removes the grant with [grantId]; returns true when one was removed.
-  bool revokeGrant(String grantId) {
+  Future<bool> revokeGrant(String grantId) async {
     final before = _grants.length;
     _grants.removeWhere((grant) => grant.grantId == grantId);
-    final removed = _grants.length != before;
-    if (removed) {
-      _emitGrants();
+    if (_grants.length == before) return false;
+    _generation++;
+    _emitGrants();
+    try {
+      await _save();
+    } on Object {
+      throw const McpApprovalException('authorization_unavailable');
     }
-    return removed;
+    return true;
   }
 
-  void revokeAll() {
-    _generation += 1;
+  Future<void> revokeAll() async {
+    _generation++;
+    _loaded =
+        true; // Invalidate an in-flight restore before clearing persistence.
     _grants.clear();
     _emitGrants();
+    try {
+      await _save();
+    } on Object {
+      throw const McpApprovalException('authorization_unavailable');
+    }
+  }
+
+  void dispose() {
+    _disposed = true;
+    _generation++;
+    unawaited(_grantsChanged.close());
   }
 }

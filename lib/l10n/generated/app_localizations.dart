@@ -931,7 +931,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpGrantsTitle.
   ///
   /// In en, this message translates to:
-  /// **'Active grants'**
+  /// **'Allowed agents'**
   String get settingsMcpGrantsTitle;
 
   /// No description provided for @settingsMcpGrantsEmpty.
@@ -1945,7 +1945,7 @@ abstract class AppLocalizations {
   /// No description provided for @securityAgentAllowSessionAction.
   ///
   /// In en, this message translates to:
-  /// **'Allow for Session'**
+  /// **'Allow Similar for Session'**
   String get securityAgentAllowSessionAction;
 
   /// No description provided for @hostEditTitle.
@@ -5683,7 +5683,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpGuardDescription.
   ///
   /// In en, this message translates to:
-  /// **'Optional cloud protection sends complete agent commands to TypeSafe at api.typesafe.ai. Commands can contain secrets or personal data. TypeSafe may retain request data under its service terms; zero retention is not guaranteed. Host records, stored SSH credentials, terminal screens and output are not attached separately. The API key is stored in device-local secure storage and sent to TypeSafe to authenticate requests; it is excluded from vault sync and backups.'**
+  /// **'Complete commands are sent to the selected provider and may contain secrets or personal data. Data retention follows its terms. Host records, stored SSH credentials and terminal output are not attached. API keys stay in device secure storage, are sent only for authentication, and are excluded from vault sync and backups.'**
   String get settingsMcpGuardDescription;
 
   /// No description provided for @settingsMcpGuardInputHint.
@@ -5695,7 +5695,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpGuardEnable.
   ///
   /// In en, this message translates to:
-  /// **'Enable model protection'**
+  /// **'Enable protection'**
   String get settingsMcpGuardEnable;
 
   /// No description provided for @settingsMcpGuardModel.
@@ -5707,7 +5707,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpGuardApiKey.
   ///
   /// In en, this message translates to:
-  /// **'TypeSafe API key'**
+  /// **'API key / token'**
   String get settingsMcpGuardApiKey;
 
   /// No description provided for @settingsMcpGuardKeySaved.
@@ -5719,7 +5719,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpGuardKeyHint.
   ///
   /// In en, this message translates to:
-  /// **'Enter your TypeSafe API key'**
+  /// **'Enter a key for this provider'**
   String get settingsMcpGuardKeyHint;
 
   /// No description provided for @settingsMcpGuardRemoveKey.
@@ -5731,7 +5731,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpGuardInvalid.
   ///
   /// In en, this message translates to:
-  /// **'Enter a valid model name and API key before enabling protection.'**
+  /// **'Check the model, connection settings and required API key.'**
   String get settingsMcpGuardInvalid;
 
   /// No description provided for @settingsMcpGuardSaveFailed.
@@ -5917,7 +5917,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpGuardSharingConsent.
   ///
   /// In en, this message translates to:
-  /// **'I agree to send complete agent commands to TypeSafe for risk assessment. I understand that commands may contain sensitive data and that TypeSafe may retain request data.'**
+  /// **'Allow sharing full commands for risk checks'**
   String get settingsMcpGuardSharingConsent;
 
   /// No description provided for @settingsMcpGuardConsentRequired.
@@ -5929,7 +5929,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpGuardPrivacyPolicy.
   ///
   /// In en, this message translates to:
-  /// **'TypeSafe privacy policy'**
+  /// **'Data & privacy'**
   String get settingsMcpGuardPrivacyPolicy;
 
   /// No description provided for @settingsMcpBypassTitle.
@@ -5949,6 +5949,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Command approval settings could not be loaded or saved'**
   String get settingsMcpBypassUnavailable;
+
+  /// No description provided for @settingsMcpGuardSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks complete agent commands in addition to local rules.'**
+  String get settingsMcpGuardSummary;
+
+  /// No description provided for @settingsMcpGuardProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider'**
+  String get settingsMcpGuardProvider;
+
+  /// No description provided for @settingsMcpGuardLocalProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Local / self-hosted'**
+  String get settingsMcpGuardLocalProvider;
+
+  /// No description provided for @settingsMcpGuardAccountId.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloudflare account ID'**
+  String get settingsMcpGuardAccountId;
+
+  /// No description provided for @settingsMcpGuardEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Inference URL'**
+  String get settingsMcpGuardEndpoint;
+
+  /// No description provided for @settingsMcpGuardOptionalKey.
+  ///
+  /// In en, this message translates to:
+  /// **'API key (optional)'**
+  String get settingsMcpGuardOptionalKey;
+
+  /// No description provided for @settingsMcpGuardLocalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'System One endpoint. HTTP is unencrypted.'**
+  String get settingsMcpGuardLocalHint;
+
+  /// No description provided for @settingsMcpGuardLocalDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete commands are sent to the configured address. Use a service you trust; its operator controls data retention. Host records, stored SSH credentials and terminal output are not attached. Settings and keys stay on this device and are excluded from vault sync and backups.'**
+  String get settingsMcpGuardLocalDescription;
+
+  /// No description provided for @settingsMcpGuardProviderTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'View provider terms'**
+  String get settingsMcpGuardProviderTerms;
+
+  /// No description provided for @securityAgentSessionScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Session scope: {prefix}'**
+  String securityAgentSessionScope(String prefix);
+
+  /// No description provided for @securityAgentAllowTaskAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Project Task'**
+  String get securityAgentAllowTaskAction;
+
+  /// No description provided for @securityAgentTaskScope.
+  ///
+  /// In en, this message translates to:
+  /// **'For this connection and session, allow recognized queries and file creation or replacement in {directory}. Deletion, hidden paths and arbitrary scripts still require review. Use only with trusted projects: remote symbolic links may point outside this directory.'**
+  String securityAgentTaskScope(String directory);
+
+  /// No description provided for @securityAgentCommandJobContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate sh process · Working directory: {directory}'**
+  String securityAgentCommandJobContext(String directory);
+
+  /// No description provided for @securityAgentUploadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent upload request'**
+  String get securityAgentUploadTitle;
+
+  /// No description provided for @securityAgentUploadBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{clientName} wants to upload a local file to {hostName}.'**
+  String securityAgentUploadBody(String clientName, String hostName);
+
+  /// No description provided for @securityAgentUploadSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Local source'**
+  String get securityAgentUploadSource;
+
+  /// No description provided for @securityAgentUploadDestination.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote destination'**
+  String get securityAgentUploadDestination;
+
+  /// No description provided for @securityAgentUploadSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Size: {bytes} bytes'**
+  String securityAgentUploadSize(int bytes);
+
+  /// No description provided for @securityAgentUploadWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This sends the file to the remote host and replaces any existing file at the destination. Approve only files you intend to share.'**
+  String get securityAgentUploadWarning;
+
+  /// No description provided for @settingsMcpAgentsScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning installed agents…'**
+  String get settingsMcpAgentsScanning;
+
+  /// No description provided for @settingsMcpGlobalSkillTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Global skill'**
+  String get settingsMcpGlobalSkillTitle;
+
+  /// No description provided for @settingsMcpGlobalSkillsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Serlink installs and updates its skill globally when MCP starts. Customized copies are kept; replacing one saves a backup. Restart the agent if the skill does not appear.'**
+  String get settingsMcpGlobalSkillsHint;
+
+  /// No description provided for @settingsMcpSkillNotInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not installed'**
+  String get settingsMcpSkillNotInstalled;
+
+  /// No description provided for @settingsMcpSkillOutdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get settingsMcpSkillOutdated;
+
+  /// No description provided for @settingsMcpSkillConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Customized skill kept'**
+  String get settingsMcpSkillConflict;
+
+  /// No description provided for @settingsMcpSkillUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot access skill'**
+  String get settingsMcpSkillUnavailable;
+
+  /// No description provided for @settingsMcpSkillReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace skill'**
+  String get settingsMcpSkillReplace;
+
+  /// No description provided for @settingsMcpSkillInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Global skill installed for {agent}'**
+  String settingsMcpSkillInstalled(String agent);
+
+  /// No description provided for @securityAgentClientAccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember agent access'**
+  String get securityAgentClientAccessTitle;
+
+  /// No description provided for @securityAgentClientAccessBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow {client} to use Serlink on this device?'**
+  String securityAgentClientAccessBody(String client);
+
+  /// No description provided for @securityAgentClientAccessScope.
+  ///
+  /// In en, this message translates to:
+  /// **'This grants access to discover hosts under the current privacy setting, open terminal and SFTP sessions, and control existing connections, including their terminal history, on all hosts. Command and upload approvals still apply.'**
+  String get securityAgentClientAccessScope;
+
+  /// No description provided for @securityAgentClientAccessRemember.
+  ///
+  /// In en, this message translates to:
+  /// **'Access is remembered across app restarts for clients using this name on this device. Revoke it anytime in Settings → Agent access.'**
+  String get securityAgentClientAccessRemember;
+
+  /// No description provided for @securityAgentRememberAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow and remember'**
+  String get securityAgentRememberAction;
+
+  /// No description provided for @settingsMcpRememberedClient.
+  ///
+  /// In en, this message translates to:
+  /// **'All hosts and connections · Remembered on this device'**
+  String get settingsMcpRememberedClient;
+
+  /// No description provided for @settingsMcpAuthorizationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save agent access. Please try again.'**
+  String get settingsMcpAuthorizationUnavailable;
+
+  /// No description provided for @agentSftpReleaseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Release agent control and keep this SFTP connection open'**
+  String get agentSftpReleaseTooltip;
 }
 
 class _AppLocalizationsDelegate

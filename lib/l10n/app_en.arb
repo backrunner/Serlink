@@ -186,7 +186,7 @@
   "@settingsMcpStdioNotInstalled": {
     "description": "Hint on the stdio config row when the serlink-mcp helper binary is missing (e.g. debug runs)."
   },
-  "settingsMcpGrantsTitle": "Active grants",
+  "settingsMcpGrantsTitle": "Allowed agents",
   "settingsMcpGrantsEmpty": "No agents currently have access.",
   "settingsMcpGrantExpiry": "until app quits",
   "settingsMcpRevokeAction": "Revoke",
@@ -601,7 +601,7 @@
     }
   },
   "securityAgentAllowOnceAction": "Allow Once",
-  "securityAgentAllowSessionAction": "Allow for Session",
+  "securityAgentAllowSessionAction": "Allow Similar for Session",
   "hostEditTitle": "Edit Host",
   "hostAddTitle": "Add Host",
   "hostSectionConnection": "Connection",
@@ -1668,15 +1668,15 @@
   "settingsMcpGuardUnavailable": "Protection settings unavailable",
   "settingsMcpGuardConfigure": "Configure",
   "settingsMcpGuardDialogTitle": "Model command protection",
-  "settingsMcpGuardDescription": "Optional cloud protection sends complete agent commands to TypeSafe at api.typesafe.ai. Commands can contain secrets or personal data. TypeSafe may retain request data under its service terms; zero retention is not guaranteed. Host records, stored SSH credentials, terminal screens and output are not attached separately. The API key is stored in device-local secure storage and sent to TypeSafe to authenticate requests; it is excluded from vault sync and backups.",
+  "settingsMcpGuardDescription": "Complete commands are sent to the selected provider and may contain secrets or personal data. Data retention follows its terms. Host records, stored SSH credentials and terminal output are not attached. API keys stay in device secure storage, are sent only for authentication, and are excluded from vault sync and backups.",
   "settingsMcpGuardInputHint": "Agents must submit complete commands. Partial input, history controls and bare Enter are blocked; Ctrl-C remains available.",
-  "settingsMcpGuardEnable": "Enable model protection",
+  "settingsMcpGuardEnable": "Enable protection",
   "settingsMcpGuardModel": "Model",
-  "settingsMcpGuardApiKey": "TypeSafe API key",
+  "settingsMcpGuardApiKey": "API key / token",
   "settingsMcpGuardKeySaved": "Key saved; leave blank to keep it",
-  "settingsMcpGuardKeyHint": "Enter your TypeSafe API key",
+  "settingsMcpGuardKeyHint": "Enter a key for this provider",
   "settingsMcpGuardRemoveKey": "Remove key and disable model protection",
-  "settingsMcpGuardInvalid": "Enter a valid model name and API key before enabling protection.",
+  "settingsMcpGuardInvalid": "Check the model, connection settings and required API key.",
   "settingsMcpGuardSaveFailed": "Could not save protection settings. Please retry.",
   "settingsMcpStrictPrivacy": "Strict host privacy",
   "settingsMcpStrictPrivacyDescription": "Off by default: after discovery consent, agents can read host addresses and other connection settings. When enabled, discovery returns only display names and IDs. Startup commands and stored credentials are excluded. Authorized terminal output and files may contain sensitive data.",
@@ -1707,7 +1707,7 @@
   "securityAgentSessionIdLabel": "Connection ID: {id}",
   "settingsMcpDiscoveryGrant": "Host and connection discovery",
   "settingsMcpExistingConnectionGrant": "Existing connection",
-  "settingsMcpGuardSharingConsent": "I agree to send complete agent commands to TypeSafe for risk assessment. I understand that commands may contain sensitive data and that TypeSafe may retain request data.",
+  "settingsMcpGuardSharingConsent": "Allow sharing full commands for risk checks",
   "settingsMcpGuardConsentRequired": "Agree to command sharing before enabling model protection.",
   "@securityAgentDiscoveryBody": {
     "placeholders": {
@@ -1733,8 +1733,78 @@
       }
     }
   },
-  "settingsMcpGuardPrivacyPolicy": "TypeSafe privacy policy",
+  "settingsMcpGuardPrivacyPolicy": "Data & privacy",
   "settingsMcpBypassTitle": "Bypass command approval",
   "settingsMcpBypassDescription": "Run ordinary commands automatically; confirm high-risk commands each time.",
-  "settingsMcpBypassUnavailable": "Command approval settings could not be loaded or saved"
+  "settingsMcpBypassUnavailable": "Command approval settings could not be loaded or saved",
+  "settingsMcpGuardSummary": "Checks complete agent commands in addition to local rules.",
+  "settingsMcpGuardProvider": "Provider",
+  "settingsMcpGuardLocalProvider": "Local / self-hosted",
+  "settingsMcpGuardAccountId": "Cloudflare account ID",
+  "settingsMcpGuardEndpoint": "Inference URL",
+  "settingsMcpGuardOptionalKey": "API key (optional)",
+  "settingsMcpGuardLocalHint": "System One endpoint. HTTP is unencrypted.",
+  "settingsMcpGuardLocalDescription": "Complete commands are sent to the configured address. Use a service you trust; its operator controls data retention. Host records, stored SSH credentials and terminal output are not attached. Settings and keys stay on this device and are excluded from vault sync and backups.",
+  "settingsMcpGuardProviderTerms": "View provider terms",
+  "securityAgentSessionScope": "Session scope: {prefix}",
+  "securityAgentAllowTaskAction": "Allow Project Task",
+  "securityAgentTaskScope": "For this connection and session, allow recognized queries and file creation or replacement in {directory}. Deletion, hidden paths and arbitrary scripts still require review. Use only with trusted projects: remote symbolic links may point outside this directory.",
+  "@securityAgentTaskScope": {"placeholders": {"directory": {"type": "String"}}},
+  "@securityAgentSessionScope": {"placeholders": {"prefix": {"type": "String"}}},
+  "securityAgentCommandJobContext": "Separate sh process · Working directory: {directory}",
+  "@securityAgentCommandJobContext": {"placeholders": {"directory": {"type": "String"}}},
+  "securityAgentUploadTitle": "Agent upload request",
+  "securityAgentUploadBody": "{clientName} wants to upload a local file to {hostName}.",
+  "securityAgentUploadSource": "Local source",
+  "securityAgentUploadDestination": "Remote destination",
+  "securityAgentUploadSize": "Size: {bytes} bytes",
+  "securityAgentUploadWarning": "This sends the file to the remote host and replaces any existing file at the destination. Approve only files you intend to share.",
+  "@securityAgentUploadBody": {
+    "placeholders": {
+      "clientName": {
+        "type": "String"
+      },
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "@securityAgentUploadSize": {
+    "placeholders": {
+      "bytes": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsMcpAgentsScanning": "Scanning installed agents…",
+  "settingsMcpGlobalSkillTitle": "Global skill",
+  "settingsMcpGlobalSkillsHint": "Serlink installs and updates its skill globally when MCP starts. Customized copies are kept; replacing one saves a backup. Restart the agent if the skill does not appear.",
+  "settingsMcpSkillNotInstalled": "Not installed",
+  "settingsMcpSkillOutdated": "Update available",
+  "settingsMcpSkillConflict": "Customized skill kept",
+  "settingsMcpSkillUnavailable": "Cannot access skill",
+  "settingsMcpSkillReplace": "Replace skill",
+  "settingsMcpSkillInstalled": "Global skill installed for {agent}",
+  "@settingsMcpSkillInstalled": {
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "securityAgentClientAccessTitle": "Remember agent access",
+  "securityAgentClientAccessBody": "Allow {client} to use Serlink on this device?",
+  "securityAgentClientAccessScope": "This grants access to discover hosts under the current privacy setting, open terminal and SFTP sessions, and control existing connections, including their terminal history, on all hosts. Command and upload approvals still apply.",
+  "securityAgentClientAccessRemember": "Access is remembered across app restarts for clients using this name on this device. Revoke it anytime in Settings → Agent access.",
+  "securityAgentRememberAction": "Allow and remember",
+  "settingsMcpRememberedClient": "All hosts and connections · Remembered on this device",
+  "settingsMcpAuthorizationUnavailable": "Could not save agent access. Please try again.",
+  "agentSftpReleaseTooltip": "Release agent control and keep this SFTP connection open",
+  "@securityAgentClientAccessBody": {
+    "placeholders": {
+      "client": {
+        "type": "String"
+      }
+    }
+  }
 }

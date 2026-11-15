@@ -14,6 +14,7 @@ import '../data/mcp_server_transport.dart';
 import '../domain/mcp_contract.dart';
 import '../domain/agent_session.dart';
 import 'agent_session_bridge.dart';
+import 'agent_skill_installer.dart';
 import 'mcp_request_context.dart';
 
 class McpServerState {
@@ -22,12 +23,16 @@ class McpServerState {
     this.port,
     this.token,
     this.lastError,
+    this.agentSkills = const [],
+    this.agentSkillsLoading = false,
   });
 
   final bool running;
   final int? port;
   final String? token;
   final String? lastError;
+  final List<AgentSkillInstallation> agentSkills;
+  final bool agentSkillsLoading;
 
   McpServerState copyWith({
     bool? running,
@@ -35,12 +40,16 @@ class McpServerState {
     String? token,
     String? lastError,
     bool clearError = false,
+    List<AgentSkillInstallation>? agentSkills,
+    bool? agentSkillsLoading,
   }) {
     return McpServerState(
       running: running ?? this.running,
       port: port ?? this.port,
       token: token ?? this.token,
       lastError: clearError ? null : lastError ?? this.lastError,
+      agentSkills: agentSkills ?? this.agentSkills,
+      agentSkillsLoading: agentSkillsLoading ?? this.agentSkillsLoading,
     );
   }
 }
@@ -87,6 +96,37 @@ class McpServerController extends Notifier<McpServerState> {
   /// mid-start still wins.
   var _wantRunning = false;
   final Map<McpRequestContext, McpServer> _requests = {};
+  Future<void> _skillRefresh = Future<void>.value();
+
+  /// Direct builds can maintain user-level skills; sandboxed builds never
+  /// inspect or write another application's configuration directories.
+  Future<void> refreshAgentSkills({bool synchronize = false}) {
+    final run = _skillRefresh.then((_) async {
+      if (!ref.mounted ||
+          !ref.read(platformCapabilitiesProvider).mcpStdioHelper) {
+        return;
+      }
+      state = state.copyWith(agentSkillsLoading: true);
+      try {
+        final skills = await ref
+            .read(agentSkillInstallerProvider)
+            .refresh(
+              synchronize: synchronize,
+              shouldContinue: () =>
+                  ref.mounted && (!synchronize || _wantRunning),
+            );
+        if (ref.mounted) {
+          state = state.copyWith(agentSkills: List.unmodifiable(skills));
+        }
+      } on Object catch (error) {
+        _log('mcp.skills.refresh_failed', details: {'error': '$error'});
+      } finally {
+        if (ref.mounted) state = state.copyWith(agentSkillsLoading: false);
+      }
+    });
+    _skillRefresh = run.then<void>((_) {}, onError: (Object _) {});
+    return run;
+  }
 
   @override
   McpServerState build() {
@@ -111,6 +151,9 @@ class McpServerController extends Notifier<McpServerState> {
   }
 
   Future<void> stop() {
+    if (ref.mounted) {
+      ref.read(agentSessionBridgeProvider).cancelAllCommandJobs();
+    }
     _wantRunning = false;
     for (final request in _requests.keys.toList()) {
       request.cancel();
@@ -179,6 +222,7 @@ class McpServerController extends Notifier<McpServerState> {
     }
     state = McpServerState(running: true, port: transport.port, token: token);
     _log('mcp.server.start', details: {'port': transport.port});
+    await refreshAgentSkills(synchronize: true);
   }
 
   Future<void> _stopLocked() async {
@@ -443,6 +487,18 @@ class McpServerController extends Notifier<McpServerState> {
         extra,
       ),
     );
+    serlinkMcpTools['serlink_sftp_upload']!.register(
+      server,
+      callback: (args, extra) => guard(
+        (clientName) => bridge.uploadSftp(
+          clientName: clientName,
+          sessionId: SessionId(args['sessionId'] as String),
+          localPath: args['localPath'] as String,
+          remotePath: args['remotePath'] as String,
+        ),
+        extra,
+      ),
+    );
     serlinkMcpTools['serlink_transfer_status']!.register(
       server,
       callback: (args, extra) => guard(
@@ -470,18 +526,117 @@ class McpServerController extends Notifier<McpServerState> {
       server,
       callback: (args, extra) => guard((clientName) async {
         final timeoutMs = args['timeoutMs'] as num?;
-        final output = await bridge.exec(
+        final command = args['command'] as String;
+        final sessionId = SessionId(args['sessionId'] as String);
+        final mode = args['mode'] as String? ?? 'terminal';
+        if (mode == 'job') {
+          return bridge.startCommand(
+            clientName: clientName,
+            sessionId: sessionId,
+            command: command,
+            cwd: args['cwd'] as String?,
+            wait: Duration(
+              milliseconds: (timeoutMs?.toInt() ?? 1000).clamp(0, 30000),
+            ),
+            maxChars: (args['maxChars'] as num?)?.toInt() ?? 65536,
+          );
+        }
+        if (mode != 'terminal') {
+          throw const McpBridgeException('invalid_execution_mode');
+        }
+        if (utf8.encode(command).length > 8192) {
+          throw const McpBridgeException(
+            'command_requires_job_mode',
+            'Resubmit the identical command with mode=job and an explicit cwd; terminal input has shell-dependent line limits',
+          );
+        }
+        if (args['cwd'] != null) {
+          throw const McpBridgeException('cwd_requires_job_mode');
+        }
+        final output = await bridge.execWithOutput(
+          clientName: clientName,
+          sessionId: sessionId,
+          command: command,
+          maxChars: (args['maxChars'] as num?)?.toInt() ?? 65536,
+          timeout: Duration(
+            milliseconds: (timeoutMs?.toInt() ?? 10000).clamp(500, 120000),
+          ),
+        );
+        return output;
+      }, extra),
+    );
+
+    serlinkMcpTools['serlink_list_commands']!.register(
+      server,
+      callback: (args, extra) => guard(
+        (clientName) async => bridge.listCommands(
           clientName: clientName,
           sessionId: SessionId(args['sessionId'] as String),
-          command: args['command'] as String,
-          timeout: timeoutMs == null
-              ? const Duration(seconds: 10)
-              // Clamp so a client cannot stall a tool call (or spin the
-              // settle loop) with an absurd timeout.
-              : Duration(milliseconds: timeoutMs.toInt().clamp(500, 120000)),
+        ),
+        extra,
+      ),
+    );
+
+    serlinkMcpTools['serlink_command_status']!.register(
+      server,
+      callback: (args, extra) => guard(
+        (clientName) => bridge.commandStatus(
+          clientName: clientName,
+          sessionId: SessionId(args['sessionId'] as String),
+          commandId: args['commandId'] as String,
+          commandSource: args['view'] == 'command',
+          cursor: (args['cursor'] as num?)?.toInt() ?? 0,
+          maxChars: (args['maxChars'] as num?)?.toInt() ?? 65536,
+          wait: Duration(
+            milliseconds: ((args['waitMs'] as num?)?.toInt() ?? 1000).clamp(
+              0,
+              30000,
+            ),
+          ),
+        ),
+        extra,
+      ),
+    );
+    serlinkMcpTools['serlink_command_cancel']!.register(
+      server,
+      callback: (args, extra) => guard(
+        (clientName) => bridge.cancelCommand(
+          clientName: clientName,
+          sessionId: SessionId(args['sessionId'] as String),
+          commandId: args['commandId'] as String,
+        ),
+        extra,
+      ),
+    );
+    serlinkMcpTools['serlink_command_release']!.register(
+      server,
+      callback: (args, extra) => guard((clientName) async {
+        await bridge.releaseCommand(
+          clientName: clientName,
+          sessionId: SessionId(args['sessionId'] as String),
+          commandId: args['commandId'] as String,
         );
-        return {'output': output};
+        return {'ok': true};
       }, extra),
+    );
+
+    serlinkMcpTools['serlink_read_output']!.register(
+      server,
+      callback: (args, extra) => guard(
+        (clientName) => bridge.readOutput(
+          clientName: clientName,
+          sessionId: SessionId(args['sessionId'] as String),
+          cursor: (args['cursor'] as num?)?.toInt() ?? 0,
+          maxChars: (args['maxChars'] as num?)?.toInt() ?? 65536,
+          wait: Duration(
+            milliseconds: ((args['waitMs'] as num?)?.toInt() ?? 1000).clamp(
+              0,
+              30000,
+            ),
+          ),
+        ),
+        extra,
+      ),
     );
 
     serlinkMcpTools['serlink_read_screen']!.register(

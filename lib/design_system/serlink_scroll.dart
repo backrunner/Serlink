@@ -93,6 +93,7 @@ class _SerlinkScrollFadeState extends State<SerlinkScrollFade> {
 }
 
 /// Shared scrolling content for forms, previews and compact menus.
+/// Clamp by default so overscroll cannot shift compact dialog content.
 class SerlinkScrollView extends StatelessWidget {
   const SerlinkScrollView({
     super.key,
@@ -114,7 +115,7 @@ class SerlinkScrollView extends StatelessWidget {
     child: SingleChildScrollView(
       controller: controller,
       scrollDirection: scrollDirection,
-      physics: physics,
+      physics: physics ?? const ClampingScrollPhysics(),
       padding: padding,
       child: child,
     ),

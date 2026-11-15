@@ -492,7 +492,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'The stdio helper ships with Serlink release builds and is not available in this installation.';
 
   @override
-  String get settingsMcpGrantsTitle => 'Active grants';
+  String get settingsMcpGrantsTitle => 'Allowed agents';
 
   @override
   String get settingsMcpGrantsEmpty => 'No agents currently have access.';
@@ -1111,7 +1111,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get securityAgentAllowOnceAction => 'Allow Once';
 
   @override
-  String get securityAgentAllowSessionAction => 'Allow for Session';
+  String get securityAgentAllowSessionAction => 'Allow Similar for Session';
 
   @override
   String get hostEditTitle => 'Edit Host';
@@ -3280,26 +3280,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsMcpGuardDescription =>
-      'Optional cloud protection sends complete agent commands to TypeSafe at api.typesafe.ai. Commands can contain secrets or personal data. TypeSafe may retain request data under its service terms; zero retention is not guaranteed. Host records, stored SSH credentials, terminal screens and output are not attached separately. The API key is stored in device-local secure storage and sent to TypeSafe to authenticate requests; it is excluded from vault sync and backups.';
+      'Complete commands are sent to the selected provider and may contain secrets or personal data. Data retention follows its terms. Host records, stored SSH credentials and terminal output are not attached. API keys stay in device secure storage, are sent only for authentication, and are excluded from vault sync and backups.';
 
   @override
   String get settingsMcpGuardInputHint =>
       'Agents must submit complete commands. Partial input, history controls and bare Enter are blocked; Ctrl-C remains available.';
 
   @override
-  String get settingsMcpGuardEnable => 'Enable model protection';
+  String get settingsMcpGuardEnable => 'Enable protection';
 
   @override
   String get settingsMcpGuardModel => 'Model';
 
   @override
-  String get settingsMcpGuardApiKey => 'TypeSafe API key';
+  String get settingsMcpGuardApiKey => 'API key / token';
 
   @override
   String get settingsMcpGuardKeySaved => 'Key saved; leave blank to keep it';
 
   @override
-  String get settingsMcpGuardKeyHint => 'Enter your TypeSafe API key';
+  String get settingsMcpGuardKeyHint => 'Enter a key for this provider';
 
   @override
   String get settingsMcpGuardRemoveKey =>
@@ -3307,7 +3307,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsMcpGuardInvalid =>
-      'Enter a valid model name and API key before enabling protection.';
+      'Check the model, connection settings and required API key.';
 
   @override
   String get settingsMcpGuardSaveFailed =>
@@ -3421,14 +3421,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsMcpGuardSharingConsent =>
-      'I agree to send complete agent commands to TypeSafe for risk assessment. I understand that commands may contain sensitive data and that TypeSafe may retain request data.';
+      'Allow sharing full commands for risk checks';
 
   @override
   String get settingsMcpGuardConsentRequired =>
       'Agree to command sharing before enabling model protection.';
 
   @override
-  String get settingsMcpGuardPrivacyPolicy => 'TypeSafe privacy policy';
+  String get settingsMcpGuardPrivacyPolicy => 'Data & privacy';
 
   @override
   String get settingsMcpBypassTitle => 'Bypass command approval';
@@ -3440,4 +3440,136 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsMcpBypassUnavailable =>
       'Command approval settings could not be loaded or saved';
+
+  @override
+  String get settingsMcpGuardSummary =>
+      'Checks complete agent commands in addition to local rules.';
+
+  @override
+  String get settingsMcpGuardProvider => 'Provider';
+
+  @override
+  String get settingsMcpGuardLocalProvider => 'Local / self-hosted';
+
+  @override
+  String get settingsMcpGuardAccountId => 'Cloudflare account ID';
+
+  @override
+  String get settingsMcpGuardEndpoint => 'Inference URL';
+
+  @override
+  String get settingsMcpGuardOptionalKey => 'API key (optional)';
+
+  @override
+  String get settingsMcpGuardLocalHint =>
+      'System One endpoint. HTTP is unencrypted.';
+
+  @override
+  String get settingsMcpGuardLocalDescription =>
+      'Complete commands are sent to the configured address. Use a service you trust; its operator controls data retention. Host records, stored SSH credentials and terminal output are not attached. Settings and keys stay on this device and are excluded from vault sync and backups.';
+
+  @override
+  String get settingsMcpGuardProviderTerms => 'View provider terms';
+
+  @override
+  String securityAgentSessionScope(String prefix) {
+    return 'Session scope: $prefix';
+  }
+
+  @override
+  String get securityAgentAllowTaskAction => 'Allow Project Task';
+
+  @override
+  String securityAgentTaskScope(String directory) {
+    return 'For this connection and session, allow recognized queries and file creation or replacement in $directory. Deletion, hidden paths and arbitrary scripts still require review. Use only with trusted projects: remote symbolic links may point outside this directory.';
+  }
+
+  @override
+  String securityAgentCommandJobContext(String directory) {
+    return 'Separate sh process · Working directory: $directory';
+  }
+
+  @override
+  String get securityAgentUploadTitle => 'Agent upload request';
+
+  @override
+  String securityAgentUploadBody(String clientName, String hostName) {
+    return '$clientName wants to upload a local file to $hostName.';
+  }
+
+  @override
+  String get securityAgentUploadSource => 'Local source';
+
+  @override
+  String get securityAgentUploadDestination => 'Remote destination';
+
+  @override
+  String securityAgentUploadSize(int bytes) {
+    return 'Size: $bytes bytes';
+  }
+
+  @override
+  String get securityAgentUploadWarning =>
+      'This sends the file to the remote host and replaces any existing file at the destination. Approve only files you intend to share.';
+
+  @override
+  String get settingsMcpAgentsScanning => 'Scanning installed agents…';
+
+  @override
+  String get settingsMcpGlobalSkillTitle => 'Global skill';
+
+  @override
+  String get settingsMcpGlobalSkillsHint =>
+      'Serlink installs and updates its skill globally when MCP starts. Customized copies are kept; replacing one saves a backup. Restart the agent if the skill does not appear.';
+
+  @override
+  String get settingsMcpSkillNotInstalled => 'Not installed';
+
+  @override
+  String get settingsMcpSkillOutdated => 'Update available';
+
+  @override
+  String get settingsMcpSkillConflict => 'Customized skill kept';
+
+  @override
+  String get settingsMcpSkillUnavailable => 'Cannot access skill';
+
+  @override
+  String get settingsMcpSkillReplace => 'Replace skill';
+
+  @override
+  String settingsMcpSkillInstalled(String agent) {
+    return 'Global skill installed for $agent';
+  }
+
+  @override
+  String get securityAgentClientAccessTitle => 'Remember agent access';
+
+  @override
+  String securityAgentClientAccessBody(String client) {
+    return 'Allow $client to use Serlink on this device?';
+  }
+
+  @override
+  String get securityAgentClientAccessScope =>
+      'This grants access to discover hosts under the current privacy setting, open terminal and SFTP sessions, and control existing connections, including their terminal history, on all hosts. Command and upload approvals still apply.';
+
+  @override
+  String get securityAgentClientAccessRemember =>
+      'Access is remembered across app restarts for clients using this name on this device. Revoke it anytime in Settings → Agent access.';
+
+  @override
+  String get securityAgentRememberAction => 'Allow and remember';
+
+  @override
+  String get settingsMcpRememberedClient =>
+      'All hosts and connections · Remembered on this device';
+
+  @override
+  String get settingsMcpAuthorizationUnavailable =>
+      'Could not save agent access. Please try again.';
+
+  @override
+  String get agentSftpReleaseTooltip =>
+      'Release agent control and keep this SFTP connection open';
 }

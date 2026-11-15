@@ -138,6 +138,7 @@ class _SftpPaneState extends ConsumerState<_SftpPane> {
 
     return Column(
       children: [
+        _AgentPaneBadge(sessionId: widget.sessionId, sftp: true),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
           child: _SftpToolbarContainer(
@@ -1334,9 +1335,6 @@ class _SftpToolbarContainer extends StatelessWidget {
     if (!scrollable) {
       return child;
     }
-    return SerlinkScrollView(
-      scrollDirection: Axis.horizontal,
-      child: child,
-    );
+    return SerlinkScrollView(scrollDirection: Axis.horizontal, child: child);
   }
 }

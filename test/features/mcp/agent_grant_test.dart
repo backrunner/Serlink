@@ -41,14 +41,25 @@ void main() {
     });
 
     test('never expires when expiresAt is null', () {
-      expect(
-        neverExpiringGrant().isExpired(DateTime.utc(2099, 1, 1)),
-        isFalse,
-      );
+      expect(neverExpiringGrant().isExpired(DateTime.utc(2099, 1, 1)), isFalse);
     });
   });
 
   group('covers', () {
+    test('remembered client grants cover every host and connection', () {
+      final value = AgentGrant(
+        grantId: 'client',
+        clientName: 'agent',
+        hostId: null,
+        clientWide: true,
+        createdAt: createdAt,
+      );
+      expect(
+        value.covers(otherHostId, createdAt, sessionId: SessionId('existing')),
+        isTrue,
+      );
+      expect(value.isDiscovery, isFalse);
+    });
     test('covers the granted host before expiry', () {
       expect(grant().covers(hostId, DateTime.utc(2026, 8, 29, 11)), isTrue);
     });

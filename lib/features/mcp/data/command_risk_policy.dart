@@ -1,10 +1,14 @@
+import 'package:path/path.dart' as p;
+
 import '../domain/command_risk.dart';
+import '../domain/command_approval_scope.dart';
+import '../domain/command_task_scope.dart';
 
 /// Assesses the risk of shell commands an MCP agent wants to run.
 ///
-/// This is deliberately NOT a full shell parser. Commands are normalized
-/// (trimmed, whitespace collapsed) and matched against an ordered list of
-/// rules; the first matching rule wins. It does not resolve variables,
+/// This is deliberately NOT a full shell parser. A bounded lexer distinguishes
+/// literal read commands from their arguments. Other input is normalized and
+/// matched against ordered rules; the first matching rule wins. It does not resolve variables,
 /// aliases, command substitution, or arbitrary shell semantics, so it must be
 /// treated as a safety net layered on top of user confirmation, not as a
 /// sandbox.
@@ -21,6 +25,107 @@ class CommandRiskPolicy {
   final List<RegExp> additionalSafePatterns;
 
   CommandRiskAssessment assess(String command) {
+    final steps = literalShellSteps(command);
+    if (steps != null &&
+        steps.every(
+          (step) =>
+              isLiteralReadCommand(step.words) ||
+              literalFileWritePaths(step.words) != null,
+        )) {
+      final targets = <String>[];
+      var replacesFile = false;
+      for (final step in steps) {
+        targets.addAll(step.outputPaths.where((path) => path != '/dev/null'));
+        final paths = literalFileWritePaths(step.words);
+        if (paths != null) {
+          final executable = step.words.first.split('/').last;
+          targets.addAll(executable == 'cp' ? [paths.last] : paths);
+          replacesFile |=
+              executable == 'tee' ||
+              (executable == 'cp' && !isLiteralNonClobberCopy(step.words));
+        }
+      }
+      if (targets.any(
+        (path) =>
+            RegExp(r'^/dev/(rdisk|sd|nvme|disk|hd|mmcblk)')
+                .hasMatch(p.posix.normalize(path)),
+      )) {
+        return CommandRiskAssessment(
+          level: CommandRiskLevel.blocked,
+          command: command,
+          matchedRule: 'redirect_to_disk_device',
+        );
+      }
+      if (targets.any(
+        (path) => RegExp(
+          r'(^|/)\.(bashrc|zshrc|bash_profile|bash_login|zprofile|profile)$',
+        ).hasMatch(path),
+      )) {
+        return CommandRiskAssessment(
+          level: CommandRiskLevel.needsConfirm,
+          command: command,
+          matchedRule: 'overwrite_shell_config',
+        );
+      }
+      final redirected = steps.any(
+        (step) => step.outputPaths.any((path) => path != '/dev/null'),
+      );
+      return CommandRiskAssessment(
+        level: replacesFile || redirected
+            ? CommandRiskLevel.needsConfirm
+            : CommandRiskLevel.safe,
+        command: command,
+        matchedRule: replacesFile
+            ? 'file_overwrite'
+            : redirected
+            ? 'output_redirection'
+            : null,
+      );
+    }
+    final literal = literalShellCommands(command);
+    // Evaluate literal read commands as argv, so a quoted search pattern or
+    // filename cannot be mistaken for an executed command. Complex shell input
+    // still follows the conservative text rules below.
+    if (literal != null &&
+        literal.every(
+          (words) =>
+              isLiteralReadCommand(words) || isLiteralNonClobberCopy(words),
+        )) {
+      return CommandRiskAssessment(
+        level: CommandRiskLevel.safe,
+        command: command,
+      );
+    }
+    // Never discard arguments from a pipeline that may feed xargs, a shell or
+    // another evaluator. The original text remains the conservative backstop.
+    final assessment = _assessText(command);
+    if (assessment.level == CommandRiskLevel.safe &&
+        literal != null &&
+        literal.any((words) {
+          final executable = words.first.split('/').last;
+          return (executable == 'rg' && !isLiteralReadCommand(words)) ||
+              (executable == 'git' &&
+                  ((gitSubcommandIndex(words) == null && words.length > 1) ||
+                      words.any(
+                        (w) =>
+                            w == '--ext-diff' ||
+                            w == '--textconv' ||
+                            w == '--output' ||
+                            w.startsWith('--output=') ||
+                            w == '--exec' ||
+                            w.startsWith('--exec='),
+                      )));
+        })) {
+      return CommandRiskAssessment(
+        level: CommandRiskLevel.needsConfirm,
+        command: command,
+        matchedRule: 'dynamic_execution',
+      );
+    }
+    return assessment;
+  }
+
+  CommandRiskAssessment _assessText(String command) {
     // Join quoted fragments as a conservative matching view (r''m, 'rm',
     // "/bin/rm"). This may flag quoted prose; it never changes sent bytes.
     final normalized = command
@@ -180,7 +285,7 @@ final List<_Rule> _rules = [
   _Rule.regex(
     'dynamic_execution',
     CommandRiskLevel.needsConfirm,
-    r'[$`\\]|(?:^|[\s;&|()])(?:[^\s;&|()]*/)?(?:eval|exec|source|sh|bash|zsh|dash|ksh|fish|python\d*(?:\.\d+)?|perl|ruby|node|nodejs|php|lua|osascript|powershell|pwsh|cmd)\b|(?:^|[;&|]\s*)\.(?:/|\s)|(?:^|[;&|]\s*)[\w./-]+\.(sh|py|pl|rb|js|ps1|bat|cmd)\b',
+    r'[$`\\]|(?:^|[\s;&|()])(?:[^\s;&|()]*/)?(?:eval|exec|source|sh|bash|zsh|dash|ksh|fish|python\d*(?:\.\d+)?|perl|ruby|node|nodejs|php|lua|osascript|powershell|pwsh|cmd|sed|find)\b|(?:^|[;&|]\s*)\.(?:/|\s)|(?:^|[;&|]\s*)[\w./-]+\.(sh|py|pl|rb|js|ps1|bat|cmd)\b',
   ),
   _Rule.regex(
     'output_redirection',

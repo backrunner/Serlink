@@ -6,6 +6,7 @@ import '../features/mcp/application/mcp_command_approval.dart';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../database/serlink_database.dart';
@@ -19,11 +20,12 @@ import '../features/hosts/application/host_repository.dart';
 import '../features/hosts/application/host_store.dart';
 import '../features/identities/application/identity_repository.dart';
 import '../features/mcp/application/agent_config_installer.dart';
+import '../features/mcp/application/agent_skill_installer.dart';
 import '../features/mcp/application/agent_session_bridge.dart';
 import '../features/mcp/application/mcp_authorization_service.dart';
 import '../features/mcp/application/mcp_server_controller.dart';
 import '../features/mcp/data/command_risk_policy.dart';
-import '../features/mcp/data/typesafe_command_decision_model.dart';
+import '../features/mcp/data/provider_command_decision_model.dart';
 import '../features/mcp/application/command_decision_guard.dart';
 import '../features/mcp/domain/agent_grant.dart';
 import '../features/mcp/domain/agent_session.dart';
@@ -3990,7 +3992,7 @@ final encryptedConnectionProfileResolverProvider =
 final commandDecisionGuardProvider = Provider<CommandDecisionGuard>((ref) {
   return CommandDecisionGuard(
     secrets: ref.watch(secretStoreProvider),
-    model: TypeSafeCommandDecisionModel(),
+    model: ProviderCommandDecisionModel(),
   );
 });
 
@@ -4026,6 +4028,7 @@ final mcpAuthorizationServiceProvider = Provider<McpAuthorizationService>((
 ) {
   final service = McpAuthorizationService(
     securityModalService: ref.watch(securityModalServiceProvider),
+    secretStore: ref.watch(secretStoreProvider),
   );
   ref.onDispose(service.dispose);
   return service;
@@ -4033,6 +4036,14 @@ final mcpAuthorizationServiceProvider = Provider<McpAuthorizationService>((
 
 final agentConfigInstallerProvider = Provider<AgentConfigInstaller>((ref) {
   return AgentConfigInstaller();
+});
+
+final agentSkillInstallerProvider = Provider<AgentSkillInstaller>((ref) {
+  return AgentSkillInstaller(
+    configInstaller: ref.watch(agentConfigInstallerProvider),
+    loadContent: () =>
+        rootBundle.loadString('assets/agent_skills/serlink-mcp/SKILL.md'),
+  );
 });
 
 final agentSessionBridgeProvider = Provider<AgentSessionBridge>((ref) {
@@ -4055,6 +4066,7 @@ final agentSessionBridgeProvider = Provider<AgentSessionBridge>((ref) {
 
 final mcpGrantsProvider = StreamProvider<List<AgentGrant>>((ref) async* {
   final service = ref.watch(mcpAuthorizationServiceProvider);
+  await service.initialize();
   yield service.grants;
   yield* service.watchGrants;
 });

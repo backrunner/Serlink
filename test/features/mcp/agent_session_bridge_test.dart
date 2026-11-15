@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,6 +33,445 @@ import 'package:serlink/features/workspace/application/workspace_tab_controller.
 import 'package:serlink/features/workspace/domain/workspace_tab.dart';
 
 void main() {
+  group('project task approval', () {
+    test(
+      'one approval covers known project writes and reads, not dangerous input',
+      () async {
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService()
+          ..commandDecision = AgentCommandDecision.allowTask;
+        final container = _container(
+          service: service,
+          modal: modal,
+          bypass: false,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final session = await _openSession(bridge);
+        Future<Map<String, Object?>> run(String command) => bridge.startCommand(
+          clientName: _clientName,
+          sessionId: session.sessionId,
+          command: command,
+          cwd: '/srv/app',
+          wait: Duration.zero,
+        );
+        await run('cp src/a.txt out/a.txt');
+        expect(modal.lastCommandPrompt!.taskDirectory, '/srv/app');
+        expect(modal.lastCommandPrompt!.allowSession, isFalse);
+        modal.commandDecision = AgentCommandDecision.deny;
+        for (final command in [
+          'git status --short',
+          'git log --oneline',
+          r"printf 'hello\n' | tee out/a.txt",
+          "printf 'rm is data' > out/note.txt",
+          'mkdir -p out/new',
+        ]) {
+          await run(command);
+        }
+        expect(modal.commandCallCount, 1);
+        expect(service.commands, hasLength(6));
+        for (final command in [
+          'rm out/a.txt',
+          'mv out/a.txt out/b.txt',
+          'git reset --hard',
+          'python3 -c "print(1)"',
+          'printf x > /srv/other/a.txt',
+          'printf x > .env',
+          'cp /etc/passwd out/a.txt',
+        ]) {
+          await expectLater(
+            run(command),
+            throwsA(_bridgeException('command_denied')),
+          );
+          expect(modal.lastCommandPrompt!.taskDirectory, isNull);
+        }
+        expect(service.commands, hasLength(6));
+      },
+    );
+
+    for (final change in [
+      'mode',
+      'vault',
+      'model',
+      'cwd',
+      'session',
+      'terminal',
+    ]) {
+      test('$change cannot inherit a project task permission', () async {
+        final model = _DecisionModel();
+        final guard = await _enabledGuard(model);
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService()
+          ..commandDecision = AgentCommandDecision.allowTask;
+        final container = _container(
+          service: service,
+          modal: modal,
+          bypass: false,
+          decisionGuard: guard,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        var session = await _openSession(bridge);
+        await bridge.startCommand(
+          clientName: _clientName,
+          sessionId: session.sessionId,
+          command: 'printf first > out.txt',
+          cwd: '/srv/app',
+          wait: Duration.zero,
+        );
+        var cwd = '/srv/app';
+        switch (change) {
+          case 'mode':
+            await container.read(mcpCommandApprovalProvider).saveBypass(false);
+          case 'vault':
+            (container.read(
+              vaultSessionControllerProvider.notifier,
+            ) as _FakeVaultSessionController).setSnapshot(
+              const VaultSessionState(
+                vaultState: VaultState.unlocked,
+                unlockGeneration: 2,
+              ),
+            );
+          case 'model':
+            await guard.saveSettings(enabled: true, model: 'jev-latest');
+          case 'cwd':
+            cwd = '/srv/other';
+          case 'session':
+            session = await _openSession(bridge);
+          case 'terminal':
+            break;
+        }
+        modal.commandDecision = AgentCommandDecision.deny;
+        await expectLater(
+          change == 'terminal'
+              ? bridge.exec(
+                  clientName: _clientName,
+                  sessionId: session.sessionId,
+                  command: 'pwd',
+                )
+              : bridge.startCommand(
+                  clientName: _clientName,
+                  sessionId: session.sessionId,
+                  command: 'printf next > next.txt',
+                  cwd: cwd,
+                  wait: Duration.zero,
+                ),
+          throwsA(_bridgeException('command_denied')),
+        );
+        expect(modal.commandCallCount, 2);
+        expect(service.commands, hasLength(1));
+      });
+    }
+
+    test('project permission still requires a fresh model judgment', () async {
+      final model = _DecisionModel();
+      final modal = _FakeSecurityModalService()
+        ..commandDecision = AgentCommandDecision.allowTask;
+      final service = _EchoSshSessionService();
+      final container = _container(
+        service: service,
+        modal: modal,
+        bypass: false,
+        decisionGuard: await _enabledGuard(model),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final session = await _openSession(bridge);
+      await bridge.startCommand(
+        clientName: _clientName,
+        sessionId: session.sessionId,
+        command: 'printf first > out.txt',
+        cwd: '/srv/app',
+        wait: Duration.zero,
+      );
+      model.decision = CommandDecision.dangerous;
+      await expectLater(
+        bridge.startCommand(
+          clientName: _clientName,
+          sessionId: session.sessionId,
+          command: 'printf next > next.txt',
+          cwd: '/srv/app',
+          wait: Duration.zero,
+        ),
+        throwsA(_bridgeException('command_blocked')),
+      );
+      expect(model.commands, hasLength(2));
+      expect(modal.commandCallCount, 1);
+      expect(service.commands, hasLength(1));
+    });
+
+    test(
+      'interrupted project approval cannot seed a task permission',
+      () async {
+        final modal = _FakeSecurityModalService()
+          ..commandGate = Completer<AgentCommandDecision>();
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: modal,
+          bypass: false,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final session = await _openSession(bridge);
+        Future<Map<String, Object?>> run() => bridge.startCommand(
+          clientName: _clientName,
+          sessionId: session.sessionId,
+          command: 'printf first > out.txt',
+          cwd: '/srv/app',
+          wait: Duration.zero,
+        );
+        final result = run();
+        final rejected = expectLater(
+          result,
+          throwsA(_bridgeException('command_blocked')),
+        );
+        await modal.commandStarted.future;
+        await bridge.sendInput(
+          clientName: _clientName,
+          sessionId: session.sessionId,
+          text: '\x03',
+        );
+        modal.commandGate!.complete(AgentCommandDecision.allowTask);
+        await rejected;
+        modal.commandGate = null;
+        modal.commandDecision = AgentCommandDecision.deny;
+        await expectLater(run(), throwsA(_bridgeException('command_denied')));
+        expect(modal.commandCallCount, 2);
+        expect(service.commands, isEmpty);
+      },
+    );
+  });
+
+  group('retained command output', () {
+    test('managed script is intact, stays running through silence and can be polled', () async {
+      final service = _EchoSshSessionService();
+      final modal = _FakeSecurityModalService()
+        ..commandDecision = AgentCommandDecision.allowOnce;
+      final container = _container(
+        service: service,
+        modal: modal,
+        bypass: false,
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final session = await _openSession(bridge);
+      final source = '#${'x' * 200000}\n\techo done\n';
+      final initial = await bridge.startCommand(
+        clientName: _clientName,
+        sessionId: session.sessionId,
+        command: source,
+        cwd: '/srv/app',
+        wait: Duration.zero,
+      );
+      final id = initial['commandId'] as String;
+      expect(
+        bridge
+            .listCommands(clientName: _clientName, sessionId: session.sessionId)
+            .single['commandId'],
+        id,
+      );
+      await expectLater(
+        bridge.commandStatus(
+          clientName: 'other-client',
+          sessionId: session.sessionId,
+          commandId: id,
+        ),
+        throwsA(_bridgeException('authorization_required')),
+      );
+      var sourceCursor = 0;
+      final recovered = StringBuffer();
+      do {
+        final sourcePage = await bridge.commandStatus(
+          clientName: _clientName,
+          sessionId: session.sessionId,
+          commandId: id,
+          cursor: sourceCursor,
+          commandSource: true,
+        );
+        recovered.write(sourcePage['output']);
+        sourceCursor = sourcePage['nextCursor'] as int;
+        if (sourcePage['hasMore'] == false) break;
+      } while (true);
+      expect(recovered.toString(), source);
+      expect(initial['state'], 'running');
+      expect(initial['finished'], isFalse);
+      expect(modal.lastCommandPrompt!.isolatedShell, isTrue);
+      expect(modal.lastCommandPrompt!.workingDirectory, '/srv/app');
+      for (var i = 0; i < 100 && !service.commands.single.inputClosed; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(utf8.decode(service.commands.single.bytes), source);
+      expect(service.commandCwd, '/srv/app');
+      final waiting = await bridge.commandStatus(
+        clientName: _clientName,
+        sessionId: session.sessionId,
+        commandId: id,
+        wait: const Duration(milliseconds: 5),
+      );
+      expect(waiting['finished'], isFalse);
+      final text = 'very-long-context-中文🙂\n' * 7000;
+      service.commands.single.out.add(utf8.encode(text));
+      await service.commands.single.finish(9);
+      var cursor = 0;
+      final all = StringBuffer();
+      Map<String, Object?> page;
+      do {
+        page = await bridge.commandStatus(
+          clientName: _clientName,
+          sessionId: session.sessionId,
+          commandId: id,
+          cursor: cursor,
+          maxChars: 4097,
+          wait: const Duration(milliseconds: 100),
+        );
+        all.write(page['output']);
+        cursor = page['nextCursor'] as int;
+      } while (page['finished'] != true || page['hasMore'] == true);
+      expect(all.toString(), text);
+      expect(page['exitCode'], 9);
+      await bridge.releaseCommand(
+        clientName: _clientName,
+        sessionId: session.sessionId,
+        commandId: id,
+      );
+      await expectLater(
+        bridge.commandStatus(
+          clientName: _clientName,
+          sessionId: session.sessionId,
+          commandId: id,
+        ),
+        throwsA(_bridgeException('command_not_found')),
+      );
+    });
+
+    for (final change in ['close', 'revoke', 'vault', 'server']) {
+      test(
+        '$change invalidates retained output and closes the managed channel',
+        () async {
+          final service = _EchoSshSessionService();
+          final container = _container(
+            service: service,
+            modal: _FakeSecurityModalService(),
+          );
+          addTearDown(container.dispose);
+          final bridge = await _bridge(container);
+          final session = await _openSession(bridge);
+          final initial = await bridge.startCommand(
+            clientName: _clientName,
+            sessionId: session.sessionId,
+            command: 'echo hello',
+            wait: Duration.zero,
+          );
+          final id = initial['commandId'] as String;
+          switch (change) {
+            case 'close':
+              await bridge.closeSession(session.sessionId);
+            case 'revoke':
+              await bridge.revokeGrant(session.grantId);
+            case 'vault':
+              (container.read(
+                vaultSessionControllerProvider.notifier,
+              ) as _FakeVaultSessionController).setSnapshot(
+                const VaultSessionState(
+                  vaultState: VaultState.locked,
+                  unlockGeneration: 2,
+                ),
+              );
+            case 'server':
+              bridge.cancelAllCommandJobs();
+          }
+          for (var i = 0; i < 100 && !service.commands.single.closed; i++) {
+            await Future<void>.delayed(const Duration(milliseconds: 2));
+          }
+          expect(service.commands.single.closed, isTrue);
+          await expectLater(
+            bridge.commandStatus(
+              clientName: _clientName,
+              sessionId: session.sessionId,
+              commandId: id,
+            ),
+            throwsA(isA<McpBridgeException>()),
+          );
+        },
+      );
+    }
+
+    test(
+      'normal terminal output is paginated beyond the 100-line snapshot',
+      () async {
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: _FakeSecurityModalService(),
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final session = await _openSession(bridge);
+        final initial = await bridge.execWithOutput(
+          clientName: _clientName,
+          sessionId: session.sessionId,
+          command: 'echo start',
+        );
+        var cursor = initial['nextCursor'] as int;
+        final text = List.generate(12000, (i) => 'context-$i\r\n').join();
+        await service.shells.single.write(utf8.encode(text));
+        final all = StringBuffer();
+        final deadline = DateTime.now().add(const Duration(seconds: 10));
+        while (all.length < text.length) {
+          if (DateTime.now().isAfter(deadline)) {
+            fail('output capture did not catch up');
+          }
+          final page = await bridge.readOutput(
+            clientName: _clientName,
+            sessionId: session.sessionId,
+            cursor: cursor,
+            maxChars: 4096,
+            wait: const Duration(milliseconds: 100),
+          );
+          all.write(page['output']);
+          cursor = page['nextCursor'] as int;
+        }
+        expect(all.toString(), text);
+        expect(initial['completionKnown'], isFalse);
+      },
+    );
+
+    test('late channel open after Ctrl-C sends no script bytes', () async {
+      final service = _EchoSshSessionService()
+        ..commandOpenGate = Completer<void>();
+      final container = _container(
+        service: service,
+        modal: _FakeSecurityModalService(),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final session = await _openSession(bridge);
+      final future = bridge.startCommand(
+        clientName: _clientName,
+        sessionId: session.sessionId,
+        command: 'echo no',
+        wait: Duration.zero,
+      );
+      final rejection = expectLater(
+        future,
+        throwsA(_bridgeException('command_blocked')),
+      );
+      while (service.commands.isEmpty) {
+        await Future<void>.delayed(const Duration(milliseconds: 2));
+      }
+      await bridge.sendInput(
+        clientName: _clientName,
+        sessionId: session.sessionId,
+        text: '\x03',
+      );
+      service.commandOpenGate!.complete();
+      await rejection;
+      expect(service.commands.single.bytes, isEmpty);
+      expect(service.commands.single.closed, isTrue);
+    });
+  });
+
   group('command approval modes', () {
     for (final changeModel in [false, true]) {
       test(
@@ -78,6 +518,210 @@ void main() {
         },
       );
     }
+    test('session approval covers only the displayed command family in that session', () async {
+      final service = _EchoSshSessionService();
+      final modal = _FakeSecurityModalService()
+        ..commandDecision = AgentCommandDecision.allowSession;
+      final container = _container(
+        service: service,
+        modal: modal,
+        bypass: false,
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final first = await _openSession(bridge);
+      await bridge.exec(
+        clientName: _clientName,
+        sessionId: first.sessionId,
+        command: 'git status',
+      );
+      expect(modal.lastCommandPrompt!.sessionCommandPrefix, 'git status …');
+      modal.commandDecision = AgentCommandDecision.deny;
+      await bridge.exec(
+        clientName: _clientName,
+        sessionId: first.sessionId,
+        command: 'git status --short',
+      );
+      expect(modal.commandCallCount, 1);
+      for (final command in [
+        'git log',
+        'git status; rm file',
+        'git status > output',
+      ]) {
+        await expectLater(
+          bridge.exec(
+            clientName: _clientName,
+            sessionId: first.sessionId,
+            command: command,
+          ),
+          throwsA(_bridgeException('command_denied')),
+        );
+      }
+      expect(modal.commandCallCount, 4);
+      final second = await _openSession(bridge);
+      await expectLater(
+        bridge.exec(
+          clientName: _clientName,
+          sessionId: second.sessionId,
+          command: 'git status',
+        ),
+        throwsA(_bridgeException('command_denied')),
+      );
+      expect(service.shells.last.writes, isEmpty);
+    });
+
+    for (final change in ['mode', 'vault', 'model']) {
+      test('$change invalidates remembered command scopes', () async {
+        final model = _DecisionModel();
+        final guard = await _enabledGuard(model);
+        final modal = _FakeSecurityModalService()
+          ..commandDecision = AgentCommandDecision.allowSession;
+        final container = _container(
+          service: _EchoSshSessionService(),
+          modal: modal,
+          bypass: false,
+          decisionGuard: guard,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        await bridge.exec(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          command: 'git status',
+        );
+        switch (change) {
+          case 'mode':
+            await container.read(mcpCommandApprovalProvider).saveBypass(false);
+          case 'model':
+            await guard.saveSettings(enabled: true, model: 'jev-latest');
+          case 'vault':
+            (container.read(
+              vaultSessionControllerProvider.notifier,
+            ) as _FakeVaultSessionController).setSnapshot(
+              const VaultSessionState(
+                vaultState: VaultState.unlocked,
+                unlockGeneration: 2,
+              ),
+            );
+        }
+        modal.commandDecision = AgentCommandDecision.deny;
+        await expectLater(
+          bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'git status -s',
+          ),
+          throwsA(_bridgeException('command_denied')),
+        );
+        expect(modal.commandCallCount, 2);
+      });
+    }
+
+    test('session permission never skips a fresh model assessment', () async {
+      final model = _DecisionModel();
+      final modal = _FakeSecurityModalService()
+        ..commandDecision = AgentCommandDecision.allowSession;
+      final service = _EchoSshSessionService();
+      final container = _container(
+        service: service,
+        modal: modal,
+        bypass: false,
+        decisionGuard: await _enabledGuard(model),
+      );
+      addTearDown(container.dispose);
+      final bridge = await _bridge(container);
+      final handle = await _openSession(bridge);
+      await bridge.exec(
+        clientName: _clientName,
+        sessionId: handle.sessionId,
+        command: 'git status',
+      );
+      model.decision = CommandDecision.dangerous;
+      await expectLater(
+        bridge.exec(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          command: 'git status -s',
+        ),
+        throwsA(_bridgeException('command_blocked')),
+      );
+      expect(model.commands, ['git status', 'git status -s']);
+      expect(service.shells.single.writes, ['git status\r']);
+      expect(modal.commandCallCount, 1);
+    });
+
+    test(
+      'interrupted session approval cannot seed a remembered permission',
+      () async {
+        final modal = _FakeSecurityModalService()
+          ..commandGate = Completer<AgentCommandDecision>();
+        final service = _EchoSshSessionService();
+        final container = _container(
+          service: service,
+          modal: modal,
+          bypass: false,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await _openSession(bridge);
+        final result = bridge.exec(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          command: 'git status',
+        );
+        final rejection = expectLater(
+          result,
+          throwsA(_bridgeException('command_blocked')),
+        );
+        await modal.commandStarted.future;
+        await bridge.sendInput(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          text: '\x03',
+        );
+        modal.commandGate!.complete(AgentCommandDecision.allowSession);
+        await rejection;
+        modal.commandGate = null;
+        modal.commandDecision = AgentCommandDecision.deny;
+        await expectLater(
+          bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: 'git status -s',
+          ),
+          throwsA(_bridgeException('command_denied')),
+        );
+        expect(modal.commandCallCount, 2);
+        expect(service.shells.single.writes, ['\x03']);
+      },
+    );
+
+    for (final command in [
+      "rg 'rm|mkfs|delete' README.md",
+      'git checkout -b feature/review',
+      'git log --grep=rm',
+    ]) {
+      test(
+        'bypass does not prompt for literal read arguments: $command',
+        () async {
+          final modal = _FakeSecurityModalService();
+          final service = _EchoSshSessionService();
+          final container = _container(service: service, modal: modal);
+          addTearDown(container.dispose);
+          final bridge = await _bridge(container);
+          final handle = await _openSession(bridge);
+          await bridge.exec(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            command: command,
+          );
+          expect(modal.commandCallCount, 0);
+          expect(service.shells.single.writes, ['$command\r']);
+        },
+      );
+    }
+
     for (final bypass in [false, true]) {
       test(
         'ordinary command ${bypass ? 'bypasses' : 'waits for'} approval',
@@ -101,7 +745,7 @@ void main() {
           if (!bypass) {
             await modal.commandStarted.future;
             expect(service.shells.single.writes, isEmpty);
-            expect(modal.lastCommandPrompt!.allowSession, isFalse);
+            expect(modal.lastCommandPrompt!.allowSession, isTrue);
             modal.commandGate!.complete(AgentCommandDecision.allowOnce);
           }
           await result;
@@ -205,7 +849,7 @@ void main() {
           case 'mode':
             await container.read(mcpCommandApprovalProvider).saveBypass(false);
           case 'revoke':
-            bridge.revokeGrant(handle.grantId);
+            await bridge.revokeGrant(handle.grantId);
           case 'vault':
           case 'reunlock':
             final vault = container.read(
@@ -382,7 +1026,7 @@ void main() {
       },
     );
 
-    test('discovery consent is scoped to client and privacy level, excludes commands', () async {
+    test('remembered client consent respects current privacy and excludes commands', () async {
       final modal = _FakeSecurityModalService();
       final container = _container(
         service: _EchoSshSessionService(),
@@ -403,11 +1047,11 @@ void main() {
       await container.read(mcpHostVisibilityProvider).saveStrict(true);
       final strict = await bridge.describeHosts(clientName: _clientName);
       expect(strict.single.keys, unorderedEquals(['id', 'displayName']));
-      expect(modal.accessCallCount, 3);
-      expect(modal.lastAccessPrompt?.discoveryStrict, true);
+      expect(modal.accessCallCount, 2);
+      expect(modal.lastAccessPrompt?.rememberClient, true);
     });
 
-    test('a strict grant cannot silently expand to full metadata', () async {
+    test('changing privacy updates metadata without reauthorizing a remembered client', () async {
       final modal = _FakeSecurityModalService();
       final container = _container(
         service: _EchoSshSessionService(),
@@ -420,11 +1064,10 @@ void main() {
       await bridge.describeHosts(clientName: _clientName);
       await container.read(mcpHostVisibilityProvider).saveStrict(false);
       modal.accessDecision = AgentAccessDecision.deny;
-      await expectLater(
-        bridge.describeHosts(clientName: _clientName),
-        throwsA(_bridgeException('authorization_denied')),
-      );
-      expect(modal.lastAccessPrompt?.discoveryStrict, false);
+      final hosts = await bridge.describeHosts(clientName: _clientName);
+      expect(hosts.single['hostname'], _host.hostname);
+      expect(modal.accessCallCount, 1);
+      expect(modal.lastAccessPrompt?.discoveryStrict, true);
     });
 
     for (final change in ['revoke', 'privacy']) {
@@ -473,8 +1116,8 @@ void main() {
         sessionId: opened.sessionId,
       );
       expect(borrowed.borrowed, true);
-      expect(modal.accessCallCount, 2);
-      expect(modal.lastAccessPrompt?.existingSessionId, opened.sessionId.value);
+      expect(modal.accessCallCount, 1);
+      expect(modal.lastAccessPrompt?.rememberClient, true);
       expect(service.openShellCount, 1);
       await bridge.closeSession(opened.sessionId, clientName: _clientName);
       expect(container.read(workspaceTabControllerProvider).tabs, hasLength(1));
@@ -548,8 +1191,8 @@ void main() {
           sessionId: id,
         );
         expect(handle.borrowed, true);
-        expect(modal.accessCallCount, 2);
-        expect(modal.lastAccessPrompt?.existingSessionId, id.value);
+        expect(modal.accessCallCount, 1);
+        expect(modal.lastAccessPrompt?.rememberClient, true);
         expect(service.openShellCount, 1);
         await bridge.exec(
           clientName: _clientName,
@@ -723,6 +1366,255 @@ void main() {
       );
     }
   });
+  group('MCP SFTP uploads', () {
+    late Directory directory;
+    late File file;
+    setUp(() async {
+      directory = await Directory.systemTemp.createTemp('serlink-upload-test-');
+      file = File('${directory.path}/upload.bin');
+      await file.writeAsBytes([0, 1, 127, 255]);
+    });
+    tearDown(() => directory.delete(recursive: true));
+
+    test(
+      'approves an upload and exposes completion to only its owner',
+      () async {
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService();
+        final container = _container(service: service, modal: modal);
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await bridge.openSession(
+          clientName: _clientName,
+          hostId: _host.id,
+          kind: AgentSessionKind.sftp,
+        );
+        final result = await McpRequestContext().run(
+          () => bridge.uploadSftp(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            localPath: file.path,
+            remotePath: '/srv/upload.bin',
+          ),
+        );
+        expect(modal.uploadCallCount, 1);
+        expect(
+          modal.lastUploadPrompt!.localPath,
+          await file.resolveSymbolicLinks(),
+        );
+        expect(modal.lastUploadPrompt!.remotePath, '/srv/upload.bin');
+        expect(modal.lastUploadPrompt!.sizeBytes, 4);
+        final id = TransferTaskId(result['taskId'] as String);
+        await _drainMicrotasks();
+        expect(service.sftp.uploads.single.bytes, [0, 1, 127, 255]);
+        final status = bridge.transferStatus(
+          clientName: _clientName,
+          sessionId: handle.sessionId,
+          taskId: id,
+        );
+        expect(status['state'], 'completed');
+        expect(status['transferredBytes'], 4);
+        expect(
+          () => bridge.transferStatus(
+            clientName: 'other',
+            sessionId: handle.sessionId,
+            taskId: id,
+          ),
+          throwsA(_bridgeException('authorization_required')),
+        );
+        modal.uploadDecision = AgentAccessDecision.deny;
+        await expectLater(
+          bridge.uploadSftp(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            localPath: file.path,
+            remotePath: '/srv/other.bin',
+          ),
+          throwsA(_bridgeException('upload_denied')),
+        );
+        expect(modal.uploadCallCount, 2);
+        expect(service.sftp.uploads, hasLength(1));
+      },
+    );
+
+    for (final change in [
+      'deny',
+      'revoke',
+      'close',
+      'vault',
+      'reunlock',
+      'cancel',
+      'source',
+    ]) {
+      test('$change while approving never queues an upload', () async {
+        final service = _EchoSshSessionService();
+        final modal = _FakeSecurityModalService()
+          ..uploadApprovalGate = Completer<AgentAccessDecision>();
+        final container = _container(service: service, modal: modal);
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await bridge.openSession(
+          clientName: _clientName,
+          hostId: _host.id,
+          kind: AgentSessionKind.sftp,
+        );
+        final request = McpRequestContext();
+        final future = request.run(
+          () => bridge.uploadSftp(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            localPath: file.path,
+            remotePath: '/srv/upload.bin',
+          ),
+        );
+        final code = switch (change) {
+          'deny' => 'upload_denied',
+          'revoke' || 'reunlock' => 'authorization_required',
+          'close' => 'session_not_found',
+          'vault' => 'vault_locked',
+          'cancel' => 'request_cancelled',
+          _ => 'local_file_changed',
+        };
+        final expectation = expectLater(
+          future,
+          throwsA(
+            change == 'cancel'
+                ? isA<McpApprovalException>().having(
+                    (e) => e.code,
+                    'code',
+                    code,
+                  )
+                : _bridgeException(code),
+          ),
+        );
+        await modal.uploadStarted.future;
+        switch (change) {
+          case 'revoke':
+            await bridge.revokeGrant(handle.grantId);
+          case 'close':
+            await bridge.closeSession(handle.sessionId);
+          case 'vault' || 'reunlock':
+            (container.read(
+              vaultSessionControllerProvider.notifier,
+            ) as _FakeVaultSessionController).setSnapshot(
+              VaultSessionState(
+                vaultState: change == 'vault'
+                    ? VaultState.locked
+                    : VaultState.unlocked,
+                unlockGeneration: 2,
+              ),
+            );
+          case 'cancel':
+            request.cancel();
+          case 'source':
+            await file.writeAsString('changed source');
+        }
+        modal.uploadApprovalGate!.complete(
+          change == 'deny'
+              ? AgentAccessDecision.deny
+              : AgentAccessDecision.allow,
+        );
+        await expectation;
+        expect(service.sftp.uploads, isEmpty);
+        expect(
+          container.read(transferQueueControllerProvider).state.tasks,
+          isEmpty,
+        );
+      });
+    }
+
+    test(
+      'rejects invalid paths, directories and inaccessible local files',
+      () async {
+        final modal = _FakeSecurityModalService();
+        final container = _container(
+          service: _EchoSshSessionService(),
+          modal: modal,
+        );
+        addTearDown(container.dispose);
+        final bridge = await _bridge(container);
+        final handle = await bridge.openSession(
+          clientName: _clientName,
+          hostId: _host.id,
+          kind: AgentSessionKind.sftp,
+        );
+        for (final item in [
+          (local: 'relative', remote: '/srv/file', code: 'invalid_local_path'),
+          (local: file.path, remote: 'relative', code: 'invalid_remote_path'),
+          (local: file.path, remote: '/srv/', code: 'invalid_remote_path'),
+          (local: file.path, remote: '/srv/..', code: 'invalid_remote_path'),
+          (
+            local: directory.path,
+            remote: '/srv/file',
+            code: 'local_file_required',
+          ),
+          (
+            local: '${directory.path}/missing',
+            remote: '/srv/file',
+            code: 'local_file_unavailable',
+          ),
+        ]) {
+          await expectLater(
+            bridge.uploadSftp(
+              clientName: _clientName,
+              sessionId: handle.sessionId,
+              localPath: item.local,
+              remotePath: item.remote,
+            ),
+            throwsA(_bridgeException(item.code)),
+          );
+        }
+        expect(modal.uploadCallCount, 0);
+      },
+    );
+
+    for (final close in [false, true]) {
+      test(
+        '${close ? 'session close' : 'cancel'} cancels an active upload',
+        () async {
+          final service = _EchoSshSessionService();
+          final gate = service.sftp.uploadGate = Completer<void>();
+          final container = _container(
+            service: service,
+            modal: _FakeSecurityModalService(),
+          );
+          addTearDown(container.dispose);
+          final bridge = await _bridge(container);
+          final handle = await bridge.openSession(
+            clientName: _clientName,
+            hostId: _host.id,
+            kind: AgentSessionKind.sftp,
+          );
+          final result = await bridge.uploadSftp(
+            clientName: _clientName,
+            sessionId: handle.sessionId,
+            localPath: file.path,
+            remotePath: '/srv/upload.bin',
+          );
+          final id = TransferTaskId(result['taskId'] as String);
+          await _drainMicrotasks();
+          final cancelled = close
+              ? bridge.closeSession(handle.sessionId)
+              : bridge.cancelTransfer(
+                  clientName: _clientName,
+                  sessionId: handle.sessionId,
+                  taskId: id,
+                );
+          gate.complete();
+          await cancelled;
+          expect(
+            container
+                .read(transferQueueControllerProvider)
+                .state
+                .byId(id)!
+                .state,
+            TransferState.canceled,
+          );
+        },
+      );
+    }
+  });
+
   group('MCP SFTP downloads', () {
     test(
       'uses visible authorized tab and downloads to a fresh local directory',
@@ -857,7 +1749,7 @@ void main() {
           download,
           throwsA(_bridgeException('authorization_required')),
         );
-        bridge.revokeGrant(handle.grantId);
+        await bridge.revokeGrant(handle.grantId);
         destination.complete(root);
         await expectation;
         expect(await root.list().toList(), isEmpty);
@@ -1092,7 +1984,7 @@ void main() {
           );
           await model.started.future;
           if (failure == 'revoked') {
-            bridge.revokeGrant(handle.grantId);
+            await bridge.revokeGrant(handle.grantId);
           }
           if (failure == 'closed') {
             await bridge.closeSession(handle.sessionId);
@@ -1418,7 +2310,7 @@ void main() {
           sessionId: handle.sessionId,
           command: 'ls',
         );
-        bridge.revokeGrant(handle.grantId);
+        await bridge.revokeGrant(handle.grantId);
 
         await expectLater(
           bridge.exec(
@@ -1909,7 +2801,22 @@ class _FakeVaultSessionController extends VaultSessionController {
   Future<VaultSessionState> build() async => _state;
 }
 
-class _EchoSshSessionService implements SshSessionService {
+class _EchoSshSessionService implements SshSessionService, SshCommandService {
+  final commands = <_CommandProcess>[];
+  Completer<void>? commandOpenGate;
+  String? commandCwd;
+  @override
+  Future<SshCommandProcess> openCommand({
+    required SessionId sessionId,
+    String? cwd,
+  }) async {
+    final process = _CommandProcess();
+    commands.add(process);
+    commandCwd = cwd;
+    await commandOpenGate?.future;
+    return process;
+  }
+
   final sftp = _MemorySftpConnection();
   final List<_EchoShellSession> shells = [];
   final List<Object> shellFailures = [];
@@ -1983,6 +2890,8 @@ class _EchoSshSessionService implements SshSessionService {
 
 class _MemorySftpConnection implements SftpConnection {
   final _done = Completer<void>();
+  final uploads = <({String localPath, String remotePath, List<int> bytes})>[];
+  Completer<void>? uploadGate;
   bool closed = false;
   @override
   Future<void> get done => _done.future;
@@ -2008,6 +2917,24 @@ class _MemorySftpConnection implements SftpConnection {
       state: TransferState.completed,
       transferredBytes: 3,
       totalBytes: 3,
+    );
+  }
+
+  @override
+  Stream<TransferProgress> upload({
+    required TransferTaskId taskId,
+    required TransferItemKind itemKind,
+    required String localPath,
+    required String remotePath,
+  }) async* {
+    final bytes = await File(localPath).readAsBytes();
+    uploads.add((localPath: localPath, remotePath: remotePath, bytes: bytes));
+    await uploadGate?.future;
+    yield TransferProgress(
+      taskId: taskId,
+      state: TransferState.completed,
+      transferredBytes: bytes.length,
+      totalBytes: bytes.length,
     );
   }
 
@@ -2070,6 +2997,19 @@ class _FakeSecurityModalService implements SecurityModalService {
   Completer<AgentCommandDecision>? commandGate;
   final commandStarted = Completer<void>();
   AgentCommandPrompt? lastCommandPrompt;
+  AgentAccessDecision uploadDecision = AgentAccessDecision.allow;
+  AgentUploadPrompt? lastUploadPrompt;
+  Completer<AgentAccessDecision>? uploadApprovalGate;
+  final uploadStarted = Completer<void>();
+  int uploadCallCount = 0;
+
+  @override
+  Future<AgentAccessDecision> confirmAgentUpload(AgentUploadPrompt prompt) {
+    uploadCallCount++;
+    lastUploadPrompt = prompt;
+    if (!uploadStarted.isCompleted) uploadStarted.complete();
+    return uploadApprovalGate?.future ?? Future.value(uploadDecision);
+  }
 
   @override
   Future<AgentAccessDecision> confirmAgentAccess(AgentAccessPrompt prompt) {
@@ -2171,5 +3111,52 @@ class _DecisionModel implements CommandDecisionModel {
     if (!started.isCompleted) started.complete();
     if (pending != null) return pending!.future;
     return decision;
+  }
+}
+
+class _CommandProcess implements SshCommandProcess {
+  final out = StreamController<List<int>>();
+  final err = StreamController<List<int>>();
+  final completed = Completer<void>();
+  final bytes = <int>[];
+  int interrupts = 0;
+  bool inputClosed = false;
+  bool closed = false;
+  @override
+  int? exitCode;
+  @override
+  String? get exitSignal => null;
+  @override
+  Stream<List<int>> get stdout => out.stream;
+  @override
+  Stream<List<int>> get stderr => err.stream;
+  @override
+  Future<void> get done => completed.future;
+  @override
+  Future<void> write(List<int> value) async {
+    bytes.addAll(value);
+  }
+
+  @override
+  Future<void> closeInput() async {
+    inputClosed = true;
+  }
+
+  @override
+  Future<void> interrupt() async {
+    interrupts++;
+  }
+
+  Future<void> finish([int? code]) async {
+    exitCode = code;
+    if (!completed.isCompleted) completed.complete();
+    unawaited(out.close());
+    unawaited(err.close());
+  }
+
+  @override
+  Future<void> close() async {
+    closed = true;
+    await finish();
   }
 }

@@ -23,6 +23,77 @@ void main() {
     hostId: 'host-1',
   );
 
+  testWidgets('remembered client approval discloses scope and persistence', (
+    tester,
+  ) async {
+    final key = GlobalKey<NavigatorState>();
+    final notifications = _Notifications();
+    await tester.pumpWidget(_TestApp(navigatorKey: key));
+    final service = FlutterSecurityModalService(
+      key: key,
+      notifications: notifications,
+    );
+    final result = service.confirmAgentAccess(
+      const AgentAccessPrompt(
+        clientName: 'agent',
+        hostDisplayName: 'Host',
+        hostId: 'host',
+        rememberClient: true,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Remember agent access'), findsOneWidget);
+    expect(find.textContaining('on all hosts'), findsOneWidget);
+    expect(find.textContaining('across app restarts'), findsOneWidget);
+    expect(notifications.requests.single['directApproval'], false);
+    await tester.tap(find.text('Allow and remember'));
+    await tester.pumpAndSettle();
+    expect(await result, AgentAccessDecision.allow);
+  });
+
+  for (final allow in [false, true]) {
+    testWidgets(
+      'upload discloses both paths and replacement before ${allow ? 'approval' : 'denial'}',
+      (tester) async {
+        final key = GlobalKey<NavigatorState>();
+        final notifications = _Notifications();
+        await tester.pumpWidget(_TestApp(navigatorKey: key));
+        final service = FlutterSecurityModalService(
+          key: key,
+          notifications: notifications,
+        );
+        final result = service.confirmAgentUpload(
+          const AgentUploadPrompt(
+            clientName: 'agent',
+            hostDisplayName: 'host',
+            localPath: '/tmp/package.zip',
+            remotePath: '/srv/package.zip',
+            sizeBytes: 123,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('/tmp/package.zip'), findsOneWidget);
+        expect(find.text('/srv/package.zip'), findsOneWidget);
+        expect(find.text('Size: 123 bytes'), findsOneWidget);
+        expect(
+          find.textContaining('replaces any existing file'),
+          findsOneWidget,
+        );
+        expect(notifications.requests.single['directApproval'], false);
+        notifications.actions.single.complete('allow');
+        await tester.pumpAndSettle();
+        expect(find.text('Agent upload request'), findsOneWidget);
+        await tester.tap(find.text(allow ? 'Upload' : 'Deny'));
+        await tester.pumpAndSettle();
+        expect(
+          await result,
+          allow ? AgentAccessDecision.allow : AgentAccessDecision.deny,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final scope in ['discovery', 'connection']) {
     testWidgets(
       '$scope consent discloses sharing and requires the full dialog',
@@ -519,6 +590,114 @@ void main() {
     );
   });
 
+  testWidgets(
+    'session approval displays the exact family and returns a scoped decision',
+    (tester) async {
+      final key = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(_TestApp(navigatorKey: key));
+      final service = FlutterSecurityModalService(key: key);
+      final result = service.confirmAgentCommand(
+        const AgentCommandPrompt(
+          clientName: 'codex',
+          hostDisplayName: 'Bastion',
+          command: 'git status --short',
+          ruleDescription: 'standard_approval',
+          sessionCommandPrefix: 'git status …',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Session scope: git status …'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('agent-command-allow-session')),
+      );
+      await tester.pumpAndSettle();
+      expect(await result, AgentCommandDecision.allowSession);
+    },
+  );
+
+  for (final locale in [
+    const Locale('en'),
+    const Locale('zh'),
+    const Locale('ja'),
+  ]) {
+    testWidgets(
+      'project task approval discloses scope on a narrow viewport ($locale)',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final key = GlobalKey<NavigatorState>();
+        await tester.pumpWidget(_TestApp(navigatorKey: key, locale: locale));
+        final l10n = AppLocalizations.of(key.currentContext!);
+        final service = FlutterSecurityModalService(key: key);
+        final result = service.confirmAgentCommand(
+          const AgentCommandPrompt(
+            clientName: 'codex',
+            hostDisplayName: 'Bastion',
+            command: 'pwd',
+            ruleDescription: 'standard_approval',
+            sessionCommandPrefix: 'pwd …',
+            isolatedShell: true,
+            workingDirectory: '/srv/app',
+            taskDirectory: '/srv/app',
+          ),
+        );
+        await tester.pumpAndSettle();
+        final disclosure = find.text(l10n.securityAgentTaskScope('/srv/app'));
+        expect(disclosure, findsOneWidget);
+        final button = find.byKey(const ValueKey('agent-command-allow-task'));
+        await tester.ensureVisible(button);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(await result, AgentCommandDecision.allowTask);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'long script review pages the full source and discloses its working directory',
+    (tester) async {
+      final key = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(_TestApp(navigatorKey: key));
+      final service = FlutterSecurityModalService(key: key);
+      final result = service.confirmAgentCommand(
+        AgentCommandPrompt(
+          clientName: 'codex',
+          hostDisplayName: 'Bastion',
+          command: '#${'x' * 17000}\necho tail-marker',
+          ruleDescription: 'standard_approval',
+          allowSession: false,
+          isolatedShell: true,
+          workingDirectory: '/srv/jobs',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Separate sh process · Working directory: /srv/jobs'),
+        findsOneWidget,
+      );
+      SelectableText code() => tester.widget<SelectableText>(
+        find.descendant(
+          of: find.byKey(const ValueKey('agent-command-code-block')),
+          matching: find.byType(SelectableText),
+        ),
+      );
+      expect(code().textSpan!.toPlainText().length, lessThanOrEqualTo(16384));
+      expect(code().textSpan!.toPlainText(), isNot(contains('tail-marker')));
+      final next = find.byKey(const ValueKey('agent-command-next-page'));
+      await tester.ensureVisible(next);
+      await tester.tap(next);
+      await tester.pumpAndSettle();
+      expect(code().textSpan!.toPlainText(), contains('tail-marker'));
+      await tester.tap(find.byKey(const ValueKey('agent-command-allow-once')));
+      await tester.pumpAndSettle();
+      expect(await result, AgentCommandDecision.allowOnce);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('mandatory command approval does not offer session bypass', (
     tester,
   ) async {
@@ -537,7 +716,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Allow for Session'), findsNothing);
+    expect(find.text('Allow Similar for Session'), findsNothing);
     await tester.tap(find.text('Allow Once'));
     await tester.pumpAndSettle();
 
@@ -549,13 +728,15 @@ void main() {
 }
 
 class _TestApp extends StatelessWidget {
-  const _TestApp({required this.navigatorKey});
+  const _TestApp({required this.navigatorKey, this.locale});
 
   final GlobalKey<NavigatorState> navigatorKey;
+  final Locale? locale;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      locale: locale,
       navigatorKey: navigatorKey,
       theme: SerlinkTheme.dark(),
       localizationsDelegates: const [

@@ -77,6 +77,7 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
   var _installExpanded = false;
   var _notificationStatus = 'unavailable';
   var _requestingNotifications = false;
+  final _installingSkills = <String>{};
   static const _notifications = McpApprovalNotifications();
 
   @override
@@ -84,6 +85,9 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_refreshNotifications());
+    unawaited(
+      ref.read(mcpServerControllerProvider.notifier).refreshAgentSkills(),
+    );
   }
 
   @override
@@ -94,7 +98,12 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_refreshNotifications());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshNotifications());
+      unawaited(
+        ref.read(mcpServerControllerProvider.notifier).refreshAgentSkills(),
+      );
+    }
   }
 
   Future<void> _refreshNotifications() async {
@@ -466,17 +475,26 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
   Widget _buildInstallGroup(AppLocalizations l10n) {
     final t = context.tokens;
     final helperPath = _mcpStdioHelperPath();
-    if (!mcpStdioHelperFileExists(helperPath)) {
-      return const SizedBox.shrink();
-    }
+    final helperInstalled = mcpStdioHelperFileExists(helperPath);
     final installer = ref.watch(agentConfigInstallerProvider);
-    final targets = installer.detectInstalledAgents();
+    final skillState = ref.watch(mcpServerControllerProvider);
+    final installations = skillState.agentSkills;
+    final targets = installations.map((skill) => skill.target).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SerlinkPressable(
           key: const ValueKey('settings-mcp-install-toggle'),
-          onTap: () => setState(() => _installExpanded = !_installExpanded),
+          onTap: () {
+            setState(() => _installExpanded = !_installExpanded);
+            if (_installExpanded) {
+              unawaited(
+                ref
+                    .read(mcpServerControllerProvider.notifier)
+                    .refreshAgentSkills(),
+              );
+            }
+          },
           borderRadius: SerlinkRadii.control,
           hoverColor: t.surfaceOverlay,
           pressedColor: t.textPrimary.withValues(alpha: 0.08),
@@ -530,29 +548,50 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
                   padding: const EdgeInsets.only(top: 10),
                   child: targets.isEmpty
                       ? _McpEmptyCard(
-                          label: l10n.settingsMcpInstallNoneDetected,
+                          label: skillState.agentSkillsLoading
+                              ? l10n.settingsMcpAgentsScanning
+                              : l10n.settingsMcpInstallNoneDetected,
                         )
                       : _McpCard(
                           children: [
+                            Text(
+                              l10n.settingsMcpGlobalSkillsHint,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: t.textSecondary),
+                            ),
+                            const SizedBox(height: 12),
                             for (
                               var index = 0;
                               index < targets.length;
                               index += 1
                             ) ...[
                               if (index > 0) const _McpCardGap(),
-                              _McpListItem.branded(
-                                iconAsset: _mcpAgentIconAsset(
-                                  targets[index].id,
+                              if (helperInstalled)
+                                _McpListItem.branded(
+                                  iconAsset: _mcpAgentIconAsset(
+                                    targets[index].id,
+                                  ),
+                                  title: targets[index].displayName,
+                                  subtitle: _mcpShortPath(
+                                    targets[index].configPath,
+                                  ),
+                                  action: _mcpInstallAction(
+                                    l10n,
+                                    installer,
+                                    targets[index],
+                                    helperPath,
+                                  ),
                                 ),
-                                title: targets[index].displayName,
-                                subtitle: _mcpShortPath(
-                                  targets[index].configPath,
-                                ),
-                                action: _mcpInstallAction(
+                              if (helperInstalled) const SizedBox(height: 10),
+                              _McpListItem(
+                                icon: Icons.menu_book_outlined,
+                                title:
+                                    '${targets[index].displayName} · ${l10n.settingsMcpGlobalSkillTitle}',
+                                subtitle:
+                                    '${_skillStatusLabel(l10n, installations[index].status)} · ${_mcpShortPath(installations[index].path)}',
+                                action: _skillInstallAction(
                                   l10n,
-                                  installer,
-                                  targets[index],
-                                  helperPath,
+                                  installations[index],
                                 ),
                               ),
                             ],
@@ -604,8 +643,12 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
     String helperPath,
   ) async {
     final l10n = context.l10n;
+    final skills = ref.read(agentSkillInstallerProvider);
+    final server = ref.read(mcpServerControllerProvider.notifier);
     try {
       await installer.install(target, helperPath: helperPath);
+      await skills.install(target);
+      await server.refreshAgentSkills();
       if (!mounted) {
         return;
       }
@@ -621,6 +664,65 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
     }
   }
 
+  String _skillStatusLabel(AppLocalizations l10n, AgentSkillStatus status) =>
+      switch (status) {
+        AgentSkillStatus.notInstalled => l10n.settingsMcpSkillNotInstalled,
+        AgentSkillStatus.installed => l10n.settingsMcpInstalledLabel,
+        AgentSkillStatus.outdated => l10n.settingsMcpSkillOutdated,
+        AgentSkillStatus.conflict => l10n.settingsMcpSkillConflict,
+        AgentSkillStatus.unavailable => l10n.settingsMcpSkillUnavailable,
+      };
+
+  Widget _skillInstallAction(
+    AppLocalizations l10n,
+    AgentSkillInstallation skill,
+  ) {
+    final installed = skill.status == AgentSkillStatus.installed;
+    return _SettingsTextButton(
+      key: ValueKey('settings-mcp-skill-${skill.target.id}'),
+      onPressed: installed || _installingSkills.contains(skill.target.id)
+          ? null
+          : () => unawaited(_installAgentSkill(skill)),
+      child: Text(
+        installed
+            ? l10n.settingsMcpInstalledLabel
+            : skill.status == AgentSkillStatus.conflict
+            ? l10n.settingsMcpSkillReplace
+            : skill.status == AgentSkillStatus.outdated
+            ? l10n.settingsMcpUpdateAction
+            : l10n.settingsMcpInstallAction,
+      ),
+    );
+  }
+
+  Future<void> _installAgentSkill(AgentSkillInstallation skill) async {
+    final l10n = context.l10n;
+    final installer = ref.read(agentSkillInstallerProvider);
+    final server = ref.read(mcpServerControllerProvider.notifier);
+    setState(() => _installingSkills.add(skill.target.id));
+    try {
+      final result = await installer.install(
+        skill.target,
+        replaceExisting: skill.status == AgentSkillStatus.conflict,
+      );
+      await server.refreshAgentSkills();
+      if (mounted) {
+        _showSnackBar(
+          context,
+          result.status == AgentSkillStatus.installed
+              ? l10n.settingsMcpSkillInstalled(skill.target.displayName)
+              : _skillStatusLabel(l10n, result.status),
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        _showSnackBar(context, l10n.settingsMcpInstallFailed('$error'));
+      }
+    } finally {
+      if (mounted) setState(() => _installingSkills.remove(skill.target.id));
+    }
+  }
+
   Widget _buildGrantsGroup(
     AppLocalizations l10n,
     List<AgentGrant> grants,
@@ -632,7 +734,11 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
         _McpGroupLabel(title: l10n.settingsMcpGrantsTitle),
         const SizedBox(height: 10),
         if (grants.isEmpty)
-          _McpEmptyCard(label: l10n.settingsMcpGrantsEmpty)
+          _McpEmptyCard(
+            label: ref.watch(mcpGrantsProvider).hasError
+                ? l10n.settingsMcpAuthorizationUnavailable
+                : l10n.settingsMcpGrantsEmpty,
+          )
         else
           _McpCard(
             children: [
@@ -641,17 +747,18 @@ class _McpManagerDialogState extends ConsumerState<_McpManagerDialog>
                 _McpListItem(
                   icon: Icons.verified_user_outlined,
                   title: grants[index].clientName,
-                  subtitle:
-                      '${grants[index].isDiscovery ? l10n.settingsMcpDiscoveryGrant : _mcpHostLabel(hostNames, grants[index].hostId!)} · '
-                      '${grants[index].sessionId == null ? '' : '${l10n.settingsMcpExistingConnectionGrant} · '}'
-                      '${l10n.settingsMcpGrantExpiry}',
+                  subtitle: grants[index].clientWide
+                      ? l10n.settingsMcpRememberedClient
+                      : '${grants[index].isDiscovery ? l10n.settingsMcpDiscoveryGrant : _mcpHostLabel(hostNames, grants[index].hostId!)} · '
+                            '${grants[index].sessionId == null ? '' : '${l10n.settingsMcpExistingConnectionGrant} · '}'
+                            '${l10n.settingsMcpGrantExpiry}',
                   action: _SettingsTextButton(
                     key: ValueKey(
                       'settings-mcp-grant-revoke-${grants[index].grantId}',
                     ),
-                    onPressed: () => ref
-                        .read(mcpAuthorizationServiceProvider)
-                        .revokeGrant(grants[index].grantId),
+                    onPressed: () => unawaited(
+                      _revokeAgentGrant(ref, grants[index].grantId),
+                    ),
                     child: Text(l10n.settingsMcpRevokeAction),
                   ),
                 ),
@@ -1014,6 +1121,28 @@ Future<void> _closeAgentSession(WidgetRef ref, SessionId sessionId) async {
     await ref.read(agentSessionBridgeProvider).closeSession(sessionId);
   } on Object {
     // The session may already be gone; the list refresh reflects that.
+  }
+}
+
+Future<void> _revokeAgentGrant(WidgetRef ref, String grantId) async {
+  final context = ref.context;
+  final service = ref.read(mcpAuthorizationServiceProvider);
+  final bridge = ref.read(agentSessionBridgeProvider);
+  final sessions = bridge.sessions
+      .where((session) => session.grantId == grantId)
+      .toList();
+  try {
+    try {
+      await service.revokeGrant(grantId);
+    } finally {
+      for (final session in sessions) {
+        await bridge.closeSession(session.sessionId, keepConnection: true);
+      }
+    }
+  } on Object {
+    if (context.mounted) {
+      _showSnackBar(context, context.l10n.settingsMcpAuthorizationUnavailable);
+    }
   }
 }
 

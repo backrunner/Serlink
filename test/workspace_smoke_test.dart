@@ -25,6 +25,8 @@ import 'package:serlink/features/hosts/domain/host.dart';
 import 'package:serlink/features/identities/application/identity_repository.dart';
 import 'package:serlink/features/identities/application/identity_write_service.dart';
 import 'package:serlink/features/identities/domain/identity.dart';
+import 'package:serlink/features/mcp/domain/agent_session.dart';
+import 'package:serlink/features/mcp/application/mcp_server_controller.dart';
 import 'package:serlink/features/import_export/application/macos_ssh_config_startup_service.dart';
 import 'package:serlink/features/sftp/application/sftp_connection.dart';
 import 'package:serlink/features/sftp/application/sftp_failure.dart';
@@ -62,6 +64,7 @@ part 'workspace_smoke_test_host_groups.dart';
 part 'workspace_smoke_test_credentials.dart';
 part 'workspace_smoke_test_terminal_fonts.dart';
 part 'workspace_smoke_test_sftp_mobile.dart';
+part 'workspace_smoke_test_agent_control.dart';
 part 'workspace_smoke_test_transfer_swipe.dart';
 part 'workspace_smoke_test_transfer_menu.dart';
 
@@ -70,6 +73,7 @@ void main() {
   _credentialPaginationTests();
   _terminalFontTests();
   _sftpMobileTests();
+  _agentControlTests();
   _mobileTransferSwipeTests();
   _desktopTransferMenuTests();
   testWidgets(
@@ -3293,6 +3297,9 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
     ProviderScope(
       overrides: [
         platformCapabilitiesProvider.overrideWithValue(resolvedCapabilities),
+        // Widget/golden tests must not bind a real HTTP server or synchronize
+        // skills into the developer's global agent configuration directories.
+        mcpServerControllerProvider.overrideWith(_NoopMcpServerController.new),
         if (documentGateway != null)
           documentGatewayProvider.overrideWithValue(documentGateway),
         if (agentIdentityLoader != null)
@@ -3354,6 +3361,14 @@ Future<_LockedVaultHarness> _pumpLockedVaultApp(
     database: database,
     recoveryKey: initialized.recoveryKey,
   );
+}
+
+class _NoopMcpServerController extends McpServerController {
+  @override
+  McpServerState build() => const McpServerState();
+
+  @override
+  Future<void> refreshAgentSkills({bool synchronize = false}) async {}
 }
 
 class _NoopMacOsSshConfigStartupController

@@ -131,7 +131,10 @@ final class McpApprovalNotifications: NSObject, UNUserNotificationCenterDelegate
   ) {
     DispatchQueue.main.async {
       let live = self.pending[notification.request.identifier] != nil
-      completionHandler(live && !NSApp.isActive ? [.banner, .sound, .list] : [])
+      // App activation alone does not mean the approval dialog has focus.
+      // A visible but unfocused window must still surface the notification.
+      let approvalWindowFocused = NSApp.isActive && NSApp.keyWindow is MainFlutterWindow
+      completionHandler(live && !approvalWindowFocused ? [.banner, .sound, .list] : [])
     }
   }
 

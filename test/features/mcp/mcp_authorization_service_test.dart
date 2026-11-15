@@ -14,67 +14,42 @@ void main() {
   final otherHostId = HostId('host-2');
 
   group('McpAuthorizationService', () {
-    test(
-      'discovery grants are revocable and never authorize host control',
-      () async {
-        final modal = _FakeSecurityModalService();
-        final service = McpAuthorizationService(securityModalService: modal);
-        addTearDown(service.dispose);
-        final grant = await service.ensureDiscoveryGrant(
-          clientName: 'agent',
-          strict: true,
-        );
-        expect(grant!.isDiscovery, true);
-        expect(grant.covers(hostId, DateTime.now()), false);
-        expect(
-          await service.ensureDiscoveryGrant(clientName: 'agent', strict: true),
-          grant,
-        );
-        expect(modal.accessCallCount, 1);
-        final full = await service.ensureDiscoveryGrant(
-          clientName: 'agent',
-          strict: false,
-        );
-        expect(full, isNot(grant));
-        expect(modal.lastAccessPrompt?.discoveryStrict, false);
-        expect(service.revokeGrant(grant.grantId), true);
-        expect(service.isValid(grant), false);
-        expect(service.isValid(full!), true);
-      },
-    );
-
-    test(
-      'host grants do not authorize existing connections or sibling panes',
-      () async {
-        final modal = _FakeSecurityModalService();
-        final service = McpAuthorizationService(securityModalService: modal);
-        addTearDown(service.dispose);
+    test('one remembered client grant covers discovery, hosts and existing sessions', () async {
+      final modal = _FakeSecurityModalService();
+      final service = McpAuthorizationService(securityModalService: modal);
+      addTearDown(service.dispose);
+      final first = (await service.ensureDiscoveryGrant(
+        clientName: 'agent',
+        strict: true,
+      ))!;
+      expect(first.clientWide, isTrue);
+      expect(first.covers(hostId, DateTime.now()), isTrue);
+      expect(modal.lastAccessPrompt?.rememberClient, isTrue);
+      expect(
+        await service.ensureDiscoveryGrant(clientName: 'agent', strict: false),
+        first,
+      );
+      expect(
         await service.ensureGrant(
           clientName: 'agent',
-          hostId: hostId,
-          hostDisplayName: 'Host',
-        );
-        final session = SessionId('existing-pane');
-        final grant = await service.ensureGrant(
-          clientName: 'agent',
-          hostId: hostId,
-          hostDisplayName: 'Host',
-          sessionId: session,
-        );
-        expect(modal.accessCallCount, 2);
-        expect(modal.lastAccessPrompt?.existingSessionId, session.value);
-        expect(grant!.covers(hostId, DateTime.now()), false);
-        expect(grant.covers(hostId, DateTime.now(), sessionId: session), true);
-        expect(
-          grant.covers(
-            hostId,
-            DateTime.now(),
-            sessionId: SessionId('other-pane'),
-          ),
-          false,
-        );
-      },
-    );
+          hostId: otherHostId,
+          hostDisplayName: 'Other',
+          sessionId: SessionId('existing'),
+        ),
+        first,
+      );
+      expect(
+        first.covers(
+          otherHostId,
+          DateTime.now(),
+          sessionId: SessionId('another'),
+        ),
+        isTrue,
+      );
+      expect(modal.accessCallCount, 1);
+      expect(await service.revokeGrant(first.grantId), isTrue);
+      expect(service.isValid(first), isFalse);
+    });
 
     test('cancelled discovery approval creates no late permission', () async {
       final modal = _FakeSecurityModalService()
@@ -140,7 +115,7 @@ void main() {
         if (dispose) {
           service.dispose();
         } else {
-          service.revokeAll();
+          await service.revokeAll();
         }
         gate.complete(AgentAccessDecision.allow);
         expect(await result, isNull);
@@ -161,7 +136,8 @@ void main() {
 
       expect(grant, isNotNull);
       expect(grant!.clientName, 'claude');
-      expect(grant.hostId, hostId);
+      expect(grant.hostId, isNull);
+      expect(grant.clientWide, isTrue);
       expect(grant.grantId, isNotEmpty);
       expect(grant.expiresAt, isNull);
       expect(service.grants, [grant]);
@@ -188,7 +164,7 @@ void main() {
       expect(modal.accessCallCount, 1);
     });
 
-    test('grants are scoped to client and host', () async {
+    test('remembered access is scoped to client across hosts', () async {
       final modal = _FakeSecurityModalService();
       final service = McpAuthorizationService(securityModalService: modal);
       await service.ensureGrant(
@@ -219,7 +195,7 @@ void main() {
           hostId: otherHostId,
           now: DateTime.now(),
         ),
-        isNull,
+        isNotNull,
       );
     });
 
@@ -276,8 +252,8 @@ void main() {
         hostDisplayName: 'Test Host',
       );
 
-      expect(service.revokeGrant(grant!.grantId), isTrue);
-      expect(service.revokeGrant(grant.grantId), isFalse);
+      expect(await service.revokeGrant(grant!.grantId), isTrue);
+      expect(await service.revokeGrant(grant.grantId), isFalse);
       expect(
         service.findValidGrant(
           clientName: 'claude',
@@ -305,13 +281,13 @@ void main() {
         hostDisplayName: 'Test Host',
       );
       await service.ensureGrant(
-        clientName: 'claude',
+        clientName: 'other-client',
         hostId: otherHostId,
         hostDisplayName: 'Other Host',
       );
       expect(service.grants, hasLength(2));
 
-      service.revokeAll();
+      await service.revokeAll();
       expect(service.grants, isEmpty);
     });
 
@@ -326,10 +302,10 @@ void main() {
         hostId: hostId,
         hostDisplayName: 'Test Host',
       );
-      service.revokeGrant(grant!.grantId);
+      await service.revokeGrant(grant!.grantId);
       // Removing an unknown grant does not emit.
-      service.revokeGrant('unknown-grant');
-      service.revokeAll();
+      await service.revokeGrant('unknown-grant');
+      await service.revokeAll();
       await Future<void>.delayed(Duration.zero);
 
       expect(emissions, [
@@ -381,6 +357,11 @@ class _FakeSecurityModalService implements SecurityModalService {
     }
     return Future.value(accessDecision);
   }
+
+  @override
+  Future<AgentAccessDecision> confirmAgentUpload(
+    AgentUploadPrompt prompt,
+  ) async => AgentAccessDecision.deny;
 
   @override
   Future<AgentCommandDecision> confirmAgentCommand(AgentCommandPrompt prompt) {

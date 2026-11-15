@@ -5,10 +5,10 @@ Serlink provides a standalone [Model Context Protocol](https://modelcontextproto
 Design principles:
 
 - **Credentials never leave the app.** The agent never receives passwords or private keys. Serlink opens the SSH session itself, as a normal workspace terminal tab.
-- **Configurable host privacy.** Host and connection discovery require explicit sharing consent. Host discovery returns configuration including hostname/IP, username, tags, routing and connection settings; startup commands are excluded. Settings > MCP / Agent access > Manage > Strict host privacy defaults off. When enabled, discovery returns only opaque host IDs and display names. Credentials and credential references are always excluded. This controls metadata; remote terminal output may still contain addresses.
-- **Explicit user authorization.** The first time an agent requests a session on a host, Serlink shows an approval dialog and, when permitted, an actionable macOS notification. If the vault is locked, tool calls fail with `vault_locked` until the user unlocks it in the app.
-- **Dangerous command interception.** Commands sent by the agent are screened by a risk policy (`lib/features/mcp/data/command_risk_policy.dart`). Standard mode confirms every command. User-enabled Bypass skips ordinary command approval, but deletion and other risky commands require fresh approval for every execution. A small set of destructive commands (disk overwrites, `mkfs`, fork bombs) remains blocked. Optional decision-model protection adds semantic screening before execution.
-- **Take back control anytime.** An agent session is a regular terminal tab — type in it to retake control. A badge marks agent-controlled panes; closing the tab or revoking the grant in Settings immediately ends agent access.
+- **Configurable host privacy.** Host and connection discovery require remembered client access consent. Host discovery returns configuration including hostname/IP, username, tags, routing and connection settings; startup commands are excluded. Settings > MCP / Agent access > Manage > Strict host privacy defaults off. When enabled, discovery returns only opaque host IDs and display names. Credentials and credential references are always excluded. This controls metadata; remote terminal output may still contain addresses.
+- **Explicit user authorization.** The first time a client requests discovery or a connection, Serlink shows an approval dialog covering all hosts and connections, and remembers allowed access on this device across restarts. Later connections reuse it until revoked. If the vault is locked, tool calls fail with `vault_locked` until the user unlocks it in the app.
+- **Dangerous command interception.** Commands sent by the agent are screened by a risk policy (`lib/features/mcp/data/command_risk_policy.dart`). Standard mode confirms ordinary commands unless the user has allowed their displayed command scope for that session. User-enabled Bypass skips ordinary command approval, but deletion and other risky commands require fresh approval for every execution. A small set of destructive commands (disk overwrites, `mkfs`, fork bombs) remains blocked. Optional decision-model protection adds semantic screening before execution.
+- **Take back control anytime.** An agent session is a regular terminal tab — type in it to retake control. A badge marks agent-controlled terminal and SFTP panes. SFTP badges identify the client and let the user release control while keeping the connection open. Closing the tab or revoking access in Settings ends agent control.
 - **Quiet capability checks.** Starting the stdio server, initializing MCP, sending heartbeats, and listing tools do not connect to or launch the desktop app. A valid Serlink tool call connects to the running app or launches it on demand. The standalone process does not access the vault or SSH credentials itself.
 
 ## Availability by channel
@@ -66,9 +66,9 @@ time queued behind another approval. Short command requests offer Allow / Deny /
 details; long or multiline commands require review in the app. Discovery and
 host/connection access requests always open the full in-app data-sharing
 disclosure; their notifications offer Deny / View details. Notification
-command approval allows **one execution** only. Host approval creates an
-app-lifetime, revocable grant after in-app consent. Borrowing an existing
-connection requires a separate grant for that specific connection. Command approvals allow one execution only; there is no session-wide approval for risky commands. Notification previews follow
+command approval allows **one execution** only. Client access approval creates a revocable, device-local permission covering discovery,
+new sessions and existing connections. It survives app restarts and does not
+need to be repeated for each host or connection. Command approvals allow one execution only; there is no session-wide approval for risky commands. Notification previews follow
 macOS settings and may include host display names and short commands.
 
 Only one approval is presented at a time. The first decision wins across the
@@ -86,18 +86,64 @@ the tool and wait without asking for a duplicate chat approval. A denial or
 `approval_timeout` / `request_cancelled` must not trigger an automatic retry.
 Vault unlocking and SSH authentication continue inside Serlink.
 
+## Global agent skills
+
+On direct desktop builds, every MCP server start detects supported local agents
+and installs or updates the bundled `serlink-mcp` skill in their **user-level
+global** directories. Detection checks existing agent configuration directories,
+known executables on `PATH`, and supported macOS app bundles. This is local
+discovery of supported clients, not proof that every client version can load the
+skill or that a remote/cloud agent has received it. App Store builds do not
+inspect or write other apps' configuration directories.
+
+| Agent | Global skill root |
+| --- | --- |
+| Claude Code | `~/.claude/skills` |
+| Cursor | `~/.cursor/skills` |
+| Windsurf | `~/.codeium/windsurf/skills` |
+| Kimi Code | `~/.kimi/skills` |
+| OpenCode | `~/.config/opencode/skills` (honors `XDG_CONFIG_HOME`) |
+| Codex | `~/.agents/skills` |
+
+These roots follow the [Claude Code](https://code.claude.com/docs/en/skills),
+[Cursor](https://cursor.com/docs/skills),
+[Kimi Code](https://moonshotai.github.io/kimi-cli/en/customization/skills.html),
+[OpenCode](https://opencode.ai/docs/skills/) and
+[OpenAI Docs](https://learn.chatgpt.com/docs/build-skills) conventions. Windsurf's
+root is also listed in the [skills installer registry](https://github.com/vercel-labs/skills/blob/main/src/agents.ts).
+
+Only the `serlink-mcp/SKILL.md` file and its `.serlink-managed.json` receipt are
+managed. Unchanged installed skills are not rewritten. An older managed copy is
+updated atomically; a user-edited or unowned copy is kept and shown as customized.
+The settings page provides separate global skill status and install/update
+actions, even when the stdio helper is unavailable. Explicit replacement backs
+up the existing content. A failure for one agent does not stop the other
+installations or the MCP server. Symlinked skill files or skill directories are
+kept rather than followed.
+
+Writing MCP configuration remains a separate user action. The existing
+“Install into agents” action installs both the MCP entry and a missing/managed
+skill; it does not silently replace custom instructions. A newly installed agent
+is picked up on the next MCP start or when reopening the manager. Restart the
+agent if it does not discover the skill in its current session. Updating skills
+does not upgrade the installed MCP helper or grant host access.
+
+The skill source is `assets/agent_skills/serlink-mcp/SKILL.md`, bundled as a Flutter
+asset so the installed app does not depend on this repository being present.
+
 ## Exposed tools
 
 All tools are prefixed `serlink_`:
 
 - `serlink_list_hosts` — hosts from the vault after explicit discovery consent (requires unlocked vault).
-- `serlink_open_session` — opens a terminal tab on a host, or an SFTP tab with `kind: "sftp"`; triggers the in-app approval dialog on first use per client+host.
+- `serlink_open_session` — opens a terminal tab on a host, or an SFTP tab with `kind: "sftp"`; requests remembered client access on first use; later connections reuse it.
 - `serlink_list_connections` — lists workspace remote panes and SFTP connections, including manually opened sessions. Returns ids, host display names and connection states without terminal contents or endpoint metadata; local terminals are excluded.
-- `serlink_attach_session` — borrows a connected session returned by `serlink_list_connections`, subject to separate per-client, per-connection consent covering existing terminal history and file access. It does not reconnect, sign again or take a session controlled by another MCP client.
+- `serlink_attach_session` — borrows a connected session returned by `serlink_list_connections`, using remembered client access covering existing terminal history and file access. It does not reconnect, sign again or take a session controlled by another MCP client.
 - `serlink_sftp_list` — lists directory metadata in an authorized SFTP session.
 - `serlink_sftp_download` — queues a single-file download into a new private directory: app-container Application Support on the App Store edition, or Downloads on the direct edition. In the App Store edition, use Export in Transfers to save the completed file through a native Save panel. Returns `taskId` and `localPath`, never file contents, and does not overwrite existing files.
-- `serlink_transfer_status` — reports state and byte counts for this client's SFTP download. Poll until `completed` and verify backup checksums before proceeding with an upgrade.
-- `serlink_transfer_cancel` — cancels this client's download. Partial files may remain; closing the SFTP session also cancels its transfers. Keep the session open until downloads finish.
+- `serlink_sftp_upload` — queues a single local file with `sessionId`, `localPath` and `remotePath` (both absolute paths, with a destination filename). Every upload requires fresh in-app approval, including in Bypass mode. The dialog shows the resolved local source, size, target host and remote path, and warns that an existing destination file will be replaced. The app streams the bytes; MCP does not return file contents. The source must be readable by Serlink; App Store sandbox restrictions still apply. Directories are not supported. Returns `taskId`, `localPath` and `remotePath`.
+- `serlink_transfer_status` — reports state and byte counts for this client's SFTP upload or download. Poll until `completed` and verify backup checksums before proceeding with an upgrade.
+- `serlink_transfer_cancel` — cancels this client's upload or download. Partial destination files may remain; closing the SFTP session also cancels its transfers. Keep the session open until transfers finish.
 - `serlink_exec` — sends a command and returns the settled screen text (heuristic: output quiet for ~400 ms).
 - `serlink_read_screen` — last N buffer lines.
 - `serlink_send_input` — complete submitted commands or Ctrl-C only, in both approval modes. Partial keystrokes and bare Enter are rejected.
@@ -106,25 +152,119 @@ All tools are prefixed `serlink_`:
 
 ## Authorization lifecycle
 
-- Discovery grants are separate from control grants, scoped to the client and strict/full privacy level, and appear in Settings for revocation. Changing from limited to full discovery requires that scope's consent. Startup commands are never included.
-- Existing-connection grants are separate from new-session host grants and cover only the selected session ID.
-- Grants are **in-memory only**: they expire when the app quits. Revoke individual grants in **Settings → Agent access → Active grants**; agent sessions are listed there too and can be closed.
-- After the separate 60-second access approval, opening waits up to 120 seconds for the SSH channel. MCP progress distinguishes access approval from connection/authentication; SSH Agent signing may require approval in 1Password or another agent. Cancellation, expired authorization and connection failure clean up the new MCP tab, including late authentication results. Existing user tabs are not reused by MCP opens.
+- Approving a client once covers discovery and opening or borrowing terminal/SFTP connections on all hosts. The initial dialog discloses this scope and persistence. The current strict/full privacy setting still controls metadata, and startup commands remain excluded. Changing privacy does not require a new client approval.
+- Client consent is stored in device-local secure storage, excluded from vault synchronization, and survives app restarts. Revoke it in **Settings → Agent access → Allowed agents**. Revocation is saved; the next connection requires consent again. The settings action also releases controlled sessions while keeping their connections open. Session handles and command permissions are not restored.
+- Consent is keyed by the negotiated MCP implementation name; clients using the same name and transport access reuse it. This is not a cryptographic process identity. The MCP bearer token still gates transport access, and vault unlocking, SSH authentication, command screening and per-upload approval remain separate.
+- When a new client needs approval, it waits up to 60 seconds; opening then waits up to 120 seconds for the SSH channel. MCP progress distinguishes access approval from connection/authentication; SSH Agent signing may require approval in 1Password or another agent. Cancellation, expired authorization and connection failure clean up the new MCP tab, including late authentication results. Existing user tabs are not reused by MCP opens.
 - Offline diagnostics record `ssh.auth.sign.start`, `ssh.auth.sign.success` or `ssh.auth.sign.failure`, elapsed time and a safe error code. Together with `ssh.auth.summary`, these distinguish a requested signature from a completed signature. They do not prove that a password manager displayed its UI, and contain no key, signature or password material.
-- Error codes surfaced to the agent: `vault_locked`, `authorization_denied`, `authorization_required`, `command_blocked`, `command_denied`, `approval_timeout`, `request_cancelled`, `session_not_found`, `connect_timeout`. The stdio helper also returns `app_unavailable` for discovery/launch failures and `app_connection_lost` for failed in-flight calls.
+- Error codes surfaced to the agent: `vault_locked`, `authorization_denied`, `authorization_required`, `authorization_unavailable`, `command_blocked`, `command_denied`, `approval_timeout`, `request_cancelled`, `session_not_found`, `connect_timeout`. The stdio helper also returns `app_unavailable` for discovery/launch failures and `app_connection_lost` for failed in-flight calls.
+
+## Long commands, complete output and managed jobs
+
+`serlink_exec` now has two execution modes. Use **`mode: "job"`** for large
+scripts, large/unknown output sizes, and long operations:
+
+```json
+{
+  "sessionId": "<terminal session>",
+  "mode": "job",
+  "cwd": "/srv/app",
+  "command": "<complete script>",
+  "timeoutMs": 1000,
+  "maxChars": 16384
+}
+```
+
+The command budget is **4 MiB of UTF-8 source**, up from 8 KiB. The entire source
+passes local rules, optional model assessment and user approval before script
+bytes are sent. A fresh non-PTY POSIX `sh -s` channel reuses the existing
+authenticated SSH connection; source is streamed through stdin, avoiding terminal
+line limits and the SSH exec argument-size limit. The script can include literal
+Tab indentation. It does **not** inherit the interactive terminal's directory,
+variables, aliases or shell state: pass an absolute `cwd` when it matters. The
+SSH server's login directory is used when `cwd` is omitted. Commands inside the
+script remain subject to the remote OS's own limits. Interactive/TUI programs
+belong in terminal mode.
+
+A job response includes `commandId`, `state`, `finished`, `exitCode`, `exitSignal`,
+`output`, `nextCursor`, `hasMore`, `totalChars`, and `outputTruncated`. A wait
+budget is **not a command runtime limit**. `timeoutMs` bounds only the initial
+response wait (default 1 second, maximum 30 seconds); a managed operation keeps
+running while the app/session stays open. Poll it with:
+
+```json
+{
+  "sessionId": "<same session>",
+  "commandId": "<returned commandId>",
+  "cursor": 16384,
+  "waitMs": 1000,
+  "maxChars": 16384
+}
+```
+
+Call **`serlink_command_status`** with the previous `nextCursor`. Drain every
+`hasMore` page, then continue polling while `finished` is false, including silent
+periods. A completed channel is reported only after stdout, stderr and the input
+sender drain; pages use fresh output totals even when exit occurs during a read.
+Only `exitCode: 0` establishes successful exit. A null exit code means the server
+did not provide a status, not success. Cancellation of a status poll leaves its
+job running. The relay's four-minute request deadline does not limit a job's
+runtime because each poll is a separate bounded request. Recovery uses these
+explicit cursors rather than an unbounded SSE replay cache.
+
+Use `view: "command"` on `serlink_command_status` to page the complete submitted
+source after context compaction; keep separate cursors for source and output.
+If a response or command ID was lost, **`serlink_list_commands`** recovers the
+retained job IDs and lifecycle metadata in that session. Never blindly rerun an
+accepted script after a client timeout.
+
+**`serlink_command_cancel`** requests SSH SIGINT; `cancel_requested` does not
+claim the process stopped. Poll for channel completion. Ctrl-C in the app's
+terminal or through `serlink_send_input` also requests interruption of that
+session's managed jobs. Closing the session, revoking the host grant, locking or
+changing vaults, stopping MCP, or quitting the app closes managed channels and
+withdraws retained output. Already executed effects cannot be undone, and an SSH
+server may not support signal delivery or terminate detached descendants.
+
+**`serlink_command_release`** deletes a finished job and its retained output.
+Up to 16 jobs are retained across sessions; release completed jobs after reading
+them to free slots. Output is not persisted as vault history: UTF-8 text is
+captured in private temporary files encrypted with per-capture keys held only in
+memory, excluded from vault sync/backups, and deleted on release/session cleanup.
+Each capture is bounded at **256 MiB**; hitting the limit or a storage failure is
+explicitly reported through `outputTruncated`/`error`. Do not automatically rerun
+an operation to recover missing output. For larger planned outputs, have the
+script write a remote log and use the existing SFTP workflow. Binary data should
+also use SFTP; text decoding replaces malformed UTF-8. Stdout and stderr are
+merged in received order. Command source stays in memory until release.
+
+Default **terminal mode** preserves the existing interactive context. Its response
+contains the first retained output page plus a `screen` tail for immediate
+context, with `completionKnown: false`. Quiet output is not proof the remote
+process exited. Continue reading **`serlink_read_output`** with `nextCursor` to
+retrieve all captured text, including long echo and output beyond terminal
+scrollback; `serlink_read_screen` remains a screen snapshot, not an output log.
+Terminal capture starts before `serlink_exec` sends input. Terminal submission
+above 8 KiB returns `command_requires_job_mode` before any bytes are sent, so an
+agent can submit the same complete source using job mode with a deliberate cwd.
+This is a transport choice, not a risk denial. Provider context limits still
+apply to model protection: source is never silently truncated or split to obtain
+approval. A provider that cannot assess the full source fails closed.
 
 ## Command approval modes
 
 Open **Settings → MCP / Agent access → Manage → Bypass command approval**.
-The switch defaults off: **Standard** mode requires a fresh approval for every
-command. Enable **Bypass** to automatically run ordinary commands after host
+The switch defaults off: **Standard** mode confirms each command unless its
+displayed scope has been allowed for that session. Enable **Bypass** to automatically run ordinary commands after host
 access is authorized. The switch is device-local, survives app restarts, and
 is excluded from vault sync and backups. MCP clients cannot change it.
 
 Both modes keep mandatory confirmation for deletion (`rm`, `rmdir`, `unlink`,
-`find -delete`), destructive Git/container/database cleanup, file overwrites,
-system shutdown, and opaque shell/script evaluation. Session allowlists cannot
-waive these confirmations. Existing disk-destruction and fork-bomb hard blocks
+`find -delete`), destructive Git/container/database cleanup, system shutdown,
+and opaque shell/script evaluation. Command-family allowlists cannot waive
+these confirmations or file-overwrite review. A separately disclosed project
+task grant can cover recognized file writes as described below.
+Existing disk-destruction and fork-bomb hard blocks
 remain non-overridable. Enabled model protection still applies and may reject a
 command before approval. Bypass does not skip discovery consent, first-host
 access approval, vault unlock, or host-key trust.
@@ -140,26 +280,106 @@ Local checks are conservative text rules, not a shell sandbox. They can flag
 quoted prose and cannot establish the effects of aliases, remote executables,
 or arbitrary terminal state. Keep the visible terminal under user supervision.
 
+The command dialog offers **Allow Once** and, for ordinary literal commands,
+**Allow Similar for Session**. The dialog shows the exact argv prefix, for example
+`git status …`. Matching uses parsed argument boundaries, not substring matching;
+`git reset`, a different executable/repository prefix, shell substitutions,
+redirections and appended commands cannot inherit that grant. Unknown programs
+receive only an exact argv grant. Compound or opaque input has no prefix grant.
+The permission belongs to that agent's terminal session, is never persisted, and
+is cleared by approval/model-setting changes or a new vault unlock generation.
+Closing the session or revoking access also ends its use. Model protection and
+mandatory dangerous-command review still run on every execution. Notification
+approval continues to allow only one execution.
+
+Bypass classifies literal read commands by their actual argv. Search terms or
+filenames containing `rm`, `delete` or `mkfs` are data, as are quoted `echo`
+arguments; ordinary branch creation (`git checkout -b`, `git switch -c`) and
+index-only `git restore --staged` no longer trigger destructive cleanup rules.
+Pipelines into interpreters or `xargs`, expansions, destructive operations and
+program options that execute code retain conservative review.
+
+Print-only `sed -n '1,120p' file`, a bounded set of `find` query predicates and
+explicit `cp -n source destination` / `cp --no-clobber` are also recognized by
+argv. Extra execution/write options fall back to conservative review. Literal
+stdout redirection and file operations distinguish quoted data from executable
+words: `printf 'rm -rf /' > note.txt` is a file write, not a deletion command.
+Appending to shell startup files still requires confirmation.
+
+### Project task approval
+
+For recognized operations submitted with **`mode: "job"`** and an explicit,
+canonical absolute **`cwd`** such as `/srv/app`, the full command dialog also
+offers **Allow Project Task**. It discloses that the current connection/session
+may query, create and replace ordinary project files. After choosing it once,
+supported operations in the same directory no longer prompt, even in Standard
+mode. This is separate from Bypass and is never enabled by the agent.
+
+Eligible operations include bounded literal queries, non-recursive `cp`,
+`mkdir`, `touch`, `tee`, and literal stdout `>` / `>>` targets. For example,
+`cp src/a.txt out/a.txt`, `printf 'hello\n' | tee out/note.txt`, and
+`printf 'updated' > out/note.txt` can share the grant. Every command and target
+in a compound request must qualify. Unknown options, scripts, substitutions,
+environment wrappers, local executables, hidden paths and `..` traversal do not
+qualify. Neither deletion nor `mv` can inherit the permission. System
+directories, filesystem roots and implicit/relative working directories cannot
+be selected as task scopes.
+
+The permission belongs to that client's session on that host. A working-directory
+or execution-mode change, approval/model settings change, vault unlock-generation
+change, session closure or access revocation ends its use. A cancelled/stale
+approval cannot seed a grant. Every request still runs the configured model and
+the final authorization/cancellation checks before any bytes are sent.
+Notifications can only allow one execution; a project grant requires reviewing
+the complete disclosure inside Serlink.
+
+**Use only with trusted projects.** Scope matching checks literal command paths;
+it does not resolve remote symbolic links, constrain remote tool implementations,
+or provide an OS filesystem sandbox. A remote symlink can point outside the
+displayed directory. Interactive terminal commands cannot use project task
+permissions because their current working directory cannot be established
+reliably.
+
 ## Decision-model command protection
 
 Open **Settings → MCP / Agent access → Manage → Command protection → Configure**.
-Enter your own TypeSafe API key, choose a System One model (default `jev-1.13.0`),
-explicitly agree to complete-command sharing, and enable model protection. It is disabled until you configure and enable it. Legacy enabled configurations without the current consent cannot contact the provider until consent is renewed.
-The API key, model and enablement are stored together in device-local secure
-storage, separately from vault records, sync and backups. Removing the saved key
-also disables model protection and clears consent. You can disable the feature and withdraw consent from the same dialog. Editing protection does not close agent sessions.
+Choose a decision provider, configure its model and connection, explicitly agree
+to complete-command sharing, then enable protection. The feature is off by default.
 
-The first adapter implements [TypeSafe's System One API](https://docs.typesafe.ai/api),
-`POST https://api.typesafe.ai/v1/systemone`. The application owns the execution
-gate; `CommandDecisionModel` is the adapter interface for another decision provider.
-Requests contain the command text and a typed Choice question. They do not attach
-host records, credentials from the vault, terminal screens or command output.
-Secrets embedded in a command are part of its text and would be sent too.
-The API key is transmitted to TypeSafe in the authorization header, while its
-storage remains device-local. TypeSafe may retain command content, account
-identification and usage/telemetry under its terms; zero retention is not assumed.
-See [TypeSafe privacy](https://typesafe.ai/legal/privacy-policy) and
-[retention guidance](https://help.typesafe.ai/articles/5974925716-how-is-submitted-data-used-or-retained).
+| Provider | Default model | Connection and authentication |
+| --- | --- | --- |
+| TypeSafe / Jev | `jev-1.13.0` | System One at `https://api.typesafe.ai/v1/systemone`; bearer API key |
+| Google / Gemini Decision | `gemini-decision-1` | Decisions API at `https://generativelanguage.googleapis.com/v1beta/decisions`; `x-goog-api-key` |
+| Cloudflare / Clef | `clef` | Workers AI `/client/v4/accounts/{accountId}/ai/run/@cf/cloudflare/{model}`; account ID and bearer API token. Model names are editable, including `clef-flash`. |
+| Local / self-hosted | `clef` | Full System One inference URL; optional bearer API key |
+
+Self-hosted services must accept the System One `model`, `state` and `questions`
+request and return `model` and typed `answers`, including the choice,
+probabilities and confidence. This is a decision protocol, not a chat-completions
+endpoint. The default example is `http://127.0.0.1:8000/v1/systemone`; Serlink does
+not start a model server. LAN hosts and HTTPS deployments are also supported.
+HTTP sends command text and any key without encryption; use HTTPS on untrusted networks.
+
+Provider, endpoint, API key, consent, model and enablement stay in device-local
+secure storage, separately from vault records, sync and backups. Existing Jev
+settings remain compatible without a migration or remote schema change. Legacy
+settings without current consent cannot contact a provider. Changing the provider,
+Cloudflare account or self-hosted URL requires renewed consent and never reuses
+the previous recipient's key. Removing the saved key disables model protection and
+clears consent. Editing protection keeps existing agent sessions open and
+invalidates pending execution permits.
+
+All adapters send only the complete command text and the same typed Choice
+question. They do not attach host records, vault credentials, terminal screens
+or command output. Secrets embedded in a command are part of its text and are
+sent too. Retention depends on the selected provider or self-hosted operator.
+The compact **Data & privacy** entry opens the full disclosure and links the selected provider's data terms:
+[TypeSafe](https://typesafe.ai/legal/privacy-policy),
+[Gemini](https://ai.google.dev/gemini-api/terms), and
+[Cloudflare](https://developers.cloudflare.com/workers-ai/platform/data-usage/).
+API contracts: [System One](https://docs.typesafe.ai/api/system-one),
+[Gemini Decisions](https://aistudio.google.com/docs/decisions-api),
+[Clef](https://developers.cloudflare.com/workers-ai/models/clef/).
 
 The enforcement order is:
 

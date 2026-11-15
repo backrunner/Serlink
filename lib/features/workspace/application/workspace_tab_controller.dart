@@ -76,8 +76,14 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
   final Map<SessionId, int> _paneConnectionTokens = {};
   final Map<WorkspaceTabId, Timer> _reconnectTimers = {};
   final Map<WorkspaceTabId, int> _reconnectAttempts = {};
-  final Map<WorkspaceTabId, SshReconnectPolicy> _reconnectPolicies = {};
-  var _remoteSessionProbeInFlight = false;
+  final Map<SessionId, Timer> _paneReconnectTimers = {};
+  final Map<SessionId, int> _paneReconnectAttempts = {};
+  final Map<SessionId, SshReconnectPolicy> _paneReconnectPolicies = {};
+  final Set<SessionId> _deferredPaneReconnects = {};
+  var _remoteSessionsInBackground = false;
+  var _remoteSessionResumePending = false;
+  var _remoteSessionProbeGeneration = 0;
+  int? _remoteSessionProbeInFlight;
 
   @override
   WorkspaceState build() {
@@ -87,7 +93,13 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       }
       _reconnectTimers.clear();
       _reconnectAttempts.clear();
-      _reconnectPolicies.clear();
+      for (final timer in _paneReconnectTimers.values) {
+        timer.cancel();
+      }
+      _paneReconnectTimers.clear();
+      _paneReconnectAttempts.clear();
+      _paneReconnectPolicies.clear();
+      _deferredPaneReconnects.clear();
       _connectionTokens.clear();
       _paneConnectionTokens.clear();
     });
@@ -413,6 +425,7 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     }
     final normalizedIndex = paneIndex.clamp(0, panes.length - 1);
     final pane = _paneWithEndpoint(tab, normalizedIndex);
+    _clearPaneReconnectState(pane.sessionId);
     final endpoint = pane.endpoint;
     final lifecycle = endpoint?.isLocal == true
         ? SessionLifecycleState.connecting
@@ -493,15 +506,19 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
 
   Future<void> _restartTerminalPane(
     WorkspaceTabState tab,
-    int paneIndex,
-  ) async {
+    int paneIndex, {
+    bool automatic = false,
+  }) async {
     final panes = _terminalPanesOf(tab.content);
     if (panes == null || paneIndex >= panes.length) {
       return;
     }
     final sessionId = panes[paneIndex].sessionId;
-    _nextPaneConnectionToken(sessionId);
+    final closingToken = _nextPaneConnectionToken(sessionId);
     await ref.read(workspaceRuntimeRegistryProvider).closeSession(sessionId);
+    if (!_isOpenPaneCurrent(sessionId, closingToken)) {
+      return;
+    }
     final location = _paneLocationForSession(sessionId);
     if (location == null) {
       return;
@@ -512,11 +529,26 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       return;
     }
     final pane = _paneWithEndpoint(currentTab, location.paneIndex);
+    if (automatic &&
+        (_remoteSessionsInBackground || _remoteSessionResumePending)) {
+      _markTerminalPaneDisconnectedByOpenSession(sessionId);
+      _schedulePaneReconnect(sessionId);
+      return;
+    }
     final token = _nextPaneConnectionToken(sessionId);
     if (_paneUsesLocalShell(currentTab.content, pane)) {
       await _connectLocalTerminalPane(currentTab, location.paneIndex, token);
     } else {
-      await _connectTerminalPane(currentTab, location.paneIndex, token);
+      if (automatic) {
+        _paneReconnectAttempts[sessionId] =
+            (_paneReconnectAttempts[sessionId] ?? 0) + 1;
+      }
+      await _connectTerminalPane(
+        currentTab,
+        location.paneIndex,
+        token,
+        preserveReconnectAttempts: automatic,
+      );
     }
   }
 
@@ -715,6 +747,8 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     }
     if (panes.length > 1) {
       for (final pane in panes.skip(1)) {
+        _clearPaneReconnectState(pane.sessionId);
+        _paneReconnectPolicies.remove(pane.sessionId);
         _paneConnectionTokens.remove(pane.sessionId);
         unawaited(
           ref
@@ -793,6 +827,8 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         : currentActive > normalizedIndex
         ? currentActive - 1
         : currentActive;
+    _clearPaneReconnectState(panes[normalizedIndex].sessionId);
+    _paneReconnectPolicies.remove(panes[normalizedIndex].sessionId);
     _paneConnectionTokens.remove(panes[normalizedIndex].sessionId);
     unawaited(
       ref
@@ -1002,11 +1038,12 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
         .firstOrNull;
     if (closingTab != null) {
       _clearReconnectState(tabId);
-      _reconnectPolicies.remove(tabId);
       _connectionTokens.remove(tabId);
       final panes = _terminalPanesOf(closingTab.content);
       if (panes != null) {
         for (final pane in panes) {
+          _clearPaneReconnectState(pane.sessionId);
+          _paneReconnectPolicies.remove(pane.sessionId);
           _paneConnectionTokens.remove(pane.sessionId);
         }
       }
@@ -1060,19 +1097,115 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     });
   }
 
-  /// Probes every connected remote terminal pane for liveness. Intended for
-  /// when the app returns from the background, where the OS may have
-  /// silently killed the SSH sockets while `shell.done` still has not
-  /// completed. Dead panes go through the same disconnect path as a
-  /// completed `shell.done`, so the recovery overlay and reconnect policy
-  /// behave exactly as if the session had dropped on its own.
-  Future<void> probeRemoteSessions() async {
-    if (_remoteSessionProbeInFlight || !ref.mounted) {
+  void _clearPaneReconnectState(SessionId sessionId) {
+    _paneReconnectTimers.remove(sessionId)?.cancel();
+    _paneReconnectAttempts.remove(sessionId);
+    _deferredPaneReconnects.remove(sessionId);
+  }
+
+  bool _paneNeedsReconnect(SessionId sessionId) {
+    final location = _paneLocationForSession(sessionId);
+    if (location == null) return false;
+    final tab = _currentTab(location.tabId);
+    final pane = _paneWithEndpoint(tab, location.paneIndex);
+    return !_paneUsesLocalShell(tab.content, pane) &&
+        (pane.lifecycle == SessionLifecycleState.disconnected ||
+            pane.lifecycle == SessionLifecycleState.failed);
+  }
+
+  void _schedulePaneReconnect(SessionId sessionId) {
+    final policy = _paneReconnectPolicies[sessionId];
+    if (policy == null ||
+        !policy.isAutomatic ||
+        !_paneNeedsReconnect(sessionId) ||
+        _paneReconnectTimers.containsKey(sessionId)) {
       return;
     }
-    _remoteSessionProbeInFlight = true;
+    final attempts = _paneReconnectAttempts[sessionId] ?? 0;
+    if (attempts >= policy.maxAttempts) return;
+    if (_remoteSessionsInBackground || _remoteSessionResumePending) {
+      _deferredPaneReconnects.add(sessionId);
+      return;
+    }
+    _deferredPaneReconnects.remove(sessionId);
+    final token = _paneConnectionTokens[sessionId]!;
+    _paneReconnectTimers[sessionId] = Timer(policy.backoff, () {
+      _paneReconnectTimers.remove(sessionId);
+      if (!_isOpenPaneCurrent(sessionId, token) ||
+          !_paneNeedsReconnect(sessionId)) {
+        return;
+      }
+      final location = _paneLocationForSession(sessionId)!;
+      _setTerminalPaneLifecycle(
+        location.tabId,
+        location.paneIndex,
+        SessionLifecycleState.reconnecting,
+        clearFailure: true,
+      );
+      // Automatic recovery must not select a tab or restart its healthy panes.
+      unawaited(
+        _restartTerminalPane(
+          _currentTab(location.tabId),
+          location.paneIndex,
+          automatic: true,
+        ),
+      );
+    });
+  }
+
+  /// Pause retries and invalidate probes before iOS can suspend Dart timers.
+  void pauseRemoteSessionRecovery() {
+    _remoteSessionsInBackground = true;
+    _remoteSessionResumePending = false;
+    _remoteSessionProbeGeneration += 1;
+    // A connected pane starts a new recovery budget for its next suspension.
+    // Already-failed panes retain their budget across rapid app switching.
+    for (final tab in state.tabs) {
+      for (final pane
+          in _terminalPanesOf(tab.content) ?? <TerminalPaneState>[]) {
+        if (pane.lifecycle == SessionLifecycleState.connected) {
+          _paneReconnectAttempts.remove(pane.sessionId);
+        }
+      }
+    }
+    _deferredPaneReconnects.addAll(_paneReconnectTimers.keys);
+    for (final timer in _paneReconnectTimers.values) {
+      timer.cancel();
+    }
+    _paneReconnectTimers.clear();
+  }
+
+  /// Give network restoration a short grace period before probing or retrying.
+  Future<void> resumeRemoteSessions() async {
+    _remoteSessionsInBackground = false;
+    _remoteSessionResumePending = true;
+    final generation = ++_remoteSessionProbeGeneration;
+    await Future<void>.delayed(const Duration(seconds: 1));
+    if (!_isRemoteRecoveryCurrent(generation)) return;
+    _remoteSessionResumePending = false;
+    for (final sessionId in _deferredPaneReconnects.toList()) {
+      _deferredPaneReconnects.remove(sessionId);
+      _schedulePaneReconnect(sessionId);
+    }
+    await probeRemoteSessions();
+  }
+
+  bool _isRemoteRecoveryCurrent(int generation) =>
+      ref.mounted &&
+      !_remoteSessionsInBackground &&
+      generation == _remoteSessionProbeGeneration;
+
+  /// Confirm a failed probe before discarding a socket after suspension.
+  /// Connection tokens prevent late results from affecting a replacement shell.
+  Future<void> probeRemoteSessions() async {
+    final generation = _remoteSessionProbeGeneration;
+    if (!_isRemoteRecoveryCurrent(generation) ||
+        _remoteSessionProbeInFlight == generation) {
+      return;
+    }
+    _remoteSessionProbeInFlight = generation;
     try {
-      final targets = <({WorkspaceTabId tabId, SessionId sessionId})>[
+      final targets = <({SessionId sessionId, int token})>[
         for (final tab in state.tabs)
           if (_terminalPanesOf(tab.content) case final panes?)
             for (var index = 0; index < panes.length; index += 1)
@@ -1081,37 +1214,58 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
                     tab.content,
                     _paneWithEndpoint(tab, index),
                   ))
-                (tabId: tab.id, sessionId: panes[index].sessionId),
+                (
+                  sessionId: panes[index].sessionId,
+                  token: _paneConnectionTokens[panes[index].sessionId]!,
+                ),
       ];
-      if (targets.isEmpty) {
-        return;
-      }
+      if (targets.isEmpty) return;
       final service = ref.read(sshSessionServiceProvider);
       await Future.wait([
         for (final target in targets)
-          _probeRemotePane(service, target.tabId, target.sessionId),
+          _probeRemotePane(service, target.sessionId, target.token, generation),
       ]);
     } finally {
-      _remoteSessionProbeInFlight = false;
+      if (_remoteSessionProbeInFlight == generation) {
+        _remoteSessionProbeInFlight = null;
+      }
     }
+  }
+
+  bool _isProbeCurrent(SessionId sessionId, int token, int generation) {
+    if (!_isRemoteRecoveryCurrent(generation) ||
+        !_isOpenPaneCurrent(sessionId, token)) {
+      return false;
+    }
+    final location = _paneLocationForSession(sessionId)!;
+    return _paneWithEndpoint(
+          _currentTab(location.tabId),
+          location.paneIndex,
+        ).lifecycle ==
+        SessionLifecycleState.connected;
   }
 
   Future<void> _probeRemotePane(
     SshSessionService service,
-    WorkspaceTabId tabId,
     SessionId sessionId,
+    int token,
+    int generation,
   ) async {
-    final alive = await service.probeShell(sessionId: sessionId);
-    if (alive || !ref.mounted) {
-      return;
+    for (var attempt = 0; attempt < 2; attempt += 1) {
+      if (!_isProbeCurrent(sessionId, token, generation)) return;
+      var alive = false;
+      try {
+        alive = await service.probeShell(sessionId: sessionId);
+      } on Object {
+        // A transport exception is a failed probe, not an app-level failure.
+      }
+      if (!_isProbeCurrent(sessionId, token, generation) || alive) return;
+      if (attempt == 0) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
     }
     _markTerminalPaneDisconnectedByOpenSession(sessionId);
-    if (_currentTerminalPaneCount(tabId) == 1) {
-      _scheduleReconnect(
-        tabId: tabId,
-        policy: _reconnectPolicies[tabId] ?? const SshReconnectPolicy(),
-      );
-    }
+    _schedulePaneReconnect(sessionId);
   }
 
   Future<TerminalDisplaySettings?> _readTerminalDisplaySettingsForHost(
@@ -1381,76 +1535,19 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       switch (tab.content) {
         case TerminalTabContent(:final panes):
           for (var paneIndex = 0; paneIndex < panes.length; paneIndex += 1) {
+            _ensureCurrent(tab.id, token);
             final currentTab = _currentTab(tab.id);
             final pane = _paneWithEndpoint(currentTab, paneIndex);
-            final paneHostId = pane.endpoint?.hostId ?? hostId;
             final paneToken = _nextPaneConnectionToken(pane.sessionId);
             if (_paneUsesLocalShell(currentTab.content, pane)) {
               await _connectLocalTerminalPane(currentTab, paneIndex, paneToken);
-              continue;
-            }
-            try {
-              final profile = await ref
-                  .read(connectionProfileResolverProvider)
-                  .resolve(hostId: paneHostId, sessionId: pane.sessionId);
-              _reconnectPolicies[tab.id] = profile.reconnectPolicy;
-              _ensureOpenPaneCurrent(pane.sessionId, paneToken);
-              _setTerminalPaneLifecycleByOpenSession(
-                pane.sessionId,
-                SessionLifecycleState.connecting,
-                clearFailure: true,
+            } else {
+              await _connectTerminalPane(
+                currentTab,
+                paneIndex,
+                paneToken,
+                preserveReconnectAttempts: preserveReconnectAttempts,
               );
-              final shell = await ref
-                  .read(sshSessionServiceProvider)
-                  .openShell(profile);
-              _ensureOpenPaneCurrent(pane.sessionId, paneToken);
-              runtime.attachTerminal(sessionId: pane.sessionId, session: shell);
-              await _runStartupCommands(shell, profile.startupCommands);
-              await _runRemoteSession(shell, profile.remoteSession);
-              _setTerminalPaneLifecycleByOpenSession(
-                pane.sessionId,
-                SessionLifecycleState.connected,
-                clearFailure: true,
-              );
-              if (preserveReconnectAttempts) {
-                _clearReconnectTimer(tab.id);
-              } else {
-                _clearReconnectState(tab.id);
-              }
-              unawaited(
-                shell.done
-                    .then((_) {
-                      if (_isOpenPaneCurrent(pane.sessionId, paneToken)) {
-                        _markTerminalPaneDisconnectedByOpenSession(
-                          pane.sessionId,
-                        );
-                        if (_currentTerminalPaneCount(tab.id) == 1) {
-                          _scheduleReconnect(
-                            tabId: tab.id,
-                            policy: profile.reconnectPolicy,
-                          );
-                        }
-                      }
-                    })
-                    .catchError((Object error) {
-                      if (_isOpenPaneCurrent(pane.sessionId, paneToken)) {
-                        _markTerminalPaneFailedByOpenSession(
-                          pane.sessionId,
-                          error,
-                        );
-                      }
-                    }),
-              );
-            } on _StaleConnectionAttempt {
-              return;
-            } on Object catch (error) {
-              if (_isOpenPaneCurrent(pane.sessionId, paneToken)) {
-                runtime.writeTerminal(
-                  pane.sessionId,
-                  'Connection failed: ${_failureFrom(error).message}\r\n',
-                );
-                _markTerminalPaneFailedByOpenSession(pane.sessionId, error);
-              }
             }
           }
         case SftpTabContent(:final sessionId):
@@ -1524,8 +1621,9 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
   Future<void> _connectTerminalPane(
     WorkspaceTabState tab,
     int paneIndex,
-    int token,
-  ) async {
+    int token, {
+    bool preserveReconnectAttempts = false,
+  }) async {
     final content = tab.content;
     final panes = _terminalPanesOf(content);
     if (panes == null || paneIndex >= panes.length) {
@@ -1540,12 +1638,15 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       return;
     }
     final runtime = ref.read(workspaceRuntimeRegistryProvider);
+    if (!preserveReconnectAttempts) {
+      _clearPaneReconnectState(pane.sessionId);
+    }
     try {
       final profile = await ref
           .read(connectionProfileResolverProvider)
           .resolve(hostId: hostId, sessionId: pane.sessionId);
-      _reconnectPolicies[tab.id] = profile.reconnectPolicy;
       _ensureOpenPaneCurrent(pane.sessionId, token);
+      _paneReconnectPolicies[pane.sessionId] = profile.reconnectPolicy;
       _setTerminalPaneLifecycleByOpenSession(
         pane.sessionId,
         SessionLifecycleState.connecting,
@@ -1554,10 +1655,15 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
       final shell = await ref
           .read(sshSessionServiceProvider)
           .openShell(profile);
-      _ensureOpenPaneCurrent(pane.sessionId, token);
+      if (!_isOpenPaneCurrent(pane.sessionId, token)) {
+        await shell.close();
+        return;
+      }
       runtime.attachTerminal(sessionId: pane.sessionId, session: shell);
       await _runStartupCommands(shell, profile.startupCommands);
+      _ensureOpenPaneCurrent(pane.sessionId, token);
       await _runRemoteSession(shell, profile.remoteSession);
+      _ensureOpenPaneCurrent(pane.sessionId, token);
       _setTerminalPaneLifecycleByOpenSession(
         pane.sessionId,
         SessionLifecycleState.connected,
@@ -1568,11 +1674,13 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
             .then((_) {
               if (_isOpenPaneCurrent(pane.sessionId, token)) {
                 _markTerminalPaneDisconnectedByOpenSession(pane.sessionId);
+                _schedulePaneReconnect(pane.sessionId);
               }
             })
             .catchError((Object error) {
               if (_isOpenPaneCurrent(pane.sessionId, token)) {
                 _markTerminalPaneFailedByOpenSession(pane.sessionId, error);
+                _schedulePaneReconnect(pane.sessionId);
               }
             }),
       );
@@ -1585,6 +1693,9 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
           'Connection failed: ${_failureFrom(error).message}\r\n',
         );
         _markTerminalPaneFailedByOpenSession(pane.sessionId, error);
+        if (preserveReconnectAttempts) {
+          _schedulePaneReconnect(pane.sessionId);
+        }
       }
     }
   }
@@ -1929,17 +2040,6 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
     return null;
   }
 
-  int? _currentTerminalPaneCount(WorkspaceTabId tabId) {
-    if (!ref.mounted) {
-      return null;
-    }
-    final tab = state.tabs
-        .where((candidate) => candidate.id == tabId)
-        .firstOrNull;
-    final content = tab?.content;
-    return content == null ? null : _terminalPanesOf(content)?.length;
-  }
-
   void _setTerminalPaneLifecycle(
     WorkspaceTabId tabId,
     int paneIndex,
@@ -2111,6 +2211,8 @@ class WorkspaceTabController extends Notifier<WorkspaceState> {
   }
 
   int _nextPaneConnectionToken(SessionId sessionId) {
+    _paneReconnectTimers.remove(sessionId)?.cancel();
+    _deferredPaneReconnects.remove(sessionId);
     final token = (_paneConnectionTokens[sessionId] ?? 0) + 1;
     _paneConnectionTokens[sessionId] = token;
     return token;

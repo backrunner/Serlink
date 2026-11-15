@@ -19,8 +19,10 @@ import 'package:serlink/platform/platform_capabilities.dart';
 import 'package:xterm/xterm.dart';
 
 part 'workspace_tab_controller_test_fakes.dart';
+part 'workspace_tab_controller_recovery.dart';
 
 void main() {
+  _remoteSessionRecoveryTests();
   test(
     'opens terminal, marks disconnect, and reconnects in same tab',
     () async {
@@ -93,7 +95,10 @@ void main() {
           content.primaryPane.lifecycle,
           SessionLifecycleState.disconnected,
         );
-        expect(service.probedSessionIds, [content.primaryPane.sessionId]);
+        expect(service.probedSessionIds, [
+          content.primaryPane.sessionId,
+          content.primaryPane.sessionId,
+        ]);
 
         // Recovery goes through the existing reconnect path.
         controller.reconnect(state.activeTab!.id);

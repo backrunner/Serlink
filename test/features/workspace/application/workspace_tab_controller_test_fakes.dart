@@ -36,7 +36,7 @@ class _FakeSshSessionService implements SshSessionService {
   final List<ConnectionProfileSnapshot> sftpProfiles = [];
   final List<Object> shellFailures = [];
   final List<SessionId> probedSessionIds = [];
-  bool Function(SessionId sessionId) probeResult = (_) => true;
+  FutureOr<bool> Function(SessionId sessionId) probeResult = (_) => true;
   var openShellCount = 0;
   var openSftpCount = 0;
 
@@ -116,6 +116,7 @@ class _FakeShellSession implements SshShellSession {
   final _stdout = StreamController<List<int>>();
   final _stderr = StreamController<List<int>>();
   final List<String> writes = [];
+  Future<void>? closeBarrier;
 
   void completeDone() {
     if (!_done.isCompleted) {
@@ -137,6 +138,7 @@ class _FakeShellSession implements SshShellSession {
   @override
   Future<void> close() async {
     completeDone();
+    await closeBarrier;
   }
 
   @override

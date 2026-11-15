@@ -1713,8 +1713,19 @@ void main() {
     );
     expect(sshService.shell._done.isCompleted, isFalse);
 
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump(const Duration(seconds: 30));
+    expect(sshService.shell._done.isCompleted, isFalse);
+
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(
+      container.read(workspaceTabControllerProvider).activeTab?.lifecycle,
+      SessionLifecycleState.connected,
+    );
+    expect(sshService.shell._done.isCompleted, isFalse);
   });
 
   testWidgets('settings runtime exports diagnostic logs', (tester) async {

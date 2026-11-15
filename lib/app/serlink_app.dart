@@ -142,6 +142,9 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       _wasBackgrounded = true;
+      ref
+          .read(workspaceTabControllerProvider.notifier)
+          .pauseRemoteSessionRecovery();
     }
     if (state == AppLifecycleState.resumed) {
       final capabilities = ref.read(platformCapabilitiesProvider);
@@ -161,13 +164,12 @@ class _LifecycleOverlayState extends ConsumerState<_LifecycleOverlay>
       }
       if (_wasBackgrounded) {
         _wasBackgrounded = false;
-        // SSH sockets may have died silently while the app was suspended
-        // (NAT expiry, network switch); dartssh2's keepalive never times
-        // out, so probe the sessions instead of waiting for shell.done.
+        // Network restoration can lag behind the foreground event. Resume
+        // recovery with a grace period and confirm failed liveness probes.
         unawaited(
           ref
               .read(workspaceTabControllerProvider.notifier)
-              .probeRemoteSessions(),
+              .resumeRemoteSessions(),
         );
       }
     }

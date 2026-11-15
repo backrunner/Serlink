@@ -435,7 +435,7 @@ class HostConnectionSettings {
   const HostConnectionSettings({
     this.connectTimeoutSeconds = 20,
     this.keepAliveIntervalSeconds = 10,
-    this.reconnectAttempts = 0,
+    this.reconnectAttempts = 3,
     this.reconnectBackoffSeconds = 5,
   });
 
@@ -471,7 +471,7 @@ class HostConnectionSettings {
         json['keepAliveIntervalSeconds'],
         fallback: 10,
       ),
-      reconnectAttempts: _intFromJson(json['reconnectAttempts'], fallback: 0),
+      reconnectAttempts: _intFromJson(json['reconnectAttempts'], fallback: 3),
       reconnectBackoffSeconds: _intFromJson(
         json['reconnectBackoffSeconds'],
         fallback: 5,

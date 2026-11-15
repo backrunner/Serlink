@@ -33,6 +33,32 @@ This was local SSH and shared-component validation with dummy loopback model
 providers; physical devices, native Windows/Linux, WAN behavior and live model
 inference were not verified.
 
+## Foreground SSH recovery
+
+Returning from the background allows one second for networking to recover before
+checking connected remote terminal panes. Each SSH ping remains bounded to five
+seconds; a failed ping is confirmed with a second probe after another second.
+Healthy sockets stay open. Probe results from an earlier connection or background
+cycle cannot disconnect a replacement shell.
+
+Automatic reconnect uses each pane's host policy and restarts only that pane,
+without selecting its tab or closing healthy siblings. Retries pause while the
+app is hidden or paused and resume after the foreground grace period. Failed
+reconnection attempts count toward the configured limit. New hosts default to
+three retries; existing explicit values, including zero to disable retries, are
+preserved. A connected pane starts a fresh recovery budget for its next
+background cycle; an interrupted recovery retains its remaining budget.
+For an existing host with zero retries, edit **Connection options →
+Auto reconnect** to enable recovery.
+
+Reconnecting opens a new SSH shell. Enable **Remote session → Attach to
+tmux/screen** with a fixed session name to reattach to a server-side session;
+the selected tool must be installed on the server. Plain shells cannot restore
+their former processes or working directory after connection loss. Foreground
+recovery does not guarantee continuous iOS background execution or resume SFTP
+transfers. A physical-device check should cover short and long background stays,
+screen locking, and switching between Wi-Fi and cellular.
+
 ## Immediate terminal connection failure
 
 `TerminalAdapter.attach()` called `stream.transform(Utf8Decoder(...))` on

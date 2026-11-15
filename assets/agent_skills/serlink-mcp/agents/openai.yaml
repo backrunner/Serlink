@@ -1,0 +1,3 @@
+interface:
+  display_name: "Serlink"
+  short_description: "Use Serlink MCP sessions and SFTP file transfers"

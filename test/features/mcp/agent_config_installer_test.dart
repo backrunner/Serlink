@@ -27,53 +27,101 @@ void main() {
     File('${home.path}/.claude.json').writeAsStringSync('{}');
 
     final detected = installer.detectInstalledAgents();
-    expect(detected.map((target) => target.id), [
-      'claude-code',
-      'cursor',
-    ]);
+    expect(detected.map((target) => target.id), ['claude-code', 'cursor']);
   });
 
-  test('json install merges into an existing config and keeps other keys', () async {
-    final claude = target('claude-code');
-    File(claude.configPath).writeAsStringSync(
-      const JsonEncoder.withIndent('  ').convert({
-        'theme': 'dark',
-        'mcpServers': {
-          'other': {'type': 'stdio', 'command': '/usr/local/bin/other'},
+  test(
+    'detects CLI executables and app bundles before first configuration',
+    () async {
+      final bin = Directory('${home.path}/bin')..createSync();
+      final applications = Directory('${home.path}/Applications')..createSync();
+      final executable = File('${bin.path}/claude')
+        ..writeAsStringSync('#!/bin/sh\n');
+      if (!Platform.isWindows) {
+        await Process.run('chmod', ['700', executable.path]);
+      }
+      Directory('${applications.path}/Cursor.app').createSync();
+      final detecting = AgentConfigInstaller(
+        homeDirectory: home.path,
+        environment: {'PATH': bin.path},
+        applicationDirectories: [applications.path],
+      );
+      expect(detecting.detectInstalledAgents().map((t) => t.id), [
+        'claude-code',
+        'cursor',
+      ]);
+      expect(Directory('${home.path}/.claude').existsSync(), isFalse);
+    },
+  );
+
+  test(
+    'honors configured roots and recognizes Kimi current user directory',
+    () {
+      final configured = AgentConfigInstaller(
+        homeDirectory: home.path,
+        environment: {
+          'XDG_CONFIG_HOME': '${home.path}/config',
+          'CODEX_HOME': '${home.path}/custom-codex',
         },
-      }),
-    );
+      );
+      Directory('${home.path}/.kimi').createSync();
+      Directory('${home.path}/custom-codex').createSync();
+      Directory('${home.path}/config/opencode').createSync(recursive: true);
+      expect(configured.detectInstalledAgents().map((t) => t.id), [
+        'kimi-code',
+        'opencode',
+        'codex',
+      ]);
+      final roots = {
+        for (final t in configured.knownTargets) t.id: t.globalSkillsDirectory,
+      };
+      expect(roots['kimi-code'], '${home.path}/.kimi/skills');
+      expect(roots['opencode'], '${home.path}/config/opencode/skills');
+      expect(roots['codex'], '${home.path}/.agents/skills');
+    },
+  );
 
-    await installer.install(claude, helperPath: helperPath);
+  test(
+    'json install merges into an existing config and keeps other keys',
+    () async {
+      final claude = target('claude-code');
+      File(claude.configPath).writeAsStringSync(
+        const JsonEncoder.withIndent('  ').convert({
+          'theme': 'dark',
+          'mcpServers': {
+            'other': {'type': 'stdio', 'command': '/usr/local/bin/other'},
+          },
+        }),
+      );
 
-    final merged =
-        jsonDecode(File(claude.configPath).readAsStringSync())
-            as Map<String, Object?>;
-    expect(merged['theme'], 'dark');
-    final servers = merged['mcpServers']! as Map<String, Object?>;
-    expect((servers['other']! as Map)['command'], '/usr/local/bin/other');
-    expect(servers['serlink'], {
-      'type': 'stdio',
-      'command': helperPath,
-    });
-    expect(
-      installer.statusFor(claude, helperPath: helperPath),
-      AgentConfigStatus.installed,
-    );
+      await installer.install(claude, helperPath: helperPath);
 
-    // The pre-write backup holds the original content.
-    final backup = File('${claude.configPath}.serlink-backup');
-    expect(backup.existsSync(), isTrue);
-    expect(backup.readAsStringSync(), contains('"theme": "dark"'));
-  });
+      final merged = jsonDecode(
+        File(claude.configPath).readAsStringSync(),
+      ) as Map<String, Object?>;
+      expect(merged['theme'], 'dark');
+      final servers = merged['mcpServers']! as Map<String, Object?>;
+      expect((servers['other']! as Map)['command'], '/usr/local/bin/other');
+      expect(servers['serlink'], {'type': 'stdio', 'command': helperPath});
+      expect(
+        installer.statusFor(claude, helperPath: helperPath),
+        AgentConfigStatus.installed,
+      );
+
+      // The pre-write backup holds the original content.
+      final backup = File('${claude.configPath}.serlink-backup');
+      expect(backup.existsSync(), isTrue);
+      expect(backup.readAsStringSync(), contains('"theme": "dark"'));
+    },
+  );
 
   test('json install creates the file and parents when missing', () async {
     final windsurf = target('windsurf');
     await installer.install(windsurf, helperPath: helperPath);
 
-    final written =
-        jsonDecode(File(windsurf.configPath).readAsStringSync())
-            as Map<String, Object?>;
+    final written = jsonDecode(
+      File(windsurf.configPath).readAsStringSync(),
+    ) as Map<String, Object?>;
     expect(written, {
       'mcpServers': {
         'serlink': {'type': 'stdio', 'command': helperPath},
@@ -115,25 +163,28 @@ void main() {
     expect(File(claude.configPath).readAsStringSync(), '{not json');
   });
 
-  test('kimi-code install writes a plain command entry into mcp.json', () async {
-    final kimi = target('kimi-code');
-    Directory('${home.path}/.kimi-code').createSync();
+  test(
+    'kimi-code install writes a plain command entry into mcp.json',
+    () async {
+      final kimi = target('kimi-code');
+      Directory('${home.path}/.kimi-code').createSync();
 
-    await installer.install(kimi, helperPath: helperPath);
+      await installer.install(kimi, helperPath: helperPath);
 
-    final written =
-        jsonDecode(File(kimi.configPath).readAsStringSync())
-            as Map<String, Object?>;
-    expect(written, {
-      'mcpServers': {
-        'serlink': {'command': helperPath},
-      },
-    });
-    expect(
-      installer.statusFor(kimi, helperPath: helperPath),
-      AgentConfigStatus.installed,
-    );
-  });
+      final written = jsonDecode(
+        File(kimi.configPath).readAsStringSync(),
+      ) as Map<String, Object?>;
+      expect(written, {
+        'mcpServers': {
+          'serlink': {'command': helperPath},
+        },
+      });
+      expect(
+        installer.statusFor(kimi, helperPath: helperPath),
+        AgentConfigStatus.installed,
+      );
+    },
+  );
 
   test('opencode install writes a local entry under the mcp key', () async {
     final opencode = target('opencode');
@@ -147,9 +198,9 @@ void main() {
 
     await installer.install(opencode, helperPath: helperPath);
 
-    final written =
-        jsonDecode(File(opencode.configPath).readAsStringSync())
-            as Map<String, Object?>;
+    final written = jsonDecode(
+      File(opencode.configPath).readAsStringSync(),
+    ) as Map<String, Object?>;
     expect(written[r'$schema'], 'https://opencode.ai/config.json');
     expect(written['model'], 'anthropic/claude-sonnet-4-5');
     expect(written['mcp'], {

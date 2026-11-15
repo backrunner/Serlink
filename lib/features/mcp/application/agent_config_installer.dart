@@ -23,6 +23,10 @@ class AgentConfigTarget {
     required this.kind,
     required this.configPath,
     required this.markerDirectory,
+    required this.globalSkillsDirectory,
+    this.additionalMarkerDirectories = const [],
+    this.executables = const [],
+    this.applicationNames = const [],
     this.serversKey = 'mcpServers',
     required this.buildEntry,
   });
@@ -37,6 +41,10 @@ class AgentConfigTarget {
   /// Directory the agent creates once installed; used for detection when the
   /// config file does not exist yet.
   final String markerDirectory;
+  final String globalSkillsDirectory;
+  final List<String> additionalMarkerDirectories;
+  final List<String> executables;
+  final List<String> applicationNames;
 
   /// JSON key holding the server map (`mcpServers` for most agents, `mcp`
   /// for opencode). Ignored for TOML targets.
@@ -67,11 +75,30 @@ class AgentConfigInstallException implements Exception {
 /// - Windsurf: `~/.codeium/windsurf/mcp_config.json` (`mcpServers`)
 /// - Codex: `~/.codex/config.toml` (`[mcp_servers.serlink]`)
 class AgentConfigInstaller {
-  AgentConfigInstaller({String? homeDirectory})
-    : _homeDirectory =
-          homeDirectory ?? Platform.environment['HOME'] ?? '';
+  AgentConfigInstaller({
+    String? homeDirectory,
+    Map<String, String>? environment,
+    List<String>? applicationDirectories,
+  }) : _homeDirectory =
+           homeDirectory ??
+           (environment ?? Platform.environment)['HOME'] ??
+           (environment ?? Platform.environment)['USERPROFILE'] ??
+           '',
+       _environment =
+           environment ??
+           (homeDirectory == null ? Platform.environment : const {}),
+       _applicationDirectories =
+           applicationDirectories ??
+           (homeDirectory == null && Platform.isMacOS
+               ? [
+                   '/Applications',
+                   '${Platform.environment['HOME']}/Applications',
+                 ]
+               : const []);
 
   final String _homeDirectory;
+  final Map<String, String> _environment;
+  final List<String> _applicationDirectories;
 
   static Map<String, Object?> _typedStdioEntry(String helperPath) {
     return {'type': 'stdio', 'command': helperPath};
@@ -95,6 +122,17 @@ class AgentConfigInstaller {
     if (home.isEmpty) {
       return const [];
     }
+    final configHome = _environment['XDG_CONFIG_HOME']?.startsWith('/') == true
+        ? _environment['XDG_CONFIG_HOME']!
+        : '$home/.config';
+    final codexHome = _environment['CODEX_HOME']?.startsWith('/') == true
+        ? _environment['CODEX_HOME']!
+        : '$home/.codex';
+    final kimiHome =
+        Directory('$home/.kimi-code').existsSync() &&
+            !Directory('$home/.kimi').existsSync()
+        ? '$home/.kimi-code'
+        : '$home/.kimi';
     return [
       AgentConfigTarget(
         id: 'claude-code',
@@ -102,6 +140,8 @@ class AgentConfigInstaller {
         kind: AgentConfigKind.json,
         configPath: '$home/.claude.json',
         markerDirectory: '$home/.claude',
+        globalSkillsDirectory: '$home/.claude/skills',
+        executables: ['claude'],
         buildEntry: _typedStdioEntry,
       ),
       AgentConfigTarget(
@@ -110,6 +150,9 @@ class AgentConfigInstaller {
         kind: AgentConfigKind.json,
         configPath: '$home/.cursor/mcp.json',
         markerDirectory: '$home/.cursor',
+        globalSkillsDirectory: '$home/.cursor/skills',
+        executables: ['cursor', 'cursor-agent'],
+        applicationNames: ['Cursor.app'],
         buildEntry: _typedStdioEntry,
       ),
       AgentConfigTarget(
@@ -118,22 +161,31 @@ class AgentConfigInstaller {
         kind: AgentConfigKind.json,
         configPath: '$home/.codeium/windsurf/mcp_config.json',
         markerDirectory: '$home/.codeium/windsurf',
+        globalSkillsDirectory: '$home/.codeium/windsurf/skills',
+        executables: ['windsurf'],
+        applicationNames: ['Windsurf.app'],
         buildEntry: _typedStdioEntry,
       ),
       AgentConfigTarget(
         id: 'kimi-code',
         displayName: 'Kimi Code',
         kind: AgentConfigKind.json,
-        configPath: '$home/.kimi-code/mcp.json',
-        markerDirectory: '$home/.kimi-code',
+        configPath: '$kimiHome/mcp.json',
+        markerDirectory: kimiHome,
+        additionalMarkerDirectories: ['$home/.kimi-code', '$home/.kimi'],
+        globalSkillsDirectory: '$home/.kimi/skills',
+        executables: ['kimi'],
         buildEntry: _plainStdioEntry,
       ),
       AgentConfigTarget(
         id: 'opencode',
         displayName: 'opencode',
         kind: AgentConfigKind.json,
-        configPath: '$home/.config/opencode/opencode.json',
-        markerDirectory: '$home/.config/opencode',
+        configPath: '$configHome/opencode/opencode.json',
+        markerDirectory: '$configHome/opencode',
+        globalSkillsDirectory: '$configHome/opencode/skills',
+        executables: ['opencode'],
+        applicationNames: ['OpenCode.app'],
         serversKey: 'mcp',
         buildEntry: _opencodeEntry,
       ),
@@ -141,8 +193,11 @@ class AgentConfigInstaller {
         id: 'codex',
         displayName: 'Codex',
         kind: AgentConfigKind.toml,
-        configPath: '$home/.codex/config.toml',
-        markerDirectory: '$home/.codex',
+        configPath: '$codexHome/config.toml',
+        markerDirectory: codexHome,
+        globalSkillsDirectory: '$home/.agents/skills',
+        executables: ['codex'],
+        applicationNames: ['Codex.app'],
         buildEntry: _typedStdioEntry,
       ),
     ];
@@ -154,10 +209,44 @@ class AgentConfigInstaller {
   List<AgentConfigTarget> detectInstalledAgents() {
     return [
       for (final target in knownTargets)
-        if (File(target.configPath).existsSync() ||
-            Directory(target.markerDirectory).existsSync())
-          target,
+        if (_isInstalled(target)) target,
     ];
+  }
+
+  bool _isInstalled(AgentConfigTarget target) {
+    try {
+      return File(target.configPath).existsSync() ||
+          [
+            target.markerDirectory,
+            ...target.additionalMarkerDirectories,
+          ].any((path) => Directory(path).existsSync()) ||
+          target.executables.any(_executableExists) ||
+          _applicationDirectories.any(
+            (directory) => target.applicationNames.any(
+              (name) => Directory('$directory/$name').existsSync(),
+            ),
+          );
+    } on FileSystemException {
+      return false;
+    }
+  }
+
+  bool _executableExists(String name) {
+    final separator = Platform.isWindows ? ';' : ':';
+    for (final directory in {
+      ...(_environment['PATH'] ?? '').split(separator),
+      '$_homeDirectory/.local/bin',
+      '$_homeDirectory/bin',
+    }) {
+      if (directory.isEmpty) continue;
+      final file = File('$directory/$name');
+      final stat = file.statSync();
+      if (stat.type == FileSystemEntityType.file &&
+          (Platform.isWindows || stat.mode & 0x49 != 0)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   AgentConfigStatus statusFor(
@@ -168,7 +257,12 @@ class AgentConfigInstaller {
     if (!file.existsSync()) {
       return AgentConfigStatus.notInstalled;
     }
-    final content = file.readAsStringSync();
+    late final String content;
+    try {
+      content = file.readAsStringSync();
+    } on FileSystemException {
+      return AgentConfigStatus.notInstalled;
+    }
     return switch (target.kind) {
       AgentConfigKind.json => _jsonStatus(target, content, helperPath),
       AgentConfigKind.toml => _tomlStatus(content, helperPath),
@@ -228,7 +322,8 @@ class AgentConfigInstaller {
     if (entry is! Map<String, Object?>) {
       return AgentConfigStatus.notInstalled;
     }
-    return _canonicalJson(entry) == _canonicalJson(target.buildEntry(helperPath))
+    return _canonicalJson(entry) ==
+            _canonicalJson(target.buildEntry(helperPath))
         ? AgentConfigStatus.installed
         : AgentConfigStatus.outdated;
   }
@@ -255,6 +350,7 @@ class AgentConfigInstaller {
       final other => other,
     });
   }
+
   AgentConfigStatus _tomlStatus(String content, String helperPath) {
     final section = _tomlSection(content);
     if (section == null) {
@@ -313,8 +409,7 @@ class AgentConfigInstaller {
   }
 
   String _mergeToml(String previous, String helperPath) {
-    final section =
-        '[mcp_servers.serlink]\ncommand = "$helperPath"\n';
+    final section = '[mcp_servers.serlink]\ncommand = "$helperPath"\n';
     final header = _tomlSectionHeader.firstMatch(previous);
     if (header == null) {
       final separator = previous.trim().isEmpty

@@ -71,6 +71,17 @@ Recommended Serlink usage:
 - Use design skills for the cross-platform desktop design system, terminal theme previews, host inventory layout, SFTP file manager, and settings surfaces.
 - Use Figma library/design-system skills if a formal component library is created before or during implementation.
 
+## Serlink MCP Operations
+
+Bundled skill source: [`serlink-mcp`](../assets/agent_skills/serlink-mcp/SKILL.md).
+MCP startup installs it in detected agents' user-level global skills directories;
+the source folder is not a project-level skill installation.
+
+Use it to operate Serlink MCP sessions and SFTP uploads/downloads, including
+per-upload approval, replacement warnings, progress polling and cancellation.
+It checks the running server's capabilities: updating the skill does not add
+upload support to an older installed app or stdio helper.
+
 ## Restart Note
 
 Restart Codex to pick up newly installed skills.

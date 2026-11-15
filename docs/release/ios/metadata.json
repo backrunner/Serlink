@@ -1,5 +1,5 @@
 {
-  "preparedAt": "2026-10-11",
+  "preparedAt": "2026-11-01",
   "platform": "IOS",
   "version": "1.0.0",
   "bundleId": "com.alkinum.serlink",
@@ -67,5 +67,5 @@
       "marketingURL": "https://serlink.alkinum.com/ja/"
     }
   },
-  "buildNumber": "12"
+  "buildNumber": "13"
 }

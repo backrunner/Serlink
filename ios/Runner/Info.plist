@@ -30,6 +30,8 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Serlink uses Face ID to unlock your local vault when biometric unlock is enabled.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Serlink connects to SSH, SFTP, and WebDAV servers you choose on your local network.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

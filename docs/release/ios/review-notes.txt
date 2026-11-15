@@ -1,15 +1,24 @@
-Serlink 1.0.0 — iPhone and iPad review notes
-Bundle ID: com.alkinum.serlink. Minimum system: iOS/iPadOS 15.
+Serlink 1.0.0 (13) - iPhone/iPad review guide
 
-No Serlink account, in-app purchase or subscription is required. SSH access uses a server supplied by the user.
-1. Create a local vault and save its recovery key.
-2. Add a password or key identity in Settings > Credentials and a host referencing it.
-3. Verify the SSH host-key fingerprint before connecting. Run harmless commands, search the output, reconnect, and try snippets.
-4. Open SFTP, browse folders and preview/edit a disposable text file.
-5. Upload a selected file with the document picker. Download and open a file using the system share sheet; on iPad the share sheet is anchored to the view.
-6. Inspect transfer progress and swipe left to remove its record. A local file can be retained or deleted separately. External edits are not automatically uploaded.
-7. iCloud and WebDAV sync are optional. Use the same iCloud account on two Apple devices to test encrypted records. Core SSH/SFTP works without sync.
+GUIDELINE 3.2: PUBLIC UTILITY
+1. No company, employer, school, partner or membership restriction.
+2. No limited group of organizations or onboarding contract. Anyone can use this standard SSH/SFTP client with any authorized server, including home Linux/NAS and rented cloud servers; the public utility category of Termius, Blink Shell and Prompt.
+3. All iOS features are public: SSH, SFTP, hosts/credentials, snippets, local encrypted vault, backups and optional sync.
+4. No Serlink account exists. Create Vault creates ON-DEVICE encrypted storage with a chosen passphrase/recovery key, not registration or organization login. SSH credentials belong to the destination server. iCloud uses Apple's account; WebDAV uses the user's endpoint.
+5. One-time App Store purchase (US base $1.99); no IAP, subscription, paid account/feature unlock or enterprise purchase.
 
-Local shell, system SSH-agent authentication and desktop splits are not iOS features. Keep the app foregrounded for transfers. Vault locking prevents new credential access; existing sessions continue until closed. Downloaded files are outside vault encryption. Diagnostics stay local unless explicitly exported.
+START WITHOUT ACCOUNT OR SERVER
+On Create/Unlock Vault, hold the large lock icon for ~1 second; if unlocked, hold the Settings version label. This public offline preview is explicitly marked simulated. Explore populated Hosts, Sessions, SFTP, Transfers, Snippets and Credentials. Open Review Sandbox; run help, pwd, ls or cat README.txt. Edit/rename files and create folders. Reset restores samples; Exit discards this isolated demo. It reads no user vault and makes no real SSH/sync connections. The attached guide covers real connections; review server credentials are supplied privately, never embedded in the app.
 
-For SSH/SFTP testing, add an SSH server available to the reviewer and its own credentials, then verify the server host key. Serlink does not operate an account service or bundled demo server.
+REAL FEATURES
+Exit demo; Create Vault with any passphrase and retain the recovery key. Settings > Credentials: add password or imported/generated private-key identity. Add Host, select credentials, verify server-key fingerprint. Connect: terminal, mobile modifiers, tabs, output search, reconnect, snippets, jump hosts and SSH forwarding. SFTP: browse, preview/edit text, mkdir/rename/delete/permissions; upload via document picker, download and Open/Export via iOS share sheet. Transfers: progress, supported retry/pause/resume/cancel, history removal and separate local-file deletion. External edits do not auto-upload.
+Settings: credentials/keys, encrypted backup/restore, metadata/config import/export, passphrase/recovery, optional biometric unlock, background-screen privacy, diagnostics, terminal display, English/Chinese/Japanese and appearance. Optional iCloud/WebDAV encrypted workspace sync includes device/conflict management. SSH/SFTP works with sync off.
+
+ENTITLEMENTS / SYSTEM ACCESS
+com.apple.developer.icloud-container-identifiers=[iCloud.com.alkinum.serlink], com.apple.developer.icloud-services=[CloudKit], exported com.apple.developer.icloud-container-environment=Production: encrypted workspace snapshots in user's private database.
+aps-environment=production plus UIBackgroundModes=remote-notification: silent CloudKit change notifications, not advertising or continuous SSH/background transfers.
+application-identifier, com.apple.developer.team-identifier and beta-reports-active identify the distribution/TestFlight build. Distribution get-task-allow=false.
+NSFaceIDUsageDescription: optional local vault unlock via Apple authentication/Keychain; no biometric templates read. NSLocalNetworkUsageDescription: user-selected LAN SSH/SFTP/WebDAV servers. Document picker/share sheet and Files/Finder sharing access app documents; downloads are outside vault encryption.
+No VPN/Network Extension, multicast, camera, microphone, photos, contacts or location capability. iOS has no local shell, desktop SSH agent/hardware keys, splits, ZMODEM or MCP server/AI-provider calls. Commands run on remote servers. Keep foregrounded for transfers. Vault locking blocks new credential access; close existing sessions/transfers separately.
+
+Attached guide: complete walkthrough, feature/permission matrix and private real-server access.

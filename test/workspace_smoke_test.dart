@@ -1553,13 +1553,7 @@ void main() {
       tester.getRect(find.text('Language')).left,
     );
 
-    // The golden is rendered with macOS fonts; Windows and Linux text differs.
-    if (Platform.isMacOS) {
-      await expectLater(
-        find.byType(SerlinkApp),
-        matchesGoldenFile('goldens/settings_desktop.png'),
-      );
-    }
+    await _expectMacOsGolden('goldens/settings_desktop.png');
 
     final syncDevicesViewButton = find.byKey(
       const ValueKey('settings-sync-devices-view-button'),
@@ -1569,10 +1563,7 @@ void main() {
     await tester.tap(syncDevicesViewButton);
     await tester.pumpAndSettle();
 
-    await expectLater(
-      find.byType(SerlinkApp),
-      matchesGoldenFile('goldens/settings_sync_devices_dialog.png'),
-    );
+    await _expectMacOsGolden('goldens/settings_sync_devices_dialog.png');
 
     // Narrow desktop window: rows switch to the compact layout, controls must
     // stay right-aligned and the language select must not balloon in width.
@@ -1582,19 +1573,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('settings-columns')), findsNothing);
-    await expectLater(
-      find.byType(SerlinkApp),
-      matchesGoldenFile('goldens/settings_compact.png'),
-    );
+    await _expectMacOsGolden('goldens/settings_compact.png');
 
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
     tester.view.physicalSize = const Size(1280, 960);
     await tester.pumpAndSettle();
-    await expectLater(
-      find.byType(SerlinkApp),
-      matchesGoldenFile('goldens/settings_desktop_dark.png'),
-    );
+    await _expectMacOsGolden('goldens/settings_desktop_dark.png');
 
     tester.platformDispatcher.textScaleFactorTestValue = 1.5;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -3586,4 +3571,12 @@ class _DelayedHostRepository implements HostRepository {
   Future<void> delete(HostId id) {
     throw UnimplementedError();
   }
+}
+
+/// Goldens are rendered with macOS fonts; Windows and Linux text differs.
+Future<void> _expectMacOsGolden(String name) async {
+  if (!Platform.isMacOS) {
+    return;
+  }
+  await expectLater(find.byType(SerlinkApp), matchesGoldenFile(name));
 }

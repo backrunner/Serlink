@@ -51,7 +51,7 @@ void main() {
       expect(profile.workingDirectory, '/Users/ops');
     });
 
-    test('uses ComSpec and user profile on Windows', () {
+    test('falls back to ComSpec on Windows without PowerShell', () {
       final profile = defaultLocalShellProfile(
         operatingSystem: 'windows',
         environment: const {
@@ -59,11 +59,88 @@ void main() {
           'USERPROFILE': r'C:\Users\ops',
           'PATH': r'C:\Windows\System32',
         },
+        fileExists: (_) => false,
       );
 
       expect(profile.executable, r'C:\Windows\System32\cmd.exe');
+      expect(profile.arguments, isEmpty);
       expect(profile.workingDirectory, r'C:\Users\ops');
       expect(profile.environment['ComSpec'], r'C:\Windows\System32\cmd.exe');
+    });
+
+    test('prefers PowerShell 7 from Program Files on Windows', () {
+      const pwsh = r'C:\Program Files\PowerShell\7\pwsh.exe';
+      const windowsPowerShell =
+          r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe';
+      final profile = defaultLocalShellProfile(
+        operatingSystem: 'windows',
+        environment: const {
+          'SystemRoot': r'C:\Windows',
+          'ProgramFiles': r'C:\Program Files\',
+          'ComSpec': r'C:\Windows\System32\cmd.exe',
+          'USERPROFILE': r'C:\Users\张三',
+        },
+        fileExists: (path) => path == pwsh || path == windowsPowerShell,
+      );
+
+      expect(profile.executable, pwsh);
+      expect(profile.arguments, const ['-NoLogo']);
+      expect(profile.workingDirectory, r'C:\Users\张三');
+    });
+
+    test('finds PowerShell 7 on PATH on Windows', () {
+      const pwsh = r'D:\Tools\pwsh\pwsh.exe';
+      final profile = defaultLocalShellProfile(
+        operatingSystem: 'windows',
+        environment: const {
+          'SystemRoot': r'C:\Windows',
+          'Path': r'C:\Windows\System32;"D:\Tools\pwsh\";',
+        },
+        fileExists: (path) => path == pwsh,
+      );
+
+      expect(profile.executable, pwsh);
+    });
+
+    test('uses Windows PowerShell when PowerShell 7 is missing', () {
+      const windowsPowerShell =
+          r'C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe';
+      final profile = defaultLocalShellProfile(
+        operatingSystem: 'windows',
+        environment: const {
+          'windir': r'C:\WINDOWS',
+          'HOMEDRIVE': 'C:',
+          'HOMEPATH': r'\Users\ops',
+        },
+        fileExists: (path) => path == windowsPowerShell,
+      );
+
+      expect(profile.executable, windowsPowerShell);
+      expect(profile.arguments, const ['-NoLogo']);
+      expect(profile.workingDirectory, r'C:\Users\ops');
+    });
+
+    test('passes the user environment except Serlink variables on Windows', () {
+      final profile = defaultLocalShellProfile(
+        operatingSystem: 'windows',
+        environment: const {
+          'APPDATA': r'C:\Users\ops\AppData\Roaming',
+          'TEMP': r'C:\Users\ops\AppData\Local\Temp',
+          'PSModulePath': r'C:\Program Files\WindowsPowerShell\Modules',
+          'JAVA_HOME': r'C:\Java',
+          'Serlink_Secret': 'redacted',
+          'SERLINK_DISTRIBUTION': 'direct',
+          '=C:': r'C:\Users\ops',
+        },
+        fileExists: (_) => false,
+      );
+
+      expect(profile.environment, const {
+        'APPDATA': r'C:\Users\ops\AppData\Roaming',
+        'TEMP': r'C:\Users\ops\AppData\Local\Temp',
+        'PSModulePath': r'C:\Program Files\WindowsPowerShell\Modules',
+        'JAVA_HOME': r'C:\Java',
+      });
     });
 
     test('throws a local terminal exception when no Unix shell exists', () {

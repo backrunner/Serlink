@@ -661,8 +661,26 @@ const _listHosts = CallToolRequest(name: 'serlink_list_hosts');
 
 Future<Directory> _tempDirectory() async {
   final dir = await Directory.systemTemp.createTemp('serlink-mcp-test');
-  addTearDown(() => dir.delete(recursive: true));
+  addTearDown(() => _deleteWhenReleased(dir));
   return dir;
+}
+
+/// Windows refuses to delete files a just-stopped server still holds open.
+Future<void> _deleteWhenReleased(Directory dir) async {
+  for (var attempt = 0; ; attempt++) {
+    if (!await dir.exists()) {
+      return;
+    }
+    try {
+      await dir.delete(recursive: true);
+      return;
+    } on FileSystemException {
+      if (attempt >= 20) {
+        rethrow;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+  }
 }
 
 Future<({McpClient client, SerlinkMcpRelay relay})> _startRelay(

@@ -1553,10 +1553,13 @@ void main() {
       tester.getRect(find.text('Language')).left,
     );
 
-    await expectLater(
-      find.byType(SerlinkApp),
-      matchesGoldenFile('goldens/settings_desktop.png'),
-    );
+    // The golden is rendered with macOS fonts; Windows and Linux text differs.
+    if (Platform.isMacOS) {
+      await expectLater(
+        find.byType(SerlinkApp),
+        matchesGoldenFile('goldens/settings_desktop.png'),
+      );
+    }
 
     final syncDevicesViewButton = find.byKey(
       const ValueKey('settings-sync-devices-view-button'),
@@ -1760,7 +1763,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Serlink'), findsOneWidget);
+    final versionLabelFinder = find.byKey(
+      const ValueKey('settings-about-version-label'),
+    );
+    // Windows and Linux also show the brand in the sidebar title bar.
+    final appTitle = find.descendant(
+      of: find.ancestor(of: versionLabelFinder, matching: find.byType(Wrap)),
+      matching: find.text('Serlink'),
+    );
+    expect(appTitle, findsOneWidget);
     expect(find.text('GitHub'), findsOneWidget);
     expect(find.text('https://github.com/backrunner/serlink'), findsNothing);
     expect(
@@ -1772,7 +1783,7 @@ void main() {
     );
     expect(versionLabel, findsOneWidget);
     expect(find.text('Version 1.2.3 (45)'), findsOneWidget);
-    final appTitleRect = tester.getRect(find.text('Serlink'));
+    final appTitleRect = tester.getRect(appTitle);
     final versionRect = tester.getRect(versionLabel);
     expect(versionRect.left, greaterThan(appTitleRect.right));
     expect(versionRect.center.dy, closeTo(appTitleRect.center.dy, 4));

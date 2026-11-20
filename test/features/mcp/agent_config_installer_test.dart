@@ -79,6 +79,8 @@ void main() {
       expect(roots['opencode'], '${home.path}/config/opencode/skills');
       expect(roots['codex'], '${home.path}/.agents/skills');
     },
+    // Uses Unix agent locations (XDG_CONFIG_HOME); MCP ships on macOS only.
+    skip: Platform.isWindows,
   );
 
   test(

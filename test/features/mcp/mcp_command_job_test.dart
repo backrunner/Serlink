@@ -1,3 +1,7 @@
+// Drives a real /bin/sh.
+@TestOn('!windows')
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';

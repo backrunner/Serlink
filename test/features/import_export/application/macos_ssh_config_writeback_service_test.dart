@@ -1,3 +1,7 @@
+// OpenSSH config write-back is a macOS feature; its file timing tests assume POSIX semantics.
+@TestOn('!windows')
+library;
+
 import 'dart:async';
 import 'dart:io';
 

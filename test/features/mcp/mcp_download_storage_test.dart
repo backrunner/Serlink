@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/features/mcp/application/mcp_download_storage.dart';
@@ -24,7 +26,7 @@ void main() {
         documentsDirectory: () =>
             throw StateError('Documents must not be queried'),
       );
-      expect(destination.path, '${root.path}/mcp-downloads');
+      expect(destination.path, p.join(root.path, 'mcp-downloads'));
       await destination.create(recursive: true);
       final file = File('${destination.path}/download.bin');
       await file.writeAsBytes([1, 2, 3]);

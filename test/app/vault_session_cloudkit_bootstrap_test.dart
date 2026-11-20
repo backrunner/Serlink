@@ -44,8 +44,21 @@ void main() {
   });
 
   tearDown(() async {
-    if (await remoteDir.exists()) {
-      await remoteDir.delete(recursive: true);
+    // A background snapshot write can still hold a file briefly; Windows
+    // refuses to delete open files, so retry before giving up.
+    for (var attempt = 0; ; attempt++) {
+      if (!await remoteDir.exists()) {
+        return;
+      }
+      try {
+        await remoteDir.delete(recursive: true);
+        return;
+      } on FileSystemException {
+        if (attempt >= 20) {
+          rethrow;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
     }
   });
 

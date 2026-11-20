@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:serlink/features/mcp/application/agent_config_installer.dart';
@@ -57,8 +59,8 @@ void main() {
       skill('claude-code').readAsStringSync(),
     );
     expect(
-      skill('codex').path,
-      '${home.path}/.agents/skills/serlink-mcp/SKILL.md',
+      p.normalize(skill('codex').path),
+      p.join(home.path, '.agents', 'skills', 'serlink-mcp', 'SKILL.md'),
     );
     expect(config.readAsStringSync(), '{"theme":"dark"}');
     expect(Directory('${home.path}/.cursor').existsSync(), isFalse);

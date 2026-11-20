@@ -1,3 +1,7 @@
+// Runs PlistBuddy and the macOS/iOS release shell scripts.
+@TestOn('mac-os')
+library;
+
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';

@@ -39,7 +39,7 @@ move between servers often and want their connection data to stay private.
 | --- | --- |
 | macOS | Primary desktop target with App Store, TestFlight, and direct distribution tooling in progress. |
 | iOS | Active mobile foundation with CloudKit sync bridge, touch workspace, document gateway, and device validation work underway. |
-| Windows | Desktop Flutter project and shared desktop core are present; installer and real-machine QA are still pending. |
+| Windows | Installer and portable builds are published on [GitHub Releases](https://github.com/backrunner/Serlink/releases) (Windows 10 1809+, x64). See [docs/windows_release.md](docs/windows_release.md). |
 | Linux | Desktop Flutter project and shared desktop core are present; packaging and distro QA are still pending. |
 | Android | Not an active release target right now. |
 

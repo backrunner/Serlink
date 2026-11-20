@@ -6,7 +6,8 @@ details live in `docs/ios_testflight_signing.md` and
 `docs/macos_testflight_signing.md`.
 
 Use `docs/ios_release.md` and `docs/macos_release.md` for the full release
-runbooks.
+runbooks. Windows builds are packaged and published by GitHub Actions; see
+`docs/windows_release.md`.
 
 ## Routine verification
 

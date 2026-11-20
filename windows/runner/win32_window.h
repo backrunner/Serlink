@@ -10,6 +10,11 @@
 // A class abstraction for a high DPI-aware Win32 Window. Intended to be
 // inherited from by classes that wish to specialize with custom
 // rendering and input handling
+// Returns the resize hit-test code (HTLEFT, HTTOPRIGHT, ...) for a screen
+// point in |lparam| on the frameless |window|, or HTCLIENT when the point is
+// not on a resize border or the window is maximized.
+LRESULT HitTestWindowResizeBorder(HWND window, LPARAM lparam);
+
 class Win32Window {
  public:
   struct Point {
@@ -35,6 +40,10 @@ class Win32Window {
   // as appropriate for the default monitor. The window is invisible until
   // |Show| is called. Returns true if the window was created successfully.
   bool Create(const std::wstring& title, const Point& origin, const Size& size);
+
+  // Creates the window centered in the work area of the monitor under the
+  // cursor. |size| is in logical pixels and is clamped to the work area.
+  bool CreateCentered(const std::wstring& title, const Size& size);
 
   // Show the current window. Returns true if the window was successfully shown.
   bool Show();
@@ -83,6 +92,13 @@ class Win32Window {
                                   UINT const message,
                                   WPARAM const wparam,
                                   LPARAM const lparam) noexcept;
+
+  // Creates the window with physical-pixel bounds.
+  bool CreateWithBounds(const std::wstring& title,
+                        int x,
+                        int y,
+                        int width,
+                        int height);
 
   // Retrieves a class instance pointer for |window|
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;

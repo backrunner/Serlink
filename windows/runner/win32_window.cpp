@@ -4,6 +4,8 @@
 #include <flutter_windows.h>
 #include <windowsx.h>
 
+#include <algorithm>
+
 #include "resource.h"
 
 namespace {
@@ -71,7 +73,49 @@ void UpdateWindowShape(HWND hwnd) {
   }
 }
 
-LRESULT HitTestResizeBorder(HWND hwnd, LPARAM lparam) {
+void ApplyWindowSizeBounds(HWND hwnd, LPARAM lparam) {
+  auto* min_max_info = reinterpret_cast<MINMAXINFO*>(lparam);
+  const double scale_factor = GetWindowScaleFactor(hwnd);
+  min_max_info->ptMinTrackSize.x =
+      Scale(kMinimumWindowWidth, scale_factor);
+  min_max_info->ptMinTrackSize.y =
+      Scale(kMinimumWindowHeight, scale_factor);
+
+  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+
+  MONITORINFO monitor_info;
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (!GetMonitorInfo(monitor, &monitor_info)) {
+    return;
+  }
+
+  const RECT work_area = monitor_info.rcWork;
+  const RECT monitor_area = monitor_info.rcMonitor;
+  min_max_info->ptMaxPosition.x = work_area.left - monitor_area.left;
+  min_max_info->ptMaxPosition.y = work_area.top - monitor_area.top;
+  min_max_info->ptMaxSize.x = work_area.right - work_area.left;
+  min_max_info->ptMaxSize.y = work_area.bottom - work_area.top;
+}
+
+// Dynamically loads the |EnableNonClientDpiScaling| from the User32 module.
+// This API is only needed for PerMonitor V1 awareness mode.
+void EnableFullDpiSupportIfAvailable(HWND hwnd) {
+  HMODULE user32_module = LoadLibraryA("User32.dll");
+  if (!user32_module) {
+    return;
+  }
+  auto enable_non_client_dpi_scaling =
+      reinterpret_cast<EnableNonClientDpiScaling*>(
+          GetProcAddress(user32_module, "EnableNonClientDpiScaling"));
+  if (enable_non_client_dpi_scaling != nullptr) {
+    enable_non_client_dpi_scaling(hwnd);
+  }
+  FreeLibrary(user32_module);
+}
+
+}  // namespace
+
+LRESULT HitTestWindowResizeBorder(HWND hwnd, LPARAM lparam) {
   if (IsZoomed(hwnd)) {
     return HTCLIENT;
   }
@@ -122,48 +166,6 @@ LRESULT HitTestResizeBorder(HWND hwnd, LPARAM lparam) {
   }
   return HTCLIENT;
 }
-
-void ApplyWindowSizeBounds(HWND hwnd, LPARAM lparam) {
-  auto* min_max_info = reinterpret_cast<MINMAXINFO*>(lparam);
-  const double scale_factor = GetWindowScaleFactor(hwnd);
-  min_max_info->ptMinTrackSize.x =
-      Scale(kMinimumWindowWidth, scale_factor);
-  min_max_info->ptMinTrackSize.y =
-      Scale(kMinimumWindowHeight, scale_factor);
-
-  HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-
-  MONITORINFO monitor_info;
-  monitor_info.cbSize = sizeof(monitor_info);
-  if (!GetMonitorInfo(monitor, &monitor_info)) {
-    return;
-  }
-
-  const RECT work_area = monitor_info.rcWork;
-  const RECT monitor_area = monitor_info.rcMonitor;
-  min_max_info->ptMaxPosition.x = work_area.left - monitor_area.left;
-  min_max_info->ptMaxPosition.y = work_area.top - monitor_area.top;
-  min_max_info->ptMaxSize.x = work_area.right - work_area.left;
-  min_max_info->ptMaxSize.y = work_area.bottom - work_area.top;
-}
-
-// Dynamically loads the |EnableNonClientDpiScaling| from the User32 module.
-// This API is only needed for PerMonitor V1 awareness mode.
-void EnableFullDpiSupportIfAvailable(HWND hwnd) {
-  HMODULE user32_module = LoadLibraryA("User32.dll");
-  if (!user32_module) {
-    return;
-  }
-  auto enable_non_client_dpi_scaling =
-      reinterpret_cast<EnableNonClientDpiScaling*>(
-          GetProcAddress(user32_module, "EnableNonClientDpiScaling"));
-  if (enable_non_client_dpi_scaling != nullptr) {
-    enable_non_client_dpi_scaling(hwnd);
-  }
-  FreeLibrary(user32_module);
-}
-
-}  // namespace
 
 // Manages the Win32Window's window class registration.
 class WindowClassRegistrar {
@@ -233,24 +235,55 @@ Win32Window::~Win32Window() {
 bool Win32Window::Create(const std::wstring& title,
                          const Point& origin,
                          const Size& size) {
-  Destroy();
-
-  const wchar_t* window_class =
-      WindowClassRegistrar::GetInstance()->GetWindowClass();
-
   const POINT target_point = {static_cast<LONG>(origin.x),
                               static_cast<LONG>(origin.y)};
   HMONITOR monitor = MonitorFromPoint(target_point, MONITOR_DEFAULTTONEAREST);
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
+  return CreateWithBounds(title, Scale(origin.x, scale_factor),
+                          Scale(origin.y, scale_factor),
+                          Scale(size.width, scale_factor),
+                          Scale(size.height, scale_factor));
+}
+
+bool Win32Window::CreateCentered(const std::wstring& title, const Size& size) {
+  POINT cursor = {0, 0};
+  GetCursorPos(&cursor);
+  HMONITOR monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY);
+  MONITORINFO monitor_info;
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (!GetMonitorInfo(monitor, &monitor_info)) {
+    return Create(title, Point(10, 10), size);
+  }
+
+  const double scale_factor = FlutterDesktopGetDpiForMonitor(monitor) / 96.0;
+  const RECT work_area = monitor_info.rcWork;
+  const int work_width = work_area.right - work_area.left;
+  const int work_height = work_area.bottom - work_area.top;
+  const int width = (std::min)(Scale(size.width, scale_factor), work_width);
+  const int height = (std::min)(Scale(size.height, scale_factor), work_height);
+
+  return CreateWithBounds(title, work_area.left + (work_width - width) / 2,
+                          work_area.top + (work_height - height) / 2, width,
+                          height);
+}
+
+bool Win32Window::CreateWithBounds(const std::wstring& title,
+                                   int x,
+                                   int y,
+                                   int width,
+                                   int height) {
+  Destroy();
+
+  const wchar_t* window_class =
+      WindowClassRegistrar::GetInstance()->GetWindowClass();
+
   const DWORD window_style =
       (WS_OVERLAPPEDWINDOW & ~WS_CAPTION) | WS_CLIPCHILDREN;
-  HWND window = CreateWindow(
-      window_class, title.c_str(), window_style,
-      Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
-      Scale(size.width, scale_factor), Scale(size.height, scale_factor),
-      nullptr, nullptr, GetModuleHandle(nullptr), this);
+  HWND window = CreateWindow(window_class, title.c_str(), window_style, x, y,
+                             width, height, nullptr, nullptr,
+                             GetModuleHandle(nullptr), this);
 
   if (!window) {
     return false;
@@ -296,7 +329,7 @@ Win32Window::MessageHandler(HWND hwnd,
       return 0;
 
     case WM_NCHITTEST:
-      return HitTestResizeBorder(hwnd, lparam);
+      return HitTestWindowResizeBorder(hwnd, lparam);
 
     case WM_GETMINMAXINFO:
       ApplyWindowSizeBounds(hwnd, lparam);

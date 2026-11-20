@@ -87,6 +87,16 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+# Ship the MSVC C++ runtime (vcruntime140*.dll, msvcp140*.dll) next to the
+# executable so the app starts on machines without the Visual C++
+# Redistributable. The Universal CRT is part of Windows 10 and later.
+if(MSVC)
+  set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${INSTALL_BUNDLE_LIB_DIR}")
+  set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT Runtime)
+  set(CMAKE_INSTALL_UCRT_LIBRARIES FALSE)
+  include(InstallRequiredSystemLibraries)
+endif()
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"

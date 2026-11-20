@@ -1,9 +1,36 @@
 #include "flutter_window.h"
 
+#include <commctrl.h>
 #include <flutter/standard_method_codec.h>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+
+namespace {
+
+constexpr UINT_PTR kFlutterViewSubclassId = 1;
+
+// The Flutter view fills the frameless window, so the frame never sees mouse
+// hit tests at its edges. Let resize-border hits fall through to the frame.
+LRESULT CALLBACK FlutterViewSubclassProc(HWND hwnd,
+                                         UINT message,
+                                         WPARAM wparam,
+                                         LPARAM lparam,
+                                         UINT_PTR subclass_id,
+                                         DWORD_PTR) {
+  if (message == WM_NCHITTEST) {
+    HWND frame = GetAncestor(hwnd, GA_ROOT);
+    if (frame != nullptr && frame != hwnd &&
+        HitTestWindowResizeBorder(frame, lparam) != HTCLIENT) {
+      return HTTRANSPARENT;
+    }
+  } else if (message == WM_NCDESTROY) {
+    RemoveWindowSubclass(hwnd, FlutterViewSubclassProc, subclass_id);
+  }
+  return DefSubclassProc(hwnd, message, wparam, lparam);
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -27,7 +54,9 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   RegisterWindowChannel();
-  SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  HWND view = flutter_controller_->view()->GetNativeWindow();
+  SetChildContent(view);
+  SetWindowSubclass(view, FlutterViewSubclassProc, kFlutterViewSubclassId, 0);
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();

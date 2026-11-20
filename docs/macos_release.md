@@ -197,7 +197,50 @@ signed bundle before replacing the old app, rolls back failed replacements,
 and preserves quarantine attributes. User data is outside the app bundle and
 is not modified. App Store builds leave the installer disabled.
 
+### GitHub Releases (CI)
+
+Pushing a `v<version>` tag runs the `macos-dmg` job in
+`.github/workflows/desktop.yml` on `macos-latest`. It builds the direct app
+with `tool/build_macos_direct.sh` (universal arm64 + x86_64, local terminal
+enabled), notarizes and staples it with `tool/notarize_macos_dmg.sh`, and the
+release job attaches `Serlink-<version>-macos-universal.dmg` and
+`SHA256SUMS-macos.txt` to the GitHub Release next to the Windows files.
+Manual runs (`workflow_dispatch` with `macos` checked) build the DMG as a
+workflow artifact without publishing.
+
+One-time setup in GitHub > Settings > Secrets and variables > Actions:
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `MACOS_DEVELOPER_ID_P12_BASE64` | secret | `base64 -i DeveloperID.p12` of the Developer ID Application certificate and private key, exported from Keychain Access |
+| `MACOS_DEVELOPER_ID_P12_PASSWORD` | secret | Password chosen when exporting the `.p12` |
+| `APP_STORE_CONNECT_API_KEY_P8_BASE64` | secret | `base64 -i AuthKey_<KEYID>.p8` of an App Store Connect team API key with the Admin role (Xcode creates the Developer ID provisioning profile for the iCloud/CloudKit entitlements, and notarytool submits with the same key) |
+| `APP_STORE_CONNECT_API_KEY_ID` | secret | The key ID |
+| `APP_STORE_CONNECT_API_ISSUER_ID` | secret | The issuer ID from App Store Connect > Users and Access > Integrations |
+| `SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED` | variable | `1`, only after the CloudKit schema is deployed to Production |
+
+Without the secrets the job skips with a warning and the release ships the
+Windows files only. Without the variable the CloudKit release gate fails the
+job and nothing is published. The certificate is imported into a temporary
+keychain that is deleted at the end of the job.
+
+The embedded `serlink-mcp` helper is compiled on the arm64 runner, so the MCP
+stdio helper runs on Apple silicon only; the app itself is universal.
+
 ### Notarization
+
+`tool/notarize_macos_dmg.sh` automates the steps below for a signed app:
+
+```sh
+SERLINK_NOTARY_KEYCHAIN_PROFILE=serlink-notary \
+  ./tool/notarize_macos_dmg.sh \
+  build/macos/Build/Products/Release/serlink.app build/Serlink.dmg
+```
+
+It accepts either a `notarytool store-credentials` profile or an App Store
+Connect API key (`SERLINK_NOTARY_KEY_PATH`, `SERLINK_NOTARY_KEY_ID`,
+`SERLINK_NOTARY_ISSUER_ID`), fails unless Apple accepts each submission, and
+prints the notary log when it does not.
 
 The build script does not submit to Apple. Notarize and staple the app first,
 then repackage it so the app inside the DMG carries its ticket. For example,

@@ -1,0 +1,314 @@
+name: Desktop
+
+# Builds, tests and packages the Windows desktop app on every push/PR. Pushing
+# a `v*` tag also builds the notarized macOS direct DMG (local terminal
+# enabled) and publishes both platforms' files to the GitHub Release for that
+# tag (creating the release if it does not exist yet). See
+# docs/windows_release.md and docs/macos_release.md.
+on:
+  push:
+    # windows/** branches run the full Windows pipeline without publishing.
+    branches: [main, 'windows/**']
+    tags: ['v*']
+    paths-ignore:
+      - 'docs/**'
+      - 'website/**'
+      - '**/*.md'
+      - 'ios/**'
+      - 'macos/**'
+      - 'android/**'
+      - 'linux/**'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'website/**'
+      - '**/*.md'
+      - 'ios/**'
+      - 'macos/**'
+      - 'android/**'
+      - 'linux/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version label for artifact names (defaults to pubspec.yaml)'
+        required: false
+        type: string
+      macos:
+        description: 'Also build the signed and notarized macOS DMG'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  FLUTTER_VERSION: '3.47.5'
+
+jobs:
+  unit-tests:
+    name: Unit tests (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+
+  terminal-integration:
+    name: Local terminal integration (ConPTY)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter test integration_test/windows_local_terminal_test.dart -d windows
+
+  package:
+    name: Build and package
+    runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $pubspec = (Select-String -Path pubspec.yaml -Pattern '^version:\s*([^+\s]+)').Matches[0].Groups[1].Value
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $version = $env:GITHUB_REF_NAME -replace '^v', ''
+            $core = ($version -split '[-+]', 2)[0]
+            if ($core -ne $pubspec) {
+              throw "Tag $env:GITHUB_REF_NAME does not match pubspec.yaml version $pubspec."
+            }
+          } elseif ($env:INPUT_VERSION) {
+            $version = $env:INPUT_VERSION
+          } else {
+            $version = "$pubspec-dev.$env:GITHUB_RUN_NUMBER"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Packaging Serlink $version"
+
+      - name: Ensure Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+          }
+
+      - run: flutter pub get
+
+      - name: Build and package
+        shell: pwsh
+        env:
+          SERLINK_VERSION: ${{ steps.version.outputs.version }}
+        run: ./tool/package_windows.ps1 -Version $env:SERLINK_VERSION
+
+      - name: Launch smoke test
+        shell: pwsh
+        run: ./tool/smoke_test_windows.ps1 -Exe build/windows/x64/runner/Release/serlink.exe -ArtifactsDir build/smoke
+
+      - name: Upload smoke test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test
+          path: build/smoke
+          if-no-files-found: ignore
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: serlink-windows-x64
+          path: build/dist/windows/*
+          if-no-files-found: error
+
+  macos-dmg:
+    name: macOS direct DMG
+    # Signing needs Apple credentials, so this runs for release tags and on
+    # request only. Without the secrets it skips with a warning and the
+    # release ships Windows files only.
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.macos
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      HAS_SIGNING_SECRETS: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 != '' && secrets.MACOS_DEVELOPER_ID_P12_PASSWORD != '' && secrets.APP_STORE_CONNECT_API_KEY_P8_BASE64 != '' && secrets.APP_STORE_CONNECT_API_KEY_ID != '' && secrets.APP_STORE_CONNECT_API_ISSUER_ID != '' }}
+    steps:
+      - name: Check signing secrets
+        if: env.HAS_SIGNING_SECRETS != 'true'
+        run: |
+          echo "::warning title=macOS DMG skipped::Add the MACOS_DEVELOPER_ID_* and APP_STORE_CONNECT_API_* repository secrets to publish the macOS DMG (see docs/macos_release.md)."
+
+      - uses: actions/checkout@v4
+        if: env.HAS_SIGNING_SECRETS == 'true'
+
+      - uses: subosito/flutter-action@v2
+        if: env.HAS_SIGNING_SECRETS == 'true'
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Resolve version
+        id: version
+        if: env.HAS_SIGNING_SECRETS == 'true'
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          pubspec="$(sed -nE 's/^version:[[:space:]]*([^+[:space:]]+).*/\1/p' pubspec.yaml)"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            if [[ "${version%%[-+]*}" != "$pubspec" ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match pubspec.yaml version $pubspec."
+              exit 1
+            fi
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            version="$INPUT_VERSION"
+          else
+            version="$pubspec-dev.$GITHUB_RUN_NUMBER"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install signing certificate and API key
+        if: env.HAS_SIGNING_SECRETS == 'true'
+        env:
+          P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+          API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
+        run: |
+          keychain="$RUNNER_TEMP/serlink-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" \
+            -P "$P12_PASSWORD" -f pkcs12 -A -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$keychain_password" "$keychain" > /dev/null
+          existing=()
+          while IFS= read -r line; do
+            line="${line//\"/}"
+            existing+=("${line#"${line%%[![:space:]]*}"}")
+          done < <(security list-keychains -d user)
+          security list-keychains -d user -s "$keychain" "${existing[@]}"
+          rm "$RUNNER_TEMP/developer-id.p12"
+          security find-identity -v -p codesigning "$keychain" | grep -q 'Developer ID Application' \
+            || { echo "::error::No Developer ID Application identity in MACOS_DEVELOPER_ID_P12_BASE64."; exit 1; }
+          mkdir -p "$RUNNER_TEMP/asc"
+          echo "$API_KEY_BASE64" | base64 --decode > "$RUNNER_TEMP/asc/AuthKey.p8"
+
+      - run: flutter pub get
+        if: env.HAS_SIGNING_SECRETS == 'true'
+
+      - name: Build direct app
+        if: env.HAS_SIGNING_SECRETS == 'true'
+        env:
+          # Set this repository variable to 1 only after deploying the
+          # CloudKit schema to Production (docs/cloudkit_production_release.md).
+          SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED: ${{ vars.SERLINK_CLOUDKIT_SCHEMA_PRODUCTION_CONFIRMED }}
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          # Automatic signing fetches the Developer ID provisioning profile
+          # (required for the iCloud/CloudKit entitlements) with the API key.
+          SERLINK_DMG_PATH="$RUNNER_TEMP/unnotarized.dmg" ./tool/build_macos_direct.sh \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc/AuthKey.p8" \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID"
+
+      - name: Notarize and package DMG
+        if: env.HAS_SIGNING_SECRETS == 'true'
+        env:
+          SERLINK_NOTARY_KEY_PATH: ${{ runner.temp }}/asc/AuthKey.p8
+          SERLINK_NOTARY_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          SERLINK_NOTARY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          SERLINK_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          app=build/macos/Build/Products/Release/serlink.app
+          archs="$(lipo -archs "$app/Contents/MacOS/serlink")"
+          echo "App architectures: $archs"
+          case "$archs" in
+            *arm64*x86_64*|*x86_64*arm64*) suffix=universal ;;
+            *) suffix="${archs// /-}" ;;
+          esac
+          mkdir -p build/dist/macos
+          dmg="build/dist/macos/Serlink-$SERLINK_VERSION-macos-$suffix.dmg"
+          ./tool/notarize_macos_dmg.sh "$app" "$dmg"
+          (cd build/dist/macos && shasum -a 256 -- *.dmg > SHA256SUMS-macos.txt && cat SHA256SUMS-macos.txt)
+
+      - name: Upload DMG
+        if: env.HAS_SIGNING_SECRETS == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: serlink-macos
+          path: build/dist/macos/*
+          if-no-files-found: error
+
+      - name: Remove signing material
+        if: always() && env.HAS_SIGNING_SECRETS == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/serlink-signing.keychain-db" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/asc"
+
+  release:
+    name: Publish GitHub Release
+    # macos-dmg succeeds without files when its secrets are missing.
+    if: >-
+      always() && startsWith(github.ref, 'refs/tags/v') &&
+      needs.package.result == 'success' &&
+      needs.terminal-integration.result == 'success' &&
+      needs.macos-dmg.result == 'success'
+    needs: [package, terminal-integration, macos-dmg]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: serlink-*
+          path: dist
+          merge-multiple: true
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -l dist
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            prerelease=()
+            if [[ "$TAG" == *-* ]]; then prerelease=(--prerelease); fi
+            gh release create "$TAG" dist/* \
+              --title "Serlink ${TAG#v}" \
+              --generate-notes \
+              --verify-tag \
+              "${prerelease[@]}"
+          fi

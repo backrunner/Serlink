@@ -14,10 +14,14 @@ flutter build macos \
   --dart-define=SERLINK_DISTRIBUTION=direct \
   --config-only
 
+# Build both architectures into build/macos so APP_PATH below exists; a bare
+# xcodebuild call would write to ~/Library/Developer/Xcode/DerivedData.
 xcodebuild \
   -workspace macos/Runner.xcworkspace \
   -scheme Runner \
   -configuration Release \
+  -destination 'generic/platform=macOS' \
+  -derivedDataPath "$ROOT_DIR/build/macos" \
   SERLINK_MACOS_CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
   SERLINK_MACOS_ENTITLEMENTS=Runner/Direct.entitlements \
   SERLINK_DMG_INSTALLER_ENABLED=YES \

@@ -106,9 +106,7 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
   }
 
   void closeKeyboard() {
-    if (hasInputConnection) {
-      _connection?.close();
-    }
+    _closeInputConnectionIfNeeded();
   }
 
   void setEditingState(TextEditingValue value) {
@@ -159,6 +157,16 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
     if (hasInputConnection) {
       _connection!.show();
     } else {
+      // A new platform client starts with the initial text. Reset the local
+      // baseline as well, or input after a focus/foreground change is treated
+      // as already sent. An interrupted composition must not suppress keys.
+      final wasComposing = !_currentEditingState.composing.isCollapsed;
+      _currentEditingState = _initEditingState;
+      _seenText = _initEditingState.text;
+      if (wasComposing) {
+        widget.onComposing(null);
+      }
+
       final config = TextInputConfiguration(
         viewId: View.of(context).viewId,
         inputType: widget.inputType,
@@ -180,10 +188,8 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
   }
 
   void _closeInputConnectionIfNeeded() {
-    if (_connection != null && _connection!.attached) {
-      _connection!.close();
-      _connection = null;
-    }
+    _connection?.close();
+    _connection = null;
   }
 
   TextEditingValue get _initEditingState => widget.deleteDetection
@@ -265,7 +271,8 @@ class CustomTextEditState extends State<CustomTextEdit> with TextInputClient {
 
   @override
   void connectionClosed() {
-    // print('connectionClosed');
+    _connection?.connectionClosedReceived();
+    _connection = null;
   }
 
   @override

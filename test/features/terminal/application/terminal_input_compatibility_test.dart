@@ -8,6 +8,169 @@ void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
 
   for (final platform in [
+    TargetPlatform.macOS,
+    TargetPlatform.windows,
+    TargetPlatform.linux,
+  ]) {
+    testWidgets('$platform accepts the first input after foregrounding', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = platform;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      binding.focusManager.listenToApplicationLifecycleChangesIfSupported();
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      final output = <String>[];
+      final focusNode = FocusNode();
+      addTearDown(focusNode.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TerminalView(
+              Terminal(onOutput: output.add),
+              focusNode: focusNode,
+              autofocus: true,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      binding.testTextInput.enterText('previous command 你好 🚀');
+      await binding.idle();
+      output.clear();
+
+      for (final background in [false, true, false]) {
+        binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+        if (background) {
+          binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+          binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        }
+        await tester.pump();
+        expect(focusNode.hasFocus, isFalse);
+        binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+        await tester.pump();
+        expect(focusNode.hasFocus, isTrue);
+        expect(binding.testTextInput.hasAnyClients, isTrue);
+
+        binding.testTextInput.enterText('a');
+        await binding.idle();
+        expect(output, ['a']);
+        output.clear();
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
+
+  testWidgets('foregrounding clears an interrupted IME composition', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    binding.focusManager.listenToApplicationLifecycleChangesIfSupported();
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    final output = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(Terminal(onOutput: output.add), autofocus: true),
+        ),
+      ),
+    );
+    await tester.pump();
+    binding.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: 'ni',
+        selection: TextSelection.collapsed(offset: 2),
+        composing: TextRange(start: 0, end: 2),
+      ),
+    );
+    await tester.pump();
+    expect(output, isEmpty);
+
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    expect(output, ['\x1b[A']);
+    binding.testTextInput.enterText('你');
+    await binding.idle();
+    expect(output.join(), '\x1b[A你');
+    await tester.pumpWidget(const SizedBox.shrink());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  for (final deleteDetection in [false, true]) {
+    testWidgets('keyboard reopening resets input (delete=$deleteDetection)', (
+      tester,
+    ) async {
+      final output = <String>[];
+      final viewKey = GlobalKey<TerminalViewState>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TerminalView(
+              Terminal(onOutput: output.add),
+              key: viewKey,
+              autofocus: true,
+              deleteDetection: deleteDetection,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final prefix = deleteDetection ? '  ' : '';
+      binding.testTextInput.enterText('${prefix}previous command');
+      await binding.idle();
+      output.clear();
+
+      viewKey.currentState!.closeKeyboard();
+      await tester.pump();
+      viewKey.currentState!.requestKeyboard();
+      await tester.pump();
+      binding.testTextInput.enterText('$prefix你🚀');
+      await binding.idle();
+      expect(output.join(), '你🚀');
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('platform-closed input can reconnect on the next terminal tap', (
+    tester,
+  ) async {
+    final output = <String>[];
+    final viewKey = GlobalKey<TerminalViewState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TerminalView(
+            Terminal(onOutput: output.add),
+            key: viewKey,
+            autofocus: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    binding.testTextInput.enterText('previous command');
+    await binding.idle();
+    output.clear();
+
+    binding.testTextInput.closeConnection();
+    await tester.pump();
+    expect(viewKey.currentState!.hasInputConnection, isFalse);
+    await tester.tap(find.byType(TerminalView));
+    await tester.pump();
+    expect(viewKey.currentState!.hasInputConnection, isTrue);
+    binding.testTextInput.enterText('a');
+    await binding.idle();
+    expect(output, ['a']);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final platform in [
     TargetPlatform.windows,
     TargetPlatform.linux,
     TargetPlatform.iOS,

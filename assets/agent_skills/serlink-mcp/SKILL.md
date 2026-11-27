@@ -115,6 +115,7 @@ For a project task, keep an explicit absolute `cwd` and the same session when
 using job mode. Newer apps can offer **Allow Project Task** in the full command
 dialog for recognized project queries and ordinary file writes. Only the user
 can select this grant; do not assume it exists, request duplicate chat approval,
-or change a rejected command's form to obtain it. Deletion, arbitrary scripts,
-hidden paths and directory changes retain their own review. This is an approval
+or change a rejected command's form to obtain it. Deletion cannot inherit this
+grant; arbitrary scripts, hidden paths and directory changes are outside its
+scope. This is an approval
 convenience for trusted projects, not a remote filesystem sandbox.

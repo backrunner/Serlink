@@ -220,6 +220,29 @@ final List<_Rule> _rules = [
     caseSensitive: false,
   ),
   _Rule.regex(
+    'recursive_script_delete',
+    CommandRiskLevel.needsConfirm,
+    r'\b(rmtree|removedirs|remove_all|rmdirSync)\s*\(|\b(?:rmSync|rm)\s*\([^;]*recursive\s*:\s*true',
+  ),
+  _Rule(
+    'bulk_script_delete',
+    CommandRiskLevel.needsConfirm,
+    (command) =>
+        (RegExp(
+              r'\bos\s*\.\s*(?:remove|unlink)\s*\(|\b(?:\w+\s*\.\s*)?unlink(?:Sync)?\s*\(',
+            ).hasMatch(command) ||
+            (RegExp(r'\bfrom os import\b[^;]*\bremove\b').hasMatch(command) &&
+                RegExp(r'\bremove\s*\(').hasMatch(command))) &&
+        RegExp(
+          r'\b(for|while|map|walk|glob|iglob|rglob|iterdir|listdir|forEach)\b',
+        ).hasMatch(command),
+  ),
+  _Rule.regex(
+    'destructive_file_operation',
+    CommandRiskLevel.needsConfirm,
+    r'\b(truncate|wipefs|blkdiscard|fdisk|sfdisk|parted)\b',
+  ),
+  _Rule.regex(
     'file_overwrite',
     CommandRiskLevel.needsConfirm,
     r'\b(truncate|wipefs|blkdiscard|fdisk|sfdisk|parted|mv|cp|tee)\b|\bsed\b[^;|&]*\s(?:-[a-zA-Z]*i|--in-place)\b',

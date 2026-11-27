@@ -1696,7 +1696,7 @@
   "mcpApprovalNotificationsUnavailable": "Approve inside Serlink",
   "mcpApprovalEnableAction": "Enable",
   "mcpApprovalSystemSettingsAction": "System settings",
-  "mcpApprovalWaitHint": "Requests wait up to 60 seconds for approval. Long commands open in Serlink for review.",
+  "mcpApprovalWaitHint": "Long commands open in Serlink for review. Configure the command approval timeout below.",
   "securityAgentDiscoveryTitle": "Share connection information",
   "securityAgentDiscoveryBody": "{client} wants to discover your saved hosts and active remote connections.",
   "securityAgentDiscoveryStrict": "Share display names, IDs and connection states only. Addresses, usernames and startup commands are excluded. This does not grant terminal or file access.",
@@ -1804,6 +1804,24 @@
     "placeholders": {
       "client": {
         "type": "String"
+      }
+    }
+  },
+  "settingsMcpApprovalTimeoutTitle": "Command approval timeout",
+  "settingsMcpApprovalTimeoutDescription": "Time to review each command, including time queued behind other approvals. Applies to new requests on this device. Access and upload approvals wait up to 1 minute.",
+  "settingsMcpApprovalTimeoutSeconds": "{seconds} seconds",
+  "@settingsMcpApprovalTimeoutSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsMcpApprovalTimeoutMinutes": "{minutes, plural, =1{1 minute} other{{minutes} minutes}}",
+  "@settingsMcpApprovalTimeoutMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
       }
     }
   }

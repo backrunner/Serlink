@@ -965,7 +965,7 @@
   "mcpApprovalNotificationsUnavailable": "请在 Serlink 内审批",
   "mcpApprovalEnableAction": "启用",
   "mcpApprovalSystemSettingsAction": "系统设置",
-  "mcpApprovalWaitHint": "请求最多等待 60 秒审批；长命令需在 Serlink 中查看并确认。",
+  "mcpApprovalWaitHint": "长命令需在 Serlink 中查看并确认。可在下方设置命令审批超时时间。",
   "securityAgentDiscoveryTitle": "共享连接信息",
   "securityAgentDiscoveryBody": "{client} 请求发现你保存的主机和当前远程连接。",
   "securityAgentDiscoveryStrict": "仅共享显示名称、ID 和连接状态，不包含地址、用户名或启动命令。此授权不允许访问终端内容或文件。",
@@ -1017,5 +1017,23 @@
   "securityAgentRememberAction": "允许并记住",
   "settingsMcpRememberedClient": "所有主机和连接 · 已在本机记住",
   "settingsMcpAuthorizationUnavailable": "无法保存代理访问权限，请重试。",
-  "agentSftpReleaseTooltip": "释放代理控制并保持此 SFTP 连接"
+  "agentSftpReleaseTooltip": "释放代理控制并保持此 SFTP 连接",
+  "settingsMcpApprovalTimeoutTitle": "命令审批超时",
+  "settingsMcpApprovalTimeoutDescription": "每条命令的审批等待时间，包含排队时间。仅对本机的新请求生效。访问和上传审批最多等待 1 分钟。",
+  "settingsMcpApprovalTimeoutSeconds": "{seconds} 秒",
+  "@settingsMcpApprovalTimeoutSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsMcpApprovalTimeoutMinutes": "{minutes} 分钟",
+  "@settingsMcpApprovalTimeoutMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  }
 }

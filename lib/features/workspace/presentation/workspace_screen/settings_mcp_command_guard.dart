@@ -50,6 +50,67 @@ class _McpCommandApprovalSectionState
                   },
           ),
         ),
+        const _McpCardGap(),
+        Row(
+          children: [
+            Icon(
+              Icons.timer_outlined,
+              size: 18,
+              color: context.tokens.textSecondary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                l10n.settingsMcpApprovalTimeoutTitle,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          settings.hasError
+              ? l10n.settingsMcpBypassUnavailable
+              : l10n.settingsMcpApprovalTimeoutDescription,
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        ExcludeFocus(
+          excluding: _saving || !settings.hasValue || settings.hasError,
+          child: IgnorePointer(
+            ignoring: _saving || !settings.hasValue || settings.hasError,
+            child: SerlinkSelect<int>(
+              key: const ValueKey('settings-mcp-approval-timeout'),
+              compact: true,
+              value: settings.value?.timeoutSeconds ?? 60,
+              items: [
+                for (final seconds in McpCommandApprovalSettings.timeoutOptions)
+                  SerlinkSelectItem(
+                    value: seconds,
+                    label: seconds < 60
+                        ? l10n.settingsMcpApprovalTimeoutSeconds(seconds)
+                        : l10n.settingsMcpApprovalTimeoutMinutes(seconds ~/ 60),
+                  ),
+              ],
+              onChanged: (seconds) async {
+                if (_saving || !settings.hasValue || settings.hasError) return;
+                setState(() => _saving = true);
+                try {
+                  await ref
+                      .read(mcpCommandApprovalProvider)
+                      .saveTimeout(seconds);
+                  ref.invalidate(mcpCommandApprovalSettingsProvider);
+                } on Object {
+                  if (context.mounted) {
+                    _showSnackBar(context, l10n.settingsMcpBypassUnavailable);
+                  }
+                } finally {
+                  if (mounted) setState(() => _saving = false);
+                }
+              },
+            ),
+          ),
+        ),
       ],
     );
   }

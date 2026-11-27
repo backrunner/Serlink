@@ -1885,7 +1885,11 @@ class SyncConflictController extends Notifier<List<SyncRecordConflict>> {
 }
 
 final securityModalServiceProvider = Provider<SecurityModalService>((ref) {
-  return FlutterSecurityModalService(key: ref.watch(appNavigatorKeyProvider));
+  final approval = ref.watch(mcpCommandApprovalProvider);
+  return FlutterSecurityModalService(
+    key: ref.watch(appNavigatorKeyProvider),
+    commandApprovalTimeout: () async => (await approval.read()).timeout,
+  );
 });
 
 final diagnosticBundleServiceProvider = Provider<DiagnosticBundleService>((

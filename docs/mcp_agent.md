@@ -61,8 +61,11 @@ not requested automatically at app startup. If alerts are denied or unavailable,
 the same approval remains available inside Serlink; System settings opens the
 macOS notification settings, and the status refreshes when you return.
 
-The original tool call waits for a decision for up to **60 seconds**, including
-time queued behind another approval. Short command requests offer Allow / Deny / View
+Command approvals wait for the device-local timeout configured in **Settings →
+MCP → Command approval timeout**: 30 seconds, 1 minute (default), 2 minutes,
+5 minutes, or 10 minutes, including time queued behind another approval. Changes
+apply to new command approvals; pending approvals keep their original deadline.
+Access and upload approvals still wait up to **60 seconds**. Short command requests offer Allow / Deny / View
 details; long or multiline commands require review in the app. Discovery and
 host/connection access requests always open the full in-app data-sharing
 disclosure; their notifications offer Deny / View details. Notification
@@ -81,7 +84,7 @@ started does **not** undo its remote effects.
 Clients that supply a progress token receive waiting progress notifications.
 Their own timeout may still end the request earlier; configure it above the
 approval window plus connection/execution time. The stdio relay forwards
-cancellation and enforces a four-minute backend request limit. The AI should call
+cancellation and enforces a fifteen-minute backend request limit. The AI should call
 the tool and wait without asking for a duplicate chat approval. A denial or
 `approval_timeout` / `request_cancelled` must not trigger an automatic retry.
 Vault unlocking and SSH authentication continue inside Serlink.

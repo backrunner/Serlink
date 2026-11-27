@@ -3377,7 +3377,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpApprovalWaitHint =>
-      'Requests wait up to 60 seconds for approval. Long commands open in Serlink for review.';
+      'Long commands open in Serlink for review. Configure the command approval timeout below.';
 
   @override
   String get securityAgentDiscoveryTitle => 'Share connection information';
@@ -3572,4 +3572,27 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get agentSftpReleaseTooltip =>
       'Release agent control and keep this SFTP connection open';
+
+  @override
+  String get settingsMcpApprovalTimeoutTitle => 'Command approval timeout';
+
+  @override
+  String get settingsMcpApprovalTimeoutDescription =>
+      'Time to review each command, including time queued behind other approvals. Applies to new requests on this device. Access and upload approvals wait up to 1 minute.';
+
+  @override
+  String settingsMcpApprovalTimeoutSeconds(int seconds) {
+    return '$seconds seconds';
+  }
+
+  @override
+  String settingsMcpApprovalTimeoutMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes minutes',
+      one: '1 minute',
+    );
+    return '$_temp0';
+  }
 }

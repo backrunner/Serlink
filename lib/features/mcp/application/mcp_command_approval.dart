@@ -6,10 +6,19 @@ import '../../../platform/secret_store.dart';
 import 'command_decision_guard.dart';
 
 class McpCommandApprovalSettings {
-  const McpCommandApprovalSettings({this.bypass = false, this.revision = ''});
+  const McpCommandApprovalSettings({
+    this.bypass = false,
+    this.revision = '',
+    this.timeoutSeconds = 60,
+  });
+
+  static const timeoutOptions = [30, 60, 120, 300, 600];
 
   final bool bypass;
   final String revision;
+  final int timeoutSeconds;
+
+  Duration get timeout => Duration(seconds: timeoutSeconds);
 }
 
 /// User-owned, device-local policy. MCP tools cannot enable bypass themselves.
@@ -18,6 +27,9 @@ class McpCommandApproval {
 
   final SecretStore secrets;
   static const storageKey = SecretRef('serlink.mcp.command-approval.v1');
+  static const timeoutStorageKey = SecretRef(
+    'serlink.mcp.command-approval-timeout.v1',
+  );
   Future<void> _pending = Future<void>.value();
   int _generation = 0;
 
@@ -27,36 +39,67 @@ class McpCommandApproval {
   Future<McpCommandApprovalSettings> read() async {
     try {
       await _pending.timeout(const Duration(seconds: 10));
-      final bytes = await secrets
-          .read(storageKey)
-          .timeout(const Duration(seconds: 10));
-      if (bytes == null) return const McpCommandApprovalSettings();
-      final value = jsonDecode(utf8.decode(bytes));
-      if (value is! Map ||
-          value['bypass'] is! bool ||
-          value['revision'] is! String ||
-          (value['revision'] as String).isEmpty) {
-        throw const FormatException('Invalid command approval setting');
-      }
-      return McpCommandApprovalSettings(
-        bypass: value['bypass'] as bool,
-        revision: value['revision'] as String,
-      );
+      return await _readStored();
     } on Object {
       throw const CommandDecisionException('command_approval_unavailable');
     }
   }
 
+  Future<McpCommandApprovalSettings> _readStored() async {
+    final timeoutBytes = await secrets
+        .read(timeoutStorageKey)
+        .timeout(const Duration(seconds: 10));
+    final savedTimeout = timeoutBytes == null
+        ? null
+        : int.tryParse(utf8.decode(timeoutBytes));
+    final timeoutSeconds =
+        McpCommandApprovalSettings.timeoutOptions.contains(savedTimeout)
+        ? savedTimeout!
+        : 60;
+    final bytes = await secrets
+        .read(storageKey)
+        .timeout(const Duration(seconds: 10));
+    if (bytes == null) {
+      return McpCommandApprovalSettings(timeoutSeconds: timeoutSeconds);
+    }
+    final value = jsonDecode(utf8.decode(bytes));
+    if (value is! Map ||
+        value['bypass'] is! bool ||
+        value['revision'] is! String ||
+        (value['revision'] as String).isEmpty) {
+      throw const FormatException('Invalid command approval setting');
+    }
+    return McpCommandApprovalSettings(
+      bypass: value['bypass'] as bool,
+      revision: value['revision'] as String,
+      timeoutSeconds: timeoutSeconds,
+    );
+  }
+
   Future<void> saveBypass(bool bypass) {
     _generation += 1;
-    final result = _pending.then(
-      (_) => secrets.write(
+    return _enqueueSave(
+      () => secrets.write(
         storageKey,
         utf8.encode(
           jsonEncode({'bypass': bypass, 'revision': const Uuid().v4()}),
         ),
       ),
     );
+  }
+
+  Future<void> saveTimeout(int seconds) {
+    if (!McpCommandApprovalSettings.timeoutOptions.contains(seconds)) {
+      throw ArgumentError.value(seconds, 'seconds', 'Unsupported timeout');
+    }
+    // A deadline preference must not revoke in-flight command permits.
+    return _enqueueSave(
+      () => secrets.write(timeoutStorageKey, utf8.encode(seconds.toString())),
+    );
+  }
+
+  Future<void> _enqueueSave(Future<void> Function() save) {
+    final result = _pending.then((_) => save());
     _pending = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return result;
   }

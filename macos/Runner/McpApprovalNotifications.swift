@@ -78,7 +78,7 @@ final class McpApprovalNotifications: NSObject, UNUserNotificationCenterDelegate
     }
     let id = Self.prefix + rawID
     let direct = args["directApproval"] as? Bool ?? false
-    let timeout = min(max(args["timeoutMs"] as? Double ?? 60000, 1), 60000) / 1000
+    let timeout = min(max(args["timeoutMs"] as? Double ?? 60000, 1), 600000) / 1000
     var actions: [UNNotificationAction] = []
     if direct {
       actions.append(UNNotificationAction(identifier: "allow", title: allow, options: [.authenticationRequired]))

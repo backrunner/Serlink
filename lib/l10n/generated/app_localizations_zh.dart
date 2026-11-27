@@ -3145,7 +3145,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get mcpApprovalSystemSettingsAction => '系统设置';
 
   @override
-  String get mcpApprovalWaitHint => '请求最多等待 60 秒审批；长命令需在 Serlink 中查看并确认。';
+  String get mcpApprovalWaitHint => '长命令需在 Serlink 中查看并确认。可在下方设置命令审批超时时间。';
 
   @override
   String get securityAgentDiscoveryTitle => '共享连接信息';
@@ -3331,4 +3331,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get agentSftpReleaseTooltip => '释放代理控制并保持此 SFTP 连接';
+
+  @override
+  String get settingsMcpApprovalTimeoutTitle => '命令审批超时';
+
+  @override
+  String get settingsMcpApprovalTimeoutDescription =>
+      '每条命令的审批等待时间，包含排队时间。仅对本机的新请求生效。访问和上传审批最多等待 1 分钟。';
+
+  @override
+  String settingsMcpApprovalTimeoutSeconds(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
+  String settingsMcpApprovalTimeoutMinutes(int minutes) {
+    return '$minutes 分钟';
+  }
 }

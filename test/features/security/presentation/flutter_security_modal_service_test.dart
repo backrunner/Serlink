@@ -155,6 +155,73 @@ void main() {
     expect(notifications.dismissed, [notifications.requests.single['id']]);
   });
 
+  testWidgets(
+    'command timeout is refreshed per request and keeps active deadlines',
+    (tester) async {
+      final key = GlobalKey<NavigatorState>();
+      final notifications = _Notifications();
+      var timeout = const Duration(minutes: 2);
+      await tester.pumpWidget(_TestApp(navigatorKey: key));
+      final service = FlutterSecurityModalService(
+        key: key,
+        notifications: notifications,
+        commandApprovalTimeout: () async => timeout,
+      );
+      const command = AgentCommandPrompt(
+        clientName: 'agent',
+        hostDisplayName: 'host',
+        command: 'pwd',
+        ruleDescription: 'standard_approval',
+      );
+      final first = service.confirmAgentCommand(command);
+      final firstExpectation = expectLater(
+        first,
+        throwsA(
+          isA<McpApprovalException>().having(
+            (error) => error.code,
+            'code',
+            'approval_timeout',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        notifications.requests.single['timeoutMs'],
+        inInclusiveRange(119000, 120000),
+      );
+      timeout = const Duration(seconds: 30);
+      await tester.pump(const Duration(seconds: 61));
+      expect(find.text('Agent command confirmation'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 60));
+      await tester.pumpAndSettle();
+      await firstExpectation;
+      notifications.actions.first.complete('allow');
+      await tester.pumpAndSettle();
+      final second = service.confirmAgentCommand(command);
+      final secondExpectation = expectLater(
+        second,
+        throwsA(
+          isA<McpApprovalException>().having(
+            (error) => error.code,
+            'code',
+            'approval_timeout',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        notifications.requests.last['timeoutMs'],
+        inInclusiveRange(29000, 30000),
+      );
+      await tester.pump(const Duration(seconds: 31));
+      await tester.pumpAndSettle();
+      await secondExpectation;
+      expect(notifications.dismissed, hasLength(2));
+      expect(find.text('Agent command confirmation'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('timeout removes approval and ignores a late notification', (
     tester,
   ) async {

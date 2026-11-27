@@ -33,6 +33,52 @@ import 'package:serlink/platform/flutter_secure_storage_secret_store.dart';
 import 'package:serlink/platform/platform_capabilities.dart';
 
 void main() {
+  testWidgets(
+    'command timeout saves and reloads without replacing the bridge',
+    (tester) async {
+      _useLargeSurface(tester);
+      final container = await _pumpSerlinkApp(
+        tester,
+        serverController: _FakeMcpServerController(),
+      );
+      await _openMcpManager(tester);
+      final bridge = container.read(agentSessionBridgeProvider);
+      final picker = find.byKey(
+        const ValueKey('settings-mcp-approval-timeout'),
+      );
+      await tester.ensureVisible(picker);
+      await tester.pumpAndSettle();
+      expect(tester.widget<SerlinkSelect<int>>(picker).value, 60);
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      final l10n = tester.element(picker).l10n;
+      await tester.tap(
+        find.text(l10n.settingsMcpApprovalTimeoutMinutes(10)).last,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        (await container.read(mcpCommandApprovalProvider).read())
+            .timeoutSeconds,
+        600,
+      );
+      expect(
+        identical(container.read(agentSessionBridgeProvider), bridge),
+        isTrue,
+      );
+      final close = find.widgetWithText(SerlinkTextButton, l10n.closeAction);
+      await tester.tap(close);
+      await tester.pumpAndSettle();
+      final manage = find.byKey(const ValueKey('settings-mcp-manage-button'));
+      await tester.ensureVisible(manage);
+      await tester.tap(manage);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(picker);
+      await tester.pumpAndSettle();
+      expect(tester.widget<SerlinkSelect<int>>(picker).value, 600);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('bypass setting persists without replacing active bridge', (
     tester,
   ) async {

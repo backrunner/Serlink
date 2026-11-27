@@ -8,6 +8,54 @@ import 'package:serlink/platform/secret_store.dart';
 
 void main() {
   test(
+    'timeout persists independently without revoking active permits',
+    () async {
+      final secrets = InMemorySecretStore();
+      final policy = McpCommandApproval(secrets);
+      expect((await policy.read()).timeoutSeconds, 60);
+      // An existing v1 bypass record remains compatible.
+      await secrets.write(
+        McpCommandApproval.storageKey,
+        utf8.encode('{"bypass":true,"revision":"old"}'),
+      );
+      final before = await policy.read();
+      final generation = policy.generation;
+      await policy.saveTimeout(600);
+      expect(policy.generation, generation);
+      await policy.validate(before);
+      var restored = await McpCommandApproval(secrets).read();
+      expect(restored.timeout, const Duration(minutes: 10));
+      expect(restored.bypass, isTrue);
+      await Future.wait([policy.saveBypass(false), policy.saveTimeout(120)]);
+      restored = await policy.read();
+      expect(restored.timeoutSeconds, 120);
+      expect(restored.bypass, isFalse);
+      expect(() => policy.saveTimeout(0), throwsArgumentError);
+      expect(() => policy.saveTimeout(601), throwsArgumentError);
+    },
+  );
+
+  test(
+    'invalid stored timeout falls back and failed save preserves it',
+    () async {
+      final secrets = _FailingStore();
+      final policy = McpCommandApproval(secrets);
+      await secrets.write(
+        McpCommandApproval.timeoutStorageKey,
+        utf8.encode('-1'),
+      );
+      expect((await policy.read()).timeoutSeconds, 60);
+      await policy.saveTimeout(300);
+      secrets.failWrite = true;
+      await expectLater(policy.saveTimeout(30), throwsStateError);
+      expect((await policy.read()).timeoutSeconds, 300);
+      secrets.failWrite = false;
+      await policy.saveTimeout(30);
+      expect((await policy.read()).timeoutSeconds, 30);
+    },
+  );
+
+  test(
     'default requires approval and bypass survives a service reload',
     () async {
       final secrets = InMemorySecretStore();

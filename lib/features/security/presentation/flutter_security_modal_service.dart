@@ -31,6 +31,7 @@ class FlutterSecurityModalService implements SecurityModalService {
     required GlobalKey<NavigatorState> key,
     this.notifications = const McpApprovalNotifications(),
     this.approvalTimeout = const Duration(seconds: 60),
+    this.commandApprovalTimeout,
     // Public named parameters cannot initialize a private field directly.
     // ignore: prefer_initializing_formals
   }) : _key = key;
@@ -38,6 +39,7 @@ class FlutterSecurityModalService implements SecurityModalService {
   final GlobalKey<NavigatorState> _key;
   final McpApprovalNotifications notifications;
   final Duration approvalTimeout;
+  final Future<Duration> Function()? commandApprovalTimeout;
   Future<void> _approvalQueue = Future<void>.value();
 
   @override
@@ -142,8 +144,9 @@ class FlutterSecurityModalService implements SecurityModalService {
   Future<AgentCommandDecision> confirmAgentCommand(
     AgentCommandPrompt prompt,
   ) async {
+    final timeout = await commandApprovalTimeout?.call() ?? approvalTimeout;
     final context = _key.currentContext;
-    if (context == null) return AgentCommandDecision.deny;
+    if (context == null || !context.mounted) return AgentCommandDecision.deny;
     final l10n = context.l10n;
     final direct =
         prompt.command.length <= 80 &&
@@ -160,6 +163,7 @@ class FlutterSecurityModalService implements SecurityModalService {
       body:
           '${l10n.securityAgentCommandBody(prompt.clientName, prompt.hostDisplayName)}\n${direct ? prompt.command : l10n.mcpApprovalReviewDetails}',
       directApproval: direct,
+      timeout: timeout,
     );
   }
 
@@ -192,7 +196,9 @@ class FlutterSecurityModalService implements SecurityModalService {
     required String title,
     required String body,
     required bool directApproval,
+    Duration? timeout,
   }) async {
+    final waitingTimeout = timeout ?? approvalTimeout;
     final request = McpRequestContext.current;
     request?.checkActive();
     final result = Completer<T>();
@@ -202,7 +208,8 @@ class FlutterSecurityModalService implements SecurityModalService {
       if (!result.isCompleted) result.completeError(McpApprovalException(code));
     }
 
-    final timer = Timer(approvalTimeout, () => fail('approval_timeout'));
+    final watch = Stopwatch()..start();
+    final timer = Timer(waitingTimeout, () => fail('approval_timeout'));
     unawaited(request?.cancelled.then((_) => fail('request_cancelled')));
     final validityTimer = request == null
         ? null
@@ -263,7 +270,8 @@ class FlutterSecurityModalService implements SecurityModalService {
               'deny': l10n.denyAction,
               'details': l10n.mcpApprovalDetailsAction,
               'directApproval': directApproval,
-              'timeoutMs': approvalTimeout.inMilliseconds,
+              'timeoutMs': (waitingTimeout - watch.elapsed).inMilliseconds
+                  .clamp(1, waitingTimeout.inMilliseconds),
             });
             if (result.isCompleted) return;
             if (action == 'allow' && directApproval) result.complete(allowed);

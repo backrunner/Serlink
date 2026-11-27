@@ -3190,7 +3190,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String get mcpApprovalSystemSettingsAction => 'システム設定';
 
   @override
-  String get mcpApprovalWaitHint => '承認は最大60秒待機します。長いコマンドは Serlink で確認します。';
+  String get mcpApprovalWaitHint =>
+      '長いコマンドは Serlink で確認します。コマンド承認のタイムアウトは以下で設定できます。';
 
   @override
   String get securityAgentDiscoveryTitle => '接続情報の共有';
@@ -3377,4 +3378,21 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get agentSftpReleaseTooltip => 'エージェントの制御を解除し、SFTP 接続を維持';
+
+  @override
+  String get settingsMcpApprovalTimeoutTitle => 'コマンド承認のタイムアウト';
+
+  @override
+  String get settingsMcpApprovalTimeoutDescription =>
+      '他の承認を待つ時間を含む、各コマンドの確認時間。このデバイスの新しいリクエストに適用されます。アクセスとアップロードの承認は最大1分待機します。';
+
+  @override
+  String settingsMcpApprovalTimeoutSeconds(int seconds) {
+    return '$seconds秒';
+  }
+
+  @override
+  String settingsMcpApprovalTimeoutMinutes(int minutes) {
+    return '$minutes分';
+  }
 }

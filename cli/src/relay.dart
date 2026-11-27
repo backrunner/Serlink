@@ -104,10 +104,11 @@ class SerlinkMcpRelay {
         ),
         CallToolResult.fromJson,
         RequestOptions(
-          // Bound the approval, connection and output waits together.
+          // Allow the maximum ten-minute command approval plus access,
+          // connection and output waits. Client cancellation still propagates.
           signal: extra.signal,
-          timeout: const Duration(minutes: 4),
-          maxTotalTimeout: const Duration(minutes: 4),
+          timeout: const Duration(minutes: 15),
+          maxTotalTimeout: const Duration(minutes: 15),
           onprogress: progressToken == null
               ? null
               : (progress) {

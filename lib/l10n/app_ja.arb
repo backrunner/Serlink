@@ -965,7 +965,7 @@
   "mcpApprovalNotificationsUnavailable": "Serlink 内で承認してください",
   "mcpApprovalEnableAction": "有効にする",
   "mcpApprovalSystemSettingsAction": "システム設定",
-  "mcpApprovalWaitHint": "承認は最大60秒待機します。長いコマンドは Serlink で確認します。",
+  "mcpApprovalWaitHint": "長いコマンドは Serlink で確認します。コマンド承認のタイムアウトは以下で設定できます。",
   "securityAgentDiscoveryTitle": "接続情報の共有",
   "securityAgentDiscoveryBody": "{client} が保存済みホストと現在のリモート接続を検出しようとしています。",
   "securityAgentDiscoveryStrict": "表示名、ID、接続状態のみを共有します。アドレス、ユーザー名、起動コマンドは含みません。端末内容やファイルへのアクセスは許可されません。",
@@ -1017,5 +1017,23 @@
   "securityAgentRememberAction": "許可して記憶",
   "settingsMcpRememberedClient": "すべてのホストと接続 · このデバイスに記憶",
   "settingsMcpAuthorizationUnavailable": "エージェントのアクセスを保存できませんでした。再試行してください。",
-  "agentSftpReleaseTooltip": "エージェントの制御を解除し、SFTP 接続を維持"
+  "agentSftpReleaseTooltip": "エージェントの制御を解除し、SFTP 接続を維持",
+  "settingsMcpApprovalTimeoutTitle": "コマンド承認のタイムアウト",
+  "settingsMcpApprovalTimeoutDescription": "他の承認を待つ時間を含む、各コマンドの確認時間。このデバイスの新しいリクエストに適用されます。アクセスとアップロードの承認は最大1分待機します。",
+  "settingsMcpApprovalTimeoutSeconds": "{seconds}秒",
+  "@settingsMcpApprovalTimeoutSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsMcpApprovalTimeoutMinutes": "{minutes}分",
+  "@settingsMcpApprovalTimeoutMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  }
 }

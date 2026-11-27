@@ -5851,7 +5851,7 @@ abstract class AppLocalizations {
   /// No description provided for @mcpApprovalWaitHint.
   ///
   /// In en, this message translates to:
-  /// **'Requests wait up to 60 seconds for approval. Long commands open in Serlink for review.'**
+  /// **'Long commands open in Serlink for review. Configure the command approval timeout below.'**
   String get mcpApprovalWaitHint;
 
   /// No description provided for @securityAgentDiscoveryTitle.
@@ -6165,6 +6165,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Release agent control and keep this SFTP connection open'**
   String get agentSftpReleaseTooltip;
+
+  /// No description provided for @settingsMcpApprovalTimeoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Command approval timeout'**
+  String get settingsMcpApprovalTimeoutTitle;
+
+  /// No description provided for @settingsMcpApprovalTimeoutDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Time to review each command, including time queued behind other approvals. Applies to new requests on this device. Access and upload approvals wait up to 1 minute.'**
+  String get settingsMcpApprovalTimeoutDescription;
+
+  /// No description provided for @settingsMcpApprovalTimeoutSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds} seconds'**
+  String settingsMcpApprovalTimeoutSeconds(int seconds);
+
+  /// No description provided for @settingsMcpApprovalTimeoutMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{1 minute} other{{minutes} minutes}}'**
+  String settingsMcpApprovalTimeoutMinutes(int minutes);
 }
 
 class _AppLocalizationsDelegate

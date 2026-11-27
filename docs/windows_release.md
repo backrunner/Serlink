@@ -20,7 +20,8 @@ CloudKit sync and the MCP server are Apple-only.
 
 The `Desktop` GitHub Actions workflow (`.github/workflows/desktop.yml`) does
 the Windows part on `windows-latest`; the same tag also publishes the macOS
-DMG (see `docs/macos_release.md`):
+DMG (see `docs/macos_release.md`) and the Linux packages (see
+`docs/linux_release.md`):
 
 1. Make sure `version:` in `pubspec.yaml` matches the release (for example
    `1.2.0+7`). The `+build` number becomes the fourth part of the Windows file

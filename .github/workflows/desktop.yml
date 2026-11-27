@@ -1,14 +1,15 @@
 name: Desktop
 
-# Builds, tests and packages the Windows desktop app on every push/PR. Pushing
-# a `v*` tag also builds the notarized macOS direct DMG (local terminal
-# enabled) and publishes both platforms' files to the GitHub Release for that
-# tag (creating the release if it does not exist yet). See
-# docs/windows_release.md and docs/macos_release.md.
+# Builds, tests and packages the Windows and Linux desktop apps on every
+# push/PR. Pushing a `v*` tag also builds the notarized macOS direct DMG (local
+# terminal enabled) and publishes all platforms' files to the GitHub Release
+# for that tag (creating the release if it does not exist yet). See
+# docs/windows_release.md, docs/linux_release.md and docs/macos_release.md.
 on:
   push:
-    # windows/** branches run the full Windows pipeline without publishing.
-    branches: [main, 'windows/**']
+    # windows/** and linux/** branches run the full pipelines without
+    # publishing.
+    branches: [main, 'windows/**', 'linux/**']
     tags: ['v*']
     paths-ignore:
       - 'docs/**'
@@ -17,7 +18,6 @@ on:
       - 'ios/**'
       - 'macos/**'
       - 'android/**'
-      - 'linux/**'
   pull_request:
     paths-ignore:
       - 'docs/**'
@@ -26,7 +26,6 @@ on:
       - 'ios/**'
       - 'macos/**'
       - 'android/**'
-      - 'linux/**'
   workflow_dispatch:
     inputs:
       version:
@@ -145,6 +144,130 @@ jobs:
         with:
           name: serlink-windows-x64
           path: build/dist/windows/*
+          if-no-files-found: error
+
+  linux-unit-tests:
+    name: Unit tests (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter test
+
+  linux-terminal-integration:
+    name: Local terminal integration (Linux pty)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux desktop toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev xvfb
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: xvfb-run -a flutter test integration_test/linux_local_terminal_test.dart -d linux
+
+  linux-package:
+    name: Build and package (Linux ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    # Build on the oldest supported userland so the bundle only needs glibc
+    # 2.34 (Ubuntu 22.04, Debian 12, Fedora 35 and newer). The container keeps
+    # that floor independent of which Ubuntu the hosted runners use.
+    container: ubuntu:22.04
+    timeout-minutes: 60
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install build, packaging and smoke test tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git curl unzip xz-utils zip file binutils dpkg-dev \
+            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
+            xvfb x11-utils openbox xdotool wmctrl dbus dbus-x11 imagemagick \
+            fonts-dejavu-core
+
+      - uses: actions/checkout@v4
+
+      # subosito/flutter-action does not provide Linux arm64 SDKs.
+      - name: Install Flutter
+        run: |
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          git config --global --add safe.directory '*'
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          pubspec="$(sed -nE 's/^version:[[:space:]]*([^+[:space:]]+).*/\1/p' pubspec.yaml)"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            if [[ "${version%%[-+]*}" != "$pubspec" ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match pubspec.yaml version $pubspec."
+              exit 1
+            fi
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            version="$INPUT_VERSION"
+          else
+            version="$pubspec-dev.$GITHUB_RUN_NUMBER"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Packaging Serlink $version"
+
+      - run: |
+          flutter config --no-analytics
+          flutter pub get
+
+      - name: Build and package
+        env:
+          SERLINK_VERSION: ${{ steps.version.outputs.version }}
+        run: ./tool/package_linux.sh --version "$SERLINK_VERSION"
+
+      # Smoke-tests the installed .deb, which carries the same bundle as the
+      # tarball, so the package metadata, /usr/bin link and icon are covered.
+      - name: Install package
+        run: apt-get install -y ./build/dist/linux/*.deb
+
+      - name: Launch smoke test
+        run: ./tool/smoke_test_linux.sh /usr/bin/serlink build/smoke
+
+      - name: Upload smoke test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-linux-${{ matrix.arch }}
+          path: build/smoke
+          if-no-files-found: ignore
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: serlink-linux-${{ matrix.arch }}
+          path: build/dist/linux/*
           if-no-files-found: error
 
   macos-dmg:
@@ -283,8 +406,15 @@ jobs:
       always() && startsWith(github.ref, 'refs/tags/v') &&
       needs.package.result == 'success' &&
       needs.terminal-integration.result == 'success' &&
+      needs.linux-package.result == 'success' &&
+      needs.linux-terminal-integration.result == 'success' &&
       needs.macos-dmg.result == 'success'
-    needs: [package, terminal-integration, macos-dmg]
+    needs:
+      - package
+      - terminal-integration
+      - linux-package
+      - linux-terminal-integration
+      - macos-dmg
     runs-on: ubuntu-latest
     permissions:
       contents: write

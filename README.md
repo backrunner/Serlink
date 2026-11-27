@@ -40,7 +40,7 @@ move between servers often and want their connection data to stay private.
 | macOS | Primary desktop target. A notarized direct DMG with local terminal tabs is published on [GitHub Releases](https://github.com/backrunner/Serlink/releases); App Store and TestFlight tooling is in progress. |
 | iOS | Active mobile foundation with CloudKit sync bridge, touch workspace, document gateway, and device validation work underway. |
 | Windows | Installer and portable builds are published on [GitHub Releases](https://github.com/backrunner/Serlink/releases) (Windows 10 1809+, x64). See [docs/windows_release.md](docs/windows_release.md). |
-| Linux | Desktop Flutter project and shared desktop core are present; packaging and distro QA are still pending. |
+| Linux | `.deb` and portable `.tar.gz` builds for x64 and arm64 are built by CI and attached to tagged [GitHub Releases](https://github.com/backrunner/Serlink/releases) (glibc 2.34+: Ubuntu 22.04, Debian 12, Fedora 35 and newer). Wayland and distro QA beyond Ubuntu are pending. See [docs/linux_release.md](docs/linux_release.md). |
 | Android | Not an active release target right now. |
 
 ## Website and support
@@ -58,7 +58,8 @@ Requirements:
 - Desktop Flutter toolchain for the target OS
 - Xcode command line tools for Apple platforms
 - Visual Studio C++ desktop workload for Windows
-- GTK/clang tooling normally required by Flutter desktop on Linux
+- GTK/clang tooling normally required by Flutter desktop on Linux, plus
+  `libsecret-1-dev` (see [docs/linux_release.md](docs/linux_release.md))
 
 Install dependencies:
 

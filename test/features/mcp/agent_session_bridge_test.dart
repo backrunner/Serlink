@@ -804,6 +804,53 @@ void main() {
       }
     }
 
+    for (final mode in ['terminal', 'input', 'job']) {
+      test(
+        'bypass requires fresh consent for Python tree deletion ($mode)',
+        () async {
+          final service = _EchoSshSessionService();
+          final modal = _FakeSecurityModalService()
+            ..commandDecision = AgentCommandDecision.allowOnce;
+          final container = _container(service: service, modal: modal);
+          addTearDown(container.dispose);
+          final bridge = await _bridge(container);
+          final handle = await _openSession(bridge);
+          const command =
+              'python3 -c "import shutil; shutil.rmtree(\'/srv/data\')"';
+          Future<Object?> run() => switch (mode) {
+            'job' => bridge.startCommand(
+              clientName: _clientName,
+              sessionId: handle.sessionId,
+              command: command,
+              cwd: '/srv/app',
+              wait: Duration.zero,
+            ),
+            'input' => bridge.sendInput(
+              clientName: _clientName,
+              sessionId: handle.sessionId,
+              text: '$command\r',
+            ),
+            _ => bridge.exec(
+              clientName: _clientName,
+              sessionId: handle.sessionId,
+              command: command,
+            ),
+          };
+          await run();
+          expect(modal.commandCallCount, 1);
+          expect(modal.lastCommandPrompt!.allowSession, isFalse);
+          modal.commandDecision = AgentCommandDecision.deny;
+          await expectLater(run(), throwsA(_bridgeException('command_denied')));
+          expect(modal.commandCallCount, 2);
+          if (mode == 'job') {
+            expect(service.commands, hasLength(1));
+          } else {
+            expect(service.shells.single.writes, ['$command\r']);
+          }
+        },
+      );
+    }
+
     for (final change in [
       'mode',
       'vault',

@@ -136,6 +136,15 @@ asset so the installed app does not depend on this repository being present.
 
 ## Exposed tools
 
+Commands submitted through `serlink_exec` (terminal or job mode) and
+`serlink_send_input` execute on the remote host. The bundled skill, MCP server
+instructions and command tool descriptions tell agents to submit native commands
+directly, for example `git status --short`. Local conventions that add `rtk`,
+`lean-ctx`, aliases, shell functions or local executable paths must not carry
+over into remote commands or scripts. A wrapper is appropriate only when the
+task specifically needs it and the agent has verified it is available on that
+remote host; agents must not install wrappers just to satisfy local conventions.
+
 All tools are prefixed `serlink_`:
 
 - `serlink_list_hosts` — hosts from the vault after explicit discovery consent (requires unlocked vault).

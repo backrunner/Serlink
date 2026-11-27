@@ -77,6 +77,14 @@ const serlinkMcpInstructions =
     'Ctrl-C only; partial input, editing/history controls and bare Enter are '
     'blocked. If command_input_reset_required is reported, send Ctrl-C before '
     'a new complete command. Never bypass a rejected risk judgment.\n'
+    '- Commands and scripts passed to serlink_exec (terminal or job mode) or '
+    'serlink_send_input run on the remote host, not the agent computer. '
+    'Submit native commands directly, e.g. git status --short rather than rtk git status --short. '
+    'Local wrapper-prefix instructions apply only to local execution: do not carry '
+    'rtk, lean-ctx, other local wrappers, aliases, shell functions or local executable paths '
+    'into remote commands or scripts. Use a wrapper only when the task specifically needs it '
+    'and its availability on that remote host has been verified. Do not install wrappers '
+    'remotely just to satisfy local command conventions.\n'
     '- For long scripts or slow operations use serlink_exec mode=job with an explicit cwd. '
     'The complete script (up to 4 MiB UTF-8) is streamed to a fresh sh process on the existing SSH connection, '
     'not typed into a terminal; it does not inherit interactive cwd, shell variables or aliases. '
@@ -265,7 +273,10 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
   'serlink_exec': SerlinkMcpTool(
     name: 'serlink_exec',
     description:
-        'Execute a complete command under the same local, model and user approval gates. '
+        'Execute a complete command on the remote host under the same local, model and user approval gates. '
+        'Submit native commands directly; local wrapper-prefix rules do not apply here. '
+        'Do not prepend rtk, lean-ctx or other local wrappers unless the task specifically needs '
+        'the wrapper and its availability on this remote host has been verified. '
         'Use mode=job for long scripts (up to 4 MiB UTF-8), large output or slow operations. '
         'Job mode streams the script to a fresh POSIX sh on the existing SSH connection, '
         'without PTY/argv line limits; specify cwd because it does not inherit terminal cwd, '
@@ -281,7 +292,11 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
           description: 'Open terminal session id.',
         ),
         'command': JsonSchema.string(
-          description: 'Complete command or script, up to 4 MiB UTF-8. Never truncated for risk assessment.',
+          description:
+              'Complete remote command or script, up to 4 MiB UTF-8. '
+              'Use native commands without local wrappers such as rtk or lean-ctx '
+              'unless needed by the task and verified available on this remote host. '
+              'Never truncated for risk assessment.',
         ),
         'mode': JsonSchema.string(
           description: 'terminal (default) or job. Job is recommended for long scripts and output.',
@@ -426,7 +441,10 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
   'serlink_send_input': SerlinkMcpTool(
     name: 'serlink_send_input',
     description:
-        'Send complete submitted commands or Ctrl-C to an open Serlink session. '
+        'Send complete submitted commands or Ctrl-C to an open remote Serlink session. '
+        'Submit native commands directly; local wrapper-prefix rules do not apply here. '
+        'Do not prepend rtk, lean-ctx or other local wrappers unless the task specifically needs '
+        'the wrapper and its availability on this remote host has been verified. '
         'Both standard and bypass modes enforce the same input and risk checks '
         'as serlink_exec; partial input, '
         'editing/history controls and bare Enter are blocked.',
@@ -437,7 +455,9 @@ final serlinkMcpTools = <String, SerlinkMcpTool>{
         ),
         'text': JsonSchema.string(
           description:
-              'A complete command ending in a newline, or Ctrl-C (U+0003).',
+              'A complete remote command ending in a newline, or Ctrl-C (U+0003). '
+              'Use native commands without local wrappers such as rtk or lean-ctx '
+              'unless needed by the task and verified available on this remote host.',
         ),
       },
       required: ['sessionId', 'text'],

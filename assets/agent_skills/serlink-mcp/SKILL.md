@@ -1,6 +1,6 @@
 ---
 name: serlink-mcp
-description: Operate Serlink MCP terminal sessions and SFTP file transfers, including uploading local files, downloading remote files, and tracking or cancelling transfers. Use when working on hosts through Serlink; not for implementing Serlink source code.
+description: Operate Serlink MCP remote terminals and SFTP uploads/downloads, including tracking and cancellation. Submit native remote commands without local-only wrappers. Use when working on hosts through Serlink; not for implementing Serlink source code.
 ---
 
 # Serlink MCP
@@ -94,6 +94,16 @@ not successful upload. Follow the transfer lifecycle below.
   releases MCP control and preserves the user's connection.
 
 ## Terminal work
+
+Commands passed to `serlink_exec` (both terminal and job modes) or
+`serlink_send_input` run on the remote host, not the agent's computer. Submit
+native commands directly: `git status --short`, not `rtk git status --short`.
+Local instructions to prefix shell commands with wrappers such as `rtk` or
+`lean-ctx` apply to local execution only; do not carry those prefixes, local
+aliases, shell functions or local executable paths into remote commands or
+scripts. Use a wrapper only when the task specifically needs it and its
+availability on that remote host has been verified. Do not install a local
+wrapper on the remote host just to satisfy a local command convention.
 
 Follow the running tools' command approval and output-pagination instructions.
 Use `serlink_exec` with a complete command. Use `mode: "job"` and an explicit

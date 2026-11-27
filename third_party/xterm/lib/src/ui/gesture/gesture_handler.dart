@@ -1,18 +1,25 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/widgets.dart';
+import 'package:xterm/src/core/buffer/buffer.dart';
+import 'package:xterm/src/core/buffer/cell_offset.dart';
 import 'package:xterm/src/core/mouse/button.dart';
 import 'package:xterm/src/core/mouse/button_state.dart';
+import 'package:xterm/src/terminal.dart';
 import 'package:xterm/src/terminal_view.dart';
 import 'package:xterm/src/ui/controller.dart';
 import 'package:xterm/src/ui/gesture/gesture_detector.dart';
 import 'package:xterm/src/ui/pointer_input.dart';
 import 'package:xterm/src/ui/render.dart';
 
+part 'touch_selection_controls.dart';
+
 class TerminalGestureHandler extends StatefulWidget {
   const TerminalGestureHandler({
     super.key,
     required this.terminalView,
     required this.terminalController,
+    required this.scrollController,
     this.child,
     this.onTapUp,
     this.onSingleTapUp,
@@ -27,6 +34,8 @@ class TerminalGestureHandler extends StatefulWidget {
   final TerminalViewState terminalView;
 
   final TerminalController terminalController;
+
+  final ScrollController scrollController;
 
   final Widget? child;
 
@@ -59,10 +68,33 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
 
   LongPressStartDetails? _lastLongPressStartDetails;
 
+  Buffer? _touchSelectionBuffer;
+
+  @override
+  void didUpdateWidget(TerminalGestureHandler oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.terminalController != oldWidget.terminalController) {
+      _touchSelectionBuffer = null;
+    }
+  }
+
+  void _showTouchSelection() {
+    if (defaultTargetPlatform == TargetPlatform.iOS &&
+        widget.terminalController.selection?.isCollapsed == false) {
+      setState(
+          () => _touchSelectionBuffer = terminalView.widget.terminal.buffer);
+    }
+  }
+
+  void _hideTouchSelection() {
+    if (_touchSelectionBuffer != null) {
+      setState(() => _touchSelectionBuffer = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return TerminalGestureDetector(
-      child: widget.child,
+    final detector = TerminalGestureDetector(
       onTapUp: widget.onTapUp,
       onSingleTapUp: onSingleTapUp,
       onTapDown: onTapDown,
@@ -72,10 +104,31 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
       onTertiaryTapUp: onSecondaryTapUp,
       onLongPressStart: onLongPressStart,
       onLongPressMoveUpdate: onLongPressMoveUpdate,
-      // onLongPressUp: onLongPressUp,
+      onLongPressUp: _showTouchSelection,
       onDragStart: onDragStart,
       onDragUpdate: onDragUpdate,
       onDoubleTapDown: onDoubleTapDown,
+      child: widget.child,
+    );
+    if (defaultTargetPlatform != TargetPlatform.iOS) return detector;
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        detector,
+        if (_touchSelectionBuffer case final buffer?
+            when buffer == terminalView.widget.terminal.buffer)
+          Positioned.fill(
+            child: _TerminalTouchSelectionControls(
+              key: ObjectKey(buffer),
+              terminal: terminalView.widget.terminal,
+              scrollController: widget.scrollController,
+              buffer: buffer,
+              view: terminalView,
+              controller: widget.terminalController,
+              onDismiss: _hideTouchSelection,
+            ),
+          ),
+      ],
     );
   }
 
@@ -126,6 +179,7 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
   }
 
   void onTapDown(TapDownDetails details) {
+    _hideTouchSelection();
     // onTapDown is special, as it will always call the supplied callback.
     // The TerminalView depends on it to bring the terminal into focus.
     _tapDown(
@@ -165,6 +219,7 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
 
   void onDoubleTapDown(TapDownDetails details) {
     renderTerminal.selectWord(details.localPosition);
+    if (details.kind == PointerDeviceKind.touch) _showTouchSelection();
   }
 
   void onLongPressStart(LongPressStartDetails details) {
@@ -178,8 +233,6 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
       details.localPosition,
     );
   }
-
-  // void onLongPressUp() {}
 
   void onDragStart(DragStartDetails details) {
     _lastDragStartDetails = details;

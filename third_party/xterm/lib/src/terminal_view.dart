@@ -300,12 +300,6 @@ class TerminalViewState extends State<TerminalView> {
       );
     }
 
-    child = TerminalActions(
-      terminal: widget.terminal,
-      controller: _controller,
-      child: child,
-    );
-
     child = KeyboardVisibilty(
       onKeyboardShow: _onKeyboardShow,
       child: child,
@@ -313,6 +307,7 @@ class TerminalViewState extends State<TerminalView> {
 
     child = TerminalGestureHandler(
       terminalView: this,
+      scrollController: _scrollController,
       terminalController: _controller,
       onSingleTapUp: _onSingleTapUp,
       onTapDown: _onTapDown,
@@ -321,6 +316,12 @@ class TerminalViewState extends State<TerminalView> {
       onSecondaryTapUp:
           widget.onSecondaryTapUp != null ? _onSecondaryTapUp : null,
       readOnly: widget.readOnly,
+      child: child,
+    );
+
+    child = TerminalActions(
+      terminal: widget.terminal,
+      controller: _controller,
       child: child,
     );
 

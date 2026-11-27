@@ -32,3 +32,5 @@ Current patches:
   and transfer callbacks after the terminal closes.
 - Allow touch-first clients to defer keyboard activation until a tap completes,
   so long presses, text selection, and scroll gestures do not summon the IME.
+- Show draggable selection handles and a localized Copy menu after a touch
+  long press or double tap on iOS.

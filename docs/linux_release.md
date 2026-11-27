@@ -58,9 +58,9 @@ tool/smoke_test_linux.sh build/linux/x64/release/bundle/serlink
 xvfb-run -a flutter test integration_test/linux_local_terminal_test.dart -d linux
 ```
 
-Output goes to `build/dist/linux`. The smoke test needs `xdotool` and
-`wmctrl`; without a display it starts its own Xvfb and openbox (`xvfb`,
-`openbox`), and it never touches your own Serlink profile.
+Output goes to `build/dist/linux`. The smoke test uses `xdotool`, `wmctrl`, `xvfb`, `xauth`,
+`openbox` and `dbus-run-session`. Each run starts its own X11 display and
+D-Bus session and uses a temporary application profile.
 
 On macOS, the same build runs in an Ubuntu container (for example with
 `container run ubuntu:22.04` or Docker) after installing the packages above

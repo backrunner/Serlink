@@ -170,7 +170,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev xvfb
+            clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev xvfb xauth
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -204,7 +204,7 @@ jobs:
           apt-get install -y --no-install-recommends \
             ca-certificates git curl unzip xz-utils zip file binutils dpkg-dev \
             clang cmake ninja-build pkg-config libgtk-3-dev libsecret-1-dev \
-            xvfb x11-utils openbox xdotool wmctrl dbus dbus-x11 imagemagick \
+            xvfb xauth x11-utils openbox xdotool wmctrl dbus dbus-x11 imagemagick \
             fonts-dejavu-core
 
       - uses: actions/checkout@v4
@@ -245,6 +245,7 @@ jobs:
       - name: Build and package
         env:
           SERLINK_VERSION: ${{ steps.version.outputs.version }}
+          SERLINK_MAX_GLIBC: '2.34'
         run: ./tool/package_linux.sh --version "$SERLINK_VERSION"
 
       # Smoke-tests the installed .deb, which carries the same bundle as the

@@ -7,26 +7,33 @@
 # window through the window manager and expects a clean exit. Writes
 # screenshots and the app's redacted diagnostic logs to the artifacts dir.
 #
-# Without DISPLAY it starts its own Xvfb server and openbox window manager;
-# without a D-Bus session bus it re-runs itself under dbus-run-session (the
-# single-instance handoff uses D-Bus). The profile lives in a temporary XDG
-# data home, so a developer's own Serlink profile is never touched.
+# Always run on a private Xvfb display and D-Bus session. A second launch
+# must reach the smoke-test instance even on a developer desktop.
 #
-# Needs: xdotool, wmctrl, and for headless runs xvfb, openbox, dbus. Uses
+# Needs: xdotool, wmctrl, xvfb, xauth, openbox and dbus. Uses
 # ImageMagick's `import` for screenshots when it is installed.
 #
 #   tool/smoke_test_linux.sh build/linux/x64/release/bundle/serlink
 #   tool/smoke_test_linux.sh path/to/serlink build/smoke
 set -euo pipefail
 
+if [[ "${1:-}" != --isolated-session ]]; then
+  profile="$(mktemp -d)"
+  trap 'rm -rf -- "$profile"' EXIT
+  export XDG_DATA_HOME="$profile/data" XDG_CONFIG_HOME="$profile/config" \
+    XDG_CACHE_HOME="$profile/cache" XDG_RUNTIME_DIR="$profile/runtime" GDK_BACKEND=x11
+  mkdir -m 700 "$XDG_RUNTIME_DIR"
+  unset DBUS_SESSION_BUS_ADDRESS WAYLAND_DISPLAY DESKTOP_STARTUP_ID XDG_ACTIVATION_TOKEN
+  xvfb-run -a -s '-screen 0 1600x1000x24 -nolisten tcp' \
+    dbus-run-session -- "$0" --isolated-session "$@"
+  exit
+fi
+shift
+
 exe="${1:?usage: smoke_test_linux.sh <serlink executable> [artifacts dir]}"
 artifacts="${2:-build/smoke}"
 startup_timeout="${SMOKE_STARTUP_TIMEOUT:-60}"
 stable_seconds="${SMOKE_STABLE_SECONDS:-15}"
-
-if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -z "${SERLINK_SMOKE_DBUS:-}" ]]; then
-  exec env SERLINK_SMOKE_DBUS=1 dbus-run-session -- "$0" "$@"
-fi
 
 exe="$(realpath "$exe")"
 mkdir -p "$artifacts"
@@ -38,25 +45,16 @@ done
 pids=()
 cleanup() {
   for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done
-  if [[ -n "${profile:-}" ]]; then rm -rf "$profile"; fi
 }
 trap cleanup EXIT
 
-if [[ -z "${DISPLAY:-}" ]]; then
-  display=":$((90 + RANDOM % 100))"
-  Xvfb "$display" -screen 0 1600x1000x24 -nolisten tcp >"$artifacts/xvfb.log" 2>&1 &
-  pids+=($!)
-  export DISPLAY="$display"
-  for _ in $(seq 1 50); do xdpyinfo >/dev/null 2>&1 && break; sleep 0.1; done
-  openbox >"$artifacts/openbox.log" 2>&1 &
-  pids+=($!)
-  sleep 1
-fi
-
-profile="$(mktemp -d)"
-export XDG_DATA_HOME="$profile/data" XDG_CONFIG_HOME="$profile/config" \
-  XDG_CACHE_HOME="$profile/cache"
-unset DESKTOP_STARTUP_ID XDG_ACTIVATION_TOKEN
+openbox >"$artifacts/openbox.log" 2>&1 &
+pids+=("$!")
+for _ in $(seq 1 50); do
+  wmctrl -m >/dev/null 2>&1 && break
+  sleep 0.1
+done
+wmctrl -m >/dev/null || { echo "Openbox failed to start." >&2; exit 1; }
 
 screenshot() {
   if command -v import >/dev/null; then
@@ -83,14 +81,14 @@ serlink_windows() {
 
 geometry() {
   # Prints "x y width height" for a window.
-  local X Y WIDTH HEIGHT SCREEN WINDOW
-  eval "$(xdotool getwindowgeometry --shell "$1")"
-  echo "$X $Y $WIDTH $HEIGHT"
+  xdotool getwindowgeometry --shell "$1" | awk -F= '
+    { fields[$1] = $2 }
+    END { print fields["X"], fields["Y"], fields["WIDTH"], fields["HEIGHT"] }'
 }
 
 "$exe" >"$artifacts/serlink-stdout.log" 2>&1 &
 app=$!
-pids+=($app)
+pids+=("$app")
 
 window=""
 deadline=$((SECONDS + startup_timeout))

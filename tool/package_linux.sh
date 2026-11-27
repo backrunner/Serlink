@@ -45,11 +45,13 @@ pubspec_build=""
 version="${version:-$pubspec_name}"
 build_number="${build_number:-${pubspec_build:-0}}"
 
-if [[ ! "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)([-+].*)?$ ]]; then
+label='[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*'
+version_pattern="^([0-9]+\.[0-9]+\.[0-9]+)(-${label})?(\+${label})?$"
+if [[ ! "$version" =~ $version_pattern ]]; then
   echo "Version '$version' is not semantic (expected MAJOR.MINOR.PATCH[-label])." >&2
   exit 1
 fi
-build_name="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+build_name="${BASH_REMATCH[1]}"
 
 case "$(uname -m)" in
   x86_64|amd64) arch=x64; deb_arch=amd64 ;;
@@ -98,10 +100,15 @@ if [[ -n "$unresolved" ]]; then
   echo "$unresolved" >&2
   exit 1
 fi
-# The newest glibc symbol version decides the oldest distribution that runs it.
-glibc="$(cd "$bundle" && objdump -T serlink lib/*.so 2>/dev/null \
-  | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -t. -k2 -n -u | tail -1 || true)"
-echo "Requires ${glibc:-unknown glibc}"
+# Use the newest required symbol, including patch versions, for the package dependency.
+glibc="$(cd "$bundle" && objdump -T serlink lib/*.so \
+  | grep -oE 'GLIBC_[0-9]+(\.[0-9]+)+' | sort -Vu | tail -1)"
+glibc="${glibc#GLIBC_}"
+echo "Requires GLIBC_$glibc"
+if [[ -n "${SERLINK_MAX_GLIBC:-}" ]] && dpkg --compare-versions "$glibc" gt "$SERLINK_MAX_GLIBC"; then
+  echo "Bundle requires glibc $glibc, above the release baseline $SERLINK_MAX_GLIBC." >&2
+  exit 1
+fi
 
 dist="$root/build/dist/linux"
 rm -rf "$dist"
@@ -132,7 +139,10 @@ if [[ $skip_deb -eq 0 ]]; then
   find "$pkg/opt/serlink/lib" -name '*.so' -exec chmod 0755 {} +
 
   # Debian orders 1.2.0~beta.1 before 1.2.0, unlike a '-' suffix.
-  deb_version="${version//-/\~}"
+  deb_version="$version"
+  if [[ "$version" == "$build_name"-* ]]; then
+    deb_version="$build_name~${version#"$build_name"-}"
+  fi
   installed_size="$(du -sk --exclude=DEBIAN "$pkg" | cut -f1)"
   cat > "$pkg/DEBIAN/control" <<EOF
 Package: serlink
@@ -140,7 +150,7 @@ Version: $deb_version
 Architecture: $deb_arch
 Maintainer: BackRunner
 Installed-Size: $installed_size
-Depends: libgtk-3-0t64 | libgtk-3-0, libsecret-1-0
+Depends: libc6 (>= $glibc), libgtk-3-0t64 | libgtk-3-0, libsecret-1-0
 Section: net
 Priority: optional
 Homepage: https://serlink.alkinum.com

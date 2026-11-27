@@ -1653,7 +1653,18 @@ void main() {
           sessionId: handle.sessionId,
           remotePath: '/backup/mail.tar.gz',
         );
-        await _drainMicrotasks();
+        // Real file I/O can outlast a fixed number of event-loop turns.
+        await container
+            .read(transferQueueControllerProvider)
+            .watchState()
+            .firstWhere(
+              (state) =>
+                  state
+                      .byId(TransferTaskId(first['taskId'] as String))
+                      ?.state ==
+                  TransferState.completed,
+            )
+            .timeout(const Duration(seconds: 5));
         final status = bridge.transferStatus(
           clientName: _clientName,
           sessionId: handle.sessionId,

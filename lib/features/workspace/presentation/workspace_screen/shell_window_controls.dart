@@ -340,18 +340,31 @@ class _WindowControls extends ConsumerStatefulWidget {
   ConsumerState<_WindowControls> createState() => _WindowControlsState();
 }
 
-class _WindowControlsState extends ConsumerState<_WindowControls> {
+class _WindowControlsState extends ConsumerState<_WindowControls>
+    with WidgetsBindingObserver {
   bool _isMaximized = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_refreshMaximized());
+  }
+
+  @override
+  void didChangeMetrics() {
+    unawaited(_refreshMaximized());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _refreshMaximized() async {
     final maximized = await AppWindow.isMaximized();
-    if (!mounted) {
+    if (!mounted || maximized == _isMaximized) {
       return;
     }
     setState(() {

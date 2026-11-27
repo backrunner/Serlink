@@ -144,13 +144,14 @@ static void window_method_call_cb(FlMethodChannel* channel,
     gtk_window_iconify(window);
     response = success_response();
   } else if (g_strcmp0(method, "toggleMaximize") == 0) {
-    if (is_window_maximized(window)) {
-      gtk_window_unmaximize(window);
-    } else {
+    // The window manager applies this request after the method returns.
+    const gboolean maximize = !is_window_maximized(window);
+    if (maximize) {
       gtk_window_maximize(window);
+    } else {
+      gtk_window_unmaximize(window);
     }
-    g_autoptr(FlValue) maximized =
-        fl_value_new_bool(is_window_maximized(window));
+    g_autoptr(FlValue) maximized = fl_value_new_bool(maximize);
     response = success_response(maximized);
   } else if (g_strcmp0(method, "isMaximized") == 0) {
     g_autoptr(FlValue) maximized =

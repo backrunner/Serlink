@@ -32,6 +32,7 @@ typedef struct PtyOptions
     Dart_Port exit_port;
 
     bool ackRead;
+    bool replaceEnvironment;
 
 } PtyOptions;
 

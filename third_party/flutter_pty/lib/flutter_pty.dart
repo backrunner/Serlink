@@ -44,6 +44,7 @@ class Pty {
 
   /// Spawns a process in a pseudo-terminal. The arguments have the same meaning
   /// as in [Process.start].
+  /// [replaceEnvironment] uses only the supplied environment and terminal defaults.
   /// [ackRead] indicates if the pty should wait for a call to [Pty.ackRead] before sending the next data.
   Pty.start(
     this.executable, {
@@ -53,6 +54,7 @@ class Pty {
     int rows = 25,
     int columns = 80,
     bool ackRead = false,
+    bool replaceEnvironment = false,
   }) {
     _ensureInitialized();
 
@@ -71,9 +73,11 @@ class Pty {
       'PATH'
     };
 
-    for (var entry in Platform.environment.entries) {
-      if (envValuesToCopy.contains(entry.key)) {
-        effectiveEnv[entry.key] = entry.value;
+    if (!replaceEnvironment) {
+      for (var entry in Platform.environment.entries) {
+        if (envValuesToCopy.contains(entry.key)) {
+          effectiveEnv[entry.key] = entry.value;
+        }
       }
     }
 
@@ -108,6 +112,7 @@ class Pty {
     options.ref.stdout_port = _stdoutPort.sendPort.nativePort;
     options.ref.exit_port = _exitPort.sendPort.nativePort;
     options.ref.ackRead = ackRead;
+    options.ref.replaceEnvironment = replaceEnvironment;
 
     if (workingDirectory != null) {
       options.ref.working_directory = workingDirectory.toNativeUtf8().cast();

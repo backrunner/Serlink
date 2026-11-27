@@ -103,6 +103,19 @@ void main() {
     );
   }, skip: skip);
 
+  testWidgets('the pty honors variables removed from the shell profile', (
+    tester,
+  ) async {
+    // Deliberately omit HOME from the child profile to check the actual
+    // environment after fork, even on a Wayland-only desktop.
+    expect(Platform.environment['HOME'], isNotEmpty);
+    await _runAndExpect(
+      () => LocalShellProfile(executable: '/bin/sh', environment: const {}),
+      r'printf "%s:%s\n" profile "${HOME-unset}"',
+      'profile:unset',
+    );
+  }, skip: skip);
+
   testWidgets('the pty reports the requested size', (tester) async {
     await _runAndExpect(
       null,

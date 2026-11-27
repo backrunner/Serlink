@@ -5,6 +5,11 @@
 
 #include <pthread.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#else
+extern char **environ;
+#endif
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
@@ -173,19 +178,27 @@ FFI_PLUGIN_EXPORT PtyHandle *pty_create(PtyOptions *options)
 
     if (pid == 0)
     {
-        set_environment(options->environment);
+        if (options->replaceEnvironment)
+        {
+#ifdef __APPLE__
+            *_NSGetEnviron() = options->environment;
+#else
+            environ = options->environment;
+#endif
+        }
+        else
+        {
+            set_environment(options->environment);
+        }
 
         if (options->working_directory != NULL && strlen(options->working_directory) > 0)
         {
             chdir(options->working_directory);
         }
 
-        int ok = execvp(options->executable, options->arguments);
-
-        if (ok < 0)
-        {
-            perror("execvp");
-        }
+        execvp(options->executable, options->arguments);
+        perror("execvp");
+        _exit(127);
     }
 
     PtyHandle *handle = (PtyHandle *)malloc(sizeof(PtyHandle));

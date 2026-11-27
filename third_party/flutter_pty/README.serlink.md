@@ -1,8 +1,10 @@
-This is a local copy of `flutter_pty` 0.4.2 with Serlink-specific Windows
-ConPTY fixes. Only `src/flutter_pty_win.c` differs from upstream; the
-`example/` directory was not copied.
+This is a local copy of `flutter_pty` 0.4.2 with Serlink-specific terminal
+fixes. The `example/` directory was not copied.
 
 Current patches:
+
+- Allow Serlink to pass a complete, filtered environment to local Linux shells.
+  A Unix child terminates with status 127 if it cannot execute the shell.
 
 - Convert the UTF-8 executable, arguments, environment and working directory
   to UTF-16 with `MultiByteToWideChar`. Upstream widened each byte, which broke

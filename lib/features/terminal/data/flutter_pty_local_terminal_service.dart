@@ -7,15 +7,15 @@ import 'package:flutter_pty/flutter_pty.dart';
 import '../../ssh/application/ssh_session_service.dart';
 import '../application/local_terminal_service.dart';
 
-typedef PtyFactory =
-    Pty Function(
-      String executable, {
-      List<String> arguments,
-      String? workingDirectory,
-      Map<String, String>? environment,
-      int rows,
-      int columns,
-    });
+typedef PtyFactory = Pty Function(
+  String executable, {
+  List<String> arguments,
+  String? workingDirectory,
+  Map<String, String>? environment,
+  bool replaceEnvironment,
+  int rows,
+  int columns,
+});
 
 class FlutterPtyLocalTerminalService implements LocalTerminalService {
   const FlutterPtyLocalTerminalService({this.profileResolver, this.ptyFactory});
@@ -32,6 +32,7 @@ class FlutterPtyLocalTerminalService implements LocalTerminalService {
         arguments: profile.arguments,
         workingDirectory: profile.workingDirectory,
         environment: profile.environment,
+        replaceEnvironment: Platform.isLinux,
         rows: rows,
         columns: columns,
       );

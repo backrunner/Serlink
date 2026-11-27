@@ -61,6 +61,10 @@ class BufferLine with IndexedItem {
     return _data[index * _cellSize + _cellContent] >> CellContent.widthShift;
   }
 
+  /// Whether this cell holds the trailing half of a double-width glyph.
+  bool isWideContinuation(int x) =>
+      x > 0 && x < length && getCodePoint(x) == 0 && getWidth(x - 1) == 2;
+
   void getCellData(int index, CellData cellData) {
     final offset = index * _cellSize;
     cellData.foreground = _data[offset + _cellForeground];

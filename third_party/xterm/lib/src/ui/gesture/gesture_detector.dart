@@ -7,6 +7,7 @@ class TerminalGestureDetector extends StatefulWidget {
   const TerminalGestureDetector({
     super.key,
     this.child,
+    this.deferTouchTaps = false,
     this.onSingleTapUp,
     this.onTapUp,
     this.onTapDown,
@@ -23,6 +24,8 @@ class TerminalGestureDetector extends StatefulWidget {
   });
 
   final Widget? child;
+
+  final bool deferTouchTaps;
 
   final GestureTapUpCallback? onTapUp;
 
@@ -59,6 +62,17 @@ class _TerminalGestureDetectorState extends State<TerminalGestureDetector> {
   Timer? _doubleTapTimer;
 
   Offset? _lastTapOffset;
+  TapDownDetails? _touchDown;
+  TapDownDetails? _doubleTouchDown;
+
+  bool _deferTouch(PointerDeviceKind? kind) =>
+      widget.deferTouchTaps && kind == PointerDeviceKind.touch;
+
+  @override
+  void dispose() {
+    _doubleTapTimer?.cancel();
+    super.dispose();
+  }
 
   // True if a second tap down of a double tap is detected. Used to discard
   // subsequent tap up / tap hold of the same tap.
@@ -67,6 +81,12 @@ class _TerminalGestureDetectorState extends State<TerminalGestureDetector> {
   // The down handler is force-run on success of a single tap and optimistically
   // run before a long press success.
   void _handleTapDown(TapDownDetails details) {
+    if (_deferTouch(details.kind)) {
+      // A press that becomes a selection must not send a click to the TUI.
+      _touchDown = details;
+      return;
+    }
+    _isDoubleTap = false;
     widget.onTapDown?.call(details);
 
     if (_doubleTapTimer != null &&
@@ -82,7 +102,15 @@ class _TerminalGestureDetectorState extends State<TerminalGestureDetector> {
   }
 
   void _handleTapUp(TapUpDetails details) {
+    if (_deferTouch(details.kind)) {
+      final down = _touchDown;
+      _touchDown = null;
+      if (down != null) widget.onTapDown?.call(down);
+      widget.onSingleTapUp?.call(details);
+      return;
+    }
     if (!_isDoubleTap) {
+      _doubleTapTimer?.cancel();
       widget.onSingleTapUp?.call(details);
       _lastTapOffset = details.globalPosition;
       _doubleTapTimer = Timer(kDoubleTapTimeout, _doubleTapTimeout);
@@ -121,6 +149,28 @@ class _TerminalGestureDetectorState extends State<TerminalGestureDetector> {
           ..onTertiaryTapUp = widget.onTertiaryTapUp;
       },
     );
+
+    if (widget.deferTouchTaps) {
+      gestures[DoubleTapGestureRecognizer] =
+          GestureRecognizerFactoryWithHandlers<DoubleTapGestureRecognizer>(
+        () => DoubleTapGestureRecognizer(
+          debugOwner: this,
+          supportedDevices: {PointerDeviceKind.touch},
+        ),
+        (recognizer) {
+          recognizer
+            ..onDoubleTapDown = (details) {
+              _doubleTouchDown = details;
+            }
+            ..onDoubleTap = () {
+              final details = _doubleTouchDown;
+              _doubleTouchDown = null;
+              if (details != null) widget.onDoubleTapDown?.call(details);
+            }
+            ..onDoubleTapCancel = () => _doubleTouchDown = null;
+        },
+      );
+    }
 
     gestures[LongPressGestureRecognizer] =
         GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(

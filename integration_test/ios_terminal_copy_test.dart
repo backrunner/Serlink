@@ -13,7 +13,8 @@ void main() {
   testWidgets('iOS copies a touch selection to the system clipboard', (
     tester,
   ) async {
-    final terminal = Terminal();
+    final reports = <String>[];
+    final terminal = Terminal(onOutput: reports.add);
     final view = GlobalKey<TerminalViewState>();
     final controller = TerminalController();
     await tester.pumpWidget(
@@ -31,7 +32,7 @@ void main() {
         ),
       ),
     );
-    terminal.write('first chosen word\r\n第二行 done');
+    terminal.write('\x1b[?1000h\x1b[?1006hfirst chosen word\r\n第二行 done');
     await tester.pump();
 
     final render = view.currentState!.renderTerminal;
@@ -74,8 +75,32 @@ void main() {
     await tester.tapAt(cell(2, 0));
     await tester.pumpAndSettle();
     expect(copy, findsOneWidget);
+    expect(view.currentState!.hasInputConnection, isFalse);
+    expect(reports, isEmpty);
     await tester.tap(copy);
     await tester.pumpAndSettle();
     expect((await Clipboard.getData(Clipboard.kTextPlain))?.text, 'first');
+
+    // Both halves of a wide character belong to the same word.
+    await tester.longPressAt(cell(3, 1));
+    await tester.pumpAndSettle();
+    expect(terminal.buffer.getText(controller.selection!), '第二行');
+    // Ending the selection inside 二 includes the whole character.
+    final grip = tester.getCenter(endHandle);
+    final drag = await tester.startGesture(grip);
+    await drag.moveBy(const Offset(60, 0));
+    await tester.pump();
+    await drag.moveTo(grip + cell(3, 1) - cell(6, 1));
+    await drag.up();
+    await tester.pumpAndSettle();
+    await tester.tap(copy);
+    await tester.pumpAndSettle();
+    expect((await Clipboard.getData(Clipboard.kTextPlain))?.text, '第二');
+
+    await tester.tapAt(cell(2, 0));
+    await tester.pump(kDoubleTapTimeout + const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+    expect(view.currentState!.hasInputConnection, isTrue);
+    expect(reports, ['\x1b[<0;3;1M', '\x1b[<0;3;1m']);
   }, skip: !Platform.isIOS);
 }

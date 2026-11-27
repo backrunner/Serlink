@@ -95,6 +95,8 @@ class _TerminalGestureHandlerState extends State<TerminalGestureHandler> {
   @override
   Widget build(BuildContext context) {
     final detector = TerminalGestureDetector(
+      deferTouchTaps: defaultTargetPlatform == TargetPlatform.iOS &&
+          terminalView.widget.deferKeyboardActivation,
       onTapUp: widget.onTapUp,
       onSingleTapUp: onSingleTapUp,
       onTapDown: onTapDown,

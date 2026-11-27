@@ -133,7 +133,11 @@ class _TerminalTouchSelectionControlsState
           final x = (point.dx / render.cellSize.width)
               .round()
               .clamp(0, widget.terminal.viewWidth);
-          final boundary = CellOffset(x, target.y);
+          final line = widget.buffer.lines[target.y];
+          final boundary = CellOffset(
+            line.isWideContinuation(x) ? (startHandle ? x - 1 : x + 1) : x,
+            target.y,
+          );
           final begin = startHandle ? boundary : range.begin;
           final end = startHandle ? range.end : boundary;
           if (begin.isBefore(end)) {

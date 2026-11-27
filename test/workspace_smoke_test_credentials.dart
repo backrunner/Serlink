@@ -1,6 +1,95 @@
 part of 'workspace_smoke_test.dart';
 
 void _credentialPaginationTests() {
+  for (final mobile in [false, true]) {
+    testWidgets(
+      'credential password visibility preserves editing and resets on reopen (mobile: $mobile)',
+      (tester) async {
+        if (mobile) {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(390, 844);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetPhysicalSize);
+        }
+        final identities = _MemoryIdentityRepository(const []);
+        await _pumpLockedVaultApp(
+          tester,
+          identityRepository: identities,
+          capabilities: mobile
+              ? const PlatformCapabilities(
+                  operatingSystem: 'ios',
+                  targetPlatform: TargetPlatform.iOS,
+                )
+              : null,
+        );
+        await _submitVaultPassphrase(tester, 'correct horse battery staple');
+        await _openCredentialManager(tester);
+        await tester.tap(find.byKey(const ValueKey('credentials-add-button')));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('credential-display-name-field')),
+          'Password credential',
+        );
+        final field = find.byKey(const ValueKey('credential-password-field'));
+        final toggle = find.byKey(
+          const ValueKey('credential-password-visibility-toggle'),
+        );
+        await tester.enterText(field, 'fixture-password');
+        final controller = tester.widget<SerlinkTextField>(field).controller!;
+        const selection = TextSelection(baseOffset: 2, extentOffset: 7);
+        controller.selection = selection;
+        for (final visible in [true, false, true]) {
+          expect(tester.widget<SerlinkTextField>(field).obscureText, visible);
+          expect(
+            tester.widget<SerlinkIconButton>(toggle).tooltip,
+            visible ? 'Show password' : 'Hide password',
+          );
+          await tester.ensureVisible(toggle);
+          await tester.pumpAndSettle();
+          await tester.tap(toggle);
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<EditableText>(
+                  find.descendant(
+                    of: field,
+                    matching: find.byType(EditableText),
+                  ),
+                )
+                .obscureText,
+            !visible,
+          );
+          expect(controller.text, 'fixture-password');
+          expect(controller.selection, selection);
+        }
+        await tester.tap(find.byKey(const ValueKey('credential-save-button')));
+        await tester.pumpAndSettle();
+        final identity = (await identities.list()).single;
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(SerlinkApp)),
+        );
+        expect(
+          (await container
+                  .read(identityWriteServiceProvider)
+                  .readSecretMaterial(identity))
+              ?.password,
+          'fixture-password',
+        );
+        await tester.tap(find.byIcon(Icons.edit_outlined));
+        await tester.pumpAndSettle();
+        expect(tester.widget<SerlinkTextField>(field).obscureText, isTrue);
+        expect(
+          tester.widget<SerlinkTextField>(field).controller!.text,
+          'fixture-password',
+        );
+        await tester.tap(toggle);
+        await tester.pumpAndSettle();
+        expect(tester.widget<SerlinkTextField>(field).obscureText, isFalse);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final count in [0, 1, 2]) {
     testWidgets(
       'agent endpoint discovery handles $count results without typing paths',

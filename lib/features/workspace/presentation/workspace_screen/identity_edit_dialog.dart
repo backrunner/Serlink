@@ -25,6 +25,7 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
 
   bool _loadingSecret = false;
   bool _saving = false;
+  bool _passwordVisible = false;
   String? _errorMessage;
   IdentityKind _kind = IdentityKind.password;
   GeneratedSshKeyType _keyType = GeneratedSshKeyType.ed25519;
@@ -177,8 +178,27 @@ class _IdentityEditDialogState extends ConsumerState<_IdentityEditDialog> {
       IdentityKind.password => SerlinkTextField(
         key: const ValueKey('credential-password-field'),
         controller: _passwordController,
-        decoration: InputDecoration(labelText: l10n.credentialPasswordLabel),
-        obscureText: true,
+        decoration: InputDecoration(
+          labelText: l10n.credentialPasswordLabel,
+          suffixIcon: SerlinkIconButton(
+            key: const ValueKey('credential-password-visibility-toggle'),
+            tooltip: _passwordVisible
+                ? l10n.hostHidePasswordTooltip
+                : l10n.hostShowPasswordTooltip,
+            onPressed: () => setState(() {
+              _passwordVisible = !_passwordVisible;
+            }),
+            icon: Icon(
+              _passwordVisible
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              size: 19,
+            ),
+          ),
+        ),
+        obscureText: !_passwordVisible,
+        autocorrect: false,
+        enableSuggestions: false,
         onSubmitted: (_) => _save(),
       ),
       IdentityKind.privateKey => Column(

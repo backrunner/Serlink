@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Serlink
+GenericName=SSH Client
+Comment=SSH terminal and SFTP workspace
+Exec=serlink
+Icon=com.alkinum.serlink
+Terminal=false
+Categories=Network;RemoteAccess;
+Keywords=ssh;sftp;terminal;remote;server;
+StartupNotify=true
+StartupWMClass=com.alkinum.serlink
+SingleMainWindow=true

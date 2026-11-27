@@ -45,6 +45,7 @@ LocalShellProfile defaultLocalShellProfile({
   return switch (os) {
     'windows' => _defaultWindowsShellProfile(env, exists),
     'macos' => _defaultMacOsShellProfile(env, exists),
+    'linux' => _defaultUnixShellProfile(env, exists, inheritEnvironment: true),
     _ => _defaultUnixShellProfile(env, exists),
   };
 }
@@ -75,8 +76,9 @@ LocalShellProfile _defaultMacOsShellProfile(
 
 LocalShellProfile _defaultUnixShellProfile(
   Map<String, String> environment,
-  FileExists fileExists,
-) {
+  FileExists fileExists, {
+  bool inheritEnvironment = false,
+}) {
   final executable = _firstExisting([
     environment['SHELL'],
     '/bin/zsh',
@@ -92,9 +94,30 @@ LocalShellProfile _defaultUnixShellProfile(
   return LocalShellProfile(
     executable: executable,
     workingDirectory: _nonEmpty(environment['HOME']),
-    environment: _shellEnvironment(environment, executable),
+    environment: inheritEnvironment
+        ? _linuxShellEnvironment(environment, executable)
+        : _shellEnvironment(environment, executable),
   );
 }
+
+/// Linux desktop terminals start non-login shells that rely on the session
+/// environment (SSH_AUTH_SOCK, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS,
+/// WAYLAND_DISPLAY, toolchain homes), so local shells inherit it like on
+/// Windows. Serlink's own variables and one-shot launch tokens are dropped.
+Map<String, String> _linuxShellEnvironment(
+  Map<String, String> environment,
+  String executable,
+) {
+  return {
+    for (final entry in environment.entries)
+      if (!entry.key.startsWith('SERLINK_') &&
+          !_linuxLaunchTokens.contains(entry.key))
+        entry.key: entry.value,
+    'SHELL': executable,
+  };
+}
+
+const _linuxLaunchTokens = {'DESKTOP_STARTUP_ID', 'XDG_ACTIVATION_TOKEN'};
 
 /// Prefers PowerShell 7, then Windows PowerShell, then `%ComSpec%`, matching
 /// the default profile order of Windows Terminal.

@@ -23,6 +23,38 @@ void main() {
       expect(profile.environment.containsKey('SERLINK_SECRET'), isFalse);
     });
 
+    test(
+      'passes the session environment except Serlink variables on Linux',
+      () {
+        final profile = defaultLocalShellProfile(
+          operatingSystem: 'linux',
+          environment: const {
+            'SHELL': '/bin/bash',
+            'HOME': '/home/ops',
+            'PATH': '/usr/bin',
+            'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh',
+            'XDG_RUNTIME_DIR': '/run/user/1000',
+            'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus',
+            'WAYLAND_DISPLAY': 'wayland-0',
+            'SERLINK_DISTRIBUTION': 'direct',
+            'DESKTOP_STARTUP_ID': 'serlink-1',
+            'XDG_ACTIVATION_TOKEN': 'token',
+          },
+          fileExists: (path) => path == '/bin/bash',
+        );
+
+        expect(profile.environment, const {
+          'SHELL': '/bin/bash',
+          'HOME': '/home/ops',
+          'PATH': '/usr/bin',
+          'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh',
+          'XDG_RUNTIME_DIR': '/run/user/1000',
+          'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus',
+          'WAYLAND_DISPLAY': 'wayland-0',
+        });
+      },
+    );
+
     test('uses login zsh on macOS even when SHELL points elsewhere', () {
       final profile = defaultLocalShellProfile(
         operatingSystem: 'macos',
